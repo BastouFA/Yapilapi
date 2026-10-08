@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Platform, ScrollView, Text, View } from 'react-native';
 import { useConfirmLogout } from '../../../mobile/lib/account-menu';
+import { TranscribeVoiceSwitch } from '../../../mobile/lib/ai-helpers';
 import { useT } from '../../../mobile/lib/i18n';
 import { registerForPush } from '../../../mobile/lib/push';
 import {
@@ -22,7 +23,7 @@ import { space } from '../../../mobile/lib/theme';
 import { Button, Card, Icon, Loading, Notice, SwitchRow, Title, useColors } from '../../../mobile/lib/ui';
 import { openInYapilapi } from '../../lib/elsewhere';
 
-/** Who can message you, and read receipts: the messaging half of YAPILAPI's privacy settings (the same ones). */
+/** Who can message you, read receipts and transcripts of your voice messages: the messaging half of YAPILAPI's privacy settings (the same ones). */
 function MessagePrivacy() {
   const { t } = useT();
   const { settings, error, save } = useInteractions();
@@ -49,6 +50,7 @@ function MessagePrivacy() {
             value={settings.readReceipts}
             onValueChange={(v) => void save({ readReceipts: v })}
           />
+          <TranscribeVoiceSwitch />
         </>
       ) : !error ? (
         <Loading />

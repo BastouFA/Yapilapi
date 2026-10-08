@@ -1177,4 +1177,5 @@ export const zh: Record<string, string> = {
   'This chat belongs to a squad. Change who’s in it from the squad.': '这个聊天属于一个小队。请在小队里更改成员。',
   'Posts shared with a squad stay with it.': '分享到小队的帖子会留在小队里。',
   'Reels in a squad’s chain are shared with that squad.': '小队接力里的短视频会分享给这个小队。',
+  'Listening isn’t available right now. Try again later.': '暂时无法收听。请稍后再试。',
 };

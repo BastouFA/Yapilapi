@@ -7024,4 +7024,11 @@ export const vi: Catalog = {
   'push.squad_joined': '{name} đã tham gia {squad}',
   'push.squad_post': '{name} đã chia sẻ trong {squad}',
   'push.squad_memory': 'Tuần của bạn trong {squad} đã sẵn sàng',
+  'push.message.voice': 'Tin nhắn thoại: {text}',
+  'chat.transcript.show': 'Hiện văn bản',
+  'chat.transcript.hide': 'Ẩn văn bản',
+  'chat.transcript.listen': 'Nghe bằng {language}',
+  'st.ai.transcribeVoice': 'Chuyển tin nhắn thoại của tôi thành văn bản',
+  'st.ai.transcribeVoiceHint':
+    'Mọi người trong cuộc trò chuyện có thể đọc những gì bạn nói trong tin nhắn thoại, bằng ngôn ngữ của họ. Tắt mục này sẽ xóa văn bản của các tin nhắn bạn đã gửi.',
 };

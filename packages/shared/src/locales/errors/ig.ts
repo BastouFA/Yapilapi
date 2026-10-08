@@ -1217,4 +1217,5 @@ export const ig: Record<string, string> = {
   'This chat belongs to a squad. Change who’s in it from the squad.': 'Mkparịta ụka a bụ nke squad. Gbanwee ndị nọ n’ime ya site na squad.',
   'Posts shared with a squad stay with it.': 'Ozi e kesara na squad na-anọ na squad ahụ.',
   'Reels in a squad’s chain are shared with that squad.': 'A na-ekesa reel ndị dị n’agbụ squad na squad ahụ.',
+  'Listening isn’t available right now. Try again later.': 'Ige ntị adịghị ugbu a. Nwaa ọzọ ma emechaa.',
 };

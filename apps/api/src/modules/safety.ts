@@ -1086,7 +1086,19 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
   app.get('/v1/flags', async () => {
     const flags = await getFlags(db);
     // Automatic translation works here right now: both flags on, and a real model to translate with.
-    return { flags, purchases: storePurchasePolicy(ctx.config), autoTranslation: flags.AI_TRANSLATION && flags.AUTO_TRANSLATE && ctx.ai.machineTranslation };
+    const machine = flags.AI_TRANSLATION && ctx.ai.machineTranslation;
+    // Voice messages (docs/product/speech-engine.md): transcripts need speech-to-text, their translations
+    // a real model, and "Listen in French" text-to-speech too.
+    const voiceTranscripts = flags.VOICE_TRANSCRIPTS && !!ctx.transcription;
+    const voiceTranslation = voiceTranscripts && flags.VOICE_TRANSLATION && machine;
+    return {
+      flags,
+      purchases: storePurchasePolicy(ctx.config),
+      autoTranslation: machine && flags.AUTO_TRANSLATE,
+      voiceTranscripts,
+      voiceTranslation,
+      voiceListen: voiceTranslation && !!ctx.speech,
+    };
   });
 
   app.put('/v1/admin/flags/:key', { preHandler: requireRole('admin') }, async (req) => {

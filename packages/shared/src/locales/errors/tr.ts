@@ -1231,4 +1231,5 @@ export const tr: Record<string, string> = {
   'This chat belongs to a squad. Change who’s in it from the squad.': 'Bu sohbet bir ekibe ait. Kimlerin içinde olduğunu ekipten değiştir.',
   'Posts shared with a squad stay with it.': 'Bir ekiple paylaşılan gönderiler ekipte kalır.',
   'Reels in a squad’s chain are shared with that squad.': 'Bir ekibin zincirindeki reel’ler o ekiple paylaşılır.',
+  'Listening isn’t available right now. Try again later.': 'Dinleme şu anda kullanılamıyor. Daha sonra tekrar dene.',
 };

@@ -117,6 +117,19 @@ const schema = z.object({
   TRANSCRIBE_API_URL: z.string().optional().default(''),
   TRANSCRIBE_API_KEY: z.string().optional().default(''),
   TRANSCRIBE_MODEL: z.string().default('whisper-1'),
+  // Text-to-speech ("Listen in French" under a translated voice message; lib/speech.ts). Off unless a provider is configured.
+  TTS_PROVIDER: z.enum(['none', 'openai-compatible']).default('none'),
+  TTS_API_URL: z.string().optional().default(''),
+  TTS_API_KEY: z.string().optional().default(''),
+  TTS_MODEL: z.string().default('gpt-4o-mini-tts'),
+  /** The voice for every language, unless TTS_VOICES names one for it. */
+  TTS_VOICE: z.string().default('alloy'),
+  /** Optional voices per language, "fr=nova,ar=onyx". */
+  TTS_VOICES: z.string().optional().default(''),
+  /** Characters spoken in new clips a day (UTC) for everyone together; cached clips are free. Past it, "not available right now" until midnight UTC. */
+  TTS_DAILY_CHAR_LIMIT: z.coerce.number().int().min(0).default(200000),
+  /** New clips one person can cause in an hour (cached ones are free). */
+  TTS_PER_HOUR: z.coerce.number().int().min(0).default(30),
   RATE_LIMIT_MAX: z.coerce.number().default(300),
   /**
    * Which proxies may say who the caller is (X-Forwarded-For). The default trusts only proxies on
@@ -258,6 +271,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     );
   if (cfg.TRANSCRIBE_PROVIDER === 'openai-compatible' && !cfg.TRANSCRIBE_API_URL)
     throw new Error('TRANSCRIBE_PROVIDER=openai-compatible needs TRANSCRIBE_API_URL (and TRANSCRIBE_API_KEY for a hosted service).');
+  if (cfg.TTS_PROVIDER === 'openai-compatible' && !cfg.TTS_API_URL)
+    throw new Error('TTS_PROVIDER=openai-compatible needs TTS_API_URL (and TTS_API_KEY for a hosted service).');
   if (!!cfg.VAPID_PUBLIC_KEY !== !!cfg.VAPID_PRIVATE_KEY) throw new Error('Browser push needs both VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY, or neither.');
   if (cfg.APP_ENV === 'production') {
     if (cfg.PAYMENTS_PROVIDER === 'dev') throw new Error('The development payment provider moves no money. Set PAYMENTS_PROVIDER for production.');

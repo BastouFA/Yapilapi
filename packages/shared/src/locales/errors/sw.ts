@@ -1333,4 +1333,5 @@ export const sw: Record<string, string> = {
   'This chat belongs to a squad. Change who’s in it from the squad.': 'Gumzo hili ni la kikosi. Badilisha walio ndani yake kutoka kwenye kikosi.',
   'Posts shared with a squad stay with it.': 'Machapisho yaliyoshirikiwa na kikosi yanabaki kwenye kikosi hicho.',
   'Reels in a squad’s chain are shared with that squad.': 'Reel kwenye mnyororo wa kikosi zinashirikiwa na kikosi hicho.',
+  'Listening isn’t available right now. Try again later.': 'Kusikiliza hakupatikani kwa sasa. Jaribu tena baadaye.',
 };

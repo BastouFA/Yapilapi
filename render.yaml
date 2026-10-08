@@ -146,15 +146,32 @@ services:
       - key: AUTO_TRANSLATE_DAILY_LIMIT
         value: '5000'
 
-      # Optional: automatic captions (speech-to-text). Any OpenAI-compatible service (OpenAI, Groq, a
-      # Whisper server). Paste the key, then change TRANSCRIBE_PROVIDER to openai-compatible.
+      # Optional: speech-to-text for automatic captions and voice message transcripts. Any
+      # OpenAI-compatible service (Groq recommended: fast and cheap; OpenAI; a Whisper server).
+      # Paste the key, then change TRANSCRIBE_PROVIDER to openai-compatible (docs/product/speech-engine.md).
       - key: TRANSCRIBE_PROVIDER
         value: none
       - key: TRANSCRIBE_API_URL
-        value: https://api.openai.com/v1
+        value: https://api.groq.com/openai/v1
       - key: TRANSCRIBE_MODEL
-        value: whisper-1
+        value: whisper-large-v3-turbo
       - key: TRANSCRIBE_API_KEY
+        sync: false
+
+      # Optional: text-to-speech for "Listen in French" under translated voice messages. Any
+      # OpenAI-compatible POST /audio/speech (OpenAI gpt-4o-mini-tts or tts-1). Paste the key, then
+      # change TTS_PROVIDER to openai-compatible. TTS_DAILY_CHAR_LIMIT caps the spend.
+      - key: TTS_PROVIDER
+        value: none
+      - key: TTS_API_URL
+        value: https://api.openai.com/v1
+      - key: TTS_MODEL
+        value: gpt-4o-mini-tts
+      - key: TTS_VOICE
+        value: alloy
+      - key: TTS_DAILY_CHAR_LIMIT
+        value: '200000'
+      - key: TTS_API_KEY
         sync: false
 
       # Optional: confirming phone numbers by text (Twilio Verify). Without it, people confirm by email.

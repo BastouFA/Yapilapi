@@ -7045,4 +7045,11 @@ export const it: Catalog = {
   'push.squad_joined': '{name} si è unito a {squad}',
   'push.squad_post': '{name} ha condiviso qualcosa in {squad}',
   'push.squad_memory': 'La tua settimana in {squad} è pronta',
+  'push.message.voice': 'Messaggio vocale: {text}',
+  'chat.transcript.show': 'Mostra testo',
+  'chat.transcript.hide': 'Nascondi testo',
+  'chat.transcript.listen': 'Ascolta in {language}',
+  'st.ai.transcribeVoice': 'Trascrivi i miei messaggi vocali',
+  'st.ai.transcribeVoiceHint':
+    'Le persone nelle tue chat possono leggere ciò che dici nei messaggi vocali, nella loro lingua. Se lo disattivi, il testo di quelli che hai inviato viene eliminato.',
 };

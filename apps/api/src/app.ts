@@ -23,6 +23,7 @@ import { logEmailSender, smtpEmailSender, type MailTransport } from './lib/email
 import { localDiskStorage, s3Storage } from './lib/storage.ts';
 import { devPaymentProvider, paymentRegistry, paystackPaymentProvider, stripePaymentProvider } from './lib/payments.ts';
 import { transcriberFromConfig } from './lib/transcription.ts';
+import { speechFromConfig, sweepSpeech } from './lib/speech.ts';
 import { devSmsProvider, twilioSmsProvider } from './lib/sms.ts';
 import { mediaModeratorFromConfig } from './lib/media-moderation.ts';
 import { registerAuth } from './plugins/auth.ts';
@@ -267,6 +268,7 @@ export async function buildApp(
     payments: defaultPayments,
     paymentProviders: paymentRegistry(defaultPayments, paystack ? [paystack] : []),
     transcription: transcriberFromConfig(config),
+    speech: speechFromConfig(config),
     sms:
       config.SMS_PROVIDER === 'twilio'
         ? twilioSmsProvider({ accountSid: config.TWILIO_ACCOUNT_SID, authToken: config.TWILIO_AUTH_TOKEN, serviceSid: config.TWILIO_VERIFY_SERVICE_SID })
@@ -567,6 +569,8 @@ export async function buildApp(
         await sweepViewOnce(viewOnceDeps).catch((e) => app.log.warn({ err: e.message }, 'view-once sweep'));
         // Disappearing messages past their time (each also has its own job; this catches any that were missed).
         await expireMessages(viewOnceDeps).catch((e) => app.log.warn({ err: e.message }, 'disappearing messages'));
+        // Spoken clips nothing is for any more (their transcript or message went), with their files.
+        await sweepSpeech({ db, storage }).catch((e) => app.log.warn({ err: e.message }, 'speech sweep'));
       }
       // Audio rooms: people whose app went quiet leave, and rooms without a host for five minutes end.
       if (Date.now() - lastRoomSweep > 10_000) {

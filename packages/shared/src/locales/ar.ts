@@ -7328,4 +7328,10 @@ export const ar: Catalog = {
   'push.squad_joined': 'انضم {name} إلى {squad}',
   'push.squad_post': 'شارك {name} شيئًا في {squad}',
   'push.squad_memory': 'أسبوعك في {squad} جاهز',
+  'push.message.voice': 'رسالة صوتية: {text}',
+  'chat.transcript.show': 'عرض النص',
+  'chat.transcript.hide': 'إخفاء النص',
+  'chat.transcript.listen': 'استمع باللغة {language}',
+  'st.ai.transcribeVoice': 'تحويل رسائلي الصوتية إلى نص',
+  'st.ai.transcribeVoiceHint': 'يمكن للأشخاص في محادثاتك قراءة ما تقوله في الرسائل الصوتية بلغتهم. إيقاف هذا الخيار يحذف نص الرسائل التي أرسلتها.',
 };

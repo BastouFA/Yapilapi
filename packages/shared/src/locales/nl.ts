@@ -7043,4 +7043,11 @@ export const nl: Catalog = {
   'push.squad_joined': '{name} doet nu mee in {squad}',
   'push.squad_post': '{name} deelde iets in {squad}',
   'push.squad_memory': 'Je week in {squad} staat klaar',
+  'push.message.voice': 'Spraakbericht: {text}',
+  'chat.transcript.show': 'Tekst tonen',
+  'chat.transcript.hide': 'Tekst verbergen',
+  'chat.transcript.listen': 'Luisteren in het {language}',
+  'st.ai.transcribeVoice': 'Mijn spraakberichten uitschrijven',
+  'st.ai.transcribeVoiceHint':
+    'Mensen in je chats kunnen lezen wat je zegt in spraakberichten, in hun eigen taal. Zet je dit uit, dan wordt de tekst van je verstuurde spraakberichten verwijderd.',
 };

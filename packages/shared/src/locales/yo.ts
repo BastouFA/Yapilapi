@@ -7007,4 +7007,11 @@ export const yo: Catalog = {
   'push.squad_joined': '{name} darapọ̀ mọ́ {squad}',
   'push.squad_post': '{name} pín nǹkan nínú {squad}',
   'push.squad_memory': 'Ọ̀sẹ̀ rẹ nínú {squad} ti ṣetán',
+  'push.message.voice': 'Ìfiránṣẹ́ ohùn: {text}',
+  'chat.transcript.show': 'Fi ọ̀rọ̀ hàn',
+  'chat.transcript.hide': 'Fi ọ̀rọ̀ pamọ́',
+  'chat.transcript.listen': 'Gbọ́ ní {language}',
+  'st.ai.transcribeVoice': 'Kọ ìfiránṣẹ́ ohùn mi sílẹ̀ bí ọ̀rọ̀',
+  'st.ai.transcribeVoiceHint':
+    'Àwọn ènìyàn nínú ìjíròrò rẹ lè ka ohun tí o sọ nínú ìfiránṣẹ́ ohùn, ní èdè wọn. Tí o bá pa èyí, ọ̀rọ̀ àwọn tí o ti fi ránṣẹ́ yóò parẹ́.',
 };

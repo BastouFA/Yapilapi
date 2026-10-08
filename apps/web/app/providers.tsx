@@ -33,6 +33,12 @@ import {
 type RealtimeEvent = { type: string; data: any };
 type Listener = (event: RealtimeEvent) => void;
 
+export interface VoiceOffers {
+  transcripts: boolean;
+  translation: boolean;
+  listen: boolean;
+}
+
 export interface Session {
   me: Me | null;
   /** True until the account (or that nobody is signed in) and its language are both here. */
@@ -42,6 +48,8 @@ export interface Session {
   refresh: () => Promise<Me | null>;
   setMe: (me: Me | null) => void;
   flags: Record<string, boolean>;
+  /** What voice messages offer here now (GET /v1/flags): their transcript, its translation, and "Listen in …". */
+  voice: VoiceOffers;
   /** Load the feature flags again (after an admin changes one; also when the tab comes back to the front). */
   refreshFlags: () => Promise<void>;
   unread: { notifications: number; messages: number };
@@ -110,6 +118,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const [flags, setFlags] = useState<Record<string, boolean>>({});
   // Automatic translation works on the server now (both flags on, and a real model).
   const [autoTranslation, setAutoTranslation] = useState(false);
+  const [voice, setVoice] = useState<VoiceOffers>({ transcripts: false, translation: false, listen: false });
   const [unread, setUnreadState] = useState({ notifications: 0, messages: 0 });
   const [toastState, setToastState] = useState<{ id: number; message: string; action?: ToastAction } | null>(null);
   const toastId = useRef(0);
@@ -198,6 +207,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         .then((r) => {
           setFlags(r.flags);
           setAutoTranslation(!!r.autoTranslation);
+          setVoice({ transcripts: !!r.voiceTranscripts, translation: !!r.voiceTranslation, listen: !!r.voiceListen });
         })
         .catch(() => {}),
     [],
@@ -351,6 +361,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         refresh,
         setMe,
         flags,
+        voice,
         refreshFlags,
         unread,
         setUnread,

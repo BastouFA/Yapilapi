@@ -1223,4 +1223,5 @@ export const vi: Record<string, string> = {
   'This chat belongs to a squad. Change who’s in it from the squad.': 'Cuộc trò chuyện này thuộc về một squad. Hãy thay đổi thành viên từ squad.',
   'Posts shared with a squad stay with it.': 'Bài đăng chia sẻ với squad sẽ ở lại trong squad.',
   'Reels in a squad’s chain are shared with that squad.': 'Reel trong chuỗi của squad được chia sẻ với squad đó.',
+  'Listening isn’t available right now. Try again later.': 'Hiện chưa nghe được. Hãy thử lại sau.',
 };

@@ -7051,4 +7051,11 @@ export const id: Catalog = {
   'push.squad_joined': '{name} bergabung ke {squad}',
   'push.squad_post': '{name} membagikan sesuatu di {squad}',
   'push.squad_memory': 'Minggu Anda di {squad} sudah siap',
+  'push.message.voice': 'Pesan suara: {text}',
+  'chat.transcript.show': 'Tampilkan teks',
+  'chat.transcript.hide': 'Sembunyikan teks',
+  'chat.transcript.listen': 'Dengarkan dalam bahasa {language}',
+  'st.ai.transcribeVoice': 'Transkripsikan pesan suara saya',
+  'st.ai.transcribeVoiceHint':
+    'Orang di chat Anda bisa membaca apa yang Anda katakan di pesan suara, dalam bahasa mereka. Jika dimatikan, teks dari pesan yang sudah Anda kirim akan dihapus.',
 };

@@ -7026,4 +7026,11 @@ export const pt: Catalog = {
   'push.squad_joined': '{name} entrou em {squad}',
   'push.squad_post': '{name} compartilhou algo em {squad}',
   'push.squad_memory': 'Sua semana em {squad} está pronta',
+  'push.message.voice': 'Mensagem de voz: {text}',
+  'chat.transcript.show': 'Mostrar texto',
+  'chat.transcript.hide': 'Ocultar texto',
+  'chat.transcript.listen': 'Ouvir em {language}',
+  'st.ai.transcribeVoice': 'Transcrever minhas mensagens de voz',
+  'st.ai.transcribeVoiceHint':
+    'As pessoas das suas conversas podem ler o que você diz nas mensagens de voz, no idioma delas. Desativar isso apaga o texto das que você enviou.',
 };

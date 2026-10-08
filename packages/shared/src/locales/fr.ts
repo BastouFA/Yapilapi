@@ -7060,4 +7060,11 @@ export const fr: Catalog = {
   'push.squad_joined': '{name} a rejoint {squad}',
   'push.squad_post': '{name} a partagé quelque chose dans {squad}',
   'push.squad_memory': 'Ta semaine dans {squad} est prête',
+  'push.message.voice': 'Message vocal : {text}',
+  'chat.transcript.show': 'Afficher le texte',
+  'chat.transcript.hide': 'Masquer le texte',
+  'chat.transcript.listen': 'Écouter en {language}',
+  'st.ai.transcribeVoice': 'Transcrire mes messages vocaux',
+  'st.ai.transcribeVoiceHint':
+    'Les personnes de tes discussions peuvent lire ce que tu dis dans tes messages vocaux, dans leur langue. Désactiver cette option supprime le texte de ceux que tu as envoyés.',
 };

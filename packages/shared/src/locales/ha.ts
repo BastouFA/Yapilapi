@@ -7032,4 +7032,11 @@ export const ha: Catalog = {
   'push.squad_joined': '{name} ya shiga {squad}',
   'push.squad_post': '{name} ya raba wani abu a {squad}',
   'push.squad_memory': 'Makonka a {squad} ya shirya',
+  'push.message.voice': 'Saƙon murya: {text}',
+  'chat.transcript.show': 'Nuna rubutu',
+  'chat.transcript.hide': 'Ɓoye rubutu',
+  'chat.transcript.listen': 'Saurara da {language}',
+  'st.ai.transcribeVoice': 'Rubuta saƙonnin muryata a rubuce',
+  'st.ai.transcribeVoiceHint':
+    'Mutanen da ke cikin hirarrakinka za su iya karanta abin da ka faɗa a saƙonnin murya, da harshensu. Idan ka kashe wannan, za a goge rubutun waɗanda ka aika.',
 };

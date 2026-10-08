@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { detectLanguage, understoodLanguages, type TranslatableKind } from '@yapilapi/shared';
 import { getFlags } from './services.ts';
+import { seesSensitiveSql } from './interactions.ts';
 import { notFound } from './errors.ts';
 import { messageVisibleSql } from './chat.ts';
 import { storyVisibleSql } from './stories.ts';
@@ -32,13 +33,16 @@ export interface TranslatableItem {
   lang: string | null;
 }
 
-const WHAT: Record<TranslatableKind, string> = { post: 'That post', comment: 'That comment', story: 'That story', message: 'Message' };
+const WHAT: Record<TranslatableKind, string> = { post: 'That post', comment: 'That comment', story: 'That story', message: 'Message', transcript: 'Message' };
 
 /**
  * Which of `ids` `viewer` can see right now, with their text: posts they can see and open
  * (audience, blocks, regional rules, subscriptions), comments on those posts that they'd be
  * shown, stories they can open, and messages in chats they're still a member of. With `auto`,
- * view-once messages are left out too: their words are never copied without a tap.
+ * view-once messages are left out too: their words are never copied without a tap. A transcript
+ * (by its message's id) is a voice message's words, as the message's reader sees it (its voice
+ * clip not taken down, or sensitive for someone who doesn't see sensitive media), while
+ * VOICE_TRANSCRIPTS and VOICE_TRANSLATION are on; view-once and disappearing messages never have one.
  */
 export async function loadTranslatables(
   db: Q,
@@ -59,7 +63,17 @@ export async function loadTranslatables(
               JOIN conversation_members cm ON cm.conversation_id = m.conversation_id AND cm.user_id = $1 AND cm.left_at IS NULL
               WHERE m.id = ANY($2::uuid[]) AND m.kind <> 'system' AND m.deleted_at IS NULL AND m.unsent_at IS NULL AND ${messageVisibleSql('$1')}
                 ${opts.auto ? 'AND NOT m.view_once' : ''}`,
+    transcript: `SELECT m.id, t.body, t.lang FROM message_transcripts t JOIN messages m ON m.id = t.message_id
+              JOIN conversation_members cm ON cm.conversation_id = m.conversation_id AND cm.user_id = $1 AND cm.left_at IS NULL
+              LEFT JOIN media md ON md.id = (m.attachments->0->>'mediaId')::uuid
+              WHERE m.id = ANY($2::uuid[]) AND t.status = 'ready' AND m.deleted_at IS NULL AND NOT m.view_once AND m.expires_at IS NULL
+                AND ${messageVisibleSql('$1')}
+                AND md.id IS NOT NULL AND md.moderation <> 'blocked' AND (md.moderation <> 'sensitive' OR ${seesSensitiveSql('$1')})`,
   };
+  if (kind === 'transcript') {
+    const flags = await getFlags(db);
+    if (!flags.VOICE_TRANSCRIPTS || !flags.VOICE_TRANSLATION) return [];
+  }
   const { rows } = await db.query<{ id: string; body: string | null; lang: string | null }>(sql[kind], [viewer, ids]);
   return rows.map((r) => ({ kind, id: r.id, text: r.body ?? '', lang: r.lang ?? langOf(r.body ?? '') }));
 }

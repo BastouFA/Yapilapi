@@ -234,6 +234,11 @@ export async function exportSections(db: Q, userId: string) {
     messageEdits: await q(
       `SELECT e.message_id, e.body, e.edited_at FROM message_edits e JOIN messages m ON m.id = e.message_id WHERE m.sender_id = $1 AND m.deleted_at IS NULL`,
     ),
+    // What you said in your voice messages, as transcribed (other people's voice messages are never included).
+    voiceTranscripts: await q(
+      `SELECT t.message_id, t.body, t.lang, t.created_at FROM message_transcripts t JOIN messages m ON m.id = t.message_id
+       WHERE m.sender_id = $1 AND t.status = 'ready' ORDER BY t.created_at`,
+    ),
     messageReactions: await q(`SELECT message_id, emoji FROM message_reactions WHERE user_id = $1`),
     messagesHidden: await q(`SELECT message_id, hidden_at FROM message_hides WHERE user_id = $1`),
     messagesPinned: await q(`SELECT conversation_id, message_id, pinned_at FROM conversation_pins WHERE pinned_by = $1`),
@@ -526,7 +531,7 @@ export async function exportSections(db: Q, userId: string) {
     preferences: await first(
       `SELECT notification_categories, focus_mode, quiet_mode, friends_only, reduced_recommendations, daily_time_budget_minutes, notifications_paused_until, yaps_paused,
               data_saver, languages, auto_translate, messages_from, comments_from, mentions_from, quiet_start, quiet_end, quiet_timezone, sensitive_media,
-              sign_in_email_alerts, smart_replies, catch_up, weekly_wrap, weekly_wrap_notify, timezone, updated_at
+              sign_in_email_alerts, smart_replies, catch_up, transcribe_voice, weekly_wrap, weekly_wrap_notify, timezone, updated_at
        FROM user_preferences WHERE user_id = $1`,
     ),
     teenControls: await first(
@@ -585,7 +590,7 @@ export const EXPORT_README = {
     content:
       'Stories, chapters, boards, saves, memories, recaps, lives, rooms, products, drops, places, businesses, photos and videos, and more you made; your event tickets, tickets given or received, events you co-host and how many people you checked in.',
     chats:
-      'Chats you are in, and the polls, lists, plans, games, calls and watch together sessions you took part in (your side only), and when you shared where you were, with whom (never the place).',
+      'Chats you are in, the transcripts of your own voice messages, and the polls, lists, plans, games, calls and watch together sessions you took part in (your side only), and when you shared where you were, with whom (never the place).',
     activity:
       'Reposts, votes, notifications, feed feedback, what the recommender learned you like, daily minutes, and views and feed activity counted per day.',
     relationships: 'Friends, friend requests, blocks, mutes, restrictions and family links.',

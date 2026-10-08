@@ -61,6 +61,7 @@ import {
   type SheetAction,
 } from '../../lib/chat-extras';
 import { TranslatableText } from '../../lib/translation';
+import { VoiceTranscript } from '../../lib/voice-transcript';
 import { useReport } from '../../lib/report';
 import { ListCard, ListComposer, PollCard, PollComposer, ReminderNote, ReminderPicker } from '../../lib/chat-polls';
 import { GameCard, GameSheet, StartGameSheet } from '../../lib/chat-games';
@@ -290,6 +291,8 @@ export default function Chat() {
         x.unsent ? x : { ...x, ...(e.data.market ? { market: e.data.market } : {}), ...(e.data.offer ? { offer: e.data.offer } : {}) },
       );
     // "Ada added 3 songs": more adds raise the line's count.
+    // A voice message's words, once they're transcribed.
+    if (e.type === 'message.transcript' && e.data?.conversationId === id) patchMessage(e.data.id, (x) => ({ ...x, transcript: e.data.transcript }));
     if (e.type === 'message.system' && e.data?.conversationId === id) patchMessage(e.data.id, (x) => ({ ...x, system: e.data.system }));
     // A mix shared here changed: its cards show it as it is now (or that it's gone).
     if (e.type === 'mix.updated' && (e.data?.conversationIds as string[] | undefined)?.includes(id)) {
@@ -1655,6 +1658,7 @@ const MessageRow = memo(function MessageRow({
       ) : null}
       {item.story ? <StoryCardView card={item.story} dark={mine} /> : null}
       <Attachments items={item.attachments} tint={tint} />
+      {item.transcript ? <VoiceTranscript id={item.id} transcript={item.transcript} own={mine} tint={tint} /> : null}
     </>
   );
   // Your messages sit at the end edge (the right in English, the left in Arabic), with the

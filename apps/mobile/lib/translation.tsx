@@ -33,14 +33,24 @@ interface TranslationCtx {
   available: boolean;
   settings: TranslationSettings;
   save: (next: TranslationSettings) => Promise<void>;
+  /** What voice messages offer on the server now: their transcript, its translation, and "Listen in …" (flags voice*). */
+  voice: { transcripts: boolean; translation: boolean; listen: boolean };
 }
 
-const Ctx = createContext<TranslationCtx>({ enabled: false, auto: false, available: false, settings: { languages: [], auto: true }, save: async () => {} });
+const NO_VOICE = { transcripts: false, translation: false, listen: false };
+const Ctx = createContext<TranslationCtx>({
+  enabled: false,
+  auto: false,
+  available: false,
+  settings: { languages: [], auto: true },
+  save: async () => {},
+  voice: NO_VOICE,
+});
 export const useTranslationSettings = () => useContext(Ctx);
 
 export function TranslationProvider({ children }: { children: ReactNode }) {
   const { me } = useSession();
-  const [flags, setFlags] = useState({ on: false, auto: false });
+  const [flags, setFlags] = useState({ on: false, auto: false, voice: NO_VOICE });
   // Chosen here, until /v1/auth/me catches up.
   const [chosen, setChosen] = useState<TranslationSettings | null>(null);
   useEffect(() => {
@@ -48,7 +58,15 @@ export function TranslationProvider({ children }: { children: ReactNode }) {
     let live = true;
     client()
       .then((api) => api.flags())
-      .then((r) => live && setFlags({ on: !!r.flags.AI_TRANSLATION, auto: !!r.autoTranslation }))
+      .then(
+        (r) =>
+          live &&
+          setFlags({
+            on: !!r.flags.AI_TRANSLATION,
+            auto: !!r.autoTranslation,
+            voice: { transcripts: !!r.voiceTranscripts, translation: !!r.voiceTranslation, listen: !!r.voiceListen },
+          }),
+      )
       .catch(() => {});
     return () => {
       live = false;
@@ -71,7 +89,14 @@ export function TranslationProvider({ children }: { children: ReactNode }) {
   );
   const value = useMemo(() => {
     const enabled = !!me && flags.on;
-    return { enabled, auto: enabled && flags.auto && settings.auto, available: enabled && flags.auto, settings, save };
+    return {
+      enabled,
+      auto: enabled && flags.auto && settings.auto,
+      available: enabled && flags.auto,
+      settings,
+      save,
+      voice: me ? { ...flags.voice, translation: enabled && flags.voice.translation, listen: enabled && flags.voice.listen } : NO_VOICE,
+    };
   }, [me, flags, settings, save]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

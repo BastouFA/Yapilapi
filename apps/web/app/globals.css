@@ -2435,6 +2435,30 @@ video.chat-att__media {
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
+/* "Show text" under a voice message: its words, translated when need be, and "Listen in …". */
+.voice-text {
+  margin-top: 2px;
+  font: 500 13px/18px var(--font-sans);
+}
+.voice-text__toggle,
+.voice-text__listen {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  color: inherit;
+}
+.voice-text .yp-translate,
+.voice-text .yp-translate__link {
+  color: inherit;
+}
+.voice-text__words {
+  margin: 0;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+  white-space: pre-wrap;
+}
 .voice-rec {
   display: flex;
   flex: 1;

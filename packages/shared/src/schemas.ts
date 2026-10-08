@@ -445,6 +445,9 @@ export const translateSchema = z.object({
   target: translationLanguage,
 });
 
+/** POST /v1/messages/:id/transcript/speech: "Listen in French", a voice message's translated words read out. */
+export const transcriptSpeechSchema = z.object({ target: translationLanguage });
+
 /** POST /v1/translations: automatic translation of the items on screen, into the reader's language. */
 export const translateBatchSchema = z.object({
   target: translationLanguage,
@@ -867,7 +870,7 @@ export const aiAssistSchema = z.object({
 });
 
 /** Settings > AI helpers: suggested replies in chats and the Catch me up card on Pulse. */
-export const aiSettingsSchema = z.object({ smartReplies: z.boolean().optional(), catchUp: z.boolean().optional() });
+export const aiSettingsSchema = z.object({ smartReplies: z.boolean().optional(), catchUp: z.boolean().optional(), transcribeVoice: z.boolean().optional() });
 
 /** Suggested replies in one chat: true or false, or null for the default (on in one-to-one chats, off in groups). */
 export const conversationSmartRepliesSchema = z.object({ enabled: z.boolean().nullable() });

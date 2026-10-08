@@ -1218,4 +1218,5 @@ export const bn: Record<string, string> = {
   'This chat belongs to a squad. Change who’s in it from the squad.': 'এই চ্যাটটি একটি স্কোয়াডের। এতে কে আছেন তা স্কোয়াড থেকে বদলান।',
   'Posts shared with a squad stay with it.': 'স্কোয়াডের সঙ্গে শেয়ার করা পোস্ট স্কোয়াডেই থাকে।',
   'Reels in a squad’s chain are shared with that squad.': 'স্কোয়াডের চেইনের রিল সেই স্কোয়াডের সঙ্গেই শেয়ার হয়।',
+  'Listening isn’t available right now. Try again later.': 'শোনা এখন উপলব্ধ নয়। পরে আবার চেষ্টা করুন।',
 };

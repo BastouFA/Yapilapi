@@ -158,7 +158,7 @@ describe('AI helpers', () => {
       expect((await as(t.app, ada).post('/v1/ai/catch-up/dismiss')).status).toBe(200);
       expect((await as(t.app, ada).post('/v1/pulse/visit')).body.offer).toBe(false);
 
-      expect((await as(t.app, ada).put('/v1/me/ai-settings', { catchUp: false })).body).toEqual({ smartReplies: true, catchUp: false });
+      expect((await as(t.app, ada).put('/v1/me/ai-settings', { catchUp: false })).body).toEqual({ smartReplies: true, catchUp: false, transcribeVoice: true });
       expect((await t.ctx.db.query(`SELECT 1 FROM pulse_visits WHERE user_id = $1`, [ada.id])).rowCount).toBe(0);
       expect((await as(t.app, ada).post('/v1/pulse/visit')).body.offer).toBe(false);
       expect((await t.ctx.db.query(`SELECT 1 FROM pulse_visits WHERE user_id = $1`, [ada.id])).rowCount).toBe(0);
@@ -285,7 +285,7 @@ describe('AI helpers', () => {
 
     it('is off by default for people under 18, who can turn it on', async () => {
       const teen = await signUp(t.app, { birthDate: `${new Date().getFullYear() - 15}-03-01` });
-      expect((await as(t.app, teen).get('/v1/me/ai-settings')).body).toEqual({ smartReplies: false, catchUp: true });
+      expect((await as(t.app, teen).get('/v1/me/ai-settings')).body).toEqual({ smartReplies: false, catchUp: true, transcribeVoice: true });
       expect((await as(t.app, teen).put('/v1/me/ai-settings', { smartReplies: true })).body.smartReplies).toBe(true);
     });
 

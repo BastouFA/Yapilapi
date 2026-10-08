@@ -1233,4 +1233,5 @@ export const ur: Record<string, string> = {
   'This chat belongs to a squad. Change who’s in it from the squad.': 'یہ چیٹ ایک اسکواڈ کی ہے۔ اس میں کون ہے، یہ اسکواڈ سے بدلیں۔',
   'Posts shared with a squad stay with it.': 'اسکواڈ کے ساتھ شیئر کی گئی پوسٹس اسکواڈ میں ہی رہتی ہیں۔',
   'Reels in a squad’s chain are shared with that squad.': 'اسکواڈ کے سلسلے کی ریلز اسی اسکواڈ کے ساتھ شیئر ہوتی ہیں۔',
+  'Listening isn’t available right now. Try again later.': 'سننا ابھی دستیاب نہیں ہے۔ بعد میں دوبارہ کوشش کریں۔',
 };

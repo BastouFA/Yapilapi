@@ -961,6 +961,13 @@ export interface YapEvent {
   autoplay: boolean;
 }
 
+/** The words of a voice message (docs/product/speech-engine.md). */
+export interface VoiceTranscript {
+  text: string;
+  /** Detected language (ISO 639-1), or null when it couldn't be told. */
+  lang: string | null;
+}
+
 export interface Message {
   id: string;
   conversationId: string;
@@ -990,6 +997,11 @@ export interface Message {
   clientId?: string | null;
   /** 'yap' for a hold-to-talk voice clip, 'system' for a line about a change in the chat (see `system`); absent for other messages. */
   kind?: 'yap' | 'system';
+  /**
+   * What was said in a voice note or a Yap, once it's transcribed (realtime `message.transcript`
+   * when it's ready). Never on view-once or disappearing messages. Translatable as kind 'transcript'.
+   */
+  transcript?: VoiceTranscript;
   /** Present on view-once messages. Their attachment has no url: open it with POST /v1/messages/:id/view-once/open. */
   viewOnce?: ViewOnceInfo;
   /** The message this one replies to. */
@@ -1396,4 +1408,6 @@ export interface AiSettings {
   smartReplies: boolean;
   /** The Catch me up card on Pulse. */
   catchUp: boolean;
+  /** "Transcribe my voice messages": people in your chats can read (and translate) what you said. On by default; turning it off deletes the transcripts. Missing from older servers. */
+  transcribeVoice?: boolean;
 }

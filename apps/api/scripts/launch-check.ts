@@ -205,7 +205,11 @@ async function main() {
 
   // Automatic captions
   if (cfg.TRANSCRIBE_PROVIDER === 'none')
-    add('Captions (speech-to-text)', 'not set', 'optional: people can still write captions; set TRANSCRIBE_PROVIDER=openai-compatible and TRANSCRIBE_API_KEY');
+    add(
+      'Captions (speech-to-text)',
+      'not set',
+      'optional: people can still write captions, and voice messages have no text; set TRANSCRIBE_PROVIDER=openai-compatible and TRANSCRIBE_API_KEY (section 7)',
+    );
   else {
     const base = cfg.TRANSCRIBE_API_URL.replace(/\/+$/, '');
     const r = await live(async () => {
@@ -215,6 +219,23 @@ async function main() {
       return `${new URL(base).host} answers (model ${cfg.TRANSCRIBE_MODEL})`;
     });
     add('Captions (speech-to-text)', r.ok ? 'ready' : 'problem', r.note);
+  }
+
+  // Listening to translated voice messages (text-to-speech)
+  if (cfg.TTS_PROVIDER === 'none')
+    add(
+      'Listening (text-to-speech)',
+      'not set',
+      'optional: translated voice messages show text only; set TTS_PROVIDER=openai-compatible and TTS_API_KEY (section 8)',
+    );
+  else {
+    const base = cfg.TTS_API_URL.replace(/\/+$/, '');
+    const r = await live(async () => {
+      const res = await fetch(`${base}/models`, { headers: cfg.TTS_API_KEY ? { authorization: `Bearer ${cfg.TTS_API_KEY}` } : {} });
+      if (res.status === 401 || res.status === 403) throw new Error(`the key was refused (${res.status})`);
+      return `${new URL(base).host} answers (model ${cfg.TTS_MODEL}, voice ${cfg.TTS_VOICE}, ${cfg.TTS_DAILY_CHAR_LIMIT} characters a day)`;
+    });
+    add('Listening (text-to-speech)', r.ok ? 'ready' : 'problem', r.note);
   }
 
   // Phone numbers, moderation, calls, live, web push

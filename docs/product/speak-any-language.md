@@ -11,11 +11,14 @@ three steps, each useful on its own.
    language the reader doesn't understand are shown translated, with a quiet "Translated from
    Hausa · See original". Videos that already have captions get them in the reader's language
    too. "See translation" stays for everything that isn't translated automatically.
-2. **Voice notes in Yap.** A voice note in a chat is transcribed (the speech-to-text provider in
-   `apps/api/src/lib/transcription.ts`, off in production until one is chosen), the transcript
-   is translated like a message, and the listener can read it or hear it read in their language
+2. **Voice notes in Yap (voice messages built, `docs/product/speech-engine.md`).** A voice note
+   or Yap in a chat is transcribed (the speech-to-text provider in
+   `apps/api/src/lib/transcription.ts`, off in production until one is chosen; Groq recommended),
+   the transcript is translated like a message (kind `transcript`), and the listener can read it
+   ("Show text") or hear it read in their language ("Listen in French", `apps/api/src/lib/speech.ts`)
    by a plain synthetic voice that is clearly not the sender's. Videos without captions get
-   automatic captions the same way, and then step 1 translates them.
+   automatic captions the same way, and then step 1 translates them (not automatic yet: the owner
+   asks for them in the video editor).
 3. **Dubbing in the creator's own voice (opt-in).** A creator can choose to have their reels
    dubbed into other languages in a voice made from their own. Off unless the creator turns it
    on, for their own videos only.

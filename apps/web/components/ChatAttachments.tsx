@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Button, Icon, SensitiveCover } from '@yapilapi/design-system';
-import type { Message, MessageKey } from '@yapilapi/shared';
+import { Button, Icon, SensitiveCover, TranslationBar, useTranslatable } from '@yapilapi/design-system';
+import { languageName, type Message, type MessageKey, type VoiceTranscript as Transcript } from '@yapilapi/shared';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
 
@@ -56,6 +56,85 @@ export function MessageAttachments({ items }: { items: Attachment[] }) {
         ),
       )}
     </div>
+  );
+}
+
+/**
+ * What was said in a voice message (docs/product/speech-engine.md), behind "Show text". In a
+ * language the reader doesn't understand it's translated like a message ("Translated from French ·
+ * See original"), and the translation can be heard: "Listen in English", a plain synthetic voice.
+ */
+export function VoiceTranscript({ id, transcript, own }: { id: string; transcript: Transcript; own: boolean }) {
+  const { t, voice } = useSession();
+  const [open, setOpen] = useState(false);
+  if (!voice.transcripts) return null;
+  return (
+    <div className="voice-text">
+      <button
+        type="button"
+        className="yp-translate__link voice-text__toggle"
+        aria-expanded={open}
+        aria-controls={`voice-text-${id}`}
+        onClick={() => setOpen((o) => !o)}
+      >
+        {open ? t('chat.transcript.hide') : t('chat.transcript.show')}
+      </button>
+      {open ? <TranscriptWords id={id} transcript={transcript} own={own || !voice.translation} /> : null}
+    </div>
+  );
+}
+
+function TranscriptWords({ id, transcript, own }: { id: string; transcript: Transcript; own: boolean }) {
+  const { locale, voice } = useSession();
+  const state = useTranslatable({ kind: 'transcript', id, text: transcript.text, lang: transcript.lang, own });
+  const shown = state.status === 'shown' ? state.translation : null;
+  return (
+    <div id={`voice-text-${id}`}>
+      <p ref={state.ref} className="voice-text__words" dir="auto" lang={state.lang ?? transcript.lang ?? undefined}>
+        {state.text}
+      </p>
+      <TranslationBar state={state} locale={locale} />
+      {shown && voice.listen ? <ListenButton id={id} target={shown.targetLanguage} /> : null}
+    </div>
+  );
+}
+
+/** "Listen in English": the translation read out, made the first time anyone asks and then shared. */
+function ListenButton({ id, target }: { id: string; target: string }) {
+  const { t, locale, toast } = useSession();
+  const audio = useRef<HTMLAudioElement | null>(null);
+  const [state, setState] = useState<'idle' | 'loading' | 'playing'>('idle');
+  useEffect(() => () => audio.current?.pause(), []);
+  const toggle = async () => {
+    if (state === 'playing') return audio.current?.pause();
+    if (!audio.current) {
+      setState('loading');
+      try {
+        const { url } = await api.messages.transcriptSpeech(id, target);
+        const a = new Audio(url);
+        a.onplay = () => setState('playing');
+        a.onpause = a.onended = () => setState('idle');
+        audio.current = a;
+      } catch (e) {
+        setState('idle');
+        toast(errorMessage(e));
+        return;
+      }
+    }
+    await audio.current.play().catch(() => setState('idle'));
+  };
+  return (
+    <button
+      type="button"
+      className="yp-translate__link voice-text__listen"
+      aria-pressed={state === 'playing'}
+      aria-busy={state === 'loading'}
+      disabled={state === 'loading'}
+      onClick={() => void toggle()}
+    >
+      <Icon name={state === 'playing' ? 'stop' : 'play'} size={14} filled />
+      {t('chat.transcript.listen', { language: languageName(target, locale) })}
+    </button>
   );
 }
 

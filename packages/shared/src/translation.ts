@@ -7,8 +7,8 @@
  * @names and links out of the model's reach, are in language-detect.ts.
  */
 
-/** What can be translated: a post, a comment, the text on a story, or a chat message. */
-export const TRANSLATABLE_KINDS = ['post', 'comment', 'story', 'message'] as const;
+/** What can be translated: a post, a comment, the text on a story, a chat message, or what was said in a voice message (by the message's id). */
+export const TRANSLATABLE_KINDS = ['post', 'comment', 'story', 'message', 'transcript'] as const;
 export type TranslatableKind = (typeof TRANSLATABLE_KINDS)[number];
 
 export interface LanguageInfo {

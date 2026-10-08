@@ -7009,6 +7009,13 @@ export const en = {
   'push.squad_joined': '{name} joined {squad}',
   'push.squad_post': '{name} shared something in {squad}',
   'push.squad_memory': 'Your week in {squad} is ready',
+  'push.message.voice': 'Voice message: {text}',
+  'chat.transcript.show': 'Show text',
+  'chat.transcript.hide': 'Hide text',
+  'chat.transcript.listen': 'Listen in {language}',
+  'st.ai.transcribeVoice': 'Transcribe my voice messages',
+  'st.ai.transcribeVoiceHint':
+    'People in your chats can read what you say in voice messages, in their language. Turning this off deletes the text of the ones you sent.',
 } as const;
 
 export type MessageKey = keyof typeof en;

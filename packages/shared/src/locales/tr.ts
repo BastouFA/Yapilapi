@@ -7018,4 +7018,11 @@ export const tr: Catalog = {
   'push.squad_joined': '{name}, {squad} ekibine katıldı',
   'push.squad_post': '{name}, {squad} ekibinde bir şey paylaştı',
   'push.squad_memory': '{squad} ekibindeki haftan hazır',
+  'push.message.voice': 'Sesli mesaj: {text}',
+  'chat.transcript.show': 'Metni göster',
+  'chat.transcript.hide': 'Metni gizle',
+  'chat.transcript.listen': '{language} dinle',
+  'st.ai.transcribeVoice': 'Sesli mesajlarımı yazıya dök',
+  'st.ai.transcribeVoiceHint':
+    'Sohbetlerindeki kişiler sesli mesajlarda söylediklerini kendi dillerinde okuyabilir. Bunu kapatırsan gönderdiklerinin metni silinir.',
 };

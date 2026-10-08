@@ -1234,4 +1234,5 @@ export const it: Record<string, string> = {
   'This chat belongs to a squad. Change who’s in it from the squad.': 'Questa chat appartiene a una squad. Cambia chi ne fa parte dalla squad.',
   'Posts shared with a squad stay with it.': 'I post condivisi con una squad restano nella squad.',
   'Reels in a squad’s chain are shared with that squad.': 'I reel nella catena di una squad sono condivisi con quella squad.',
+  'Listening isn’t available right now. Try again later.': 'L’ascolto non è disponibile al momento. Riprova più tardi.',
 };

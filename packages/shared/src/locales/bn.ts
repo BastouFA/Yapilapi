@@ -7005,4 +7005,11 @@ export const bn: Catalog = {
   'push.squad_joined': '{name} {squad}-এ যোগ দিয়েছেন',
   'push.squad_post': '{name} {squad}-এ কিছু শেয়ার করেছেন',
   'push.squad_memory': '{squad}-এ আপনার সপ্তাহ তৈরি',
+  'push.message.voice': 'ভয়েস মেসেজ: {text}',
+  'chat.transcript.show': 'লেখা দেখান',
+  'chat.transcript.hide': 'লেখা লুকান',
+  'chat.transcript.listen': '{language} ভাষায় শুনুন',
+  'st.ai.transcribeVoice': 'আমার ভয়েস মেসেজ লেখায় রূপান্তর করুন',
+  'st.ai.transcribeVoiceHint':
+    'আপনার চ্যাটের লোকেরা আপনার ভয়েস মেসেজে বলা কথা নিজেদের ভাষায় পড়তে পারেন। এটি বন্ধ করলে আপনার পাঠানো মেসেজগুলোর লেখা মুছে যায়।',
 };

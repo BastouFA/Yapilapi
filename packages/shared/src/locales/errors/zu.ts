@@ -1247,4 +1247,5 @@ export const zu: Record<string, string> = {
   'This chat belongs to a squad. Change who’s in it from the squad.': 'Le ngxoxo ingeye-squad. Shintsha abakuyo ku-squad.',
   'Posts shared with a squad stay with it.': 'Okuthunyelwe okwabelwe ne-squad kuhlala kuyo.',
   'Reels in a squad’s chain are shared with that squad.': 'Ama-reel asochungechungeni lwe-squad abelwa naleyo squad.',
+  'Listening isn’t available right now. Try again later.': 'Ukulalela akutholakali manje. Zama futhi emuva kwesikhathi.',
 };

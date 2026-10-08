@@ -7013,4 +7013,11 @@ export const hi: Catalog = {
   'push.squad_joined': '{name} {squad} में जुड़े',
   'push.squad_post': '{name} ने {squad} में कुछ शेयर किया',
   'push.squad_memory': '{squad} में आपका हफ़्ता तैयार है',
+  'push.message.voice': 'वॉइस मैसेज: {text}',
+  'chat.transcript.show': 'टेक्स्ट दिखाएं',
+  'chat.transcript.hide': 'टेक्स्ट छिपाएं',
+  'chat.transcript.listen': '{language} में सुनें',
+  'st.ai.transcribeVoice': 'मेरे वॉइस मैसेज को टेक्स्ट में बदलें',
+  'st.ai.transcribeVoiceHint':
+    'आपकी चैट में लोग आपके वॉइस मैसेज में कही बात अपनी भाषा में पढ़ सकते हैं। इसे बंद करने पर आपके भेजे गए मैसेज का टेक्स्ट मिट जाता है।',
 };

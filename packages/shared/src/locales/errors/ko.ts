@@ -1199,4 +1199,5 @@ export const ko: Record<string, string> = {
   'This chat belongs to a squad. Change who’s in it from the squad.': '이 채팅은 스쿼드의 채팅이에요. 멤버는 스쿼드에서 바꾸세요.',
   'Posts shared with a squad stay with it.': '스쿼드에 공유한 게시물은 스쿼드에 남아요.',
   'Reels in a squad’s chain are shared with that squad.': '스쿼드 릴레이의 릴스는 그 스쿼드에 공유돼요.',
+  'Listening isn’t available right now. Try again later.': '지금은 들을 수 없어요. 나중에 다시 시도해 주세요.',
 };

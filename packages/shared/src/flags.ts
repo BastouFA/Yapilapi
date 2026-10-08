@@ -7,6 +7,15 @@ export const FEATURE_FLAGS = {
     default: true,
     description: 'Show posts, comments, stories and messages in each reader’s language without a tap (needs AI_TRANSLATION and a translation model).',
   },
+  VOICE_TRANSCRIPTS: {
+    default: true,
+    description: 'Voice notes and Yaps in chats get a transcript members can read (needs a speech-to-text provider, TRANSCRIBE_PROVIDER).',
+  },
+  VOICE_TRANSLATION: {
+    default: true,
+    description:
+      'Voice message transcripts are translated for people who don’t understand the language, with "Listen in …" (needs VOICE_TRANSCRIPTS, AI_TRANSLATION and a translation model; listening needs TTS_PROVIDER).',
+  },
   AI_CATCH_UP: { default: true, description: 'Catch me up on Pulse: a short summary of what your people shared while you were away.' },
   AI_SMART_REPLIES: { default: true, description: 'Suggested short replies under the last message you received in a chat.' },
   AI_ALT_TEXT: { default: true, description: 'Suggest a description of a photo for people using screen readers.' },

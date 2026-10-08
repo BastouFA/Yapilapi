@@ -7030,4 +7030,11 @@ export const sw: Catalog = {
   'push.squad_joined': '{name} amejiunga na {squad}',
   'push.squad_post': '{name} ameshiriki kitu kwenye {squad}',
   'push.squad_memory': 'Wiki yako kwenye {squad} iko tayari',
+  'push.message.voice': 'Ujumbe wa sauti: {text}',
+  'chat.transcript.show': 'Onyesha maandishi',
+  'chat.transcript.hide': 'Ficha maandishi',
+  'chat.transcript.listen': 'Sikiliza kwa {language}',
+  'st.ai.transcribeVoice': 'Andika jumbe zangu za sauti kama maandishi',
+  'st.ai.transcribeVoiceHint':
+    'Watu kwenye gumzo zako wanaweza kusoma unachosema kwenye jumbe za sauti, kwa lugha yao. Ukizima hili, maandishi ya jumbe ulizotuma yanafutwa.',
 };

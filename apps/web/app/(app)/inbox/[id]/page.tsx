@@ -25,7 +25,7 @@ import { ReportSheet } from '@/components/PostList';
 import { useRealtime, useSession } from '../../../providers';
 import { useCalls } from '@/components/Calls';
 import { MiniAppsSheet } from '@/components/MiniApps';
-import { MessageAttachments, ViewOnceMessage, VoiceRecorder } from '@/components/ChatAttachments';
+import { MessageAttachments, ViewOnceMessage, VoiceRecorder, VoiceTranscript } from '@/components/ChatAttachments';
 import { ViewOnceCapture } from '@/components/ViewOnceCapture';
 import { TurnOnYapsPrompt, YapButton } from '@/components/Yap';
 import { StoryCardView } from '@/components/StoryStickers';
@@ -335,6 +335,8 @@ export default function ChatPage() {
         x.unsent ? x : { ...x, ...(e.data.market ? { market: e.data.market } : {}), ...(e.data.offer ? { offer: e.data.offer } : {}) },
       );
     // "Ada added 3 songs": more adds raise the line's count.
+    // A voice message's words, once they're transcribed.
+    if (e.type === 'message.transcript' && e.data.conversationId === id) patchMessage(e.data.id, (x) => ({ ...x, transcript: e.data.transcript }));
     if (e.type === 'message.system' && e.data.conversationId === id) patchMessage(e.data.id, (x) => ({ ...x, system: e.data.system }));
     // A mix shared here changed: its cards show it as it is now (or that it's gone).
     if (e.type === 'mix.updated' && (e.data.conversationIds as string[] | undefined)?.includes(id)) {
@@ -896,6 +898,7 @@ export default function ChatPage() {
                 {m.kind === 'yap' ? <span className="chat-yap-label">{t('m.yap.label')}</span> : null}
                 {m.story ? <StoryCardView card={m.story} /> : null}
                 {m.attachments.length ? <MessageAttachments items={m.attachments} /> : null}
+                {m.transcript ? <VoiceTranscript id={m.id} transcript={m.transcript} own={mine} /> : null}
                 {text}
               </>
             ) : (

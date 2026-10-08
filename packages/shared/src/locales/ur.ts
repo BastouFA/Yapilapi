@@ -7014,4 +7014,11 @@ export const ur: Catalog = {
   'push.squad_joined': '{name} {squad} میں شامل ہوئے',
   'push.squad_post': '{name} نے {squad} میں کچھ شیئر کیا',
   'push.squad_memory': '{squad} میں آپ کا ہفتہ تیار ہے',
+  'push.message.voice': 'صوتی پیغام: {text}',
+  'chat.transcript.show': 'متن دکھائیں',
+  'chat.transcript.hide': 'متن چھپائیں',
+  'chat.transcript.listen': '{language} میں سنیں',
+  'st.ai.transcribeVoice': 'میرے صوتی پیغامات کو متن میں بدلیں',
+  'st.ai.transcribeVoiceHint':
+    'آپ کی چیٹس میں لوگ آپ کے صوتی پیغامات میں کہی گئی بات اپنی زبان میں پڑھ سکتے ہیں۔ اسے بند کرنے سے آپ کے بھیجے گئے پیغامات کا متن حذف ہو جاتا ہے۔',
 };

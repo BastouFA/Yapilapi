@@ -6997,4 +6997,11 @@ export const ja: Catalog = {
   'push.squad_joined': '{name}さんが{squad}に参加しました',
   'push.squad_post': '{name}さんが{squad}で共有しました',
   'push.squad_memory': '{squad}での1週間がまとまりました',
+  'push.message.voice': 'ボイスメッセージ: {text}',
+  'chat.transcript.show': 'テキストを表示',
+  'chat.transcript.hide': 'テキストを隠す',
+  'chat.transcript.listen': '{language}で聞く',
+  'st.ai.transcribeVoice': '自分のボイスメッセージを文字起こしする',
+  'st.ai.transcribeVoiceHint':
+    'チャットの相手は、あなたがボイスメッセージで話した内容を自分の言語で読めます。オフにすると、送信済みのメッセージの文字起こしは削除されます。',
 };

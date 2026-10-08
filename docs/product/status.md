@@ -684,6 +684,16 @@ What's happening around you right now (docs/product/city-map.md; flag `CITY_MAP`
 
 **Not done:** "Add a place" on the phone; the phone screen hasn't been run on a device.
 
+## Voice messages everyone understands, and the speech engine (2026-10-08, migration 0089, `apps/api/test/voice-messages.test.ts`, `apps/web/e2e/voice-messages.spec.ts`)
+
+Speak any language, step 2 (docs/product/speech-engine.md). Flags `VOICE_TRANSCRIPTS` and `VOICE_TRANSLATION`, on by default and effective only with providers (`GET /v1/flags`: `voiceTranscripts`, `voiceTranslation`, `voiceListen`).
+
+- **Speech engine**: speech-to-text (`lib/transcription.ts`), translation (`lib/translation.ts`) and new text-to-speech (`lib/speech.ts`: `TTS_PROVIDER` `none` or `openai-compatible`, `POST {TTS_API_URL}/audio/speech`, MP3; no stand-in voice). `speak(text, lang)` returns a clip cached per text, language, voice and model and shared by every listener, within `TTS_DAILY_CHAR_LIMIT` (everyone, per day) and `TTS_PER_HOUR` (per person); clips go when nothing they're for is left (worker sweep).
+- **Voice messages**: voice notes and Yaps are transcribed in a job (`voice.transcribe`); members see **Show text** under them (web chat, Yap mode, the phone chat and Yap), translated like a message when they don't understand the language ("Translated from French · See original", kind `transcript`), with **Listen in {language}**. Never view-once or disappearing messages; members only, blocks and hides respected; deleted with the message; your own in the data export. **Transcribe my voice messages** (Settings > AI helpers, and Yap's settings), on by default; off deletes the old ones. A voice note's push says its first words when they're ready within 15 seconds.
+- **Production**: Groq recommended for speech-to-text, OpenAI `gpt-4o-mini-tts` or `tts-1` for listening (docs/operations/launch-setup.md, sections 7 and 8; `render.yaml`, `render.free.yaml`; the launch check).
+
+**Not done:** automatic captions for videos without any (still asked for in the video editor), suggested replies from transcripts, transcripts of audio posts through this job (they keep their caption track), and the phone screens haven't been run on a device.
+
 ## Not built yet
 
 - Mainstream music: needs a licensing deal (docs/operations/music.md). Reporting song use to a licensing partner is not built.

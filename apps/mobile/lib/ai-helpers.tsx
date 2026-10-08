@@ -387,7 +387,39 @@ export function CommunityCatchUp({ communityId }: { communityId: string }) {
   );
 }
 
-/** Settings > Privacy: suggested replies in chats (off by default under 18) and the Catch me up card on Pulse. */
+/** "Transcribe my voice messages" on its own (Yap's settings), the same account setting as in AI helpers. */
+export function TranscribeVoiceSwitch() {
+  const { t } = useT();
+  const [on, setOn] = useState<boolean | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    client()
+      .then((api) => api.ai.settings())
+      .then(
+        (s) => setOn(s.transcribeVoice ?? null),
+        () => {},
+      );
+  }, []);
+  if (on === null) return null;
+  const save = async (v: boolean) => {
+    setOn(v);
+    setError(null);
+    try {
+      setOn((await (await client()).ai.setSettings({ transcribeVoice: v })).transcribeVoice ?? v);
+    } catch (e) {
+      setOn(!v);
+      setError(errorMessage(e));
+    }
+  };
+  return (
+    <>
+      <SwitchRow label={t('st.ai.transcribeVoice')} hint={t('st.ai.transcribeVoiceHint')} value={on} onValueChange={(v) => void save(v)} />
+      {error ? <Notice tone="danger">{error}</Notice> : null}
+    </>
+  );
+}
+
+/** Settings > Privacy: suggested replies in chats (off by default under 18), the Catch me up card on Pulse, and transcripts of your voice messages. */
 export function AiHelpersSettings() {
   const { t } = useT();
   const [s, setS] = useState<AiSettings | null>(null);
@@ -419,6 +451,14 @@ export function AiHelpersSettings() {
             onValueChange={(v) => void save({ smartReplies: v })}
           />
           <SwitchRow label={t('st.ai.catchUp')} hint={t('st.ai.catchUpHint')} value={s.catchUp} onValueChange={(v) => void save({ catchUp: v })} />
+          {s.transcribeVoice !== undefined ? (
+            <SwitchRow
+              label={t('st.ai.transcribeVoice')}
+              hint={t('st.ai.transcribeVoiceHint')}
+              value={s.transcribeVoice}
+              onValueChange={(v) => void save({ transcribeVoice: v })}
+            />
+          ) : null}
         </>
       ) : null}
     </Card>

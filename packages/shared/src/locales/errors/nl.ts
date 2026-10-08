@@ -1238,4 +1238,5 @@ export const nl: Record<string, string> = {
   'This chat belongs to a squad. Change who’s in it from the squad.': 'Deze chat hoort bij een squad. Wie erin zit, verander je in de squad.',
   'Posts shared with a squad stay with it.': 'Berichten die met een squad zijn gedeeld, blijven in die squad.',
   'Reels in a squad’s chain are shared with that squad.': 'Reels in de keten van een squad worden met die squad gedeeld.',
+  'Listening isn’t available right now. Try again later.': 'Luisteren is nu niet beschikbaar. Probeer het later opnieuw.',
 };

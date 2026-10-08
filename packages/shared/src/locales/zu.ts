@@ -7059,4 +7059,11 @@ export const zu: Catalog = {
   'push.squad_joined': 'U-{name} ujoyine i-{squad}',
   'push.squad_post': 'U-{name} wabelane ngokuthile ku-{squad}',
   'push.squad_memory': 'Iviki lakho ku-{squad} selilungile',
+  'push.message.voice': 'Umlayezo wezwi: {text}',
+  'chat.transcript.show': 'Bonisa umbhalo',
+  'chat.transcript.hide': 'Fihla umbhalo',
+  'chat.transcript.listen': 'Lalela ngo-{language}',
+  'st.ai.transcribeVoice': 'Bhala imilayezo yami yezwi',
+  'st.ai.transcribeVoiceHint':
+    'Abantu abasezingxoxweni zakho bangafunda lokho okushoyo emilayezweni yezwi, ngolimi lwabo. Uma ukuvala lokhu, umbhalo wemilayezo oyithumele uyasuswa.',
 };

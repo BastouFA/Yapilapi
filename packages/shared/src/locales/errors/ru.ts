@@ -1227,4 +1227,5 @@ export const ru: Record<string, string> = {
   'This chat belongs to a squad. Change who’s in it from the squad.': 'Этот чат принадлежит скваду. Состав меняется в самом скваде.',
   'Posts shared with a squad stay with it.': 'Публикации для сквада остаются в скваде.',
   'Reels in a squad’s chain are shared with that squad.': 'Рилсы в цепочке сквада публикуются для этого сквада.',
+  'Listening isn’t available right now. Try again later.': 'Прослушивание сейчас недоступно. Попробуйте позже.',
 };

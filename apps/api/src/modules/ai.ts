@@ -138,27 +138,34 @@ export default async function aiModule(app: FastifyInstance, ctx: AppContext) {
   const idParam = z.object({ id: z.string().uuid() });
 
   async function aiSettings(userId: string): Promise<AiSettings> {
-    const { rows } = await db.query<{ smart: boolean; catch_up: boolean }>(
-      `SELECT ${smartRepliesEverywhereSql('$1')} AS smart, coalesce((SELECT catch_up FROM user_preferences WHERE user_id = $1), true) AS catch_up`,
+    const { rows } = await db.query<{ smart: boolean; catch_up: boolean; transcribe_voice: boolean }>(
+      `SELECT ${smartRepliesEverywhereSql('$1')} AS smart, coalesce((SELECT catch_up FROM user_preferences WHERE user_id = $1), true) AS catch_up,
+              coalesce((SELECT transcribe_voice FROM user_preferences WHERE user_id = $1), true) AS transcribe_voice`,
       [userId],
     );
-    return { smartReplies: !!rows[0]?.smart, catchUp: rows[0]?.catch_up ?? true };
+    return { smartReplies: !!rows[0]?.smart, catchUp: rows[0]?.catch_up ?? true, transcribeVoice: rows[0]?.transcribe_voice ?? true };
   }
 
-  /** Settings > Privacy > AI helpers: suggested replies in chats (off by default under 18) and the Catch me up card. */
+  /**
+   * Settings > Privacy > AI helpers: suggested replies in chats (off by default under 18), the
+   * Catch me up card, and "Transcribe my voice messages".
+   */
   app.get('/v1/me/ai-settings', { preHandler: requireAuth }, async (req): Promise<AiSettings> => aiSettings(me(req).id));
 
   app.put('/v1/me/ai-settings', { preHandler: requireAuth }, async (req): Promise<AiSettings> => {
     const u = me(req);
     const input = parse(aiSettingsSchema, req.body);
     await db.query(
-      `INSERT INTO user_preferences (user_id, smart_replies, catch_up) VALUES ($1, $2, coalesce($3, true))
+      `INSERT INTO user_preferences (user_id, smart_replies, catch_up, transcribe_voice) VALUES ($1, $2, coalesce($3, true), coalesce($4, true))
        ON CONFLICT (user_id) DO UPDATE SET smart_replies = coalesce($2, user_preferences.smart_replies),
-         catch_up = coalesce($3, user_preferences.catch_up), updated_at = now()`,
-      [u.id, input.smartReplies ?? null, input.catchUp ?? null],
+         catch_up = coalesce($3, user_preferences.catch_up), transcribe_voice = coalesce($4, user_preferences.transcribe_voice), updated_at = now()`,
+      [u.id, input.smartReplies ?? null, input.catchUp ?? null, input.transcribeVoice ?? null],
     );
     // Turning the card off forgets the visits it was based on.
     if (input.catchUp === false) await db.query(`DELETE FROM pulse_visits WHERE user_id = $1`, [u.id]);
+    // Turning transcripts off deletes the ones made of your voice messages (with their translations and spoken clips).
+    if (input.transcribeVoice === false)
+      await db.query(`DELETE FROM message_transcripts t USING messages m WHERE m.id = t.message_id AND m.sender_id = $1`, [u.id]);
     return aiSettings(u.id);
   });
 

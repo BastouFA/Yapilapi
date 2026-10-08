@@ -107,12 +107,18 @@ function listing(d: Data, fallback: MessageKey, locale: string): string {
 /**
  * A new message (lib/message-push.ts): "Ada: See you at six", "Ada in Family: Photo", or "Ada: 3 new
  * messages" once several came in. `d.preview` is the message as the recipient sees it, `d.chat` a
- * group's name, `d.private` a disappearing message.
+ * group's name, `d.private` a disappearing message, `d.transcript` a voice note's first words
+ * ("Ada: Voice message: See you at six").
  */
 function messageText(name: string, d: Data, locale: string): string {
   const count = Math.max(1, Number(d.count ?? 1) || 1);
   const preview = d.preview as MessagePreview | undefined;
-  const text = count > 1 || !preview ? tp('push.message.count', count, locale) : messageLine(preview, !!d.private, locale);
+  const text =
+    count > 1 || !preview
+      ? tp('push.message.count', count, locale)
+      : typeof d.transcript === 'string' && d.transcript && !d.private && !preview.viewOnce
+        ? t('push.message.voice', locale, { text: d.transcript })
+        : messageLine(preview, !!d.private, locale);
   const chat = typeof d.chat === 'string' && d.chat ? d.chat : null;
   return chat ? t('push.message.group', locale, { name, group: chat, text }) : t('push.message', locale, { name, text });
 }

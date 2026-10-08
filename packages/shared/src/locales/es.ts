@@ -7035,4 +7035,11 @@ export const es: Catalog = {
   'push.squad_joined': '{name} se unió a {squad}',
   'push.squad_post': '{name} compartió algo en {squad}',
   'push.squad_memory': 'Tu semana en {squad} está lista',
+  'push.message.voice': 'Mensaje de voz: {text}',
+  'chat.transcript.show': 'Mostrar texto',
+  'chat.transcript.hide': 'Ocultar texto',
+  'chat.transcript.listen': 'Escuchar en {language}',
+  'st.ai.transcribeVoice': 'Transcribir mis mensajes de voz',
+  'st.ai.transcribeVoiceHint':
+    'Las personas de tus chats pueden leer lo que dices en tus mensajes de voz, en su idioma. Si lo desactivas, se borra el texto de los que enviaste.',
 };

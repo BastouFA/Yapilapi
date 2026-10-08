@@ -6958,4 +6958,10 @@ export const am: Catalog = {
   'push.squad_joined': '{name} {squad}ን ተቀላቅሏል',
   'push.squad_post': '{name} በ{squad} ውስጥ የሆነ ነገር አጋርቷል',
   'push.squad_memory': 'በ{squad} ያለዎት ሳምንት ዝግጁ ነው',
+  'push.message.voice': 'የድምጽ መልዕክት፦ {text}',
+  'chat.transcript.show': 'ጽሑፍ አሳይ',
+  'chat.transcript.hide': 'ጽሑፍ ደብቅ',
+  'chat.transcript.listen': 'በ{language} ያዳምጡ',
+  'st.ai.transcribeVoice': 'የድምጽ መልዕክቶቼን ወደ ጽሑፍ ቀይር',
+  'st.ai.transcribeVoiceHint': 'በውይይቶችዎ ውስጥ ያሉ ሰዎች በድምጽ መልዕክቶች የሚናገሩትን በቋንቋቸው ማንበብ ይችላሉ። ይህን ማጥፋት የላኳቸውን መልዕክቶች ጽሑፍ ይሰርዛል።',
 };

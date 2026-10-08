@@ -1337,4 +1337,5 @@ export const ha: Record<string, string> = {
   'This chat belongs to a squad. Change who’s in it from the squad.': 'Wannan hirar ta wani squad ce. Canza waɗanda ke ciki daga squad ɗin.',
   'Posts shared with a squad stay with it.': 'Rubuce-rubucen da aka raba da squad suna zama a cikinsa.',
   'Reels in a squad’s chain are shared with that squad.': 'Reel a cikin sarƙar squad ana raba su da wannan squad ɗin.',
+  'Listening isn’t available right now. Try again later.': 'Ba a iya sauraro yanzu. Sake gwadawa nan gaba.',
 };

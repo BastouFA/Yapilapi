@@ -1233,4 +1233,5 @@ export const hi: Record<string, string> = {
   'This chat belongs to a squad. Change who’s in it from the squad.': 'यह चैट एक स्क्वाड की है। इसमें कौन है, यह स्क्वाड से बदलें।',
   'Posts shared with a squad stay with it.': 'स्क्वाड के साथ शेयर की गई पोस्ट स्क्वाड में ही रहती हैं।',
   'Reels in a squad’s chain are shared with that squad.': 'स्क्वाड की चेन की रील उसी स्क्वाड के साथ शेयर होती हैं।',
+  'Listening isn’t available right now. Try again later.': 'सुनना अभी उपलब्ध नहीं है। बाद में फिर से कोशिश करें।',
 };

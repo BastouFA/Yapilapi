@@ -6977,4 +6977,10 @@ export const ko: Catalog = {
   'push.squad_joined': '{name}님이 {squad}에 참여했어요',
   'push.squad_post': '{name}님이 {squad}에 공유했어요',
   'push.squad_memory': '{squad}의 한 주가 준비됐어요',
+  'push.message.voice': '음성 메시지: {text}',
+  'chat.transcript.show': '텍스트 보기',
+  'chat.transcript.hide': '텍스트 숨기기',
+  'chat.transcript.listen': '{language}로 듣기',
+  'st.ai.transcribeVoice': '내 음성 메시지를 텍스트로 변환',
+  'st.ai.transcribeVoiceHint': '채팅 상대가 음성 메시지에서 내가 한 말을 자신의 언어로 읽을 수 있어요. 끄면 보낸 메시지의 텍스트가 삭제돼요.',
 };

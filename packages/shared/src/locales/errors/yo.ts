@@ -1318,4 +1318,5 @@ export const yo: Record<string, string> = {
   'This chat belongs to a squad. Change who’s in it from the squad.': 'Ìjíròrò yìí jẹ́ ti squad kan. Yí àwọn tó wà nínú rẹ̀ padà láti inú squad.',
   'Posts shared with a squad stay with it.': 'Àwọn ìfiránṣẹ́ tí a pín pẹ̀lú squad máa ń wà nínú rẹ̀.',
   'Reels in a squad’s chain are shared with that squad.': 'Àwọn reel nínú ẹ̀wọ̀n squad ni a ń pín pẹ̀lú squad náà.',
+  'Listening isn’t available right now. Try again later.': 'Gbígbọ́ kò sí báyìí. Gbìyànjú lẹ́ẹ̀kan sí i nígbà míì.',
 };

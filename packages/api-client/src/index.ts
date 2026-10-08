@@ -1147,6 +1147,8 @@ export function createClient(opts: ClientOptions) {
       unsend: (id: string) => post<{ message: Message | null }>(`/v1/messages/${id}/unsend`),
       /** Delete for me: gone from your view of the chat only. */
       deleteForMe: (id: string) => post<{ ok: true }>(`/v1/messages/${id}/delete-for-me`),
+      /** "Listen in French": a voice message's translated words read out (the address of a shared clip). */
+      transcriptSpeech: (id: string, target: string) => post<{ url: string; language: string }>(`/v1/messages/${id}/transcript/speech`, { target }),
       react: (id: string, emoji: string) => put<{ ok: true }>(`/v1/messages/${id}/reactions/${encodeURIComponent(emoji)}`),
       unreact: (id: string, emoji: string) => del<{ ok: true }>(`/v1/messages/${id}/reactions/${encodeURIComponent(emoji)}`),
       pin: (id: string) => put<{ items: PinnedMessage[] }>(`/v1/messages/${id}/pin`),
@@ -1480,8 +1482,20 @@ export function createClient(opts: ClientOptions) {
       /** Paid tips you got or sent; ones sent during a live are gifts. */
       tips: (direction: 'received' | 'sent' = 'received') => get<{ direction: 'received' | 'sent'; items: TipRecord[] }>(`/v1/me/tips${qs({ direction })}`),
     },
-    /** Feature flags, how the phone apps offer digital goods (`purchases`), and whether automatic translation works here now (`autoTranslation`); both missing from older servers. */
-    flags: () => get<{ flags: Record<string, boolean>; purchases?: StorePurchasePolicy; autoTranslation?: boolean }>('/v1/flags'),
+    /**
+     * Feature flags, how the phone apps offer digital goods (`purchases`), whether automatic translation works here now
+     * (`autoTranslation`), and what voice messages offer: transcripts, their translation and "Listen in …" (`voice*`).
+     * All but `flags` are missing from older servers.
+     */
+    flags: () =>
+      get<{
+        flags: Record<string, boolean>;
+        purchases?: StorePurchasePolicy;
+        autoTranslation?: boolean;
+        voiceTranscripts?: boolean;
+        voiceTranslation?: boolean;
+        voiceListen?: boolean;
+      }>('/v1/flags'),
     /** What anyone can see of a shared link without an account (link previews, signed-out views). */
     public: {
       post: (id: string) => get<{ post: PublicPostPreview }>(`/v1/public/posts/${encodeURIComponent(id)}`),

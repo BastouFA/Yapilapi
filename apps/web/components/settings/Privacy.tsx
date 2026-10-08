@@ -361,7 +361,7 @@ export function MemoryCard() {
   );
 }
 
-/** AI helpers: suggested replies in chats (off by default under 18) and the Catch me up card on Pulse. */
+/** AI helpers: suggested replies in chats (off by default under 18), the Catch me up card on Pulse, and transcripts of your voice messages. */
 export function AiHelpersCard() {
   const { t, toast } = useSession();
   const [s, setS] = useState<AiSettings | null>(null);
@@ -389,6 +389,14 @@ export function AiHelpersCard() {
           <p className="muted" style={{ margin: 0, fontSize: 13 }}>
             {t('st.ai.catchUpHint')}
           </p>
+          {s.transcribeVoice !== undefined ? (
+            <>
+              <Switch label={t('st.ai.transcribeVoice')} checked={s.transcribeVoice} onChange={(v) => void save({ transcribeVoice: v })} />
+              <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+                {t('st.ai.transcribeVoiceHint')}
+              </p>
+            </>
+          ) : null}
         </div>
       </Card>
     </Anchor>

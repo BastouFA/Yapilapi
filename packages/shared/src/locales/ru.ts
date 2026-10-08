@@ -7407,4 +7407,11 @@ export const ru: Catalog = {
   'push.squad_joined': '{name} вступает в {squad}',
   'push.squad_post': '{name} публикует что-то в {squad}',
   'push.squad_memory': 'Ваша неделя в {squad} готова',
+  'push.message.voice': 'Голосовое сообщение: {text}',
+  'chat.transcript.show': 'Показать текст',
+  'chat.transcript.hide': 'Скрыть текст',
+  'chat.transcript.listen': 'Слушать: {language}',
+  'st.ai.transcribeVoice': 'Расшифровывать мои голосовые сообщения',
+  'st.ai.transcribeVoiceHint':
+    'Люди в ваших чатах смогут читать то, что вы говорите в голосовых сообщениях, на своём языке. Если выключить, текст отправленных вами сообщений будет удалён.',
 };

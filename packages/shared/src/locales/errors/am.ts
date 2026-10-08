@@ -1182,4 +1182,5 @@ export const am: Record<string, string> = {
   'This chat belongs to a squad. Change who’s in it from the squad.': 'ይህ ውይይት የስኳድ ነው። በውስጡ ያሉትን ከስኳዱ ይቀይሩ።',
   'Posts shared with a squad stay with it.': 'ለስኳድ የተጋሩ ልጥፎች በስኳዱ ውስጥ ይቆያሉ።',
   'Reels in a squad’s chain are shared with that squad.': 'በስኳድ ሰንሰለት ውስጥ ያሉ ሪሎች ለዚያው ስኳድ ይጋራሉ።',
+  'Listening isn’t available right now. Try again later.': 'ማዳመጥ አሁን አይገኝም። ቆይተው እንደገና ይሞክሩ።',
 };

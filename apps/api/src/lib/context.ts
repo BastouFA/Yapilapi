@@ -7,6 +7,7 @@ import type { EmailSender } from './email.ts';
 import type { MediaStorage } from './storage.ts';
 import type { PaymentProvider, PaymentRegistry } from './payments.ts';
 import type { TranscriptionProvider } from './transcription.ts';
+import type { SpeechProvider } from './speech.ts';
 import type { SmsProvider } from './sms.ts';
 import type { MediaModerator } from './media-moderation.ts';
 import type { RoomMedia } from './room-media.ts';
@@ -26,8 +27,10 @@ export interface AppContext {
   payments: PaymentProvider;
   /** Every configured provider: pick one by currency for new payments, by name for refunds and webhooks. */
   paymentProviders: PaymentRegistry;
-  /** Speech-to-text for automatic captions; null when not configured. */
+  /** Speech-to-text for automatic captions and voice message transcripts; null when not configured. */
   transcription: TranscriptionProvider | null;
+  /** Text-to-speech ("Listen in French"); null when not configured (lib/speech.ts). */
+  speech: SpeechProvider | null;
   /** Phone verification codes (dev logs them; Twilio Verify in production). */
   sms: SmsProvider;
   /** Automated image and video checks, run in the media job. */

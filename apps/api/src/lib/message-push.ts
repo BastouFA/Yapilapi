@@ -2,7 +2,7 @@ import type { Pool, PoolClient } from 'pg';
 import type { RealtimeHub } from './realtime.ts';
 import { messagePreviews } from './chat.ts';
 import { activeControls } from './family.ts';
-import { notify } from './services.ts';
+import { isEnabled, notify } from './services.ts';
 import { ageOf } from './users.ts';
 
 type Q = Pool | PoolClient;
@@ -12,6 +12,18 @@ type Q = Pool | PoolClient;
  * again, saying how many, once the last one is this old.
  */
 export const MESSAGE_REPUSH_SECONDS = 120;
+
+/** A voice message's push says at most this much of what was said (its transcript). */
+export const PUSH_TRANSCRIPT_CHARS = 80;
+
+/** The first words of a transcript, cut between words: "See you at six, and bring…". */
+export function firstWords(text: string, max = PUSH_TRANSCRIPT_CHARS): string {
+  const chars = [...text.replace(/\s+/g, ' ').trim()];
+  if (chars.length <= max) return chars.join('');
+  const cut = chars.slice(0, max).join('');
+  const space = cut.lastIndexOf(' ');
+  return `${(space > max / 2 ? cut.slice(0, space) : cut).trimEnd()}…`;
+}
 
 /**
  * A new message pushes, like a messenger, to everyone in the chat who isn't connected right now
@@ -29,7 +41,9 @@ export const MESSAGE_REPUSH_SECONDS = 120;
  * the minor-safety rule and family settings (like Yaps, lib/yaps.ts), and a message request (someone
  * who isn't a friend writing first in a one-to-one chat) pushes for its first message only, until
  * they write back. The text says only what the recipient would see in the chat, and a disappearing
- * message only what it is (lib/push.ts, messageText).
+ * message only what it is (lib/push.ts, messageText). A voice note with a transcript says its first
+ * words (lib/voice-transcripts.ts sends its push once the words are ready); view-once and
+ * disappearing ones are never transcribed.
  */
 export async function pushNewMessage(deps: { db: Q; realtime: RealtimeHub }, messageId: string): Promise<void> {
   const { db, realtime } = deps;
@@ -44,8 +58,10 @@ export async function pushNewMessage(deps: { db: Q; realtime: RealtimeHub }, mes
       created_by: string;
       sender_birth: Date | null;
       wrote_before: boolean;
+      transcript: string | null;
     }>(
       `SELECT m.id, m.conversation_id, m.sender_id, m.expires_at, c.kind AS chat_kind, c.title, c.created_by, u.birth_date AS sender_birth,
+              (SELECT t.body FROM message_transcripts t WHERE t.message_id = m.id AND t.status = 'ready' AND NOT m.view_once AND m.expires_at IS NULL) AS transcript,
               EXISTS (SELECT 1 FROM messages x WHERE x.conversation_id = m.conversation_id AND x.sender_id = m.sender_id AND x.kind <> 'system'
                       AND x.moderation_status = 'normal' AND (x.created_at, x.id) < (m.created_at, m.id)) AS wrote_before
        FROM messages m JOIN conversations c ON c.id = m.conversation_id JOIN users u ON u.id = m.sender_id
@@ -65,6 +81,7 @@ export async function pushNewMessage(deps: { db: Q; realtime: RealtimeHub }, mes
     [m.conversation_id, m.sender_id],
   );
   const senderAge = ageOf(m.sender_birth);
+  const transcript = m.transcript && (await isEnabled(db, 'VOICE_TRANSCRIPTS')) ? firstWords(m.transcript) : null;
   for (const r of rows) {
     if (realtime.isOnline(r.id)) continue;
     const age = ageOf(r.birth_date);
@@ -86,7 +103,12 @@ export async function pushNewMessage(deps: { db: Q; realtime: RealtimeHub }, mes
       entityId: m.conversation_id,
       group: m.conversation_id,
       messages: { repushAfterSeconds: MESSAGE_REPUSH_SECONDS },
-      pushData: { preview: { ...preview, sender: null }, private: !!m.expires_at, chat: m.chat_kind === 'group' ? m.title : null },
+      pushData: {
+        preview: { ...preview, sender: null },
+        private: !!m.expires_at,
+        chat: m.chat_kind === 'group' ? m.title : null,
+        ...(transcript && preview.attachmentKind === 'audio' ? { transcript } : {}),
+      },
     });
   }
 }

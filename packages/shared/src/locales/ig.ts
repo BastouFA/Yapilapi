@@ -7014,4 +7014,11 @@ export const ig: Catalog = {
   'push.squad_joined': '{name} sonyere na {squad}',
   'push.squad_post': '{name} kesara ihe na {squad}',
   'push.squad_memory': 'Izu gị na {squad} adịla njikere',
+  'push.message.voice': 'Ozi olu: {text}',
+  'chat.transcript.show': 'Gosi ederede',
+  'chat.transcript.hide': 'Zoo ederede',
+  'chat.transcript.listen': 'Gee ntị na {language}',
+  'st.ai.transcribeVoice': 'Dee ozi olu m dịka ederede',
+  'st.ai.transcribeVoiceHint':
+    'Ndị nọ na nkata gị nwere ike ịgụ ihe ị kwuru n’ozi olu, n’asụsụ ha. Ọ bụrụ na ị gbanyụọ ya, a ga-ehichapụ ederede nke ndị ị zitere.',
 };

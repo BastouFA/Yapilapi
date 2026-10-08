@@ -1230,4 +1230,5 @@ export const id: Record<string, string> = {
   'This chat belongs to a squad. Change who’s in it from the squad.': 'Chat ini milik sebuah squad. Ubah siapa yang ada di dalamnya dari squad.',
   'Posts shared with a squad stay with it.': 'Postingan yang dibagikan ke squad tetap ada di squad itu.',
   'Reels in a squad’s chain are shared with that squad.': 'Reel dalam rantai squad dibagikan ke squad itu.',
+  'Listening isn’t available right now. Try again later.': 'Mendengarkan belum tersedia saat ini. Coba lagi nanti.',
 };

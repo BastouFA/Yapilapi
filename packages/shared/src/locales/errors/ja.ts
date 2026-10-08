@@ -1220,4 +1220,5 @@ export const ja: Record<string, string> = {
   'This chat belongs to a squad. Change who’s in it from the squad.': 'このチャットはスクワッドのものです。メンバーはスクワッドで変更してください。',
   'Posts shared with a squad stay with it.': 'スクワッドに共有した投稿は、スクワッドに残ります。',
   'Reels in a squad’s chain are shared with that squad.': 'スクワッドのチェーンのリールは、そのスクワッドに共有されます。',
+  'Listening isn’t available right now. Try again later.': '現在、音声で聞くことはできません。後でもう一度お試しください。',
 };

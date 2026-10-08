@@ -6957,4 +6957,10 @@ export const zh: Catalog = {
   'push.squad_joined': '{name} 加入了 {squad}',
   'push.squad_post': '{name} 在 {squad} 分享了内容',
   'push.squad_memory': '你在 {squad} 的这一周已整理好',
+  'push.message.voice': '语音消息：{text}',
+  'chat.transcript.show': '显示文字',
+  'chat.transcript.hide': '隐藏文字',
+  'chat.transcript.listen': '用{language}收听',
+  'st.ai.transcribeVoice': '将我的语音消息转为文字',
+  'st.ai.transcribeVoiceHint': '聊天中的人可以用自己的语言阅读你在语音消息中说的话。关闭后，你已发送消息的文字会被删除。',
 };

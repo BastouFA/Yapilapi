@@ -59,6 +59,8 @@ import { sharesFor, stopSharesOnJoin, stopSharesOnLeave } from '../lib/location.
 import { registerLocation } from './location.ts';
 import { marketCardsFor, offersFor } from '../lib/market.ts';
 import { registerMarketChats } from './market.ts';
+import { queueTranscript, transcriptsFor } from '../lib/voice-transcripts.ts';
+import { registerVoiceMessages } from './voice-messages.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
 
@@ -566,7 +568,25 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
   /** Messages as one reader sees them: attachment verdicts, story cards, view once, the quoted reply and reactions. */
   async function present(rows: Record<string, any>[], reader: string): Promise<Message[]> {
     const items = await withViewOnce(await withVerdicts((await withStories(rows, reader)).map(toMessage), await seesSensitiveMedia(db, reader)), reader);
-    return decorate(items, reader);
+    return decorate(await withTranscripts(items), reader);
+  }
+
+  /**
+   * Voice messages carry their transcript once it's ready (lib/voice-transcripts.ts), while
+   * VOICE_TRANSCRIPTS is on and speech-to-text is set up, and only where the voice clip itself
+   * is shown (not taken down, not hidden as sensitive from this reader).
+   */
+  async function withTranscripts(items: Message[]): Promise<Message[]> {
+    const voice = new Set(
+      items
+        .filter(
+          (m) => !m.unsent && !m.viewOnce && !m.expiresAt && m.attachments?.length === 1 && m.attachments[0]!.kind === 'audio' && !m.attachments[0]!.removed,
+        )
+        .map((m) => m.id),
+    );
+    if (!voice.size || !ctx.transcription || !(await isEnabled(db, 'VOICE_TRANSCRIPTS'))) return items;
+    const got = await transcriptsFor(db, [...voice]);
+    return got.size ? items.map((m) => (voice.has(m.id) && got.has(m.id) ? { ...m, transcript: got.get(m.id)! } : m)) : items;
   }
 
   async function decorate(items: Message[], reader: string): Promise<Message[]> {
@@ -810,6 +830,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       }
       return rows[0];
     });
+    // A voice note or a Yap is transcribed in a job; a voice note's push waits for its first words (lib/voice-transcripts.ts).
+    const transcribing = row.inserted && (await queueTranscript(db, ctx.transcription, u.id, row, { push: !yap && row.moderation_status === 'normal' }));
     const sender = (await usersByIds(db, [u.id])).get(u.id)!;
     const storyId = (row.story_id as string | null) ?? null;
     /** The message as one reader sees it: with the story card opening only if they can see the story. */
@@ -867,8 +889,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       );
     }
     if (yap && row.inserted) await deliverYap(u.id, id, members, (userId) => (adults.has(userId) ? forAdults! : forOthers!));
-    // Everyone here who isn't connected gets a push (a Yap pushes as itself, above).
-    else if (row.inserted) await pushNewMessage({ db, realtime: ctx.realtime }, row.id);
+    // Everyone here who isn't connected gets a push (a Yap pushes as itself, above; a voice note being transcribed, from its job).
+    else if (row.inserted && !transcribing) await pushNewMessage({ db, realtime: ctx.realtime }, row.id);
     track(db, u.id, row.kind === 'yap' ? 'yap_sent' : 'message_sent', { kind: conv.kind, ...(row.view_once ? { viewOnce: true } : {}) });
     return { message: await ownCopy(adults.has(u.id) ? forAdults! : forOthers!) };
   }
@@ -1409,6 +1431,9 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
 
   // Send later, and chat wallpapers and colours (modules/chat-later.ts).
   registerChatLater(app, ctx, { assertMember, memberIds, loadMessage, sendMessage });
+
+  // Voice messages everyone understands: transcripts and "Listen in French" (modules/voice-messages.ts).
+  registerVoiceMessages(app, ctx);
 
   // ── Realtime socket ───────────────────────────────────────────────────
   /** A 60-second ticket for opening the realtime socket from another origin (see lib/realtime-ticket.ts). */

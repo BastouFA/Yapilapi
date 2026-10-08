@@ -7059,4 +7059,11 @@ export const de: Catalog = {
   'push.squad_joined': '{name} ist {squad} beigetreten',
   'push.squad_post': '{name} hat etwas in {squad} geteilt',
   'push.squad_memory': 'Deine Woche in {squad} ist fertig',
+  'push.message.voice': 'Sprachnachricht: {text}',
+  'chat.transcript.show': 'Text anzeigen',
+  'chat.transcript.hide': 'Text ausblenden',
+  'chat.transcript.listen': 'Auf {language} anhören',
+  'st.ai.transcribeVoice': 'Meine Sprachnachrichten transkribieren',
+  'st.ai.transcribeVoiceHint':
+    'Personen in deinen Chats können lesen, was du in Sprachnachrichten sagst, in ihrer Sprache. Wenn du das ausschaltest, wird der Text deiner gesendeten Sprachnachrichten gelöscht.',
 };

@@ -30,7 +30,8 @@ in a commit. A setting left empty counts as unset.
 | 4 | Lawyer review | Yes, before a public launch | Their time | `docs/legal/review-pack.md` |
 | 5 | Apple and Google developer accounts | Yes, for the store apps | 1 to 3 days of checks | Apple yearly fee, Google one-time fee |
 | 6 | How iPhone purchases work | Yes, before App Store review | A decision | `docs/operations/in-app-purchases.md` |
-| 7 | Automatic captions (speech-to-text) | No: people can still write captions | 10 minutes | Pay per minute of audio |
+| 7 | Speech-to-text (automatic captions, voice message transcripts) | No: people can still write captions; voice messages just have no text | 10 minutes | Pay per minute of audio |
+| 8 | Text-to-speech ("Listen in French" under translated voice messages) | No: the button isn't offered | 10 minutes | Pay per character; `TTS_DAILY_CHAR_LIMIT` caps it |
 
 ## 1. Email
 
@@ -159,25 +160,62 @@ drops and bookings through the app's own checkout is allowed either way.
 change for each choice. Until you choose, the iPhone app follows the safest option, which passes
 review.
 
-## 7. Automatic captions (speech-to-text)
+## 7. Speech-to-text (automatic captions and voice message transcripts)
 
 Without a provider, the video editor says automatic captions aren't set up, and people can still
-write captions or upload a .vtt file. With one, "Make captions automatically" works on videos.
+write captions or upload a .vtt file; voice messages in chats have no "Show text". With one, "Make
+captions automatically" works on videos, and voice notes and Yaps in chats are transcribed (and
+translated for people who don't understand them; `docs/product/speech-engine.md`).
 
-1. Create an API key with OpenAI (https://platform.openai.com, **API keys**) and set a monthly limit.
-   Any other service with the same `POST /audio/transcriptions` request that returns WebVTT works too,
-   including a Whisper server you run yourself.
-2. Set:
+1. **Recommended: Groq** (fast and cheap for short voice notes). Create an API key at
+   https://console.groq.com (**API Keys**) and set a spending limit. OpenAI
+   (https://platform.openai.com, **API keys**) works the same way, and so does any other service with
+   the same `POST /audio/transcriptions` request that returns WebVTT, including a Whisper server you
+   run yourself.
+2. Set (Groq):
 
    ```
    TRANSCRIBE_PROVIDER=openai-compatible
-   TRANSCRIBE_API_URL=https://api.openai.com/v1
+   TRANSCRIBE_API_URL=https://api.groq.com/openai/v1
    TRANSCRIBE_API_KEY=<the key>
-   TRANSCRIBE_MODEL=whisper-1
+   TRANSCRIBE_MODEL=whisper-large-v3-turbo
    ```
 
-3. Check it: the launch check asks the service for its model list (nothing is transcribed or paid
-   for), then open a short video in the video editor and choose **Make captions automatically**.
+   With OpenAI instead: `TRANSCRIBE_API_URL=https://api.openai.com/v1` and `TRANSCRIBE_MODEL=whisper-1`.
 
-The audio of the video being captioned is sent to the provider; this belongs in the privacy policy
-next to the AI helpers.
+3. Check it: the launch check asks the service for its model list (nothing is transcribed or paid
+   for), then open a short video in the video editor and choose **Make captions automatically**, and
+   send a voice note in a chat: "Show text" appears under it a moment later.
+
+The audio of the video being captioned, and of voice messages (unless the sender turned off
+"Transcribe my voice messages"; never view-once or disappearing ones), is sent to the provider; this
+belongs in the privacy policy next to the AI helpers. `VOICE_TRANSCRIPTS` (Admin > Feature flags)
+turns voice message transcripts off for everyone without touching captions.
+
+## 8. Text-to-speech ("Listen in French")
+
+Without a provider, translated voice messages show their translated text only. With one, a
+"Listen in {language}" button reads the translation out in a plain synthetic voice (never the
+sender's). Each clip is made the first time someone taps it and shared by everyone after.
+
+1. Create an API key with OpenAI (https://platform.openai.com, **API keys**) and set a monthly limit.
+   Any service with the OpenAI-compatible `POST /audio/speech` request works.
+2. Set:
+
+   ```
+   TTS_PROVIDER=openai-compatible
+   TTS_API_URL=https://api.openai.com/v1
+   TTS_API_KEY=<the key>
+   TTS_MODEL=gpt-4o-mini-tts        # or tts-1
+   TTS_VOICE=alloy
+   TTS_DAILY_CHAR_LIMIT=200000      # characters a day for everyone; then "not available right now"
+   TTS_PER_HOUR=30                  # new clips per person per hour
+   ```
+
+   `TTS_VOICES=fr=nova,ar=onyx` picks a voice per language (optional).
+3. Check it: the launch check asks the service for its model list; then, as someone whose app
+   language differs from a voice note's, open "Show text" and tap **Listen in …**.
+
+The translated text (never the audio or the sender's name) is sent to the provider.
+`VOICE_TRANSLATION` (Admin > Feature flags) turns translated transcripts and listening off for
+everyone.
