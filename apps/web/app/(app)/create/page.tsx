@@ -22,7 +22,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AutocompleteText } from '@/components/Autocomplete';
 import { Suspense, useEffect, useRef, useState } from 'react';
-import { Alert, BottomSheet, Button, Checkbox, formatScheduled, Segments, Select, TextField } from '@yapilapi/design-system';
+import { Alert, BottomSheet, Button, Checkbox, formatScheduled, Icon, Segments, Select, Skeleton, TextField } from '@yapilapi/design-system';
 import {
   ECHO_PERMISSIONS,
   type EchoPermission,
@@ -39,6 +39,11 @@ import {
   type StoryVisibility,
   type Visibility,
   type EditorParamsInput,
+  CHAIN_RULES,
+  FAIR_START,
+  fullCount,
+  type Chain,
+  type ChainJoin,
 } from '@yapilapi/shared';
 
 /** Posts can be for subscribers, stories for close friends; one picker holds either. */
@@ -56,6 +61,7 @@ import { StoryStickerEditor, type DraftSticker } from '@/components/StorySticker
 import { clipMax, draftMusic, MusicField, musicInput, soundAsTrack, type DraftMusic } from '@/components/MusicPicker';
 import { localInput, nextHour, scheduleBounds } from '@/lib/schedule';
 import { VoiceRecorder } from '@/components/ChatAttachments';
+import { ChainJoinSelect, chainableAudience, guessChainJoin, takeMicHref } from '@/components/PassTheMic';
 import { useSession } from '../../providers';
 
 // The editors open full screen once photos or a video are picked, so they download then.
@@ -190,6 +196,48 @@ function Create() {
   const [audience, setAudience] = useState<string[]>([]);
   const [scheduling, setScheduling] = useState(false);
   const [when, setWhen] = useState(nextHour);
+  // Pass the Mic: taking the mic (?chain=<id>, from "Take the mic") posts this reel as the chain's next one;
+  // otherwise the reel can start a chain of its own. Not for drafts (a chain reel is posted right away).
+  const micOn = !!flags.PASS_THE_MIC && !draftId;
+  const chainId = micOn && /^[0-9a-f-]{36}$/i.test(params.get('chain') ?? '') ? params.get('chain') : null;
+  const [chain, setChain] = useState<Chain | null>(null);
+  const [chainMissing, setChainMissing] = useState<string | null>(null);
+  const [startChain, setStartChain] = useState(false);
+  const [chainPrompt, setChainPrompt] = useState('');
+  // Who can take the mic; null keeps the account's default (people you follow for under-18 accounts).
+  const [chainJoin, setChainJoin] = useState<ChainJoin | null>(null);
+  // Fair start: whether this reel would be shown to new people (a new creator's first reels).
+  const [fairOffered, setFairOffered] = useState(false);
+  useEffect(() => {
+    if (!chainId) return;
+    let live = true;
+    api.chains.get(chainId).then(
+      (r) => live && setChain(r.chain),
+      (e) => live && setChainMissing(errorMessage(e)),
+    );
+    return () => {
+      live = false;
+    };
+  }, [chainId]);
+  useEffect(() => {
+    if (!me || !flags.FAIR_START || kind !== 'reel' || draftId) return;
+    let live = true;
+    api.fairStart.offered().then(
+      (r) => live && setFairOffered(r.offered),
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [me, flags.FAIR_START, kind, draftId]);
+  // A chain reel goes up now, to everyone, followers or friends, outside communities.
+  const chainAudience = kind === 'reel' && !communityId && chainableAudience(visibility);
+  const joining = kind === 'reel' && !!chainId;
+  const starting = kind === 'reel' && micOn && !chainId && startChain && chainAudience && !!chainPrompt.trim();
+  // Taking the mic: the audience picker keeps to what a chain allows.
+  useEffect(() => {
+    if (joining && !chainableAudience(visibility)) setVisibility('public');
+  }, [joining, visibility]);
 
   useEffect(() => {
     if (!draftId) return;
@@ -504,6 +552,13 @@ function Create() {
     };
   }
 
+  /** Pass the Mic, for a reel published now: the chain it joins, or the chain it starts. */
+  function chainFields(): Record<string, unknown> {
+    if (joining && chainId && chainAudience) return { chainId };
+    if (starting) return { chainPrompt: chainPrompt.trim(), ...(chainJoin ? { chainJoin } : {}) };
+    return {};
+  }
+
   /** Keep the post for later: as a draft, or to publish at the chosen time. */
   async function keep(mode: 'draft' | 'schedule') {
     setBusy(mode);
@@ -553,9 +608,12 @@ function Create() {
         return;
       }
       // A draft is saved with what's here now, then published through the same checks as a new post.
-      const r = draftId ? (await api.drafts.save(draftId, postContent()), await api.drafts.publish(draftId)) : await api.posts.create(postContent());
+      const r = draftId
+        ? (await api.drafts.save(draftId, postContent()), await api.drafts.publish(draftId))
+        : await api.posts.create({ ...postContent(), ...(kind === 'reel' ? chainFields() : {}) });
       if (kind === 'reel') {
-        toast(noticeText(r.moderation, t) ?? t('compose.reelPublished'));
+        const chained = joining && chainAudience ? 'mic.joined' : starting ? 'mic.started' : null;
+        toast(noticeText(r.moderation, t) ?? t(chained ?? 'compose.reelPublished'));
         router.push(`/reels?start=${r.post.id}`);
         return;
       }
@@ -574,7 +632,11 @@ function Create() {
     kind === 'reel'
       ? media.length !== 1 || media[0]!.kind !== 'video' || (!!remixOf && !original)
       : !body.trim() && !media.length && !poll && !(kind === 'post' && link?.trim()) && !(kind === 'story' && (stickers.length || music));
-  const blocked = uploading || !draftLoaded || empty;
+  // Taking the mic waits for the chain; starting one needs its prompt.
+  const chainIncomplete = (joining && !chain) || (kind === 'reel' && micOn && !chainId && startChain && chainAudience && !chainPrompt.trim());
+  const blocked = uploading || !draftLoaded || empty || chainIncomplete;
+  // A reel in a chain is posted right away: no draft, no schedule.
+  const chainNow = joining || (kind === 'reel' && micOn && startChain && chainAudience);
 
   return (
     <>
@@ -638,6 +700,35 @@ function Create() {
           ) : (
             <p className="muted">{t('compose.loadingOriginal')}</p>
           )
+        ) : null}
+        {joining ? (
+          chainMissing ? (
+            <Alert tone="danger">{chainMissing}</Alert>
+          ) : chain ? (
+            <div className="mic-join" role="note">
+              <span className="mic-join__icon" aria-hidden>
+                <Icon name="mic" size={20} />
+              </span>
+              <div className="mic-join__text">
+                <strong dir="auto">{t('mic.joining', { prompt: chain.prompt })}</strong>
+                <span className="muted">{t('mic.startedBy', { name: chain.starter.displayName })}</span>
+                {chain.closed ? <span className="muted">{t('mic.closed')}</span> : null}
+              </div>
+              <Link href={takeMicHref(chain.id, params.get('sound'), '/camera')} className="yp-btn yp-btn--secondary yp-btn--sm">
+                {t('m.create.openCamera')}
+              </Link>
+            </div>
+          ) : (
+            <Skeleton height={64} />
+          )
+        ) : null}
+        {kind === 'reel' && fairOffered && flags.FAIR_START ? (
+          <p className="mic-fair">
+            <Icon name="sparkle" size={16} />
+            <span>
+              <strong>{t('fair.title')}</strong> · {t('fair.promise', { target: fullCount(FAIR_START.target, locale) })}
+            </span>
+          </p>
         ) : null}
         <p className="muted" style={{ margin: 0, fontSize: 14 }}>
           {kind === 'post' ? t('compose.hint.post') : kind === 'reel' ? t('compose.hint.reel', { minutes: reelMax / 60 }) : t('compose.hint.story')}
@@ -988,7 +1079,13 @@ function Create() {
             >
               {(kind === 'story' ? STORY_VISIBILITIES : POST_VISIBILITIES)
                 // Stories can't go to a circle; they have close friends instead.
-                .filter((v) => (kind !== 'story' || (v !== 'selected' && v !== 'subscribers' && v !== 'circle')) && (v !== 'subscribers' || hasPlans))
+                .filter(
+                  (v) =>
+                    (kind !== 'story' || (v !== 'selected' && v !== 'subscribers' && v !== 'circle')) &&
+                    (v !== 'subscribers' || hasPlans) &&
+                    // Taking the mic: only the audiences a chain allows.
+                    (!joining || chainableAudience(v)),
+                )
                 .flatMap((v) =>
                   v === 'circle'
                     ? circles.length
@@ -1063,6 +1160,30 @@ function Create() {
               ))}
             </Select>
           ) : null}
+          {kind === 'reel' && micOn && !chainId && chainAudience ? (
+            <div className="stack-sm">
+              <Checkbox
+                label={t('mic.start')}
+                description={t('mic.start.hint')}
+                checked={startChain}
+                onChange={(e) => setStartChain(e.currentTarget.checked)}
+              />
+              {startChain ? (
+                <>
+                  <TextField
+                    label={t('mic.prompt')}
+                    placeholder={t('mic.prompt.placeholder')}
+                    value={chainPrompt}
+                    maxLength={CHAIN_RULES.promptMax}
+                    dir="auto"
+                    error={fields.chainPrompt}
+                    onChange={(e) => setChainPrompt(e.currentTarget.value)}
+                  />
+                  <ChainJoinSelect value={chainJoin ?? guessChainJoin(me?.under18)} onChange={setChainJoin} withNobody={false} />
+                </>
+              ) : null}
+            </div>
+          ) : null}
           {visibility === 'subscribers' && !communityId && kind !== 'story' ? (
             <p className="muted" style={{ margin: 0, fontSize: 13 }}>
               {t('compose.subscribersHint')}
@@ -1099,7 +1220,7 @@ function Create() {
                 : 'create.publish',
           )}
         </Button>
-        {kind !== 'story' ? (
+        {kind !== 'story' && !chainNow ? (
           <div className="stack-sm">
             <div className="row">
               <Button variant="secondary" loading={busy === 'draft'} disabled={blocked || !!busy} onClick={() => keep('draft')}>

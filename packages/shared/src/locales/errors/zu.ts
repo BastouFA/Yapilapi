@@ -1218,4 +1218,18 @@ export const zu: Record<string, string> = {
   'This video was not uploaded here, so its cover can’t be changed.': 'Le vidiyo ayilayishwanga lapha, ngakho isembozo sayo asikwazi ukushintshwa.',
   'Choose one cover.': 'Khetha isembozo esisodwa.',
   'Choose a video or a photo.': 'Khetha ividiyo noma isithombe.',
+  // Pass the Mic (apps/api/src/lib/chains.ts, apps/api/src/modules/pass-the-mic.ts)
+  'Chains are made of reels posted right away.': 'Izinchungechunge zakhiwa ngama-reel athunyelwe ngokushesha.',
+  'Only people the starter follows can take the mic on this chain.':
+    'Kulolu chungechunge, abantu abalandelwa ngulowo oluqalile kuphela abangathatha imakrofoni.',
+  'Only reels shared publicly, with followers or with friends can be in a chain.':
+    'Ama-reel abelwe wonke umuntu, abalandeli noma abangani kuphela angaba ochungechungeni.',
+  'Pass the Mic is not enabled.': 'Isici esithi Dlulisa imakrofoni asivuliwe.',
+  "That chain doesn't exist or isn't visible to you.": 'Lolo chungechunge alukho noma awukwazi ukulubona.',
+  'That reel is already in a chain.': 'Leyo reel isivele isochungechungeni.',
+  'This chain is closed.': 'Lolu chungechunge luvaliwe.',
+  'You can add up to {max} reels to one chain.': 'Ungengeza ama-reel afika ku-{max} ochungechungeni olulodwa.',
+  'You can pass the mic on one chain to up to {max} people.': 'Ochungechungeni olulodwa ungadlulisela imakrofoni kubantu abafika ku-{max}.',
+  'You can’t take the mic on this chain.': 'Awukwazi ukuthatha imakrofoni kulolu chungechunge.',
+  'You’ve added a lot of reels to chains today. Try again tomorrow.': 'Wengeze ama-reel amaningi ezinchungechungeni namuhla. Zama futhi kusasa.',
 };

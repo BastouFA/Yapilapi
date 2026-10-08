@@ -1204,4 +1204,17 @@ export const hi: Record<string, string> = {
   'This video was not uploaded here, so its cover can’t be changed.': 'यह वीडियो यहाँ अपलोड नहीं हुआ था, इसलिए इसका कवर बदला नहीं जा सकता।',
   'Choose one cover.': 'एक कवर चुनें।',
   'Choose a video or a photo.': 'कोई वीडियो या फ़ोटो चुनें।',
+  // Pass the Mic (apps/api/src/lib/chains.ts, apps/api/src/modules/pass-the-mic.ts)
+  'Chains are made of reels posted right away.': 'चेन सिर्फ़ तुरंत पोस्ट की गई रील से बनती है।',
+  'Only people the starter follows can take the mic on this chain.': 'इस चेन में सिर्फ़ वही लोग माइक ले सकते हैं जिन्हें चेन शुरू करने वाला फ़ॉलो करता है।',
+  'Only reels shared publicly, with followers or with friends can be in a chain.':
+    'सिर्फ़ सभी के लिए, फ़ॉलोअर्स के साथ या दोस्तों के साथ शेयर की गई रील ही चेन में हो सकती है।',
+  'Pass the Mic is not enabled.': 'माइक आगे बढ़ाएँ सुविधा चालू नहीं है।',
+  "That chain doesn't exist or isn't visible to you.": 'वह चेन मौजूद नहीं है या आपको नहीं दिखती।',
+  'That reel is already in a chain.': 'वह रील पहले से एक चेन में है।',
+  'This chain is closed.': 'यह चेन बंद है।',
+  'You can add up to {max} reels to one chain.': 'एक चेन में आप ज़्यादा से ज़्यादा {max} रील जोड़ सकते हैं।',
+  'You can pass the mic on one chain to up to {max} people.': 'एक चेन में आप ज़्यादा से ज़्यादा {max} लोगों को माइक दे सकते हैं।',
+  'You can’t take the mic on this chain.': 'आप इस चेन में माइक नहीं ले सकते।',
+  'You’ve added a lot of reels to chains today. Try again tomorrow.': 'आज आपने चेन में बहुत सारी रील जोड़ी हैं। कल फिर से कोशिश करें।',
 };

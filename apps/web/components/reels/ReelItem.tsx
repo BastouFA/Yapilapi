@@ -19,6 +19,7 @@ import { recordFeedEvent } from '@/lib/feed-events';
 import { NextLink } from '@/lib/link';
 import { musicHref, useMusicCredit, useMusicLoop } from '@/components/StoryMusic';
 import { useSession } from '@/app/providers';
+import { ChainBar } from '@/components/PassTheMic';
 import { Scrubber } from './Scrubber';
 import { prefersReducedMotion, type ReelPrefs } from './prefs';
 
@@ -47,6 +48,10 @@ export interface ReelViewerApi {
   /** Your echo whose original is gone: keep it to yourself, or delete it. */
   keepEchoPrivate: (p: Post) => void;
   deleteEcho: (p: Post) => void;
+  /** Pass the Mic: put the reel before or after this one in its chain in its place (false when there is none). */
+  chainStep: (p: Post, dir: 'next' | 'previous') => Promise<boolean>;
+  /** Take the mic: the reel composer with the chain's prompt and sound. */
+  takeMic: (p: Post) => void;
 }
 
 type AuthorStat = { followers: number; following: boolean } | undefined;
@@ -116,7 +121,7 @@ export function ReelItem({
   meId: string | undefined;
   viewer: ReelViewerApi;
 }) {
-  const { t, tp, locale } = useSession();
+  const { t, tp, locale, flags } = useSession();
   const credit = useMusicCredit();
   const compact = new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 });
   const mine = post.author.id === meId;
@@ -683,6 +688,9 @@ export function ReelItem({
         ) : null}
 
         <div className="reel__info">
+          {post.chain && flags.PASS_THE_MIC ? (
+            <ChainBar chain={post.chain} onStep={(dir) => viewer.chainStep(post, dir)} onTake={() => viewer.takeMic(post)} />
+          ) : null}
           <div className="reel__byline">
             <Link href={`/u/${post.author.username}`} className="reel__author" onClick={openedProfile}>
               <bdi>{post.author.displayName}</bdi>

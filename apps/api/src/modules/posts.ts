@@ -165,7 +165,8 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     }
     const screening = await screenPost(db, ctx.config, u.id, {
       body: input.body,
-      pollText: input.poll?.options.join(' ') ?? '',
+      // A chain's prompt is shown to everyone who sees the chain: checked like the post's own words.
+      pollText: [input.poll?.options.join(' ') ?? '', input.chainPrompt ?? ''].join(' ').trim(),
       visibility: input.visibility,
       communityId: input.communityId,
     });
@@ -193,6 +194,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
       remixOf: input.remixOf,
       remixMode: input.remixMode,
       echo: written.echo,
+      chain: written.chain,
     });
     reply.code(201);
     const [post] = await hydratePosts(db, [written.id], u.id);

@@ -24,6 +24,7 @@ import {
   formatList,
   formatMoney,
   formatRelativeTime,
+  fullCount,
   MODERATION_TARGET_KEYS,
   type MessageKey,
   type StorePurchasePolicy,
@@ -200,6 +201,7 @@ export default function Admin() {
           ) : tab === 'flags' ? (
             <div className="stack">
               <Flags />
+              <PassTheMicStats />
               <PhonePurchases />
             </div>
           ) : tab === 'miniapps' ? (
@@ -676,6 +678,29 @@ function Flags() {
               }}
             />
           ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+/** Pass the Mic and Fair start, at a glance: chains this week and the fair-start pool. */
+function PassTheMicStats() {
+  const { t, locale } = useSession();
+  const { data, error, reload } = useLoad(() => api.admin.passTheMic(), []);
+  const n = (v: number) => fullCount(v, locale);
+  return (
+    <Card title={t('mic.title')}>
+      {error ? (
+        <LoadFailed error={error} onRetry={reload} />
+      ) : !data ? (
+        <Skeleton height={60} />
+      ) : (
+        <div className="stack-sm">
+          <p style={{ margin: 0 }}>{t('admin.mic.chains', { active: n(data.chains.active), links: n(data.chains.links) })}</p>
+          <p style={{ margin: 0 }}>
+            {t('admin.mic.fairStart', { active: n(data.fairStart.active), slowed: n(data.fairStart.slowed), done: n(data.fairStart.done) })}
+          </p>
         </div>
       )}
     </Card>

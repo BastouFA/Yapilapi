@@ -72,6 +72,7 @@ import studioModule from './modules/studio.ts';
 import editorModule from './modules/editor.ts';
 import collagesModule from './modules/collages.ts';
 import echoesModule from './modules/echoes.ts';
+import passTheMicModule from './modules/pass-the-mic.ts';
 import tagsModule from './modules/tags.ts';
 import collabsModule from './modules/collabs.ts';
 import postCoversModule from './modules/post-covers.ts';
@@ -113,6 +114,7 @@ import { sweepWatch } from './lib/watch.ts';
 import { sweepWeeklyWraps } from './lib/wrap.ts';
 import { maybeRunRetention } from './lib/retention.ts';
 import { sweepMarket } from './lib/market.ts';
+import { sweepFairStarts } from './lib/fair-start.ts';
 import Stripe from 'stripe';
 import { adminEmails, promoteListedAdmins } from './lib/admin-bootstrap.ts';
 import { ensureStripeWebhook, isStripeWebhookSecret, stripeWebhookUrl } from './lib/stripe-webhook-setup.ts';
@@ -489,6 +491,7 @@ export async function buildApp(
     editorModule,
     collagesModule,
     echoesModule,
+    passTheMicModule,
     plusModule,
     invitesModule,
     growthModule,
@@ -576,6 +579,8 @@ export async function buildApp(
         await sweepWeeklyWraps({ db, realtime: ctx.realtime }).catch((e) => app.log.warn({ err: e.message }, 'weekly wraps'));
         // Market listings: a reminder before one ends, and a note when it has (lib/market.ts).
         await sweepMarket({ db, realtime: ctx.realtime }).catch((e) => app.log.warn({ err: e.message }, 'market sweep'));
+        // Fair starts whose week is over (or that reached their target) finish, and their creators get the report (lib/fair-start.ts).
+        await sweepFairStarts({ db, realtime: ctx.realtime }).catch((e) => app.log.warn({ err: e.message }, 'fair start sweep'));
       }
       // Every 10 minutes: songs in use are read again from their providers (withdrawn ones play silently with a note).
       if (Date.now() - lastMusicRefresh > 10 * 60_000) {

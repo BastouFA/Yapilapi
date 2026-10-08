@@ -1202,4 +1202,17 @@ export const id: Record<string, string> = {
   'Choose one cover.': 'Pilih satu sampul.',
   'Choose a video or a photo.': 'Pilih video atau foto.',
   'You can keep up to 5 accounts in this browser.': 'Anda bisa menyimpan hingga 5 akun di browser ini.',
+  // Pass the Mic (apps/api/src/lib/chains.ts, apps/api/src/modules/pass-the-mic.ts)
+  'Chains are made of reels posted right away.': 'Rantai terdiri dari reel yang langsung diposting.',
+  'Only people the starter follows can take the mic on this chain.': 'Hanya orang yang diikuti pemulai rantai yang bisa mengambil mikrofon di rantai ini.',
+  'Only reels shared publicly, with followers or with friends can be in a chain.':
+    'Hanya reel yang dibagikan ke semua orang, ke pengikut, atau ke teman yang bisa masuk rantai.',
+  'Pass the Mic is not enabled.': 'Oper mikrofon belum diaktifkan.',
+  "That chain doesn't exist or isn't visible to you.": 'Rantai itu tidak ada atau tidak bisa Anda lihat.',
+  'That reel is already in a chain.': 'Reel itu sudah ada di sebuah rantai.',
+  'This chain is closed.': 'Rantai ini ditutup.',
+  'You can add up to {max} reels to one chain.': 'Anda bisa menambahkan hingga {max} reel ke satu rantai.',
+  'You can pass the mic on one chain to up to {max} people.': 'Di satu rantai, Anda bisa mengoper mikrofon ke hingga {max} orang.',
+  'You can’t take the mic on this chain.': 'Anda tidak bisa mengambil mikrofon di rantai ini.',
+  'You’ve added a lot of reels to chains today. Try again tomorrow.': 'Anda sudah menambahkan banyak reel ke rantai hari ini. Coba lagi besok.',
 };

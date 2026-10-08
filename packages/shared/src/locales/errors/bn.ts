@@ -1189,4 +1189,17 @@ export const bn: Record<string, string> = {
   'This video was not uploaded here, so its cover can’t be changed.': 'এই ভিডিওটি এখানে আপলোড করা হয়নি, তাই এর কভার বদলানো যাবে না।',
   'Choose one cover.': 'একটি কভার বেছে নিন।',
   'Choose a video or a photo.': 'একটি ভিডিও বা একটি ছবি বেছে নিন।',
+  // Pass the Mic (apps/api/src/lib/chains.ts, apps/api/src/modules/pass-the-mic.ts)
+  'Chains are made of reels posted right away.': 'চেইন শুধু সঙ্গে সঙ্গে পোস্ট করা রিল দিয়ে তৈরি হয়।',
+  'Only people the starter follows can take the mic on this chain.': 'এই চেইনে শুধু তাঁরাই মাইক নিতে পারবেন, যাঁদের চেইনটি যিনি শুরু করেছেন তিনি ফলো করেন।',
+  'Only reels shared publicly, with followers or with friends can be in a chain.':
+    'শুধু সবার জন্য, ফলোয়ারদের সঙ্গে বা বন্ধুদের সঙ্গে শেয়ার করা রিলই চেইনে থাকতে পারে।',
+  'Pass the Mic is not enabled.': 'মাইক এগিয়ে দিন চালু নেই।',
+  "That chain doesn't exist or isn't visible to you.": 'সেই চেইনটি নেই বা আপনি সেটি দেখতে পারবেন না।',
+  'That reel is already in a chain.': 'সেই রিলটি ইতিমধ্যে একটি চেইনে আছে।',
+  'This chain is closed.': 'এই চেইনটি বন্ধ।',
+  'You can add up to {max} reels to one chain.': 'একটি চেইনে আপনি সর্বোচ্চ {max}টি রিল যোগ করতে পারবেন।',
+  'You can pass the mic on one chain to up to {max} people.': 'একটি চেইনে আপনি সর্বোচ্চ {max} জনকে মাইক দিতে পারবেন।',
+  'You can’t take the mic on this chain.': 'আপনি এই চেইনে মাইক নিতে পারবেন না।',
+  'You’ve added a lot of reels to chains today. Try again tomorrow.': 'আজ আপনি চেইনে অনেক রিল যোগ করেছেন। আগামীকাল আবার চেষ্টা করুন।',
 };

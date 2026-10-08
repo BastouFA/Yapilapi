@@ -8,6 +8,8 @@ import { isVideoFile, MEDIA_ACCEPT, VIDEO_ACCEPT, type DualCorner, type MessageK
 import { DualReview, type DualShots } from '@/components/DualReview';
 import { canvasBlob, composeDual, grabFrame } from '@/lib/dual-photo';
 import { deliverEchoMedia, deliverPendingMedia, type CreateMode } from '@/lib/pending-media';
+import { api } from '@/lib/api';
+import { takeMicHref } from '@/components/PassTheMic';
 import { useSession } from '../../providers';
 
 const MODES: { id: CreateMode; label: MessageKey }[] = [
@@ -33,11 +35,32 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 function Camera() {
   const router = useRouter();
   const params = useSearchParams();
-  const { me, toast, t } = useSession();
+  const { me, toast, t, flags } = useSession();
   // Recording for an echo (/camera?echo=<reel id>): a reel-style video, handed back to the Echo page.
   const echoOf = /^[0-9a-f-]{36}$/i.test(params.get('echo') ?? '') ? params.get('echo') : null;
-  const initial = echoOf ? 'reel' : ((['post', 'reel', 'story'] as const).find((m) => m === params.get('mode')) ?? 'post');
+  // Taking the mic (/camera?chain=<id>&sound=<id>): a reel, handed to Create with the chain (and its sound).
+  const chainId = !echoOf && flags.PASS_THE_MIC && /^[0-9a-f-]{36}$/i.test(params.get('chain') ?? '') ? params.get('chain') : null;
+  const chainSound = chainId && /^[0-9a-f-]{36}$/i.test(params.get('sound') ?? '') ? params.get('sound') : null;
+  const [chainPrompt, setChainPrompt] = useState<string | null>(null);
+  useEffect(() => {
+    if (!chainId) return setChainPrompt(null);
+    let live = true;
+    api.chains.get(chainId).then(
+      (r) => live && setChainPrompt(r.chain.prompt),
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [chainId]);
+  // The mode is fixed while recording for something (an echo, a chain).
+  const fixed = !!echoOf || !!chainId;
+  const initial = echoOf || params.get('chain') ? 'reel' : ((['post', 'reel', 'story'] as const).find((m) => m === params.get('mode')) ?? 'post');
   const [mode, setMode] = useState<CreateMode>(initial);
+  // The flags arrive after the first render: a chain link opens the reel camera then.
+  useEffect(() => {
+    if (chainId) setMode('reel');
+  }, [chainId]);
   const [facing, setFacing] = useState<'user' | 'environment'>('environment');
   const [status, setStatus] = useState<'starting' | 'ready' | 'denied' | 'none'>('starting');
   const [hasAudio, setHasAudio] = useState(false);
@@ -109,9 +132,9 @@ function Camera() {
         return;
       }
       deliverPendingMedia(files, as);
-      router.replace(as === 'post' ? '/create' : `/create?mode=${as}`);
+      router.replace(chainId ? takeMicHref(chainId, chainSound) : as === 'post' ? '/create' : `/create?mode=${as}`);
     },
-    [router, echoOf],
+    [router, echoOf, chainId, chainSound],
   );
 
   const takePhoto = () => {
@@ -257,7 +280,7 @@ function Camera() {
 
   /** Choose a mode with the keyboard; `focus` moves focus to its tab (when the tabs have it). */
   const pickMode = (to: number, focus: boolean) => {
-    if (recording || dualBusy || echoOf) return;
+    if (recording || dualBusy || fixed) return;
     const next = MODES[(to + MODES.length) % MODES.length]!;
     setMode(next.id);
     if (focus) modeTabs.current[next.id]?.focus();
@@ -331,7 +354,11 @@ function Camera() {
             <span className="cam__dot" aria-hidden /> {clock(elapsed)} / {clock(maxSeconds)}
           </span>
         ) : (
-          <Link href={mode === 'post' ? '/create' : `/create?mode=${mode}`} className="cam__pill cam__pill--ghost" replace>
+          <Link
+            href={chainId ? takeMicHref(chainId, chainSound) : mode === 'post' ? '/create' : `/create?mode=${mode}`}
+            className="cam__pill cam__pill--ghost"
+            replace
+          >
             {t(mode === 'story' ? 'm.camera.storyStickers' : 'camera.writeInstead')}
           </Link>
         )}
@@ -345,6 +372,12 @@ function Camera() {
       </div>
 
       <div className="cam__bottom">
+        {chainId && chainPrompt ? (
+          <p className="cam__prompt" dir="auto">
+            <Icon name="mic" size={16} />
+            <span>{t('mic.joining', { prompt: chainPrompt })}</span>
+          </p>
+        ) : null}
         {/* Both sides needs a second camera, and makes photos only. */}
         {canFlip && mode !== 'reel' && !recording && status === 'ready' ? (
           <button
@@ -403,7 +436,7 @@ function Camera() {
             )}
           </span>
         </div>
-        {echoOf ? null : (
+        {fixed ? null : (
           <div className="cam__modes" role="tablist" aria-label={t('m.create.mode')} onKeyDown={onTabsKey}>
             {MODES.map((m) => (
               <button

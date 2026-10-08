@@ -13,6 +13,7 @@ import type { MarketChatCard, MarketOffer } from './market.ts';
 import type { FeedEventKind, FeedEventSurface } from './constants.ts';
 import type { CoverRecipe } from './cover.ts';
 import type { EchoPermission, EchoRef } from './echoes.ts';
+import type { ChainRef } from './pass-the-mic.ts';
 import type {
   BoardVisibility,
   CircleKind,
@@ -411,6 +412,8 @@ export interface Post {
   echoOf?: EchoRef | null;
   /** Only on your own reels: who may echo it (your choice, or the default for your account). */
   allowEchoes?: EchoPermission;
+  /** Reels in a Pass the Mic chain: the chain, where this reel is in it, and whether you may take the mic (see pass-the-mic.ts). */
+  chain?: ChainRef;
   /** Reels: the sound it uses (its own, or one it borrowed). */
   sound?: SoundRef | null;
   /** Reels: named points the creator marked in the video (up to five, in time order), shown on the scrubber. */

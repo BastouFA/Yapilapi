@@ -17,6 +17,8 @@ import { t, tp } from '@yapilapi/shared/i18n';
 import { echoAllowedSql, echoPermissionSql } from './echoes.ts';
 import { trendSql } from './post-stats.ts';
 import { isRising, risingCutoff, RISING } from './rising.ts';
+import { chainRefs } from './chains.ts';
+import { isEnabled } from './services.ts';
 
 type Q = Pool | PoolClient;
 
@@ -151,6 +153,12 @@ export async function hydratePosts(db: Q, ids: string[], viewer: string | null, 
       viewer,
     );
     for (const r of mixing) byId.get(r.id)!.mix = cards.get(r.mix_id) ?? null;
+  }
+  // Pass the Mic: the chain a reel is in, while the viewer can see the chain (lib/chains.ts).
+  const reelIds = rows.filter((r) => r.format === 'reel' && r.unlocked && r.status === 'published').map((r) => r.id as string);
+  if (reelIds.length) {
+    const refs = await chainRefs(db, reelIds, viewer);
+    if (refs.size && (await isEnabled(db, 'PASS_THE_MIC'))) for (const [id, chain] of refs) byId.get(id)!.chain = chain;
   }
   // Co-authors ("Ada and Bola") and people tagged in photos (none on locked posts, which carry no media).
   await attachCollabsAndTags(db, [...new Set(posts)], viewer);

@@ -1290,4 +1290,17 @@ export const yo: Record<string, string> = {
   'This video was not uploaded here, so its cover can’t be changed.': 'A kò gbé fídíò yìí sókè níbí, nítorí náà a kò lè yí àwòrán iwájú rẹ̀ padà.',
   'Choose one cover.': 'Yan àwòrán iwájú kan ṣoṣo.',
   'Choose a video or a photo.': 'Yan fídíò tàbí fọ́tò kan.',
+  // Pass the Mic (apps/api/src/lib/chains.ts, apps/api/src/modules/pass-the-mic.ts)
+  'Chains are made of reels posted right away.': 'Àwọn reel tí a tẹ̀ jáde lẹ́sẹ̀kẹsẹ̀ ni a fi ń ṣe ẹ̀wọ̀n.',
+  'Only people the starter follows can take the mic on this chain.': 'Àwọn tí ẹni tó bẹ̀rẹ̀ ẹ̀wọ̀n yìí ń tẹ̀lé nìkan ló lè gba máíkì lórí rẹ̀.',
+  'Only reels shared publicly, with followers or with friends can be in a chain.':
+    'Àwọn reel tí a pín ní gbangba, pẹ̀lú àwọn olùtẹ̀lé tàbí pẹ̀lú àwọn ọ̀rẹ́ nìkan ló lè wà nínú ẹ̀wọ̀n.',
+  'Pass the Mic is not enabled.': 'Gbé Máíkì Kọjá kò tíì ṣiṣẹ́.',
+  "That chain doesn't exist or isn't visible to you.": 'Ẹ̀wọ̀n yẹn kò sí tàbí o kò lè rí i.',
+  'That reel is already in a chain.': 'Reel yẹn ti wà nínú ẹ̀wọ̀n kan tẹ́lẹ̀.',
+  'This chain is closed.': 'Ẹ̀wọ̀n yìí ti tì.',
+  'You can add up to {max} reels to one chain.': 'O lè fi reel tó tó {max} kún ẹ̀wọ̀n kan.',
+  'You can pass the mic on one chain to up to {max} people.': 'O lè gbé máíkì ẹ̀wọ̀n kan fún ènìyàn tó tó {max}.',
+  'You can’t take the mic on this chain.': 'O kò lè gba máíkì lórí ẹ̀wọ̀n yìí.',
+  'You’ve added a lot of reels to chains today. Try again tomorrow.': 'O ti fi ọ̀pọ̀ reel kún àwọn ẹ̀wọ̀n lónìí. Gbìyànjú lẹ́ẹ̀kan sí i lọ́la.',
 };

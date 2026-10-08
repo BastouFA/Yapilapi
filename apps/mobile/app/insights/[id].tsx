@@ -5,6 +5,7 @@ import type { Boost, PostInsights } from '../../../../packages/api-client/src/in
 import type { Post } from '../../../../packages/shared/src/types';
 import { client, errorMessage, isGone } from '../../lib/api';
 import { SectionHeader } from '../../lib/chips';
+import { FairStartCard } from '../../lib/chains';
 import { BoostResult, DayBars, StatGrid } from '../../lib/creator';
 import { useFlag } from '../../lib/flags';
 import { useT } from '../../lib/i18n';
@@ -24,6 +25,7 @@ export default function InsightsScreen() {
   const { t, number, date } = useT();
   const { me } = useSession();
   const ads = useFlag('ADS');
+  const fair = useFlag('FAIR_START');
   const commerce = useFlag('COMMERCE');
   const offer = useDigitalPurchases();
   const [data, setData] = useState<{ insights: PostInsights; post: Post | null; boosts: Boost[] } | null | undefined>(undefined);
@@ -120,6 +122,9 @@ export default function InsightsScreen() {
         ]}
       />
       <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('m.insights.viewsNote')}</Text>
+
+      {/* A new creator's reel shown to up to 1,000 people: how far it got, or what came of it. */}
+      {s.fairStart && fair !== false ? <FairStartCard fairStart={s.fairStart} /> : null}
 
       <View style={{ gap: space[2] }}>
         <SectionHeader title={t('m.insights.viewsByDay')} />

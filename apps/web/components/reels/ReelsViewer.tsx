@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { EmptyState, Skeleton } from '@yapilapi/design-system';
-import type { EchoPermission, Post, ReelHighlight, ReelMoment } from '@yapilapi/shared';
+import { chainBarText, fullCount, type EchoPermission, type Post, type ReelHighlight, type ReelMoment } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { recordFeedEvent } from '@/lib/feed-events';
 import { CommentsSheet, ReportSheet } from '@/components/PostList';
@@ -13,7 +13,8 @@ import { WatchChatPicker } from '@/components/WatchTogether';
 import { SendToChatSheet } from '@/components/SendToChat';
 import { useSession } from '@/app/providers';
 import { ReelItem, type ReelViewerApi } from './ReelItem';
-import { HighlightsSheet, OptionsSheet, ShareSheet } from './sheets';
+import { HighlightsSheet, OptionsSheet, ShareSheet, type ChainOptions } from './sheets';
+import { PassMicSheet, StartChainSheet, takeMicHref } from '@/components/PassTheMic';
 import { VideoCoverEditor } from '@/components/editor/VideoCoverEditor';
 import { prefersReducedMotion, readPrefs, writePrefs, DEFAULT_PREFS, type ReelPrefs } from './prefs';
 
@@ -28,6 +29,8 @@ type Sheet =
   | { kind: 'saveTo'; post: Post }
   | { kind: 'watch'; post: Post }
   | { kind: 'send'; post: Post }
+  | { kind: 'startChain'; post: Post }
+  | { kind: 'passMic'; post: Post }
   | null;
 
 /** Keys that belong to what has focus (typing, a menu), not to the viewer. */
@@ -41,10 +44,13 @@ const typing = (el: EventTarget | null) => el instanceof HTMLElement && (el.isCo
  * returns to it.
  */
 export function ReelsViewer() {
-  const { toast, me, t, dataSaver } = useSession();
+  const { toast, me, t, tp, locale, dataSaver, flags } = useSession();
   const router = useRouter();
   const start = useSearchParams().get('start');
   const [items, setItems] = useState<Post[] | null>(null);
+  // The list as it is now, for a chain step that comes back after a request.
+  const itemsRef = useRef<Post[] | null>(null);
+  itemsRef.current = items;
   const [authors, setAuthors] = useState<AuthorStats>({});
   const [cursor, setCursor] = useState<string | null>(null);
   const [active, setActive] = useState(0);
@@ -114,8 +120,9 @@ export function ReelsViewer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [start]);
 
-  // The reel on screen is the one mostly in view.
+  // The reel on screen is the one mostly in view (watched again when a chain step puts another reel in a place).
   const count = items?.length ?? 0;
+  const ids = items?.map((p) => p.id).join() ?? '';
   useEffect(() => {
     const root = list.current;
     if (!root || !count) return;
@@ -127,7 +134,7 @@ export function ReelsViewer() {
     );
     root.querySelectorAll<HTMLElement>('.reel').forEach((el) => io.observe(el));
     return () => io.disconnect();
-  }, [count]);
+  }, [count, ids]);
 
   // The frame's shape decides whether a video fills it or shows whole.
   useEffect(() => {
@@ -333,6 +340,92 @@ export function ReelsViewer() {
     }
   }
 
+  /** The reel again, after its chain changed (started, closed, left). */
+  const reload = (id: string) =>
+    api.posts.get(id).then(
+      (r) => patch(id, () => r.post),
+      () => {},
+    );
+
+  /**
+   * Pass the Mic, moving sideways: the reel before or after this one in its chain takes its place
+   * (scrolling up and down stays the feed). False when there is none that way.
+   */
+  const stepping = useRef(false);
+  async function chainStep(p: Post, dir: 'next' | 'previous'): Promise<boolean> {
+    if (!p.chain || stepping.current) return true;
+    stepping.current = true;
+    try {
+      const { post: next } = await api.chains.step(p.chain.id, p.id, dir);
+      const cur = itemsRef.current;
+      const at = cur?.findIndex((x) => x.id === p.id) ?? -1;
+      if (!next || next.format !== 'reel' || !cur || at < 0) return false;
+      // Focus on the chain's buttons follows to the same button on the reel that comes in.
+      const refocus = !!(document.activeElement as HTMLElement | null)?.closest?.('.reel-chain');
+      // The reel may already be further along in the feed: it moves here instead of showing twice.
+      const before = cur.slice(0, at).filter((x) => x.id !== next.id);
+      const after = cur.slice(at + 1).filter((x) => x.id !== next.id);
+      setItems([...before, next, ...after]);
+      if (before.length !== at) {
+        setActive(before.length);
+        requestAnimationFrame(() => list.current?.scrollTo({ top: before.length * (list.current?.clientHeight ?? 0) }));
+      }
+      if (next.chain) setAnnounce(chainBarText(next.chain, t, tp, (n) => fullCount(n, locale)));
+      if (refocus) requestAnimationFrame(() => list.current?.querySelector<HTMLElement>(`.reel--active .reel-chain__${dir}`)?.focus());
+      return true;
+    } catch (e) {
+      toast(errorMessage(e));
+      return true;
+    } finally {
+      stepping.current = false;
+    }
+  }
+
+  /** Take the mic: the composer with the chain's prompt, and the starter's sound when they let it be used. */
+  async function takeMic(p: Post) {
+    if (!p.chain) return;
+    const id = p.chain.id;
+    const sound = await api.chains.get(id).then(
+      (r) => r.chain.sound?.id ?? null,
+      () => null,
+    );
+    router.push(takeMicHref(id, sound));
+  }
+
+  async function editChain(p: Post, whoCanJoin: 'everyone' | 'nobody') {
+    if (!p.chain) return;
+    try {
+      await api.chains.edit(p.chain.id, { whoCanJoin });
+      toast(t('mic.saved'));
+      void reload(p.id);
+    } catch (e) {
+      toast(errorMessage(e));
+    }
+  }
+
+  async function removeFromChain(p: Post) {
+    if (!p.chain) return;
+    const starter = p.chain.isStarter;
+    try {
+      await api.chains.removeLink(p.chain.id, p.id);
+      patch(p.id, (x) => ({ ...x, chain: undefined }));
+      toast(t(starter ? 'mic.removed' : 'mic.left'));
+    } catch (e) {
+      toast(errorMessage(e));
+    }
+  }
+
+  const chainOptions: ChainOptions | undefined =
+    me && flags.PASS_THE_MIC
+      ? {
+          start: (p) => setSheet({ kind: 'startChain', post: p }),
+          pass: (p) => setSheet({ kind: 'passMic', post: p }),
+          remove: (p) => void removeFromChain(p),
+          setJoin: (p, who) => void editChain(p, who),
+          saved: (p) => void reload(p.id),
+        }
+      : undefined;
+
   const seekTo = (id: string, ms: number) => {
     const v = videos.current.get(id);
     if (!v) return;
@@ -396,6 +489,8 @@ export function ReelsViewer() {
     clearResume: (p) => void api.posts.clearResume(p.id).catch(() => {}),
     keepEchoPrivate: (p) => void keepEchoPrivate(p),
     deleteEcho: (p) => void deleteEcho(p),
+    chainStep: (p, dir) => chainStep(p, dir),
+    takeMic: (p) => void takeMic(p),
   };
   const [viewer] = useState<ReelViewerApi>(() => {
     const call =
@@ -423,10 +518,13 @@ export function ReelsViewer() {
       clearResume: call('clearResume'),
       keepEchoPrivate: call('keepEchoPrivate'),
       deleteEcho: call('deleteEcho'),
+      chainStep: (p: Post, dir: 'next' | 'previous') => impl.current.chainStep(p, dir),
+      takeMic: call('takeMic'),
     } as ReelViewerApi;
   });
 
   // Keys: ↑/↓ or K/J move between reels, Space plays or pauses, ←/→ move 5 seconds, M sound, C clear view.
+  // On a reel in a chain, ←/→ move along the chain (in reading order) and Shift+←/→ move 5 seconds.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || typing(e.target)) return;
@@ -458,6 +556,14 @@ export function ReelsViewer() {
           break;
         case 'ArrowLeft':
         case 'ArrowRight':
+          if (current?.chain && flags.PASS_THE_MIC && !e.shiftKey) {
+            if (target?.closest('[role="slider"], [role="menu"]')) return;
+            e.preventDefault();
+            // The chain's next button is at the end of the line: on the left in right-to-left languages.
+            const rtl = getComputedStyle(document.documentElement).direction === 'rtl';
+            void impl.current.chainStep(current, (e.key === 'ArrowRight') !== rtl ? 'next' : 'previous');
+            break;
+          }
           if (!v || onControl) return;
           e.preventDefault();
           v.currentTime = Math.max(0, Math.min((v.duration || 0) - 0.1, v.currentTime + (e.key === 'ArrowRight' ? 5 : -5)));
@@ -477,7 +583,7 @@ export function ReelsViewer() {
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [current, clear]);
+  }, [current, clear, flags.PASS_THE_MIC]);
 
   if (items === null)
     return (
@@ -507,6 +613,7 @@ export function ReelsViewer() {
       <h1 className="yp-visually-hidden">{t('m.title.reels')}</h1>
       <p className="yp-visually-hidden" id="reels-keys">
         {t('reel.keys')}
+        {current?.chain && flags.PASS_THE_MIC ? ` ${t('mic.keys')}` : ''}
       </p>
       <p className="yp-visually-hidden" aria-live="polite">
         {announce}
@@ -618,7 +725,10 @@ export function ReelsViewer() {
         onLeaveCollab={(p) => void leaveCollab(p)}
         onReport={(p) => setSheet({ kind: 'report', post: p })}
         onToggleCounts={(p) => void toggleCounts(p)}
+        chain={chainOptions}
       />
+      <StartChainSheet post={open?.kind === 'startChain' ? open.post : null} onClose={closeSheet} onStarted={(p) => patch(p.id, () => p)} />
+      <PassMicSheet chainId={open?.kind === 'passMic' ? (open.post.chain?.id ?? null) : null} onClose={closeSheet} />
       {open?.kind === 'highlights' ? (
         <HighlightsSheet
           post={open.post}

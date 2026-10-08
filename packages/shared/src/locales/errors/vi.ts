@@ -1195,4 +1195,17 @@ export const vi: Record<string, string> = {
   'This video was not uploaded here, so its cover can’t be changed.': 'Video này không được tải lên ở đây, nên không thể đổi ảnh bìa.',
   'Choose one cover.': 'Chọn một ảnh bìa.',
   'Choose a video or a photo.': 'Chọn một video hoặc một ảnh.',
+  // Pass the Mic (apps/api/src/lib/chains.ts, apps/api/src/modules/pass-the-mic.ts)
+  'Chains are made of reels posted right away.': 'Chuỗi chỉ gồm các reel được đăng ngay.',
+  'Only people the starter follows can take the mic on this chain.': 'Chỉ những người mà người bắt đầu chuỗi theo dõi mới có thể nhận micro trong chuỗi này.',
+  'Only reels shared publicly, with followers or with friends can be in a chain.':
+    'Chỉ các reel chia sẻ công khai, với người theo dõi hoặc với bạn bè mới có thể vào chuỗi.',
+  'Pass the Mic is not enabled.': 'Chuyền micro chưa được bật.',
+  "That chain doesn't exist or isn't visible to you.": 'Chuỗi đó không tồn tại hoặc bạn không xem được.',
+  'That reel is already in a chain.': 'Reel đó đã ở trong một chuỗi.',
+  'This chain is closed.': 'Chuỗi này đã đóng.',
+  'You can add up to {max} reels to one chain.': 'Bạn có thể thêm tối đa {max} reel vào một chuỗi.',
+  'You can pass the mic on one chain to up to {max} people.': 'Trong một chuỗi, bạn có thể chuyền micro cho tối đa {max} người.',
+  'You can’t take the mic on this chain.': 'Bạn không thể nhận micro trong chuỗi này.',
+  'You’ve added a lot of reels to chains today. Try again tomorrow.': 'Hôm nay bạn đã thêm nhiều reel vào các chuỗi. Hãy thử lại vào ngày mai.',
 };

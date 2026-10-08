@@ -1309,4 +1309,17 @@ export const ha: Record<string, string> = {
   'This video was not uploaded here, so its cover can’t be changed.': 'Ba a ɗora wannan bidiyon a nan ba, don haka ba za a iya canza murfinsa ba.',
   'Choose one cover.': 'Zaɓi murfi ɗaya kawai.',
   'Choose a video or a photo.': 'Zaɓi bidiyo ko hoto.',
+  // Pass the Mic (apps/api/src/lib/chains.ts, apps/api/src/modules/pass-the-mic.ts)
+  'Chains are made of reels posted right away.': 'Ana yin sarƙoƙi da reels da aka wallafa nan take.',
+  'Only people the starter follows can take the mic on this chain.': 'Mutanen da wanda ya fara sarƙar yake bi ne kaɗai za su iya karɓar makirufo a cikinta.',
+  'Only reels shared publicly, with followers or with friends can be in a chain.':
+    'Reels da aka raba a fili, da mabiya ko da abokai ne kaɗai za su iya kasancewa a cikin sarƙa.',
+  'Pass the Mic is not enabled.': 'Ba a kunna Mika Makirufo ba.',
+  "That chain doesn't exist or isn't visible to you.": 'Wannan sarƙar ba ta wanzu ko ba za ka iya ganinta ba.',
+  'That reel is already in a chain.': 'Wannan reel ɗin yana cikin sarƙa tuni.',
+  'This chain is closed.': 'An rufe wannan sarƙar.',
+  'You can add up to {max} reels to one chain.': 'Za ka iya ƙara har reels {max} a sarƙa ɗaya.',
+  'You can pass the mic on one chain to up to {max} people.': 'Za ka iya mika makirufo na sarƙa ɗaya ga mutane har {max}.',
+  'You can’t take the mic on this chain.': 'Ba za ka iya karɓar makirufo a wannan sarƙar ba.',
+  'You’ve added a lot of reels to chains today. Try again tomorrow.': 'Ka ƙara reels da yawa a sarƙoƙi yau. Sake gwadawa gobe.',
 };

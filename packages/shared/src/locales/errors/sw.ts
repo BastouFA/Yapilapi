@@ -1305,4 +1305,17 @@ export const sw: Record<string, string> = {
   'This video was not uploaded here, so its cover can’t be changed.': 'Video hii haikupakiwa hapa, kwa hivyo jalada lake haliwezi kubadilishwa.',
   'Choose one cover.': 'Chagua jalada moja.',
   'Choose a video or a photo.': 'Chagua video au picha.',
+  // Pass the Mic (apps/api/src/lib/chains.ts, apps/api/src/modules/pass-the-mic.ts)
+  'Chains are made of reels posted right away.': 'Minyororo hutengenezwa kwa reel zinazochapishwa papo hapo.',
+  'Only people the starter follows can take the mic on this chain.': 'Ni watu tu ambao aliyeanzisha mnyororo huu anawafuata wanaoweza kuchukua maikrofoni.',
+  'Only reels shared publicly, with followers or with friends can be in a chain.':
+    'Ni reel zilizoshirikiwa hadharani, na wafuasi au na marafiki pekee zinazoweza kuwa kwenye mnyororo.',
+  'Pass the Mic is not enabled.': 'Pitisha Maikrofoni haijawashwa.',
+  "That chain doesn't exist or isn't visible to you.": 'Mnyororo huo haupo au huwezi kuuona.',
+  'That reel is already in a chain.': 'Reel hiyo tayari iko kwenye mnyororo.',
+  'This chain is closed.': 'Mnyororo huu umefungwa.',
+  'You can add up to {max} reels to one chain.': 'Unaweza kuongeza hadi reel {max} kwenye mnyororo mmoja.',
+  'You can pass the mic on one chain to up to {max} people.': 'Unaweza kupitisha maikrofoni ya mnyororo mmoja kwa hadi watu {max}.',
+  'You can’t take the mic on this chain.': 'Huwezi kuchukua maikrofoni kwenye mnyororo huu.',
+  'You’ve added a lot of reels to chains today. Try again tomorrow.': 'Umeongeza reel nyingi kwenye minyororo leo. Jaribu tena kesho.',
 };

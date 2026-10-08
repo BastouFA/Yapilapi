@@ -1172,4 +1172,16 @@ export const ko: Record<string, string> = {
   'This video was not uploaded here, so its cover can’t be changed.': '이 동영상은 여기에 업로드된 것이 아니라서 커버를 바꿀 수 없어요.',
   'Choose one cover.': '커버를 하나 선택하세요.',
   'Choose a video or a photo.': '동영상 또는 사진을 선택하세요.',
+  // Pass the Mic (apps/api/src/lib/chains.ts, apps/api/src/modules/pass-the-mic.ts)
+  'Chains are made of reels posted right away.': '릴레이는 바로 게시된 릴스로만 만들 수 있어요.',
+  'Only people the starter follows can take the mic on this chain.': '이 릴레이에서는 시작한 사람이 팔로우하는 사람만 마이크를 받을 수 있어요.',
+  'Only reels shared publicly, with followers or with friends can be in a chain.': '전체 공개, 팔로워 공개 또는 친구 공개 릴스만 릴레이에 넣을 수 있어요.',
+  'Pass the Mic is not enabled.': '마이크 넘기기가 켜져 있지 않아요.',
+  "That chain doesn't exist or isn't visible to you.": '그 릴레이는 없거나 볼 수 없어요.',
+  'That reel is already in a chain.': '그 릴스는 이미 릴레이에 들어가 있어요.',
+  'This chain is closed.': '마감된 릴레이예요.',
+  'You can add up to {max} reels to one chain.': '한 릴레이에 릴스를 최대 {max}개까지 추가할 수 있어요.',
+  'You can pass the mic on one chain to up to {max} people.': '한 릴레이에서 마이크는 최대 {max}명에게 넘길 수 있어요.',
+  'You can’t take the mic on this chain.': '이 릴레이에서는 마이크를 받을 수 없어요.',
+  'You’ve added a lot of reels to chains today. Try again tomorrow.': '오늘 릴레이에 릴스를 많이 추가했어요. 내일 다시 시도해 주세요.',
 };

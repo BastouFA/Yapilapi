@@ -12,7 +12,7 @@ import {
 } from '@yapilapi/shared';
 import { moderationOf } from './notices.ts';
 import type { AppContext } from './context.ts';
-import { AppError, badRequest, forbidden, notFound } from './errors.ts';
+import { AppError, badRequest, featureDisabled, forbidden, notFound } from './errors.ts';
 import { scheduledPostFailureCode, scheduledPostFailureEnglish } from './failures.ts';
 import { enqueue, enqueueAt, type JobHandler } from './jobs.ts';
 import { analyzeText, statusForRisk, type Analysis } from './moderation.ts';
@@ -32,6 +32,9 @@ import { topicsFor } from '../modules/tags.ts';
 import { langOf } from './translation.ts';
 import type { PreparedMusic } from './music/index.ts';
 import { claimEcho, linkEcho } from './echoes.ts';
+import { announceChainLink, joinChain, startChain, type ChainJoined } from './chains.ts';
+import { enrollFairStart } from './fair-start.ts';
+import { isEnabled } from './services.ts';
 
 type Q = Pool | PoolClient;
 type Deps = Pick<AppContext, 'db' | 'config' | 'realtime' | 'music'> & Partial<Pick<AppContext, 'transcription'>>;
@@ -100,8 +103,11 @@ export async function writePost(
   userId: string,
   given: CreatePostInput,
   opts: { id?: string; state: PostState; scheduledAt?: Date | null; moderationStatus?: string; music?: PreparedMusic | null },
-): Promise<{ id: string; kind: string; taggedIds: string[]; remixAuthor: string | null; echo: EchoPosted | null }> {
+): Promise<{ id: string; kind: string; taggedIds: string[]; remixAuthor: string | null; echo: EchoPosted | null; chain: ChainJoined | null }> {
   const input = await withStoredKinds(c, userId, given);
+  // Pass the Mic: a reel that starts a chain or takes the mic on one (lib/chains.ts) is posted right away.
+  if ((input.chainId || input.chainPrompt) && !(await isEnabled(c, 'PASS_THE_MIC'))) throw featureDisabled('Pass the Mic');
+  if ((input.chainId || input.chainPrompt) && (opts.id || opts.state !== 'published')) throw badRequest('Chains are made of reels posted right away.');
   const kind = postKind(input);
   // A recording is a post of its own: not a reel, and without photos, videos or a poll.
   if (input.media.some((m) => m.kind === 'audio')) {
@@ -317,7 +323,11 @@ export async function writePost(
     await assertCanInvite(c, userId, input.collaborators, { visibility: input.communityId ? 'public' : input.visibility, communityId: input.communityId });
     await c.query(`INSERT INTO post_collaborators (post_id, user_id, invited_by) SELECT $1, unnest($2::uuid[]), $3`, [id, input.collaborators, userId]);
   }
-  return { id, kind, taggedIds, remixAuthor, echo: echo ? { originalId: echo.originalId, originalAuthorId: echo.originalAuthorId } : null };
+  // Last, once its sound is known: the chain it starts, or the one it joins as the next reel.
+  let chain: ChainJoined | null = null;
+  if (input.chainPrompt) await startChain(c, userId, id, input.chainPrompt, input.chainJoin);
+  else if (input.chainId) chain = await joinChain(c, userId, input.chainId, id);
+  return { id, kind, taggedIds, remixAuthor, echo: echo ? { originalId: echo.originalId, originalAuthorId: echo.originalAuthorId } : null, chain };
 }
 
 /** An echo that was just posted: the reel it answers and who made that reel. */
@@ -438,6 +448,7 @@ export async function announcePost(
     remixOf: string | null | undefined;
     remixMode: string | null | undefined;
     echo?: EchoPosted | null;
+    chain?: ChainJoined | null;
   },
 ): Promise<void> {
   const { db, realtime } = deps;
@@ -445,6 +456,10 @@ export async function announcePost(
   await emitWebhook(db, p.authorId, 'post.created', { postId: p.postId, kind: p.kind, visibility: p.visibility });
   if (p.kind === 'audio') await transcribeRecording(deps, p.postId);
   if (p.status !== 'normal') return;
+  // A new creator's reel: a fair start to its first audience, when it and its author may have one (lib/fair-start.ts).
+  if (p.kind === 'video') await enrollFairStart(db, p.postId, deps.config.SPAM_CHECKS);
+  // Pass the Mic: the chain's starter, and the reel before's author, hear someone took the mic.
+  if (p.chain) await announceChainLink(db, realtime, { ...p.chain, postId: p.postId, authorId: p.authorId });
   // Mentions in the text (posts and reel captions alike), photo tags and co-author invites.
   await notifyMentions(db, realtime, { text: p.body, actorId: p.authorId, postId: p.postId, skip: [...p.taggedIds, ...p.collaborators] });
   await notifyPhotoTags(db, realtime, { postId: p.postId, actorId: p.authorId, userIds: p.taggedIds });

@@ -9,6 +9,8 @@ import { cropSchema, mediaEditSchema } from './filters.ts';
 import { COVER_MAX_STRAIGHTEN } from './cover.ts';
 import { ECHO_PERMISSIONS } from './echoes.ts';
 import {
+  CHAIN_JOIN,
+  CHAIN_RULES,
   CIRCLE_KINDS,
   COMMENT_POLICIES,
   COMMENT_SORTS,
@@ -317,6 +319,12 @@ export const createPostSchema = z
     echo: uuid.optional(),
     /** Hide the like and view counts from everyone but you. Left out, your account's choice (Settings, Privacy). */
     hideCounts: z.boolean().optional(),
+    /** Reels: take the mic, posting this reel as the next one in a Pass the Mic chain. */
+    chainId: uuid.optional(),
+    /** Reels: start a chain with this reel, with this prompt for the next ones. */
+    chainPrompt: z.string().trim().min(1).max(CHAIN_RULES.promptMax).optional(),
+    /** With chainPrompt: who can take the mic. Left out, the default for your account. */
+    chainJoin: z.enum(CHAIN_JOIN).optional(),
   })
   .superRefine((v, ctx) => {
     if (v.echo) {
@@ -327,6 +335,12 @@ export const createPostSchema = z
       if (v.communityId) refuse("An echo can't be posted in a community.", 'communityId');
       if (v.visibility === 'subscribers') refuse("An echo can't be for subscribers only: it shows someone else's reel.", 'visibility');
       if (v.collaborators.length) refuse("An echo can't have co-authors.", 'collaborators');
+    }
+    if (v.chainId || v.chainPrompt) {
+      const refuse = (message: string) => ctx.addIssue({ code: 'custom', message, path: [v.chainId ? 'chainId' : 'chainPrompt'] });
+      if (v.format !== 'reel' || v.draft || v.scheduledAt || v.echo || (v.chainId && v.chainPrompt)) refuse('Chains are made of reels posted right away.');
+      else if (v.communityId || !['public', 'followers', 'friends'].includes(v.visibility))
+        refuse('Only reels shared publicly, with followers or with friends can be in a chain.');
     }
     if (v.allowEchoes && v.format !== 'reel') ctx.addIssue({ code: 'custom', message: 'Only reels can be echoed.', path: ['allowEchoes'] });
     if (v.highlights?.length && v.format !== 'reel') ctx.addIssue({ code: 'custom', message: 'Only reels have highlights.', path: ['highlights'] });

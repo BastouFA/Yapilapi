@@ -1189,4 +1189,17 @@ export const ig: Record<string, string> = {
   'This video was not uploaded here, so its cover can’t be changed.': 'E bugoghị vidiyo a ebe a, ya mere enweghị ike ịgbanwe mkpuchi ya.',
   'Choose one cover.': 'Họrọ otu mkpuchi.',
   'Choose a video or a photo.': 'Họrọ vidiyo ma ọ bụ foto.',
+  // Pass the Mic (apps/api/src/lib/chains.ts, apps/api/src/modules/pass-the-mic.ts)
+  'Chains are made of reels posted right away.': 'A na-eji reel e bipụtara ozugbo eme agbụ.',
+  'Only people the starter follows can take the mic on this chain.': 'Naanị ndị onye malitere agbụ a na-eso nwere ike iwere igwe okwu na ya.',
+  'Only reels shared publicly, with followers or with friends can be in a chain.':
+    'Naanị reel e kesara onye ọ bụla, ndị na-eso ya ma ọ bụ ndị enyi nwere ike ịbanye n’agbụ.',
+  'Pass the Mic is not enabled.': 'Nyefee igwe okwu adịghị arụ ọrụ ugbu a.',
+  "That chain doesn't exist or isn't visible to you.": 'Agbụ ahụ adịghị ma ọ bụ ị gaghị ahụ ya.',
+  'That reel is already in a chain.': 'Reel ahụ adịlarị n’agbụ.',
+  'This chain is closed.': 'Agbụ a emechiela.',
+  'You can add up to {max} reels to one chain.': 'Ị nwere ike itinye ihe ruru reel {max} n’otu agbụ.',
+  'You can pass the mic on one chain to up to {max} people.': 'N’otu agbụ, ị nwere ike inyefe igwe okwu ihe ruru mmadụ {max}.',
+  'You can’t take the mic on this chain.': 'Ị nweghị ike iwere igwe okwu n’agbụ a.',
+  'You’ve added a lot of reels to chains today. Try again tomorrow.': 'Ị tinyela ọtụtụ reel n’agbụ taa. Nwaa ọzọ echi.',
 };

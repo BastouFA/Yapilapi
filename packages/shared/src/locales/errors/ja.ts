@@ -1192,4 +1192,17 @@ export const ja: Record<string, string> = {
   'Choose one cover.': 'カバーを1つ選んでください。',
   'Choose a video or a photo.': '動画か写真を選んでください。',
   'You can keep up to 5 accounts in this browser.': 'このブラウザには最大5個のアカウントを保持できます。',
+  // Pass the Mic (apps/api/src/lib/chains.ts, apps/api/src/modules/pass-the-mic.ts)
+  'Chains are made of reels posted right away.': 'リレーに使えるのは、すぐに投稿されたリールだけです。',
+  'Only people the starter follows can take the mic on this chain.': 'このリレーでマイクを受け取れるのは、開始した人がフォローしている人だけです。',
+  'Only reels shared publicly, with followers or with friends can be in a chain.':
+    'リレーに入れられるのは、全員、フォロワー、または友達に公開されたリールだけです。',
+  'Pass the Mic is not enabled.': 'マイクリレーは有効になっていません。',
+  "That chain doesn't exist or isn't visible to you.": 'そのリレーは存在しないか、表示できません。',
+  'That reel is already in a chain.': 'そのリールはすでにリレーに入っています。',
+  'This chain is closed.': 'このリレーは締め切られています。',
+  'You can add up to {max} reels to one chain.': '1つのリレーに追加できるリールは最大{max}本です。',
+  'You can pass the mic on one chain to up to {max} people.': '1つのリレーでマイクを渡せるのは最大{max}人までです。',
+  'You can’t take the mic on this chain.': 'このリレーではマイクを受け取れません。',
+  'You’ve added a lot of reels to chains today. Try again tomorrow.': '今日はたくさんのリールをリレーに追加しました。明日もう一度お試しください。',
 };

@@ -7,6 +7,7 @@ import './globals.css';
 import './settings.css';
 import './watch.css';
 import './echo.css';
+import './mic.css';
 import './tickets.css';
 import './market.css';
 import { Providers } from './providers';

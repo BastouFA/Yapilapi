@@ -78,6 +78,9 @@ import { onAppAway, recordFeedEvent } from '../lib/feed-events';
 import { compactCount } from '../../../packages/shared/src/post-stats';
 import { RisingBadge } from '../lib/post-stats';
 import { useSendPost } from '../lib/post-send';
+import { useFlag } from '../lib/flags';
+import { canStartChain, chainRefFrom, ChainWhoSheet, openChain, PassMicSheet, StartChainSheet, takeTheMic } from '../lib/chains';
+import { chainBarText, type Chain, type ChainRef } from '../../../packages/shared/src/pass-the-mic';
 
 /** What a reel plays: on Data saver the lowest MP4, or the 360p stream for videos processed before it existed. */
 const reelSource = (m: MediaItem, saver: boolean) =>
@@ -118,7 +121,12 @@ type ReelActions = {
   watched: (p: Post) => void;
   keepEchoPrivate: (p: Post) => void;
   deleteEcho: (p: Post) => void;
+  /** Pass the Mic: the reel before or after this one in its chain, in its place; take the mic; the chain's page. */
+  chainStep: (p: Post, index: number, dir: 'next' | 'previous') => void;
+  takeMic: (p: Post) => void;
+  openChain: (p: Post) => void;
 };
+type SheetKind = 'share' | 'options' | 'highlights' | 'cover' | 'pass' | 'chainWho' | 'startChain';
 const NO_MOMENTS: ReelMoment[] = [];
 
 function useReducedMotion() {
@@ -139,7 +147,7 @@ function useReducedMotion() {
  */
 export default function Reels() {
   const c = useColors();
-  const { t, number, locale } = useT();
+  const { t, tp, number, locale } = useT();
   const insets = useSafeAreaInsets();
   const focused = useIsFocused();
   const { start, at } = useLocalSearchParams<{ start?: string; at?: string }>();
@@ -157,7 +165,8 @@ export default function Reels() {
   const [active, setActive] = useState(0);
   const [height, setHeight] = useState(0);
   const [moments, setMoments] = useState<Record<string, ReelMoment[]>>({});
-  const [sheet, setSheet] = useState<{ kind: 'share' | 'options' | 'highlights' | 'cover'; post: Post } | null>(null);
+  const [sheet, setSheet] = useState<{ kind: SheetKind; post: Post } | null>(null);
+  const micOn = useFlag('PASS_THE_MIC') === true;
   // The reel on screen registers what the highlights editor needs from it.
   const controls = useRef<Record<string, ReelControls>>({});
   const loading = useRef(false);
@@ -356,7 +365,7 @@ export default function Reels() {
   }
 
   /** Close the sheet on screen and open another once it has slid away. */
-  const swapSheet = (next: { kind: 'share' | 'options' | 'highlights' | 'cover'; post: Post }) => {
+  const swapSheet = (next: { kind: SheetKind; post: Post }) => {
     setSheet(null);
     setTimeout(() => setSheet(next), SHEET_SWAP_MS);
   };
@@ -470,6 +479,88 @@ export default function Reels() {
     }
   }
 
+  // Pass the Mic. A chain's settings changed: every reel of it here shows them.
+  const patchChain = (chain: Chain) =>
+    setItems(
+      (cur) =>
+        cur?.map((x) =>
+          x.chain?.id === chain.id
+            ? {
+                ...x,
+                chain: {
+                  ...x.chain,
+                  prompt: chain.prompt,
+                  closed: chain.closed,
+                  canJoin: chain.viewer.canJoin,
+                  people: chain.counts.people,
+                  countries: chain.counts.countries,
+                },
+              }
+            : x,
+        ) ?? cur,
+    );
+  const dropChain = (id: string) => patch(id, ({ chain: _chain, ...x }) => x);
+
+  // Sideways in a chain: the reel before or after this one takes its place (vertical paging stays the feed).
+  const stepping = useRef(false);
+  async function chainStep(p: Post, index: number, dir: 'next' | 'previous') {
+    if (!p.chain || stepping.current) return;
+    stepping.current = true;
+    try {
+      const { post: next } = await (await client()).chains.step(p.chain.id, p.id, dir);
+      if (!next) return;
+      // Already further up or down the feed: only one of it stays, the one in front of you.
+      const other = items?.findIndex((x, i) => i !== index && x.id === next.id) ?? -1;
+      const to = other >= 0 && other < index ? index - 1 : index;
+      setItems((cur) => {
+        if (!cur || cur[index]?.id !== p.id) return cur;
+        return cur.map((x, i) => (i === index ? next : x)).filter((x, i) => i === index || x.id !== next.id);
+      });
+      if (to !== index) {
+        setActive(to);
+        requestAnimationFrame(() => list.current?.scrollToIndex({ index: to, animated: false }));
+      }
+      AccessibilityInfo.announceForAccessibility(
+        next.chain ? chainBarText(next.chain, t, tp, (n) => number(n)) : t('m.reels.by', { name: next.author.displayName }),
+      );
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      stepping.current = false;
+    }
+  }
+
+  async function setChainOpen(p: Post, open: boolean) {
+    if (!p.chain) return;
+    try {
+      const r = await (await client()).chains.edit(p.chain.id, { whoCanJoin: open ? 'everyone' : 'nobody' });
+      patchChain(r.chain);
+      setStatus(t('mic.saved'));
+    } catch (e) {
+      setError(errorMessage(e));
+    }
+  }
+
+  /** The starter takes a reel out of the chain, or its author leaves with it; the reel stays up. */
+  function leaveChain(p: Post) {
+    const chain = p.chain;
+    if (!chain) return;
+    const leaving = !chain.isStarter;
+    const go = async () => {
+      try {
+        await (await client()).chains.removeLink(chain.id, p.id);
+        dropChain(p.id);
+        setStatus(t(leaving ? 'mic.left' : 'mic.removed'));
+      } catch (e) {
+        setError(errorMessage(e));
+      }
+    };
+    Alert.alert(t(leaving ? 'mic.leave' : 'mic.remove'), undefined, [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t(leaving ? 'mic.leave' : 'mic.remove'), style: 'destructive', onPress: () => void go() },
+    ]);
+  }
+
   // Send in a chat: the server counts the share.
   const sender = useSendPost(setStatus);
 
@@ -531,6 +622,9 @@ export default function Reels() {
     watched,
     keepEchoPrivate: (p) => void keepEchoPrivate(p),
     deleteEcho: (p) => deleteEcho(p),
+    chainStep: (p, index, dir) => void chainStep(p, index, dir),
+    takeMic: (p) => p.chain && takeTheMic(p.chain.id),
+    openChain: (p) => p.chain && openChain(p.chain.id),
   };
   const actions = useRef(rowActions);
   actions.current = rowActions;
@@ -557,10 +651,11 @@ export default function Reels() {
         following={!!followed[item.author.id]}
         mine={item.author.id === me?.id}
         signedIn={signedIn}
+        chainOn={micOn}
         actions={actions}
       />
     ),
-    [height, active, focused, muted, clear, speed, big, captions, holdId, moments, start, at, soundHint, followed, me?.id, signedIn],
+    [height, active, focused, muted, clear, speed, big, captions, holdId, moments, start, at, soundHint, followed, me?.id, signedIn, micOn],
   );
 
   const back = (color: string) => (
@@ -737,6 +832,33 @@ export default function Reels() {
         onAllowRemix={(p, v) => void setAllowRemix(p, v)}
         onAllowEchoes={(p, v) => void setAllowEchoes(p, v)}
         onCountsHidden={(p, v) => void setCountsHidden(p, v)}
+        mic={micOn && signedIn}
+        onPassMic={(p) => swapSheet({ kind: 'pass', post: p })}
+        onChainWho={(p) => swapSheet({ kind: 'chainWho', post: p })}
+        onChainOpen={(p, open) => void setChainOpen(p, open)}
+        onLeaveChain={(p) => setTimeout(() => leaveChain(p), SHEET_SWAP_MS)}
+        onStartChain={(p) => swapSheet({ kind: 'startChain', post: p })}
+      />
+      <PassMicSheet
+        chainId={sheet?.kind === 'pass' ? (sheetPost?.chain?.id ?? null) : null}
+        onClose={() => setSheet(null)}
+        onPassed={(n) => setStatus(tp('mic.pass.sent', n, { count: number(n) }))}
+      />
+      <ChainWhoSheet
+        chainId={sheet?.kind === 'chainWho' ? (sheetPost?.chain?.id ?? null) : null}
+        onClose={() => setSheet(null)}
+        onSaved={(chain) => {
+          patchChain(chain);
+          setStatus(t('mic.saved'));
+        }}
+      />
+      <StartChainSheet
+        post={sheet?.kind === 'startChain' ? sheetPost : null}
+        onClose={() => setSheet(null)}
+        onStarted={(chain) => {
+          if (sheetPost) patch(sheetPost.id, (x) => ({ ...x, chain: chainRefFrom(chain) }));
+          setStatus(t('mic.started'));
+        }}
       />
       {reporter.sheet}
       {watchTogether.sheet}
@@ -788,6 +910,9 @@ const ReelRow = memo(function ReelRow({ index, signedIn, actions, ...props }: Re
       onWatched={() => actions.current.watched(post)}
       onKeepEchoPrivate={() => actions.current.keepEchoPrivate(post)}
       onDeleteEcho={() => actions.current.deleteEcho(post)}
+      onChainStep={(dir) => actions.current.chainStep(post, index, dir)}
+      onTakeMic={() => actions.current.takeMic(post)}
+      onOpenChain={() => actions.current.openChain(post)}
     />
   );
 });
@@ -825,6 +950,10 @@ function Reel({
   onWatched,
   onKeepEchoPrivate,
   onDeleteEcho,
+  chainOn,
+  onChainStep,
+  onTakeMic,
+  onOpenChain,
 }: {
   post: Post;
   height: number;
@@ -867,6 +996,11 @@ function Reel({
   /** Your echo whose original is gone: keep it to yourself, or delete it. */
   onKeepEchoPrivate: () => void;
   onDeleteEcho: () => void;
+  /** Pass the Mic is on: a reel in a chain shows the chain bar, and moves along it sideways. */
+  chainOn: boolean;
+  onChainStep: (dir: 'next' | 'previous') => void;
+  onTakeMic: () => void;
+  onOpenChain: () => void;
 }) {
   const c = useColors();
   const { t, tp, number, locale } = useT();
@@ -1194,12 +1328,30 @@ function Reel({
     ...(mine && post.countsHidden ? [t('post.stats.onlyYou')] : []),
   ];
   const bottom = insets.bottom + space[1];
+  const chain = chainOn ? (post.chain ?? null) : null;
+
+  // A chain reel moves along its chain with a sideways swipe: claimed only when the move is mostly
+  // sideways, so swiping up and down stays the feed (and the scrubber keeps its own drag).
+  const sideways = useRef({ on: false, step: onChainStep });
+  sideways.current = { on: !!chain && !details && !clear, step: onChainStep };
+  const swipe = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, g) => sideways.current.on && Math.abs(g.dx) > 24 && Math.abs(g.dx) > Math.abs(g.dy) * 2,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderRelease: (_, g) => {
+        if (Math.abs(g.dx) < 60) return;
+        const forward = I18nManager.isRTL ? g.dx > 0 : g.dx < 0;
+        sideways.current.step(forward ? 'next' : 'previous');
+      },
+    }),
+  ).current;
 
   return (
     <View
       style={{ height, backgroundColor: '#05060B', overflow: 'hidden' }}
       accessibilityLabel={t('m.reels.by', { name: post.author.displayName })}
       onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+      {...swipe.panHandlers}
     >
       <Pressable
         accessibilityRole="button"
@@ -1317,12 +1469,21 @@ function Reel({
         </View>
       ) : null}
 
-      {!details ? <CaptionOverlay cues={cues} seconds={time.current} big={big} bottom={clear ? bottom + 56 : bottom + 150} /> : null}
+      {!details ? (
+        // Above the info strip, and above the chain bar when there is one.
+        <CaptionOverlay
+          cues={cues}
+          seconds={time.current}
+          big={big}
+          bottom={clear ? bottom + 56 : bottom + 150 + (chain ? (chain.canJoin || chain.closed ? 112 : 70) : 0)}
+        />
+      ) : null}
 
       {/* The info strip: name, Follow, one caption line with "more", the sound. */}
       {!details ? (
         // 57 above the bottom, not 48: room for the last chip's touch area (44) above the play button.
         <Animated.View style={[s.info, { bottom: bottom + 57, opacity: fade }]} pointerEvents={clear ? 'none' : 'box-none'}>
+          {chain ? <ChainBar chain={chain} onStep={onChainStep} onTake={onTakeMic} onOpen={onOpenChain} /> : null}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
             {/* The name and Follow split the 8pt gap between them, so their touch areas don't overlap. */}
             <Pressable accessibilityRole="link" onPress={openAuthor} hitSlop={{ top: 12, bottom: 12, left: 4, right: 4 }} style={{ flexShrink: 1 }}>
@@ -1677,6 +1838,70 @@ function Reel({
   );
 }
 
+/**
+ * A chain reel's bar: where it is in the chain ("Link 3 of 47 · 12 countries"), the prompt and who
+ * started it (opening the chain's page), the reels before and after it, and "Take the mic".
+ */
+function ChainBar({ chain, onStep, onTake, onOpen }: { chain: ChainRef; onStep: (dir: 'next' | 'previous') => void; onTake: () => void; onOpen: () => void }) {
+  const { t, tp, number } = useT();
+  const where = chainBarText(chain, t, tp, (n) => number(n));
+  const by = t('mic.startedBy', { name: chain.starter.displayName });
+  const first = chain.position <= 1;
+  const last = chain.position >= chain.total;
+  return (
+    <View style={s.chainBar}>
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('mic.previous')}
+          accessibilityState={{ disabled: first }}
+          disabled={first}
+          onPress={() => onStep('previous')}
+          style={[s.chainStep, first && { opacity: 0.35 }]}
+        >
+          <Icon name="chevron-back" size={22} color={WHITE} directional />
+        </Pressable>
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel={`${where}. ${chain.prompt}. ${by}`}
+          accessibilityHint={t('mic.open')}
+          onPress={onOpen}
+          style={{ flex: 1, minHeight: 44, justifyContent: 'center', paddingHorizontal: 2 }}
+        >
+          <Text style={s.chainMeta} numberOfLines={1}>
+            {where}
+          </Text>
+          <Text style={[s.chainPrompt, userText]} numberOfLines={2}>
+            {chain.prompt}
+          </Text>
+          <Text style={[s.chainMeta, userText]} numberOfLines={1}>
+            {by}
+          </Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('mic.next')}
+          accessibilityState={{ disabled: last }}
+          disabled={last}
+          onPress={() => onStep('next')}
+          style={[s.chainStep, last && { opacity: 0.35 }]}
+        >
+          <Icon name="chevron-forward" size={22} color={WHITE} directional />
+        </Pressable>
+      </View>
+      {chain.canJoin ? (
+        // 36 tall: the touch area reaches 44 above and below.
+        <Pressable accessibilityRole="button" hitSlop={{ top: 4, bottom: 4 }} onPress={onTake} style={s.take}>
+          <Icon name="mic" size={16} color="#0B0C14" />
+          <Text style={{ color: '#0B0C14', fontWeight: '800', fontSize: 14 }}>{t('mic.take')}</Text>
+        </Pressable>
+      ) : chain.closed ? (
+        <Text style={[s.chainMeta, { paddingHorizontal: space[2], paddingBottom: space[1] }]}>{t('mic.closed')}</Text>
+      ) : null}
+    </View>
+  );
+}
+
 /** The progress bar: drag to scrub (with the time above your finger), ticks for highlights, bubbles for moment comments. */
 function Scrubber({
   current,
@@ -1910,6 +2135,12 @@ function OptionsSheet({
   onAllowRemix,
   onAllowEchoes,
   onCountsHidden,
+  mic,
+  onPassMic,
+  onChainWho,
+  onChainOpen,
+  onLeaveChain,
+  onStartChain,
 }: {
   post: Post | null;
   mine: boolean;
@@ -1930,6 +2161,13 @@ function OptionsSheet({
   onAllowRemix: (p: Post, allow: boolean) => void;
   onAllowEchoes: (p: Post, allow: EchoPermission) => void;
   onCountsHidden: (p: Post, hidden: boolean) => void;
+  /** Pass the Mic is on and you're signed in: the chain's choices (or "Start a chain" on your own reel). */
+  mic: boolean;
+  onPassMic: (p: Post) => void;
+  onChainWho: (p: Post) => void;
+  onChainOpen: (p: Post, open: boolean) => void;
+  onLeaveChain: (p: Post) => void;
+  onStartChain: (p: Post) => void;
 }) {
   const c = useColors();
   const { t, number } = useT();
@@ -1972,6 +2210,26 @@ function OptionsSheet({
           <View style={{ height: space[2] }} />
           {post.visibility !== 'private' ? <SheetItem icon="link-outline" label={t('reel.share.copy')} onPress={done(() => onCopy(post))} /> : null}
           {post.downloadable ? <SheetItem icon="download-outline" label={t('share.video.download')} onPress={done(() => onDownload(post))} /> : null}
+          {mic && post.chain ? (
+            <>
+              <SheetItem icon="paper-plane-outline" label={t('mic.pass')} onPress={() => onPassMic(post)} />
+              {post.chain.isStarter ? (
+                <>
+                  <SheetItem
+                    icon={post.chain.closed ? 'lock-open-outline' : 'lock-closed-outline'}
+                    label={post.chain.closed ? t('mic.reopen') : t('mic.close')}
+                    onPress={done(() => onChainOpen(post, post.chain!.closed))}
+                  />
+                  <SheetItem icon="people-outline" label={t('mic.who')} onPress={() => onChainWho(post)} />
+                  <SheetItem icon="remove-circle-outline" label={t('mic.remove')} danger onPress={done(() => onLeaveChain(post))} />
+                </>
+              ) : mine ? (
+                <SheetItem icon="exit-outline" label={t('mic.leave')} danger onPress={done(() => onLeaveChain(post))} />
+              ) : null}
+            </>
+          ) : mic && mine && canStartChain(post) ? (
+            <SheetItem icon="mic-outline" label={t('mic.start')} onPress={() => onStartChain(post)} />
+          ) : null}
           {mine && !post.status ? (
             <SheetItem
               icon={post.countsHidden ? 'eye-outline' : 'eye-off-outline'}
@@ -2232,6 +2490,21 @@ const s = StyleSheet.create({
   count: { color: WHITE, fontSize: 12, fontWeight: '700', minHeight: 14, textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 3 },
   stat: { color: WHITE, fontSize: 12, fontWeight: '700', textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 3 },
   srOnly: { position: 'absolute', width: 1, height: 1, opacity: 0 },
+  chainBar: { gap: 2, borderRadius: radius.md, backgroundColor: 'rgba(5,6,11,0.55)', paddingBottom: space[1], marginBottom: space[1] },
+  chainStep: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  chainMeta: { color: '#E4E6F0', fontSize: 12, fontWeight: '700' },
+  chainPrompt: { color: WHITE, fontSize: 14, fontWeight: '800', lineHeight: 19 },
+  take: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    minHeight: 36,
+    marginStart: space[2],
+    paddingHorizontal: space[3],
+    borderRadius: 12,
+    backgroundColor: SUN,
+  },
   controls: { position: 'absolute', start: space[2], end: space[2], height: 44, flexDirection: 'row', alignItems: 'center', gap: space[1] },
   time: { color: WHITE, fontSize: 11, fontWeight: '600', minWidth: 72, textAlign: 'right', fontVariant: ['tabular-nums'] },
   scrub: { flex: 1, height: 44, justifyContent: 'center' },

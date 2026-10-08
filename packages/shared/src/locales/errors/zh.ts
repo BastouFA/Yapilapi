@@ -1150,4 +1150,16 @@ export const zh: Record<string, string> = {
   'Choose one cover.': '请选择一个封面。',
   'Choose a video or a photo.': '请选择一段视频或一张照片。',
   'You can keep up to 5 accounts in this browser.': '这个浏览器上最多可以保留 5 个账号。',
+  // Pass the Mic (apps/api/src/lib/chains.ts, apps/api/src/modules/pass-the-mic.ts)
+  'Chains are made of reels posted right away.': '接力只能由立即发布的短视频组成。',
+  'Only people the starter follows can take the mic on this chain.': '只有发起人关注的人才能在这个接力中接麦。',
+  'Only reels shared publicly, with followers or with friends can be in a chain.': '只有公开、仅粉丝可见或仅好友可见的短视频才能加入接力。',
+  'Pass the Mic is not enabled.': '传麦功能尚未开启。',
+  "That chain doesn't exist or isn't visible to you.": '这个接力不存在，或者你无法查看。',
+  'That reel is already in a chain.': '这个短视频已经在一个接力中了。',
+  'This chain is closed.': '这个接力已关闭。',
+  'You can add up to {max} reels to one chain.': '一个接力最多可以添加 {max} 个短视频。',
+  'You can pass the mic on one chain to up to {max} people.': '在一个接力中，你最多可以把麦传给 {max} 个人。',
+  'You can’t take the mic on this chain.': '你不能在这个接力中接麦。',
+  'You’ve added a lot of reels to chains today. Try again tomorrow.': '你今天已经往接力里添加了很多短视频。请明天再试。',
 };

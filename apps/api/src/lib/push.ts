@@ -172,6 +172,12 @@ const TEXT: Record<string, Text> = {
   reel_remix: say('push.reel_remix'),
   // Echoes of one reel are batched (lib/echoes.ts), so this pushes for the first one only.
   reel_echo: say('push.reel_echo'),
+  // Pass the Mic: batched per chain (lib/chains.ts), so each chain pushes once until it's read.
+  chain_link: say('push.chain_link'),
+  chain_next: say('push.chain_next'),
+  chain_pass: say('push.chain_pass'),
+  // The report is in the app; the push says it's ready.
+  fair_start_done: say('push.fair_start_done'),
   post_mention: say('push.post_mention'),
   comment_mention: say('push.comment_mention'),
   comment_like: say('push.comment_like'),

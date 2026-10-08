@@ -1227,4 +1227,18 @@ export const de: Record<string, string> = {
   'Choose one cover.': 'Wähle ein Titelbild.',
   'Choose a video or a photo.': 'Wähle ein Video oder ein Foto.',
   'You can keep up to 5 accounts in this browser.': 'Du kannst bis zu 5 Konten in diesem Browser behalten.',
+  // Pass the Mic (apps/api/src/lib/chains.ts, apps/api/src/modules/pass-the-mic.ts)
+  'Chains are made of reels posted right away.': 'Ketten bestehen aus Reels, die sofort gepostet wurden.',
+  'Only people the starter follows can take the mic on this chain.':
+    'In dieser Kette können nur Leute das Mikro übernehmen, denen die Person folgt, die sie gestartet hat.',
+  'Only reels shared publicly, with followers or with friends can be in a chain.':
+    'Nur Reels, die öffentlich, mit Followern oder mit Freunden geteilt wurden, können in eine Kette.',
+  'Pass the Mic is not enabled.': '„Gib das Mikro weiter“ ist nicht aktiviert.',
+  "That chain doesn't exist or isn't visible to you.": 'Diese Kette gibt es nicht oder du kannst sie nicht sehen.',
+  'That reel is already in a chain.': 'Dieses Reel ist schon in einer Kette.',
+  'This chain is closed.': 'Diese Kette ist geschlossen.',
+  'You can add up to {max} reels to one chain.': 'Du kannst einer Kette bis zu {max} Reels hinzufügen.',
+  'You can pass the mic on one chain to up to {max} people.': 'Du kannst das Mikro in einer Kette an bis zu {max} Leute weitergeben.',
+  'You can’t take the mic on this chain.': 'Du kannst in dieser Kette das Mikro nicht übernehmen.',
+  'You’ve added a lot of reels to chains today. Try again tomorrow.': 'Du hast heute schon viele Reels zu Ketten hinzugefügt. Versuch es morgen noch einmal.',
 };

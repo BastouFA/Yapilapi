@@ -10,7 +10,8 @@ import { appPath } from '../lib/links';
  * creator's plans (u/<name>?subscribe=1, plans/<name>), one thing from a shop
  * (u/<name>?shop=1&product=<id>), boosting a post (p/<id>?boost=1) and its insights
  * (p/<id>/insights, insights/<id>). An event's check-in (events/<id>/check-in), a reel's echoes
- * (reels/<id>/echoes), settings/your-data, settings/purchases and the legal pages open their screens.
+ * (reels/<id>/echoes), a Pass the Mic chain (chains/<id>), settings/your-data, settings/purchases
+ * and the legal pages open their screens.
  * Anything unexpected opens as it came, and a path with no screen shows app/+not-found.tsx.
  */
 export function redirectSystemPath({ path }: { path: string; initial: boolean }) {

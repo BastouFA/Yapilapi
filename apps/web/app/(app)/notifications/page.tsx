@@ -8,6 +8,8 @@ import {
   formatRelativeTime,
   fullCount,
   milestoneNoticeText,
+  micNoticeHref,
+  micNoticeText,
   miniAppNoticeText,
   reportOutcomeText,
   appealDecidedText,
@@ -115,6 +117,9 @@ const COMMENT_TYPES = new Set(['post_comment', 'comment_reply', 'comment_like', 
 
 function hrefFor(n: NotificationItem, meUsername?: string): string | undefined {
   if (n.type === 'new_sign_in') return '/settings/security?review=sign-in';
+  // Pass the Mic and Fair start: the chain's page, or the reel.
+  const mic = micNoticeHref(n);
+  if (mic) return 'chain' in mic ? `/chains/${mic.chain}` : `/reels?start=${mic.reel}`;
   // A call opens the chat it was in (older call notifications open the caller).
   if (n.type === 'call_incoming' && typeof n.data.conversationId === 'string') return `/inbox/${n.data.conversationId}`;
   // Market: a rating opens your profile's Market tab; the rest open the listing (offers open the chat, below).
@@ -189,6 +194,9 @@ function batchedText(n: NotificationItem, t: Session['t'], tp: Session['tp']): s
   // "Ada and 3 others echoed your reel".
   const echo = echoNoticeText(n, t, tp);
   if (echo) return echo;
+  // "Ada and 2 others took the mic on your chain", "Fair start finished: 1,000 people saw your reel".
+  const mic = micNoticeText(n, t, tp);
+  if (mic) return mic;
   // Whole sentences in your language (the name, when there is one, is part of them).
   if (n.type === 'weekly_wrap') return t('wrap.notif');
   if (n.type === 'watch_invite') return t('watch.invite', { name: n.actor?.displayName ?? t('m.calls.someone') });

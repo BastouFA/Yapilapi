@@ -16,6 +16,7 @@ import {
 } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
+import { ChainJoinField, chainableAudience, FairStartCard } from '@/components/PassTheMic';
 import type { ReelPrefs } from './prefs';
 
 function SheetItem({ icon, label, onClick, danger, pressed }: { icon: IconName; label: string; onClick: () => void; danger?: boolean; pressed?: boolean }) {
@@ -139,10 +140,24 @@ export function ShareSheet({
   );
 }
 
+/** What the "…" sheet does for Pass the Mic (the viewer owns the requests and the other sheets). */
+export interface ChainOptions {
+  /** Your reel that isn't in a chain: start one with it. */
+  start: (p: Post) => void;
+  /** Invite people to add the next reel. */
+  pass: (p: Post) => void;
+  /** The starter takes the reel out of the chain, or its author leaves with it. */
+  remove: (p: Post) => void;
+  /** The starter closes the chain ('nobody') or opens it again ('everyone'). */
+  setJoin: (p: Post, who: 'everyone' | 'nobody') => void;
+  /** The starter changed who can take the mic in the sheet (already saved). */
+  saved: (p: Post) => void;
+}
+
 /**
  * The "…" sheet: how to watch (speed, captions, quality) and what to do with the reel
  * (picture in picture, not interested, copy link, download, highlights, remix and echo settings
- * for the creator, leave as co-author, report).
+ * for the creator, Pass the Mic and the reel's fair start, leave as co-author, report).
  */
 export function OptionsSheet({
   post,
@@ -162,6 +177,7 @@ export function OptionsSheet({
   onLeaveCollab,
   onReport,
   onToggleCounts,
+  chain,
 }: {
   post: Post | null;
   mine: boolean;
@@ -184,9 +200,15 @@ export function OptionsSheet({
   onReport: (p: Post) => void;
   /** The creator: hide the like and view counts from everyone else, or show them again. */
   onToggleCounts?: (p: Post) => void;
+  /** Pass the Mic (signed in, with the flag on). */
+  chain?: ChainOptions;
 }) {
-  const { t, locale } = useSession();
+  const { t, locale, flags, me } = useSession();
   if (!post) return null;
+  const mic = flags.PASS_THE_MIC && me && post.format === 'reel' ? chain : undefined;
+  const link = post.chain;
+  // Your reel posted where a chain can be: not an echo, not in a community, shared publicly, with followers or friends.
+  const canStart = !!mic && mine && !link && !post.echoOf && !post.community && chainableAudience(post.visibility);
   const hasCaptions = !!post.media[0]?.captions?.length;
   const fmt = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 });
   const speedLabel = (s: ReelSpeed) => (s === 1 ? t('reel.speed.normal') : `${fmt.format(s)}×`);
@@ -240,7 +262,26 @@ export function OptionsSheet({
             <span className="muted reel-sheet__note">{t('echo.settings.hint')}</span>
           </div>
         ) : null}
+        {mic && link?.isStarter ? (
+          <div className="reel-sheet__group">
+            <span className="reel-sheet__label">{t('mic.title')}</span>
+            <ChainJoinField chainId={link.id} onSaved={() => mic.saved(post)} />
+          </div>
+        ) : null}
+        {mine && post.format === 'reel' ? <FairStartCard postId={post.id} /> : null}
         <ul className="reel-sheet__list">
+          {mic && link ? <SheetItem icon="send" label={t('mic.pass')} onClick={done(() => mic.pass(post))} /> : null}
+          {mic && link?.isStarter ? (
+            <SheetItem
+              icon={link.closed ? 'mic' : 'mic-off'}
+              label={t(link.closed ? 'mic.reopen' : 'mic.close')}
+              onClick={done(() => mic.setJoin(post, link.closed ? 'everyone' : 'nobody'))}
+            />
+          ) : null}
+          {mic && link && (link.isStarter || mine) ? (
+            <SheetItem icon="logout" label={t(link.isStarter ? 'mic.remove' : 'mic.leave')} onClick={done(() => mic.remove(post))} />
+          ) : null}
+          {canStart ? <SheetItem icon="mic" label={t('mic.start')} onClick={done(() => mic!.start(post))} /> : null}
           {pip ? <SheetItem icon="image" label={t('reel.pip')} onClick={done(onPip)} /> : null}
           <SheetItem icon="link" label={t('reel.share.copy')} onClick={done(() => onCopy(post))} />
           {post.downloadable ? <SheetItem icon="download" label={t('share.video.download')} onClick={done(() => onDownload(post))} /> : null}

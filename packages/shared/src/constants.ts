@@ -407,3 +407,50 @@ export type AdminPeriod = (typeof ADMIN_PERIODS)[number];
 /** Announcements to everyone: a title, a few lines, and an optional link (https://, or a path in the app). */
 export const ANNOUNCEMENT_TITLE_MAX = 120;
 export const ANNOUNCEMENT_BODY_MAX = 2000;
+
+/**
+ * Pass the Mic: reels made together, one after another (docs/product/pass-the-mic.md).
+ * Who can take the mic: everyone who can see the chain, people the starter follows, or nobody (closed).
+ */
+export const CHAIN_JOIN = ['everyone', 'following', 'nobody'] as const;
+export type ChainJoin = (typeof CHAIN_JOIN)[number];
+export const CHAIN_RULES = {
+  /** A prompt is 1 to this many characters. */
+  promptMax: 120,
+  /** One person adds at most this many reels to one chain. */
+  linksPerPersonPerChain: 3,
+  /** One person adds at most this many links (to any chains) in a day. */
+  linksPerDay: 20,
+  /** One person passes one chain's mic to at most this many people, and this many in one go. */
+  passesPerChain: 10,
+  passesAtOnce: 5,
+  /** A chain with a new link in this many days is active (Wander's Chains shelf, admin counts). */
+  activeDays: 7,
+} as const;
+
+/**
+ * Fair start: a new creator's first reels are shown to up to `target` real people
+ * (docs/product/pass-the-mic.md). Every number the recommender uses for it is here.
+ */
+export const FAIR_START = {
+  /** The first reels of every account get a fair start… */
+  firstReels: 3,
+  /** …then one a week (every `everyDays`) while the account has fewer than `underFollowers` followers. */
+  underFollowers: 1000,
+  everyDays: 7,
+  /** Up to this many distinct real people see it. A target, not a promise: on a small app it reaches whoever there is. */
+  target: 1000,
+  /** It stops after this many days, whatever it reached. */
+  days: 7,
+  /** One slot in `slotEvery` of For you and Reels goes to a fair-start reel, the first at `firstSlot` (0-based). */
+  slotEvery: 9,
+  firstSlot: 3,
+  /** The early quality check runs once this many people saw it. */
+  checkAfter: 50,
+  /** Slowed when more than this share of those people moved on at once (a skip), or when it was reported. */
+  skipShare: 0.6,
+  /** A slowed reel still reaches this many people (unless it is taken down). */
+  minimum: 200,
+  /** Accounts made from one address (their sign-up) have at most this many fair-start reels running at once. */
+  perSignupAddress: 2,
+} as const;

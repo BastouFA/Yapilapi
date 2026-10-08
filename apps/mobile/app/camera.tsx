@@ -24,6 +24,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import type { DualCorner } from '../../../packages/shared/src/dual';
+import { client } from '../lib/api';
 import { createModeFrom, deliverEchoAsset, deliverPendingAsset, type CreateMode } from '../lib/create-sheet';
 import { composeOnServer, DualReview, type Shot } from '../lib/dual';
 import { useT } from '../lib/i18n';
@@ -130,10 +131,28 @@ export default function Camera() {
   const { t } = useT();
   const { me } = useSession();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ mode?: string; echo?: string }>();
+  const params = useLocalSearchParams<{ mode?: string; echo?: string; chain?: string }>();
   // Recording for an echo (echo=<reel id>): a reel-style video, handed back to the Echo screen.
   const echoOf = typeof params.echo === 'string' && /^[0-9a-f-]{36}$/i.test(params.echo) ? params.echo : null;
-  const [mode, setMode] = useState<CreateMode>(echoOf ? 'reel' : (createModeFrom(params.mode) ?? 'post'));
+  // Taking the mic on a Pass the Mic chain (chain=<id>): a reel, with the chain's prompt on screen; Create posts it in the chain.
+  const chainId = !echoOf && typeof params.chain === 'string' && /^[0-9a-f-]{36}$/i.test(params.chain) ? params.chain : null;
+  const [prompt, setPrompt] = useState<string | null>(null);
+  useEffect(() => {
+    if (!chainId) return;
+    let live = true;
+    void client()
+      .then((api) => api.chains.get(chainId))
+      .then(
+        (r) => live && setPrompt(r.chain.prompt),
+        () => {},
+      );
+    return () => {
+      live = false;
+    };
+  }, [chainId]);
+  // An echo or a chain is always a reel: the mode switcher is hidden.
+  const reelOnly = !!echoOf || !!chainId;
+  const [mode, setMode] = useState<CreateMode>(reelOnly ? 'reel' : (createModeFrom(params.mode) ?? 'post'));
   const [facing, setFacing] = useState<CameraType>('back');
   const [flash, setFlash] = useState<Flash>('off');
   // Post and Story take photos; the camera switches to video only while holding the shutter.
@@ -246,7 +265,7 @@ export default function Camera() {
   }, [recording, maxSeconds]);
 
   function choose(next: CreateMode) {
-    if (recordingRef.current || busyRef.current || echoOf) return;
+    if (recordingRef.current || busyRef.current || reelOnly) return;
     setMode(next);
     setVideoMode(false);
     if (next === 'reel') setDual(false);
@@ -287,7 +306,7 @@ export default function Camera() {
     }
     deliverPendingAsset(asset, mode);
     // Back to the tabs already underneath (a plain replace would stack a second copy of them).
-    router.dismissTo({ pathname: '/create', params: mode === 'post' ? {} : { mode } });
+    router.dismissTo({ pathname: '/create', params: chainId ? { mode, chain: chainId } : mode === 'post' ? {} : { mode } });
   }
 
   function writeInstead() {
@@ -561,6 +580,16 @@ export default function Camera() {
         )}
       </View>
 
+      {/* Taking the mic: the chain's prompt, under the top buttons. */}
+      {chainId && prompt ? (
+        <View style={[s.prompt, { top: insets.top + space[2] + 56 }]} pointerEvents="none">
+          <Icon name="mic-outline" size={16} color={WHITE} />
+          <Text style={s.promptText} numberOfLines={3}>
+            {t('mic.joining', { prompt })}
+          </Text>
+        </View>
+      ) : null}
+
       {/* Bottom: Both sides; gallery, shutter, flip; the mode switcher under them. */}
       <View style={[s.bottom, { paddingBottom: insets.bottom + space[3] }]} pointerEvents="box-none">
         {granted && clipMode && !recording ? (
@@ -643,10 +672,10 @@ export default function Camera() {
         <View
           accessibilityRole="tablist"
           accessibilityLabel={t('m.camera.modes')}
-          style={[s.modes, (recording || echoOf) && { opacity: 0 }]}
-          pointerEvents={recording || echoOf ? 'none' : 'auto'}
-          importantForAccessibility={recording || echoOf ? 'no-hide-descendants' : 'auto'}
-          accessibilityElementsHidden={!!recording || !!echoOf}
+          style={[s.modes, (recording || reelOnly) && { opacity: 0 }]}
+          pointerEvents={recording || reelOnly ? 'none' : 'auto'}
+          importantForAccessibility={recording || reelOnly ? 'no-hide-descendants' : 'auto'}
+          accessibilityElementsHidden={!!recording || reelOnly}
           {...swipe.panHandlers}
         >
           <Animated.View style={[s.modeRow, { transform: [{ translateX: modeX }] }]}>
@@ -782,5 +811,18 @@ const s = StyleSheet.create({
   },
   dualToggleOn: { backgroundColor: WHITE },
   dualToggleText: { color: WHITE, fontWeight: '700', fontSize: 14 },
+  prompt: {
+    position: 'absolute',
+    start: space[4],
+    end: space[4],
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[2],
+    paddingHorizontal: space[3],
+    paddingVertical: space[2],
+    borderRadius: radius.md,
+    backgroundColor: 'rgba(5,6,11,0.72)',
+  },
+  promptText: { color: WHITE, fontSize: 14, fontWeight: '600', lineHeight: 20, flexShrink: 1 },
   dualHint: { color: WHITE, textAlign: 'center', fontSize: 14, fontWeight: '600' },
 });

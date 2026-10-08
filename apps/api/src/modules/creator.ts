@@ -5,6 +5,7 @@ import { byOrWithSql } from '../lib/collabs.ts';
 import { notFound, parse } from '../lib/errors.ts';
 import { publicUserFrom } from '../lib/users.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
+import { fairStartOf } from '../lib/fair-start.ts';
 
 /**
  * Creator Studio foundation: performance of your own content (posts you co-author count too),
@@ -76,6 +77,8 @@ export default async function creatorModule(app: FastifyInstance, ctx: AppContex
         saves: p.saves as number,
         reposts: p.reposts as number,
         viewsByDay: days.rows.map((r) => ({ day: r.day, views: r.views as number })),
+        // A new creator's reel: how far its fair start got, and its report (lib/fair-start.ts).
+        fairStart: p.format === 'reel' ? await fairStartOf(ctx.db, p.id) : null,
       },
     };
   });

@@ -1,6 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { useEffect } from 'react';
+import { micNoticeHref } from '../../../packages/shared/src/pass-the-mic';
 import { useSession } from './session';
 
 /** What a notification (from the list, or the data of a push) says about where it leads. */
@@ -22,6 +23,13 @@ export type NotificationTarget = {
 export function notificationHref(n: NotificationTarget): string | null {
   const id = n.entityId ? encodeURIComponent(n.entityId) : null;
   if ((n.type === 'reel_duet' || n.type === 'reel_remix') && id) return `/reels?start=${id}`;
+  // Pass the Mic: a finished fair start opens the reel's insights (the report); someone taking the
+  // mic opens their reel, several of them or a pass opens the chain. A push carries no data: a pass
+  // names the chain itself (entity 'chain').
+  if (n.type === 'fair_start_done') return id ? `/insights/${id}` : null;
+  if (n.type === 'chain_pass' && n.entityType === 'chain' && id) return `/chain/${id}`;
+  const mic = micNoticeHref({ type: n.type, entityId: n.entityId, data: n.data ?? {} });
+  if (mic) return 'chain' in mic ? `/chain/${encodeURIComponent(mic.chain)}` : `/reels?start=${encodeURIComponent(mic.reel)}`;
   // A milestone on your post or reel opens it (a push carries no format: it opens the post's page).
   if (n.type === 'post_milestone' && id) return n.data?.format === 'reel' ? `/reels?start=${id}` : `/p/${id}`;
   // A call opens the chat it was in (older call notifications open the caller).
@@ -147,6 +155,7 @@ const RENAMED: Record<string, string> = {
   story: 's',
   memory: 'memories',
   lives: 'live',
+  chains: 'chain',
 };
 
 /**

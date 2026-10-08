@@ -1155,4 +1155,16 @@ export const am: Record<string, string> = {
   'This video was not uploaded here, so its cover can’t be changed.': 'ይህ ቪዲዮ እዚህ ስላልተሰቀለ ሽፋኑ ሊቀየር አይችልም።',
   'Choose one cover.': 'አንድ ሽፋን ይምረጡ።',
   'Choose a video or a photo.': 'ቪዲዮ ወይም ፎቶ ይምረጡ።',
+  // Pass the Mic (apps/api/src/lib/chains.ts, apps/api/src/modules/pass-the-mic.ts)
+  'Chains are made of reels posted right away.': 'ሰንሰለቶች ወዲያውኑ ከተለጠፉ ሪሎች የተሰሩ ናቸው።',
+  'Only people the starter follows can take the mic on this chain.': 'በዚህ ሰንሰለት ውስጥ ማይኩን መውሰድ የሚችሉት ሰንሰለቱን የጀመረው ሰው የሚከተላቸው ብቻ ናቸው።',
+  'Only reels shared publicly, with followers or with friends can be in a chain.': 'በሰንሰለት ውስጥ መሆን የሚችሉት ለሁሉም፣ ለተከታዮች ወይም ለጓደኞች የተጋሩ ሪሎች ብቻ ናቸው።',
+  'Pass the Mic is not enabled.': 'ማይኩን ማቀበል አልነቃም።',
+  "That chain doesn't exist or isn't visible to you.": 'ያ ሰንሰለት የለም ወይም ለእርስዎ አይታይም።',
+  'That reel is already in a chain.': 'ያ ሪል አስቀድሞ በሰንሰለት ውስጥ ነው።',
+  'This chain is closed.': 'ይህ ሰንሰለት ተዘግቷል።',
+  'You can add up to {max} reels to one chain.': 'በአንድ ሰንሰለት ላይ እስከ {max} ሪሎች ማከል ይችላሉ።',
+  'You can pass the mic on one chain to up to {max} people.': 'በአንድ ሰንሰለት ውስጥ ማይኩን እስከ {max} ሰዎች ማቀበል ይችላሉ።',
+  'You can’t take the mic on this chain.': 'በዚህ ሰንሰለት ውስጥ ማይኩን መውሰድ አይችሉም።',
+  'You’ve added a lot of reels to chains today. Try again tomorrow.': 'ዛሬ ብዙ ሪሎችን ወደ ሰንሰለቶች አክለዋል። ነገ እንደገና ይሞክሩ።',
 };

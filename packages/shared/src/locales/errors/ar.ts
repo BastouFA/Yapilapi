@@ -1276,4 +1276,17 @@ export const ar: Record<string, string> = {
   'This video was not uploaded here, so its cover can’t be changed.': 'لم يُرفع هذا الفيديو هنا، لذا لا يمكن تغيير غلافه.',
   'Choose one cover.': 'اختر غلافًا واحدًا.',
   'Choose a video or a photo.': 'اختر فيديو أو صورة.',
+  // Pass the Mic (apps/api/src/lib/chains.ts, apps/api/src/modules/pass-the-mic.ts)
+  'Chains are made of reels posted right away.': 'تتكوّن السلاسل من مقاطع تُنشر فورًا.',
+  'Only people the starter follows can take the mic on this chain.': 'يمكن فقط للأشخاص الذين يتابعهم من بدأ السلسلة أخذ الميكروفون فيها.',
+  'Only reels shared publicly, with followers or with friends can be in a chain.':
+    'يمكن فقط للمقاطع المنشورة للعامة أو للمتابعين أو للأصدقاء أن تكون في سلسلة.',
+  'Pass the Mic is not enabled.': 'ميزة مرّر الميكروفون غير مفعّلة.',
+  "That chain doesn't exist or isn't visible to you.": 'هذه السلسلة غير موجودة أو لا يمكنك رؤيتها.',
+  'That reel is already in a chain.': 'هذا المقطع موجود في سلسلة بالفعل.',
+  'This chain is closed.': 'هذه السلسلة مغلقة.',
+  'You can add up to {max} reels to one chain.': 'يمكنك إضافة ما يصل إلى {max} مقاطع إلى سلسلة واحدة.',
+  'You can pass the mic on one chain to up to {max} people.': 'يمكنك تمرير الميكروفون في سلسلة واحدة إلى ما يصل إلى {max} أشخاص.',
+  'You can’t take the mic on this chain.': 'لا يمكنك أخذ الميكروفون في هذه السلسلة.',
+  'You’ve added a lot of reels to chains today. Try again tomorrow.': 'أضفت الكثير من المقاطع إلى السلاسل اليوم. حاول مجددًا غدًا.',
 };

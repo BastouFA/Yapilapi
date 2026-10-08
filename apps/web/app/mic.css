@@ -1,0 +1,344 @@
+/* ── Pass the Mic: chains of reels, and Fair start ─────────────────────── */
+
+/* On a reel in a chain, at the top of the info strip: always over the dark video, whatever the theme. */
+.reel-chain {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 340px;
+  padding: 8px;
+  border-radius: 16px;
+  background: #05060b80;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  color: #fff;
+  text-shadow: none;
+}
+.reel-chain__head {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-height: 44px;
+  padding: 2px 4px;
+  border-radius: 10px;
+  color: #fff;
+  text-decoration: none;
+}
+.reel-chain__head:hover .reel-chain__prompt {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.reel-chain__where {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--reel-sun);
+  font: 800 12px/16px var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+.reel-chain__where svg {
+  flex: none;
+}
+.reel-chain__prompt {
+  display: -webkit-box;
+  overflow: hidden;
+  font: 700 14px/19px var(--font-sans);
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow-wrap: anywhere;
+}
+.reel-chain__by {
+  overflow: hidden;
+  color: #ffffffd9;
+  font-size: 12px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reel-chain__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.reel-chain__row .reel__icon-btn[aria-disabled='true'] {
+  opacity: 0.4;
+  cursor: default;
+}
+.reel-chain__take {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 15px;
+  background: #fff;
+  color: #0b0c14;
+  font: 800 14px/18px var(--font-sans);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.reel-chain__take:hover {
+  background: #e9eaf2;
+}
+.reel-chain__closed {
+  flex: 1;
+  min-width: 0;
+  color: #ffffffd9;
+  font: 700 12px/16px var(--font-sans);
+  text-align: center;
+}
+.reel-chain__spacer {
+  flex: 1;
+}
+
+/* A reel's fair start, for its creator (the reel's "…" sheet, and its post page). */
+.fair-card {
+  display: grid;
+  gap: 6px;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+  color: var(--ink);
+}
+.fair-card__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font: 800 15px/20px var(--font-sans);
+}
+.fair-card__bar {
+  height: 8px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--line);
+}
+.fair-card__bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--yapi);
+}
+.fair-card__line {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+  font-variant-numeric: tabular-nums;
+}
+.fair-card__note {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+/* Wander's Chains shelf: a row of cards that scrolls sideways. */
+.chain-shelf {
+  display: grid;
+  grid-auto-columns: minmax(150px, 180px);
+  grid-auto-flow: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0 0 var(--space-2);
+  overflow-x: auto;
+  list-style: none;
+  scroll-snap-type: x proximity;
+  overscroll-behavior-x: contain;
+}
+.chain-shelf > li {
+  scroll-snap-align: start;
+  min-width: 0;
+}
+.chain-card {
+  display: grid;
+  gap: var(--space-2);
+  height: 100%;
+  border-radius: var(--radius-lg);
+  color: var(--ink);
+  text-decoration: none;
+}
+.chain-card:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.chain-card__cover {
+  position: relative;
+  display: block;
+  aspect-ratio: 9 / 14;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: #05060b;
+}
+.chain-card__cover img,
+.chain-card__cover video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.chain-card__badge {
+  position: absolute;
+  inset-block-start: 8px;
+  inset-inline-start: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 9px;
+  background: #05060bb3;
+  color: #fff;
+  font: 700 12px/16px var(--font-sans);
+}
+.chain-card__text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.chain-card__prompt {
+  display: -webkit-box;
+  overflow: hidden;
+  font: 700 14px/19px var(--font-sans);
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow-wrap: anywhere;
+}
+.chain-card:hover .chain-card__prompt {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.chain-card__meta {
+  overflow: hidden;
+  color: var(--ink-muted);
+  font-size: 12px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The chain's page. */
+.chain-head {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+}
+.chain-head__prompt {
+  margin: 0;
+  font: 800 22px/28px var(--font-display);
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+.chain-head__starter {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  justify-self: start;
+  min-height: 44px;
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: none;
+}
+.chain-head__starter:hover span {
+  text-decoration: underline;
+}
+.chain-head__counts {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.chain-head__actions {
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+.chain-head__closed {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-weight: 700;
+}
+.chain-head__sound {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-self: start;
+  min-height: 44px;
+  color: var(--ink-muted);
+  font-size: 14px;
+}
+.chain-manage {
+  max-width: 420px;
+}
+
+/* Create, taking the mic: the prompt your reel answers. */
+.mic-join {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+}
+.mic-join__icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
+  background: var(--yapi-soft);
+  color: var(--ink);
+}
+.mic-join__text {
+  display: grid;
+  flex: 1 1 200px;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.mic-join__text .muted {
+  font-size: 13px;
+}
+.mic-fair {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 14px;
+  line-height: 20px;
+}
+.mic-fair svg {
+  flex: none;
+  margin-top: 2px;
+}
+.mic-fair strong {
+  color: var(--ink);
+}
+
+/* The camera, taking the mic: the prompt above the shutter. */
+.cam__prompt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-self: center;
+  max-width: min(100%, 420px);
+  margin: 0;
+  padding: 8px 14px;
+  border-radius: 14px;
+  background: rgb(0 0 0 / 0.5);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+.cam__prompt svg {
+  flex: none;
+}

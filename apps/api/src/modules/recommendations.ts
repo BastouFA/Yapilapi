@@ -6,6 +6,7 @@ import type { AppContext } from '../lib/context.ts';
 import { AFFINITY, learn, type Learning } from '../lib/affinity.ts';
 import { bumpStats, TREND, type StatDelta } from '../lib/post-stats.ts';
 import { checkMilestones } from '../lib/milestones.ts';
+import { countFairStartViews } from '../lib/fair-start.ts';
 import { personalizationAllowed } from '../lib/services.ts';
 import { postVisibleSql } from '../lib/visibility.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
@@ -158,6 +159,8 @@ export default async function recommendationsModule(app: FastifyInstance, ctx: A
           'views',
         );
     }
+    // Fair start: each real person who saw a fair-start reel counts once toward its target (lib/fair-start.ts).
+    if (seen.size) await countFairStartViews(db, ctx.realtime, u.id, [...seen]);
     // The post's numbers count for everyone; what you like is only learned with Personalization on.
     await learn(db, u.id, learned, await personalizationAllowed(db, u.id));
     return { accepted: kept.length };

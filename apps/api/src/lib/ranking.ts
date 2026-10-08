@@ -4,6 +4,8 @@ import { fadedScoreSql } from './affinity.ts';
 import { trendSql } from './post-stats.ts';
 import { postVisibleSql } from './visibility.ts';
 import type { FeedReason } from './posts.ts';
+import { FAIR_START } from '@yapilapi/shared';
+import { getFlags } from './services.ts';
 
 type Q = Pool | PoolClient;
 
@@ -52,6 +54,8 @@ export const RANKING = {
     skip: 2.0,
     /** × exp(−age in hours / freshnessHours). */
     freshness: 4.0,
+    /** A later reel of a Pass the Mic chain you watched an earlier reel of: the chain's audience carries on. */
+    chain: 1.5,
     /**
      * A suggestion (not from your connections or communities) in a language you don't understand:
      * a mild preference for what you can read when it reaches you translated ("Translate
@@ -104,6 +108,9 @@ export const RANKING = {
     evergreenRate: 0.15,
     /** Posts that haven't had their chance yet (see exploration). */
     exploration: 200,
+    /** Later reels of chains you watched a reel of (in the last chainDays). */
+    chain: 200,
+    chainDays: 14,
   },
   /** What you already saw: hidden for seenDays on the same surface (unless very fresh from a friend); finished reels for completedDays. */
   seen: { days: 3, closeFriendHours: 12, completedDays: 7 },
@@ -182,6 +189,8 @@ export interface Features {
   trend: number;
   ageHours: number;
   newCreator: boolean;
+  /** A later reel of a chain the viewer watched an earlier reel of. */
+  chainAudience?: boolean;
   /** In a language the viewer doesn't understand: 'translated' when it reaches them translated, 'unread' when it doesn't. */
   unreadLanguage?: 'translated' | 'unread' | null;
   /** For the reason: names and topics. */
@@ -226,6 +235,7 @@ export function scoreOf(f: Features, personalized: boolean): number {
   if (f.friend || f.collabFriend) p += W.friend;
   if (f.followed || (f.collabFollowed && !f.collabFriend)) p += W.follow;
   if (f.member) p += W.community;
+  if (f.chainAudience) p += W.chain;
   const connected = f.own || f.friend || f.followed || f.member || f.collabFriend || f.collabFollowed;
   if (f.unreadLanguage && !connected) p += f.unreadLanguage === 'translated' ? W.unreadLanguageTranslated : W.unreadLanguage;
   return s + p;
@@ -350,7 +360,7 @@ export function arrange(cands: Features[], opts: { personalized: boolean; surfac
 }
 
 /** The candidate and feature query for one viewer (see the module comment). */
-function rankingSql(o: RankOptions): { sql: string; params: unknown[] } {
+function rankingSql(o: RankOptions, chains = false): { sql: string; params: unknown[] } {
   const C = RANKING.candidates;
   const reels = o.surface === 'reels';
   const at = '$2::timestamptz';
@@ -428,6 +438,15 @@ function rankingSql(o: RankOptions): { sql: string; params: unknown[] } {
        CROSS JOIN LATERAL (SELECT p.id FROM posts p WHERE p.author_id = tc.author_id AND ${live} ${since(C.creatorDays)}
                            ORDER BY p.created_at DESC LIMIT ${C.perCreator}) x`,
       `SELECT p.id FROM alike sm JOIN posts p ON p.id = sm.post_id WHERE ${live}`,
+      ...(chains
+        ? [
+            // Pass the Mic: later reels of chains you watched (part of) a reel of.
+            `(SELECT DISTINCT l2.post_id AS id FROM feed_events fe JOIN reel_chain_links l1 ON l1.post_id = fe.post_id
+               JOIN reel_chain_links l2 ON l2.chain_id = l1.chain_id AND l2.position > l1.position JOIN posts p ON p.id = l2.post_id
+               WHERE fe.user_id = $1 AND fe.kind IN ('watch', 'complete') AND fe.created_at > ${at} - interval '${C.chainDays} days' AND fe.created_at <= ${at}
+                 AND ${live} LIMIT ${C.chain})`,
+          ]
+        : []),
       `(SELECT p.id FROM posts p JOIN users au ON au.id = p.author_id LEFT JOIN post_stats ps ON ps.post_id = p.id
         WHERE ${live} ${since(C.freshDays)} AND p.author_id <> $1
           AND p.like_count + p.comment_count + coalesce(ps.saves, 0) < ${RANKING.exploration.maxEngagement}
@@ -497,7 +516,15 @@ function rankingSql(o: RankOptions): { sql: string; params: unknown[] } {
            ${trendSql(at)}::real AS trend,
            (extract(epoch FROM (${at} - p.created_at)) / 3600.0)::real AS age_hours,
            (au.created_at > ${at} - interval '${X.newCreatorDays} days'
-            OR (SELECT count(*) FROM (SELECT 1 FROM posts p3 WHERE p3.author_id = p.author_id AND p3.deleted_at IS NULL AND p3.status = 'published' LIMIT ${X.newCreatorPosts}) z) < ${X.newCreatorPosts}) AS new_creator
+            OR (SELECT count(*) FROM (SELECT 1 FROM posts p3 WHERE p3.author_id = p.author_id AND p3.deleted_at IS NULL AND p3.status = 'published' LIMIT ${X.newCreatorPosts}) z) < ${X.newCreatorPosts}) AS new_creator,
+           ${
+             chains && P
+               ? `EXISTS (SELECT 1 FROM reel_chain_links l2 JOIN reel_chain_links l1 ON l1.chain_id = l2.chain_id AND l1.position < l2.position
+                          JOIN feed_events fe ON fe.post_id = l1.post_id AND fe.user_id = $1 AND fe.kind IN ('watch', 'complete')
+                            AND fe.created_at > ${at} - interval '${C.chainDays} days'
+                          WHERE l2.post_id = p.id)`
+               : 'false'
+           } AS chain_audience
     -- Driven by the candidates (each looked up by id), so the checks below run on them only, however many posts there are.
     FROM (SELECT id FROM candidates) c JOIN posts p ON p.id = c.id
     JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id
@@ -521,7 +548,8 @@ const rateSql = (() => {
 
 /** Rank a feed for one viewer: every candidate in order, with its reason. */
 export async function rankFeed(db: Q, o: RankOptions): Promise<Arranged[]> {
-  const { sql, params } = rankingSql(o);
+  const flags = await getFlags(db);
+  const { sql, params } = rankingSql(o, flags.PASS_THE_MIC);
   const { rows } = await db.query(sql, params);
   const feats: Features[] = rows.map((r) => ({
     id: r.id,
@@ -552,6 +580,7 @@ export async function rankFeed(db: Q, o: RankOptions): Promise<Arranged[]> {
     trend: Number(r.trend),
     ageHours: Number(r.age_hours),
     newCreator: r.new_creator,
+    chainAudience: r.chain_audience,
     unreadLanguage: o.reader && r.lang && !o.reader.understood.includes(r.lang) ? (o.reader.translated ? 'translated' : 'unread') : null,
     displayName: r.display_name,
     collabName: r.collab_name,
@@ -559,10 +588,90 @@ export async function rankFeed(db: Q, o: RankOptions): Promise<Arranged[]> {
     matchedTopic: r.matched_topic,
     learnedTopic: r.learned_topic,
   }));
-  return arrange(feats, { personalized: o.personalized, surface: o.surface, explore: o.personalized, mixFormats: o.surface === 'for_you' }).slice(
-    0,
-    RANKING.sessionSize,
+  const arranged = arrange(feats, { personalized: o.personalized, surface: o.surface, explore: o.personalized, mixFormats: o.surface === 'for_you' });
+  const fair = flags.FAIR_START ? await fairStartPicks(db, o) : [];
+  return withFairStart(arranged, fair).slice(0, RANKING.sessionSize);
+}
+
+/** A fair-start reel that may take a slot in this viewer's feed, with how well it fits them. */
+export interface FairPick {
+  id: string;
+  fit: number;
+}
+
+/**
+ * Fair start (lib/fair-start.ts): one slot in FAIR_START.slotEvery, from FAIR_START.firstSlot,
+ * goes to the fair-start reel that fits the viewer best and that they never saw. Each one
+ * appears once (moved there when the feed had it already); when there are none left, the slots
+ * are ordinary ones again, so a small app never repeats anything.
+ */
+export function withFairStart(list: Arranged[], picks: FairPick[]): Arranged[] {
+  if (!picks.length) return list;
+  const ordered = [...picks].sort((a, b) => b.fit - a.fit || (a.id < b.id ? -1 : 1));
+  const chosen = new Set(ordered.map((p) => p.id));
+  const reasons = new Map(list.map((x) => [x.id, x.reason]));
+  const rest = list.filter((x) => !chosen.has(x.id));
+  const out: Arranged[] = [];
+  let next = 0;
+  while (rest.length || next < ordered.length) {
+    const slot = out.length >= FAIR_START.firstSlot && (out.length - FAIR_START.firstSlot) % FAIR_START.slotEvery === 0;
+    if ((slot && next < ordered.length) || !rest.length) {
+      const id = ordered[next++]!.id;
+      const had = reasons.get(id);
+      const general = !had || had.code === 'popular' || had.code === 'trending' || had.code === 'community_popular';
+      out.push({ id, reason: general ? { code: 'new_creator' } : had });
+    } else out.push(rest.shift()!);
+  }
+  return out;
+}
+
+/**
+ * The fair-start reels this viewer may get, with how well each fits them: topics they picked or
+ * engage with, their languages, their country, and how far each still is from its target. A reel in
+ * a language they don't understand still fits when it reaches them translated ("Translate
+ * automatically"); otherwise it comes after the others. Never
+ * their own, never one they already saw (anywhere), never from a creator they keep skipping;
+ * slowed ones come after the others and only until FAIR_START.minimum. Every rule of the feed applies.
+ */
+export async function fairStartPicks(db: Q, o: RankOptions): Promise<FairPick[]> {
+  const F = FAIR_START;
+  const reels = o.surface === 'reels';
+  const taste = o.personalized
+    ? `coalesce((SELECT array_agg(t.slug) FROM user_interests ui JOIN topics t ON t.id = ui.topic_id WHERE ui.user_id = $1), '{}')
+       || coalesce((SELECT array_agg(a.topic) FROM (SELECT a.topic FROM user_topic_affinity a WHERE a.user_id = $1 AND a.score > 0.5 ORDER BY a.score DESC LIMIT 10) a), '{}')`
+    : `'{}'::text[]`;
+  const { rows } = await db.query(
+    `WITH me AS (SELECT ${taste} AS topics,
+                        -- The languages they understand (lib/translation.ts readerLanguages), or their app language.
+                        coalesce($4::text[], (SELECT ARRAY[split_part(pr.locale, '-', 1)] FROM profiles pr WHERE pr.user_id = $1)) AS langs,
+                        (SELECT pr.country FROM profiles pr WHERE pr.user_id = $1) AS country)
+     SELECT p.id, f.reached, f.target, f.slowed,
+            (SELECT count(*) FROM unnest(p.topics) t WHERE t = ANY(me.topics))::int AS topic_n,
+            (p.lang IS NOT NULL AND p.lang = ANY(me.langs)) AS same_lang,
+            (p.lang IS NOT NULL AND me.langs IS NOT NULL AND NOT (p.lang = ANY(me.langs))) AS other_lang,
+            (ap.country IS NOT NULL AND ap.country = me.country) AS local
+     FROM fair_start_reels f JOIN posts p ON p.id = f.post_id JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id CROSS JOIN me
+     WHERE f.status = 'active' AND f.ends_at > $2::timestamptz AND p.author_id <> $1 AND p.created_at <= $2::timestamptz
+       AND (NOT f.slowed OR f.reached < ${F.minimum})
+       AND NOT EXISTS (SELECT 1 FROM fair_start_views v WHERE v.post_id = p.id AND v.viewer_id = $1)
+       AND NOT EXISTS (SELECT 1 FROM feed_events fe WHERE fe.user_id = $1 AND fe.post_id = p.id AND fe.kind = 'impression')
+       AND coalesce((SELECT a.score FROM user_creator_affinity a WHERE a.user_id = $1 AND a.author_id = p.author_id), 0) > -2
+       AND p.moderation_status = 'normal' AND ${postVisibleSql('$1')} ${o.personal}
+       AND ($3 OR NOT EXISTS (SELECT 1 FROM post_media pm JOIN media m ON m.id = pm.media_id WHERE pm.post_id = p.id AND m.moderation = 'sensitive'))
+       ${o.reduced && !reels ? 'AND false' : ''}
+     ORDER BY f.started_at LIMIT 100`,
+    [o.userId, o.asOf, !!o.sensitiveOk, o.reader?.understood ?? null],
   );
+  // A reel they'd read translated is as good a fit as one with no language; one they can't read comes last.
+  const elsewhere = o.reader?.translated ? 0 : -1;
+  return rows.map((r) => {
+    const target = r.slowed ? Math.min(r.target, F.minimum) : r.target;
+    const need = Math.max(0, 1 - r.reached / Math.max(1, target));
+    return {
+      id: r.id,
+      fit: Math.min(2, r.topic_n) + (r.same_lang ? 1 : r.other_lang ? elsewhere : 0) + (r.local ? 0.5 : 0) + 1.5 * need - (r.slowed ? 3 : 0),
+    };
+  });
 }
 
 /** A feed's cursor: the moment it was ranked, where the next page starts, and its kept order (feed_sessions). */

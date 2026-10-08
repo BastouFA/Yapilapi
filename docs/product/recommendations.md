@@ -79,6 +79,7 @@ Every time a feed is opened, a few thousand candidate posts are gathered from:
   on), and the 300 posts they engaged with most in the last 14 days that you haven't.
 - **Trending**: the 300 posts with the most momentum in the last day.
 - **Evergreen**: up to 100 posts 14 to 60 days old with a high engagement rate.
+- **Chains you watched**: later reels of Pass the Mic chains you watched a reel of in the last 14 days (docs/product/pass-the-mic.md).
 - **Not seen enough yet**: 200 recent posts from new creators (account under 30 days, or fewer than 5 posts) or with fewer than 50 impressions,
   that don't have 3 likes, comments and saves yet.
 
@@ -89,6 +90,7 @@ Each candidate gets a score, the sum of (weights in `RANKING.weights`):
 - **Your interests**: +1.2 per topic you picked, +1 per topic you asked to see more of, −2 per topic you asked to see less of.
 - **Your learned topics**: up to ±2.5, rising with your scores for the post's topics (squashed so it levels off).
 - **Your learned creator**: up to about +2.7 for a creator you engage with a lot, down to −3 for one you keep skipping.
+- **A chain you watched**: +1.5 for a later reel of a Pass the Mic chain you watched a reel of.
 - **Who it's from**: friend +3, someone you follow +2, a community you're in +1.5, your own post +1 (co-authors count like the author).
 - **People like you**: up to about +2, by how strongly they engaged with it.
 - **Quality**: the engagement rate, (likes + 2 × comments + 3 × shares + 3 × saves + 2 × finished watches) ÷ (impressions + 20). The 20 keeps a post
@@ -114,6 +116,8 @@ The posts go in score order, with these rules:
 
 - **New creators get seen**: one slot in six goes to the best post (by its own engagement rate and freshness) from the "not seen enough yet" group,
   never from your own people. When it's from a new creator, its reason says "From a new creator on YAPILAPI".
+- **Fair start**: one slot in nine, from the 4th, goes to a new creator's fair-start reel that suits you and you never saw
+  (docs/product/pass-the-mic.md, `FAIR_START`).
 - **One creator at a time**: a creator's posts after their first two score 1.5 lower each, so a busy account spreads out instead of filling the feed.
 - **One topic at a time**: no more than 3 posts with the same main topic in any 10 in a row.
 - **Formats mix (For you)**: after 2 videos, photos or text posts in a row, the next is another format when one scores almost as well (within 1

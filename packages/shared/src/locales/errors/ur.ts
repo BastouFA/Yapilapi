@@ -1204,4 +1204,17 @@ export const ur: Record<string, string> = {
   'This video was not uploaded here, so its cover can’t be changed.': 'یہ ویڈیو یہاں اپ لوڈ نہیں ہوئی، اس لیے اس کا کور نہیں بدلا جا سکتا۔',
   'Choose one cover.': 'ایک کور چنیں۔',
   'Choose a video or a photo.': 'کوئی ویڈیو یا تصویر چنیں۔',
+  // Pass the Mic (apps/api/src/lib/chains.ts, apps/api/src/modules/pass-the-mic.ts)
+  'Chains are made of reels posted right away.': 'سلسلے صرف فوراً پوسٹ کی گئی ریلز سے بنتے ہیں۔',
+  'Only people the starter follows can take the mic on this chain.': 'اس سلسلے میں صرف وہی لوگ مائیک لے سکتے ہیں جنہیں سلسلہ شروع کرنے والا فالو کرتا ہے۔',
+  'Only reels shared publicly, with followers or with friends can be in a chain.':
+    'صرف سب کے لیے، فالوورز کے ساتھ یا دوستوں کے ساتھ شیئر کی گئی ریلز ہی سلسلے میں شامل ہو سکتی ہیں۔',
+  'Pass the Mic is not enabled.': 'مائیک آگے بڑھائیں فیچر فعال نہیں ہے۔',
+  "That chain doesn't exist or isn't visible to you.": 'وہ سلسلہ موجود نہیں یا آپ کو نظر نہیں آتا۔',
+  'That reel is already in a chain.': 'وہ ریل پہلے سے ایک سلسلے میں ہے۔',
+  'This chain is closed.': 'یہ سلسلہ بند ہے۔',
+  'You can add up to {max} reels to one chain.': 'آپ ایک سلسلے میں زیادہ سے زیادہ {max} ریلز شامل کر سکتے ہیں۔',
+  'You can pass the mic on one chain to up to {max} people.': 'آپ ایک سلسلے میں زیادہ سے زیادہ {max} لوگوں کو مائیک دے سکتے ہیں۔',
+  'You can’t take the mic on this chain.': 'آپ اس سلسلے میں مائیک نہیں لے سکتے۔',
+  'You’ve added a lot of reels to chains today. Try again tomorrow.': 'آج آپ نے سلسلوں میں بہت سی ریلز شامل کی ہیں۔ کل دوبارہ کوشش کریں۔',
 };

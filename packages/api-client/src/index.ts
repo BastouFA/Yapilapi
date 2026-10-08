@@ -116,6 +116,10 @@ import type {
   EchoCreateInput,
   EchoOptions,
   EchoPermission,
+  Chain,
+  ChainEditInput,
+  ChainJoin,
+  FairStart,
   EchoRender,
   ChatTheme,
   ScheduledMessage,
@@ -805,6 +809,32 @@ export function createClient(opts: ClientOptions) {
           await new Promise((r) => setTimeout(r, o.intervalMs ?? 1500));
         }
       },
+    },
+    /**
+     * Pass the Mic: reels made together, one after another. Take the mic by posting a reel with
+     * posts.create({ format: 'reel', chainId }); start one with a new reel with `chainPrompt`, or
+     * with a reel you already posted here.
+     */
+    chains: {
+      start: (postId: string, prompt: string, whoCanJoin?: ChainJoin) => post<{ chain: Chain }>('/v1/chains', { postId, prompt, whoCanJoin }),
+      /** Chains with new reels this week, the busiest first (Wander's Chains shelf). */
+      active: (limit?: number) => get<{ items: Chain[] }>(`/v1/chains/active${qs({ limit })}`),
+      get: (id: string) => get<{ chain: Chain }>(`/v1/chains/${id}`),
+      /** The chain's reels you can see, in order. */
+      links: (id: string, cursor?: string) => get<Page<Post>>(`/v1/chains/${id}/links${qs({ cursor })}`),
+      /** The reel after (or before) one, among those you can see: null at either end. */
+      step: (id: string, from: string, dir: 'next' | 'previous') => get<{ post: Post | null }>(`/v1/chains/${id}/step${qs({ from, dir })}`),
+      /** The starter: change the prompt, or who can take the mic ('nobody' closes it). */
+      edit: (id: string, b: ChainEditInput) => patch<{ chain: Chain }>(`/v1/chains/${id}`, b),
+      /** The starter removes a reel from the chain, or its author leaves with it. The reel stays up. */
+      removeLink: (id: string, postId: string) => del<{ removed: boolean }>(`/v1/chains/${id}/links/${postId}`),
+      /** Invite people you follow or are friends with to add the next reel (those who can't are skipped). */
+      pass: (id: string, userIds: string[]) => post<{ passed: number }>(`/v1/chains/${id}/pass`, { userIds }),
+    },
+    /** Fair start: whether your next reel gets one, and how one of yours is doing. */
+    fairStart: {
+      offered: () => get<{ offered: boolean }>('/v1/me/fair-start'),
+      forPost: (postId: string) => get<{ fairStart: FairStart | null }>(`/v1/posts/${postId}/fair-start`),
     },
     /** Echo videos you asked for (posts.echo), while they're made. */
     echoes: {
@@ -1973,6 +2003,12 @@ export function createClient(opts: ClientOptions) {
         post<{ minutesToday: number; dailyLimitMinutes: number | null; overLimit: boolean; quietNow: boolean; supervised: boolean }>('/v1/me/usage/heartbeat'),
     },
     admin: {
+      /** Chains this week and the fair-start pool. */
+      passTheMic: () =>
+        get<{
+          chains: { active: number; total: number; links: number };
+          fairStart: { active: number; slowed: number; done: number; stopped: number; averageReached: number };
+        }>('/v1/admin/pass-the-mic'),
       cases: (status = 'open') => get<{ items: Record<string, any>[] }>(`/v1/admin/moderation/cases${qs({ status })}`),
       decide: (id: string, decision: string, note?: string) => post(`/v1/admin/moderation/cases/${id}/decide`, { decision, note }),
       summary: () => get<{ summary: Record<string, number>; meaningfulByAction: { name: string; n: number }[] }>('/v1/admin/analytics/summary'),
@@ -2214,6 +2250,8 @@ export interface PostInsights {
   saves: number;
   reposts: number;
   viewsByDay: { day: string; views: number }[];
+  /** Reels: its fair start, when it had one (docs/product/pass-the-mic.md). */
+  fairStart?: FairStart | null;
 }
 
 export interface Payout {

@@ -6,10 +6,11 @@ import { MoreResults, SearchFailed, type BusinessResult, type PlaceResult, type 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { Avatar, Button, CommunityCard, EmptyState, EventCard, List, ListItem, Skeleton } from '@yapilapi/design-system';
-import type { Community, EventItem, MessageKey, Post, PublicUser } from '@yapilapi/shared';
+import type { Chain, Community, EventItem, MessageKey, Post, PublicUser } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { TrendingTags } from '@/components/TrendingTags';
+import { ChainCard } from '@/components/PassTheMic';
 import { PostList } from '@/components/PostList';
 import { normalizeTag } from '@yapilapi/shared';
 import { useSession } from '../../providers';
@@ -45,6 +46,8 @@ function Discover() {
   const [now, setNow] = useState<Awaited<ReturnType<typeof api.now>> | null>(null);
   const [communities, setCommunities] = useState<Community[]>([]);
   const [events, setEvents] = useState<EventItem[]>([]);
+  // Pass the Mic: chains with new reels this week.
+  const [chains, setChains] = useState<Chain[]>([]);
 
   useEffect(() => {
     setInput(q);
@@ -75,6 +78,17 @@ function Discover() {
       .then((r) => setEvents(r.items))
       .catch(() => {});
   }, []);
+  useEffect(() => {
+    if (!flags.PASS_THE_MIC) return setChains([]);
+    let live = true;
+    api.chains.active(12).then(
+      (r) => live && setChains(r.items),
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [flags.PASS_THE_MIC]);
 
   const r = results?.results ?? {};
   const people = (r.people ?? []) as PublicUser[];
@@ -236,6 +250,18 @@ function Discover() {
             <h2 className="section-title">{t('sidebar.trending')}</h2>
             <TrendingTags />
           </section>
+          {flags.PASS_THE_MIC && chains.length ? (
+            <section className="stack-sm" aria-labelledby="chains-shelf">
+              <h2 id="chains-shelf" className="section-title">
+                {t('mic.shelf')}
+              </h2>
+              <ul className="chain-shelf">
+                {chains.map((c) => (
+                  <ChainCard key={c.id} chain={c} />
+                ))}
+              </ul>
+            </section>
+          ) : null}
           <section className="stack-sm">
             <h2 className="section-title">{t('discover.now')}</h2>
             {now === null ? (

@@ -7,7 +7,15 @@ import { Alert, Image, Linking, ScrollView, Text, View } from 'react-native';
 import type { EditorParamsInput } from '../../../../packages/shared/src/filters';
 import type { MessageKey } from '../../../../packages/shared/src/i18n-core';
 import type { CaptionIdeas, Circle, MediaItem, PublicUser } from '../../../../packages/shared/src/types';
-import { AUDIO_POST_MAX_MS, AUDIO_POST_MIN_MS, COMMENT_POLICIES, PLUS_AUDIO_POST_MAX_MS, type CommentPolicy } from '../../../../packages/shared/src/constants';
+import {
+  AUDIO_POST_MAX_MS,
+  AUDIO_POST_MIN_MS,
+  CHAIN_RULES,
+  COMMENT_POLICIES,
+  PLUS_AUDIO_POST_MAX_MS,
+  type ChainJoin,
+  type CommentPolicy,
+} from '../../../../packages/shared/src/constants';
 import { extractHashtags } from '../../../../packages/shared/src/hashtags';
 import { ECHO_PERMISSIONS, type EchoPermission } from '../../../../packages/shared/src/echoes';
 import { useAutocomplete } from '../../lib/autocomplete';
@@ -43,6 +51,7 @@ import { SchedulePicker } from '../../lib/post-edit';
 import { CaptionIdeasPanel, SuggestAltText } from '../../lib/ai-helpers';
 import { PostAudio } from '../../lib/post';
 import { useFlag } from '../../lib/flags';
+import { FairStartPromise, JoinChoice } from '../../lib/chains';
 import { noticeText } from '../../../../packages/shared/src/server-text';
 
 const VISIBILITY = [
@@ -89,7 +98,15 @@ export default function Create() {
   const { t, number, dateTime } = useT();
   const { me } = useSession();
   const bottom = useTabBarSpace();
-  const params = useLocalSearchParams<{ mode?: string; sound?: string; track?: string; draft?: string; remixOf?: string; remixMode?: string }>();
+  const params = useLocalSearchParams<{
+    mode?: string;
+    sound?: string;
+    track?: string;
+    draft?: string;
+    remixOf?: string;
+    remixMode?: string;
+    chain?: string;
+  }>();
   const [kind, setKind] = useState<Kind>(kindFrom(params.mode) ?? 'post');
   const [body, setBody] = useState('');
   const [visibility, setVisibility] = useState<Visibility>(kind === 'story' ? 'friends' : 'public');
@@ -154,6 +171,12 @@ export default function Create() {
   const [remix, setRemix] = useState<{ id: string; mode: 'duet' | 'remix' } | null>(null);
   const [original, setOriginal] = useState<Original | null>(null);
   const [originalMissing, setOriginalMissing] = useState(false);
+  // Pass the Mic: the chain this reel joins ("Take the mic"), or a new chain it starts (a prompt, and who can take the mic).
+  const micOn = useFlag('PASS_THE_MIC') === true;
+  const [joining, setJoining] = useState<{ id: string; prompt: string } | null>(null);
+  const [starting, setStarting] = useState(false);
+  const [chainPrompt, setChainPrompt] = useState('');
+  const [chainJoin, setChainJoin] = useState<ChainJoin | null>(null);
   // Posting for subscribers needs a subscription plan (set up in Studio on the web).
   const [hasPlans, setHasPlans] = useState(false);
   const [editing, setEditing] = useState<Picked | null>(null);
@@ -200,8 +223,12 @@ export default function Create() {
     setKind(k);
     setError(null);
     setNote(null);
-    // Duets and remixes are reels.
-    if (k !== 'reel') setRemix(null);
+    // Duets, remixes and chains are reels.
+    if (k !== 'reel') {
+      setRemix(null);
+      setJoining(null);
+      setStarting(false);
+    }
     // Keep only what the new kind can hold: a reel is a video.
     setMedia((m) => (k === 'reel' && m?.kind !== 'video' ? null : m));
     if (k === 'story' && (visibility === 'public' || visibility === 'subscribers' || visibility === 'circle')) setVisibility('friends');
@@ -268,6 +295,34 @@ export default function Create() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.remixOf]);
 
+  // "Take the mic" (Reels, a chain's page, through the camera) opens this tab as a reel joining that
+  // chain, with the chain's sound when there is one.
+  useEffect(() => {
+    if (!params.chain) return;
+    const id = params.chain;
+    router.setParams({ chain: '' });
+    setKind('reel');
+    setMedia((m) => (m?.kind === 'video' ? m : null));
+    setRemix(null);
+    setOriginal(null);
+    setOriginalMissing(false);
+    setStarting(false);
+    client()
+      .then(async (api) => {
+        const { chain } = await api.chains.get(id);
+        setJoining({ id: chain.id, prompt: chain.prompt });
+        // Joining a chain is sharing it with people: a reel for everyone, followers or friends.
+        setVisibility((v) => (v === 'public' || v === 'followers' || v === 'friends' ? v : 'public'));
+        setKeptAudience(null);
+        if (chain.sound) {
+          const r = await api.sounds.get(chain.sound.id);
+          setMusic(draftMusic(soundAsTrack(r.sound), 'reel'));
+        }
+      })
+      .catch((e: unknown) => setError(errorMessage(e)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.chain]);
+
   // Drafts ("Continue") opens a draft here.
   useEffect(() => {
     if (!params.draft) return;
@@ -278,6 +333,8 @@ export default function Create() {
       .then(
         ({ post, circleId, audience }) => {
           setDraftId(id);
+          setJoining(null);
+          setStarting(false);
           setKind(post.format === 'reel' ? 'reel' : 'post');
           setBody(post.body);
           setAiUsed(!!post.aiAssisted);
@@ -583,6 +640,12 @@ export default function Create() {
               ? { music: { trackId: music.track.id, startMs: music.startMs, durationMs: music.durationMs } }
               : {}),
         ...(coauthors.length ? { collaborators: coauthors.map((u) => u.id) } : {}),
+        // Posted right away only (keep() leaves these out): the chain it joins, or the one it starts.
+        ...(joining && chainable
+          ? { chainId: joining.id }
+          : starting && chainable && chainPrompt.trim()
+            ? { chainPrompt: chainPrompt.trim(), ...(chainJoin ? { chainJoin } : {}) }
+            : {}),
       };
     }
     const first = media
@@ -628,6 +691,10 @@ export default function Create() {
   }
 
   function clear() {
+    setJoining(null);
+    setStarting(false);
+    setChainPrompt('');
+    setChainJoin(null);
     setBody('');
     setIdeas(null);
     setAiUsed(false);
@@ -660,8 +727,10 @@ export default function Create() {
     setNeedsVerify(false);
     try {
       const api = await client();
-      if (draftId) await api.drafts.save(draftId, { ...content(), ...(at ? { scheduledAt: at.toISOString() } : {}) });
-      else await api.posts.create({ ...content(), ...(at ? { scheduledAt: at.toISOString() } : { draft: true }) });
+      // A chain is made of reels posted right away: a draft or a scheduled reel isn't in one.
+      const { chainId: _chainId, chainPrompt: _prompt, chainJoin: _join, ...later } = content();
+      if (draftId) await api.drafts.save(draftId, { ...later, ...(at ? { scheduledAt: at.toISOString() } : {}) });
+      else await api.posts.create({ ...later, ...(at ? { scheduledAt: at.toISOString() } : { draft: true }) });
       clear();
       Alert.alert(at ? t('m.create.scheduled', { time: dateTime(at) }) : t('m.create.draftSaved'));
       router.push('/drafts');
@@ -700,10 +769,12 @@ export default function Create() {
         return;
       }
       // A draft is saved with what's here now, then published through the same checks as a new post.
-      const r = draftId ? (await api.drafts.save(draftId, content()), await api.drafts.publish(draftId)) : await api.posts.create(content());
+      const sent = content();
+      const r = draftId ? (await api.drafts.save(draftId, sent), await api.drafts.publish(draftId)) : await api.posts.create(sent);
       clear();
       if (kind === 'reel') {
         if (r.moderation) Alert.alert(noticeText(r.moderation, t) ?? r.moderation.message);
+        else if (sent.chainId || sent.chainPrompt) Alert.alert(t(sent.chainId ? 'mic.joined' : 'mic.started'));
         router.push({ pathname: '/reels', params: { start: r.post.id } });
         return;
       }
@@ -719,6 +790,15 @@ export default function Create() {
   }
 
   const hint = KINDS.find((k) => k.id === kind)!.hint;
+  // A reel can join or start a chain when it's posted now, for everyone, followers or friends, outside a community.
+  const chainable =
+    micOn &&
+    kind === 'reel' &&
+    !draftId &&
+    !keptAudience &&
+    !keptParts?.fields.communityId &&
+    (visibility === 'public' || visibility === 'followers' || visibility === 'friends');
+  const inChain = chainable && (!!joining || (starting && !!chainPrompt.trim()));
   const forCircle = kind !== 'story' && !keptAudience && visibility === 'circle';
   const chosenCircle = circles?.find((x) => x.id === circleId) ?? null;
   const canPublish =
@@ -727,6 +807,7 @@ export default function Create() {
     !uploading &&
     (!forCircle || !!chosenCircle) &&
     (kind !== 'reel' || !remix || !!original) &&
+    (!starting || !chainable || !!chainPrompt.trim()) &&
     (kind !== 'post' || !poll || pollOptions.length >= 2) &&
     (kind === 'reel'
       ? media?.kind === 'video'
@@ -735,8 +816,11 @@ export default function Create() {
         (kind === 'post' && (more.length > 0 || !!poll || !!link?.trim())) ||
         (kind === 'story' && (stickers.length > 0 || !!music)));
   const audienceOptions: { id: Visibility; label: string }[] = [
-    ...VISIBILITY.filter((v) => v.id !== 'subscribers' || (hasPlans && kind !== 'story')).map((v) => ({ id: v.id, label: t(v.label) })),
-    ...(kind !== 'story' && circles?.length
+    ...VISIBILITY.filter((v) => v.id !== 'subscribers' || (hasPlans && kind !== 'story'))
+      // Taking the mic: the reel is shared with everyone, followers or friends.
+      .filter((v) => !(kind === 'reel' && joining) || v.id === 'public' || v.id === 'followers' || v.id === 'friends')
+      .map((v) => ({ id: v.id, label: t(v.label) })),
+    ...(kind !== 'story' && !(kind === 'reel' && joining) && circles?.length
       ? [{ id: 'circle' as const, label: forCircle && chosenCircle ? t('m.create.circle', { name: chosenCircle.name }) : t('visibility.circle') }]
       : []),
     // A draft's audience the choices here don't cover (chosen people): kept unless another is picked.
@@ -784,6 +868,20 @@ export default function Create() {
             }}
           />
         ) : null}
+        {kind === 'reel' && joining && chainable ? (
+          <Notice title={t('mic.title')}>
+            <Text style={[{ color: c.ink, lineHeight: 20 }, userText]}>{t('mic.joining', { prompt: joining.prompt })}</Text>
+            <Button
+              label={t('m.common.remove')}
+              variant="secondary"
+              size="sm"
+              icon="close"
+              onPress={() => setJoining(null)}
+              style={{ alignSelf: 'flex-start' }}
+            />
+          </Notice>
+        ) : null}
+        <FairStartPromise active={kind === 'reel' && !draftId} />
         <Card style={{ gap: space[3] }}>
           <Field
             label={kind === 'reel' ? t('m.create.reel.caption') : kind === 'story' ? t('m.create.story.body') : t('create.placeholder')}
@@ -1161,6 +1259,23 @@ export default function Create() {
               </Text>
             </View>
           ) : null}
+          {chainable && !joining ? (
+            <View style={{ gap: space[2] }}>
+              <SwitchRow label={t('mic.start')} hint={t('mic.start.hint')} value={starting} onValueChange={setStarting} />
+              {starting ? (
+                <>
+                  <Field
+                    label={t('mic.prompt')}
+                    placeholder={t('mic.prompt.placeholder')}
+                    value={chainPrompt}
+                    onChangeText={setChainPrompt}
+                    maxLength={CHAIN_RULES.promptMax}
+                  />
+                  <JoinChoice value={chainJoin} onChange={setChainJoin} />
+                </>
+              ) : null}
+            </View>
+          ) : null}
           {error ? <Notice tone="danger">{error}</Notice> : null}
           {needsVerify || (me?.needsVerification && kind !== 'story' && visibility === 'public') ? <VerifyPrompt action="post" /> : null}
           {note ? <Notice>{note}</Notice> : null}
@@ -1179,7 +1294,7 @@ export default function Create() {
             disabled={!canPublish}
             onPress={() => publish()}
           />
-          {kind !== 'story' ? (
+          {kind !== 'story' && !inChain ? (
             <View style={{ flexDirection: 'row', gap: space[2] }}>
               <Button label={t('m.create.saveDraft')} variant="secondary" size="sm" disabled={!canPublish} onPress={() => keep(null)} style={{ flex: 1 }} />
               <Button

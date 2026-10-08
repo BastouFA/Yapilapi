@@ -646,6 +646,16 @@ YAPILAPI now speaks 23 languages: the eight it had, plus Chinese (Simplified), H
 - **Country names on the phone** (`apps/mobile/lib/region-names.ts`, made by `scripts/region-names.mjs`) are in all 23 languages; names that are the same as in English are left out of the table.
 - The new translations were checked against English by script (keys, placeholders, plural forms, no exclamation marks), not by native speakers: every one of the 15 needs a review.
 
+## Pass the Mic and Fair start (2026-10-08, migration 0085, `apps/api/test/pass-the-mic.test.ts`)
+
+Two reasons to make reels (docs/product/pass-the-mic.md has every rule and number; flags `PASS_THE_MIC` and `FAIR_START`, on by default).
+
+- **Pass the Mic**: a creator starts a chain with a prompt when posting a reel or from one of their reels; anyone allowed takes the mic (the reel camera with the prompt and the chain's sound) and their reel is the next link. A chain bar ("Link 3 of 47 · 12 countries"), sideways moves along the chain (web buttons and arrow keys, phone swipe), a chain page with a grid and "Take the mic", and a Chains shelf in Wander. The starter chooses who can take the mic (everyone, people they follow, nobody), closes it and removes reels (never deleting them); authors leave with theirs. Blocks, private accounts, minor protection, moderation (removed and held reels drop out) and limits (3 reels per person per chain, 20 a day) apply. Notifications to the starter and the reel before's author, batched per chain, and "Pass the mic" to people you follow or are friends with. The recommender gives a chain's later reels to people who watched an earlier one.
+- **Fair start**: a confirmed adult creator's first 3 reels, then one a week under 1,000 followers, one at a time, are shown to up to 1,000 real people through one slot in 9 of For you and Reels, chosen by fit (topics, the languages the viewer understands or reads translated, country, need), never twice to anyone. Slowed (down to a 200-person minimum) when early viewers mostly skip or it's reported, stopped when taken down, finished at its target or after 7 days with one notification and a report on the reel's stats (phone Insights; web the reel's options and page): "1,000 people saw your reel · 630 watched to the end · 24 shared · 12 followed you", with a progress bar while it runs. Anti-abuse: limited, risky and unconfirmed accounts get none, and with spam checks on accounts from one sign-up address have at most 2 running.
+- **Admin**: chain and fair-start counts under Feature flags. **Your data**: chains, links, passes and fair starts are in the download.
+
+**Not done:** a reel cleared from review later gets no fair start; language weighs in the fit but is not a filter; passing the mic by @mention in a caption.
+
 ## Not built yet
 
 - Mainstream music: needs a licensing deal (docs/operations/music.md). Reporting song use to a licensing partner is not built.

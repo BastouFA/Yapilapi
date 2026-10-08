@@ -1205,4 +1205,18 @@ export const it: Record<string, string> = {
   'Choose one cover.': 'Scegli una copertina.',
   'Choose a video or a photo.': 'Scegli un video o una foto.',
   'You can keep up to 5 accounts in this browser.': 'Puoi tenere fino a 5 account su questo browser.',
+  // Pass the Mic (apps/api/src/lib/chains.ts, apps/api/src/modules/pass-the-mic.ts)
+  'Chains are made of reels posted right away.': 'Le catene sono fatte di reel pubblicati subito.',
+  'Only people the starter follows can take the mic on this chain.':
+    'In questa catena possono prendere il microfono solo le persone seguite da chi l’ha avviata.',
+  'Only reels shared publicly, with followers or with friends can be in a chain.':
+    'Solo i reel condivisi con tutti, con i follower o con gli amici possono stare in una catena.',
+  'Pass the Mic is not enabled.': 'Passa il microfono non è attivo.',
+  "That chain doesn't exist or isn't visible to you.": 'Quella catena non esiste o non è visibile per te.',
+  'That reel is already in a chain.': 'Quel reel è già in una catena.',
+  'This chain is closed.': 'Questa catena è chiusa.',
+  'You can add up to {max} reels to one chain.': 'Puoi aggiungere fino a {max} reel a una catena.',
+  'You can pass the mic on one chain to up to {max} people.': 'In una catena puoi passare il microfono a {max} persone al massimo.',
+  'You can’t take the mic on this chain.': 'Non puoi prendere il microfono in questa catena.',
+  'You’ve added a lot of reels to chains today. Try again tomorrow.': 'Oggi hai aggiunto molti reel alle catene. Riprova domani.',
 };

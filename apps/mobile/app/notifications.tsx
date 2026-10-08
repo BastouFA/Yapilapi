@@ -7,6 +7,7 @@ import { appealDecidedText, reportOutcomeText } from '../../../packages/shared/s
 import { miniAppNoticeText } from '../../../packages/shared/src/mini-apps';
 import { togetherNoticeText } from '../../../packages/shared/src/together';
 import { echoNoticeText } from '../../../packages/shared/src/echoes';
+import { micNoticeText } from '../../../packages/shared/src/pass-the-mic';
 import { scheduledPostFailedText } from '../../../packages/shared/src/job-failures';
 import { signInNoticeText } from '../../../packages/shared/src/server-text';
 import { fullCount, milestoneNoticeText } from '../../../packages/shared/src/post-stats';
@@ -155,6 +156,9 @@ function describe(g: Group, tr: Translator): string {
   // "Ada and 3 others echoed your reel".
   const echo = echoNoticeText(n, t, tp);
   if (echo) return echo;
+  // Pass the Mic: "Ada took the mic on your chain", a pass, and a finished fair start.
+  const mic = micNoticeText(n, t, tp);
+  if (mic) return mic;
   // Market: offers and answers to them, a sale to you, a rating, and listings ending.
   const market = marketNoticeText(n, t, tp);
   if (market) return market;

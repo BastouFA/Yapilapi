@@ -1199,4 +1199,17 @@ export const ru: Record<string, string> = {
   'Choose one cover.': 'Выберите одну обложку.',
   'Choose a video or a photo.': 'Выберите видео или фото.',
   'You can keep up to 5 accounts in this browser.': 'В этом браузере можно держать не больше 5 аккаунтов.',
+  // Pass the Mic (apps/api/src/lib/chains.ts, apps/api/src/modules/pass-the-mic.ts)
+  'Chains are made of reels posted right away.': 'Цепочки состоят из рилсов, опубликованных сразу.',
+  'Only people the starter follows can take the mic on this chain.': 'В этой цепочке микрофон могут взять только те, на кого подписан её автор.',
+  'Only reels shared publicly, with followers or with friends can be in a chain.':
+    'В цепочку можно добавить только рилсы, открытые для всех, для подписчиков или для друзей.',
+  'Pass the Mic is not enabled.': 'Функция «Передай микрофон» не включена.',
+  "That chain doesn't exist or isn't visible to you.": 'Такой цепочки нет, или она вам недоступна.',
+  'That reel is already in a chain.': 'Этот рилс уже в цепочке.',
+  'This chain is closed.': 'Эта цепочка закрыта.',
+  'You can add up to {max} reels to one chain.': 'Максимум рилсов в одной цепочке: {max}.',
+  'You can pass the mic on one chain to up to {max} people.': 'Максимум получателей микрофона в одной цепочке: {max}.',
+  'You can’t take the mic on this chain.': 'Вы не можете взять микрофон в этой цепочке.',
+  'You’ve added a lot of reels to chains today. Try again tomorrow.': 'Сегодня вы добавили в цепочки много рилсов. Попробуйте завтра.',
 };

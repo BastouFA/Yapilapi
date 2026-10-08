@@ -1203,4 +1203,17 @@ export const tr: Record<string, string> = {
   'Choose one cover.': 'Bir kapak seç.',
   'Choose a video or a photo.': 'Bir video ya da fotoğraf seç.',
   'You can keep up to 5 accounts in this browser.': 'Bu tarayıcıda en fazla 5 hesap tutabilirsin.',
+  // Pass the Mic (apps/api/src/lib/chains.ts, apps/api/src/modules/pass-the-mic.ts)
+  'Chains are made of reels posted right away.': 'Zincirler hemen paylaşılan reel’lerden oluşur.',
+  'Only people the starter follows can take the mic on this chain.': 'Bu zincirde yalnızca başlatan kişinin takip ettiği kişiler mikrofonu alabilir.',
+  'Only reels shared publicly, with followers or with friends can be in a chain.':
+    'Zincire yalnızca herkese açık, takipçilerle ya da arkadaşlarla paylaşılan reel’ler girebilir.',
+  'Pass the Mic is not enabled.': 'Mikrofonu uzat özelliği etkin değil.',
+  "That chain doesn't exist or isn't visible to you.": 'Bu zincir yok ya da onu göremiyorsun.',
+  'That reel is already in a chain.': 'Bu reel zaten bir zincirde.',
+  'This chain is closed.': 'Bu zincir kapalı.',
+  'You can add up to {max} reels to one chain.': 'Bir zincire en fazla {max} reel ekleyebilirsin.',
+  'You can pass the mic on one chain to up to {max} people.': 'Bir zincirde mikrofonu en fazla {max} kişiye uzatabilirsin.',
+  'You can’t take the mic on this chain.': 'Bu zincirde mikrofonu alamazsın.',
+  'You’ve added a lot of reels to chains today. Try again tomorrow.': 'Bugün zincirlere çok sayıda reel ekledin. Yarın tekrar dene.',
 };

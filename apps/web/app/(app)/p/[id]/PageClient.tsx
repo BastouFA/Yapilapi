@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { PostList } from '@/components/PostList';
 import { boostChoicesFrom, type BoostChoices } from '@/components/Boost';
 import { JoinNote, NeedsAccount } from '@/components/SignedOut';
+import { FairStartCard } from '@/components/PassTheMic';
 import { useSession } from '../../../providers';
 
 /**
@@ -16,7 +17,17 @@ import { useSession } from '../../../providers';
 export default function PostPageClient({ isPublic }: { isPublic: boolean }) {
   const { id } = useParams<{ id: string }>();
   const { me, t } = useSession();
-  const load = useCallback(() => api.posts.get(id).then((r) => ({ items: [r.post], nextCursor: null })), [id]);
+  // Your own reel shows its fair start (how many new people it reached) above it.
+  const [reelAuthor, setReelAuthor] = useState<string | null>(null);
+  const load = useCallback(
+    () =>
+      api.posts.get(id).then((r) => {
+        setReelAuthor(r.post.format === 'reel' ? r.post.author.id : null);
+        return { items: [r.post], nextCursor: null };
+      }),
+    [id],
+  );
+  const ownReel = !!me && reelAuthor === me.id;
   // ?boost=1 (from the phone app's boost screen) opens the boost sheet on your own post, with its choices filled in.
   const [boost, setBoost] = useState<{ postId: string; choices?: BoostChoices } | undefined>(undefined);
   // ?comments=1 (a notification about a comment) opens the comments.
@@ -32,6 +43,7 @@ export default function PostPageClient({ isPublic }: { isPublic: boolean }) {
       <div className="yp-topbar">
         <h1>{t('m.title.post')}</h1>
       </div>
+      {ownReel ? <FairStartCard postId={id} /> : null}
       {/* One post: no "You're all caught up" under it. */}
       <PostList load={load} reloadKey={id} boost={boost} openComments={comments} showEnd={false} empty={t('postPage.unavailable')} />
       {!me ? <JoinNote text={t('postPage.join')} /> : null}

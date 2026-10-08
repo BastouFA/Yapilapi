@@ -7,6 +7,7 @@ import { normalizeTag } from '../../../../packages/shared/src/hashtags';
 import type { Community, EventItem, Post, PublicUser } from '../../../../packages/shared/src/types';
 import type { TrendingTag } from '../../../../packages/api-client/src/index';
 import { client, errorMessage } from '../../lib/api';
+import { ChainShelf } from '../../lib/chains';
 import { Chip, ChipRow, SectionHeader } from '../../lib/chips';
 import { useT } from '../../lib/i18n';
 import { PostCard } from '../../lib/post';
@@ -155,7 +156,9 @@ export default function Wander() {
       clearTimeout(timer);
     };
   }, [term, tab, attempt]);
-  const refresh = useRefresh(() => (term ? setAttempt((a) => a + 1) : loadExplore()));
+  // Pulling to refresh before typing also asks for the Chains shelf again.
+  const [explored, setExplored] = useState(0);
+  const refresh = useRefresh(() => (term ? setAttempt((a) => a + 1) : (setExplored((n) => n + 1), loadExplore())));
 
   const remember = useCallback(
     (value = term) => {
@@ -368,6 +371,9 @@ export default function Wander() {
                 <Text style={{ color: c.inkMuted }}>{t('trending.empty')}</Text>
               )}
             </View>
+
+            {/* Pass the Mic: chains with new reels this week (hidden when there are none). */}
+            <ChainShelf refreshKey={explored} />
 
             {communities.length ? (
               <View style={{ gap: space[2] }}>

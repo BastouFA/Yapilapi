@@ -17,6 +17,8 @@ export const FEATURE_FLAGS = {
   PLAY: { default: false, description: 'Games and play experiences.' },
   REAL: { default: false, description: 'Authenticity-focused dual capture.' },
   REAL_TOGETHER: { default: false, description: 'Shared multi-perspective experiences.' },
+  PASS_THE_MIC: { default: true, description: 'Pass the Mic: reels made together, one after another, from a prompt (chains).' },
+  FAIR_START: { default: true, description: "Fair start: a new creator's first reels are shown to up to 1,000 people." },
   ADS: { default: false, description: 'Sponsored posts: paid campaigns shown only to adults who opted in to advertising.' },
 } as const;
 
