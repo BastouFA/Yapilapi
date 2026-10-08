@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, RefreshControl, SectionList, Text, View } from 'react-native';
-import type { MessageKey } from '../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import type { NotificationItem, PublicUser } from '../../../packages/shared/src/types';
 import { appealDecidedText, reportOutcomeText } from '../../../packages/shared/src/report-outcome';
 import { miniAppNoticeText } from '../../../packages/shared/src/mini-apps';

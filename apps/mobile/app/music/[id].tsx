@@ -1,7 +1,7 @@
 import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Image, Linking, Pressable, Text, View } from 'react-native';
-import type { MessageKey } from '../../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../../packages/shared/src/i18n-core';
 import type { MusicTrack } from '../../../../packages/shared/src/music';
 import type { Post } from '../../../../packages/shared/src/types';
 import { client, errorMessage, isGone, mediaUrl } from '../../lib/api';

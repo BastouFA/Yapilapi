@@ -45,7 +45,9 @@ describe('translateMessage', () => {
     expect(translateMessage('Log in to continue.', 'fr')).toBe(ERROR_MESSAGES.fr!['Log in to continue.']);
     expect(translateMessage('Log in to continue.', 'fr-CA')).toBe(ERROR_MESSAGES.fr!['Log in to continue.']);
     expect(translateMessage('Log in to continue.', 'en')).toBe('Log in to continue.');
-    expect(translateMessage('Log in to continue.', 'de')).toBe('Log in to continue.');
+    expect(translateMessage('Log in to continue.', 'de')).toBe(ERROR_MESSAGES.de!['Log in to continue.']);
+    expect(translateMessage('Log in to continue.', 'ur-PK')).toBe(ERROR_MESSAGES.ur!['Log in to continue.']);
+    expect(translateMessage('Log in to continue.', 'nl')).toBe('Log in to continue.');
     expect(translateMessage('Not a message the API writes.', 'fr')).toBe('Not a message the API writes.');
 
     const template = 'We just sent a code. You can ask for another in {wait} seconds.';
@@ -70,9 +72,12 @@ describe('translateMessage', () => {
 
   it('reads Accept-Language by preference', () => {
     expect(fromAcceptLanguage('fr-CA,fr;q=0.9,en;q=0.8')).toBe('fr');
-    expect(fromAcceptLanguage('de-DE,de;q=0.9,pt-BR;q=0.8')).toBe('pt');
+    expect(fromAcceptLanguage('nl-NL,nl;q=0.9,pt-BR;q=0.8')).toBe('pt');
+    expect(fromAcceptLanguage('de-DE,de;q=0.9,pt-BR;q=0.8')).toBe('de');
+    expect(fromAcceptLanguage('zh-Hans-CN,zh;q=0.9')).toBe('zh');
+    expect(fromAcceptLanguage('ja,en;q=0.5')).toBe('ja');
     expect(fromAcceptLanguage('en;q=0.5,ar;q=0.9')).toBe('ar');
-    expect(fromAcceptLanguage('de, *;q=0.1')).toBeUndefined();
+    expect(fromAcceptLanguage('nl, *;q=0.1')).toBeUndefined();
     expect(fromAcceptLanguage('')).toBeUndefined();
   });
 });

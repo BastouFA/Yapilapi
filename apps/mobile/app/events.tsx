@@ -1,7 +1,7 @@
 import { router, useFocusEffect, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { FlatList } from 'react-native';
-import type { MessageKey } from '../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import type { EventItem } from '../../../packages/shared/src/index';
 import { client, errorMessage } from '../lib/api';
 import { HeaderAction } from '../lib/forms';

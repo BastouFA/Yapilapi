@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { ApiError, type AgentKind, type AgentResult } from '../../../packages/api-client/src/index';
-import type { MessageKey } from '../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import { client, errorMessage } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { space } from '../lib/theme';

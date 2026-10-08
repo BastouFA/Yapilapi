@@ -2,7 +2,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { AppState, RefreshControl, ScrollView, Text, View } from 'react-native';
 import type { InvitesInfo, PlusInfo } from '../../../packages/api-client/src/index';
-import { formatMoney } from '../../../packages/shared/src/i18n';
+import { formatMoney } from '../../../packages/shared/src/i18n-core';
 import { client, errorMessage } from '../lib/api';
 import { SectionHeader } from '../lib/chips';
 import { useT } from '../lib/i18n';

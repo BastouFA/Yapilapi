@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 import { NOTIFICATION_CATEGORIES } from '../../../packages/shared/src/constants';
-import type { MessageKey } from '../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import { client, errorMessage, isGone } from './api';
 import { Chip, ChipRow } from './chips';
 import { useT } from './i18n';

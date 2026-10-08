@@ -29,7 +29,7 @@ import {
   type DayCell,
   type Limits,
 } from '../../../packages/shared/src/date-picker';
-import type { MessageKey } from '../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import { useT, type Translator } from './i18n';
 import { radius, space } from './theme';
 import { Button, Icon, useColors, useScreenFocused } from './ui';

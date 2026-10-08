@@ -28,7 +28,7 @@ Some features are optional helpers that use a third-party AI model: summaries, s
   - Arabic-speaking North Africa and the Middle East.
 - **Europe and the United States:** some users there are likely, since the web app is open to anyone.
 - **Launch countries:** the owner has not yet chosen them. Both stores let you pick countries. The app-store guide suggests starting with the countries the lawyer has reviewed.
-- **Language of the legal texts:** the page text is English only. The page frame is translated into all 8 languages and marked, in each language, as English-only text: titles, navigation, "Last updated" and a note that the text is in English. See question 40.
+- **Language of the legal texts:** the page text is English only. The page frame is translated into every app language (23) and marked, in each language, as English-only text: titles, navigation, "Last updated" and a note that the text is in English. See question 40.
 
 ## 3. The documents
 

@@ -22,7 +22,7 @@ import {
   type AccessibilityActionEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { MessageKey } from '../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import type { DualCorner } from '../../../packages/shared/src/dual';
 import { createModeFrom, deliverEchoAsset, deliverPendingAsset, type CreateMode } from '../lib/create-sheet';
 import { composeOnServer, DualReview, type Shot } from '../lib/dual';

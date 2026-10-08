@@ -18,8 +18,9 @@ export interface LanguageInfo {
 }
 
 /**
- * Languages the detector recognises and translation can target: the app's eight
- * languages first, then others widely used by people on YAPILAPI.
+ * Languages the detector recognises and translation can target: the app's own
+ * languages first (every one has a catalog in locales/), then others widely used
+ * by people on YAPILAPI.
  */
 export const TRANSLATION_LANGUAGES: readonly LanguageInfo[] = [
   { code: 'en', autonym: 'English' },
@@ -32,28 +33,62 @@ export const TRANSLATION_LANGUAGES: readonly LanguageInfo[] = [
   { code: 'ha', autonym: 'Hausa' },
   { code: 'ig', autonym: 'Igbo' },
   { code: 'am', autonym: 'አማርኛ' },
+  { code: 'zu', autonym: 'isiZulu' },
   { code: 'de', autonym: 'Deutsch' },
   { code: 'it', autonym: 'Italiano' },
-  { code: 'nl', autonym: 'Nederlands' },
-  { code: 'pl', autonym: 'Polski' },
   { code: 'tr', autonym: 'Türkçe' },
   { code: 'ru', autonym: 'Русский' },
-  { code: 'uk', autonym: 'Українська' },
-  { code: 'el', autonym: 'Ελληνικά' },
-  { code: 'he', autonym: 'עברית' },
-  { code: 'fa', autonym: 'فارسی' },
   { code: 'ur', autonym: 'اردو' },
   { code: 'hi', autonym: 'हिन्दी' },
   { code: 'bn', autonym: 'বাংলা' },
   { code: 'zh', autonym: '中文' },
   { code: 'ja', autonym: '日本語' },
   { code: 'ko', autonym: '한국어' },
-  { code: 'th', autonym: 'ไทย' },
   { code: 'vi', autonym: 'Tiếng Việt' },
   { code: 'id', autonym: 'Bahasa Indonesia' },
+  { code: 'nl', autonym: 'Nederlands' },
+  { code: 'pl', autonym: 'Polski' },
+  { code: 'uk', autonym: 'Українська' },
+  { code: 'el', autonym: 'Ελληνικά' },
+  { code: 'he', autonym: 'עברית' },
+  { code: 'fa', autonym: 'فارسی' },
+  { code: 'th', autonym: 'ไทย' },
 ];
 
 export const TRANSLATION_LANGUAGE_CODES: readonly string[] = TRANSLATION_LANGUAGES.map((l) => l.code);
+
+/** A language's name in itself ("Français", "日本語", "isiZulu"), the same on every platform; the code when it isn't listed. */
+export function autonym(code: string): string {
+  return TRANSLATION_LANGUAGES.find((l) => l.code === code)?.autonym ?? code;
+}
+
+/** For sorting: lower case, accents off ("Español" → "espanol"), where the platform can take them off. */
+function sortKey(name: string): string {
+  const lower = name.toLowerCase();
+  try {
+    // Hangul syllables come apart under NFD too, and go back together under NFC.
+    return lower
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .normalize('NFC');
+  } catch {
+    return lower;
+  }
+}
+
+/**
+ * Language codes in the order a language picker lists them: by their own names, Latin letters
+ * first (Bahasa Indonesia, Deutsch, English… Yorùbá), then the other scripts (Русский, اردو,
+ * हिन्दी… 한국어). The order is by character, not the platform's collation, so the server, every
+ * browser and the phone agree.
+ */
+export function byAutonym(codes: readonly string[]): string[] {
+  return [...codes].sort((a, b) => {
+    const x = sortKey(autonym(a));
+    const y = sortKey(autonym(b));
+    return x < y ? -1 : x > y ? 1 : 0;
+  });
+}
 
 /** How many languages someone can list under "Languages I understand". */
 export const MAX_UNDERSTOOD_LANGUAGES = 12;

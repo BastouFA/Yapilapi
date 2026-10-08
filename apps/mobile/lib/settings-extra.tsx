@@ -3,11 +3,11 @@ import { router, type Href } from 'expo-router';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { AccessibilityInfo, Alert, Linking, Platform, Pressable, Text, View } from 'react-native';
 import type { AccountInfo, InteractionSettings, PublicUser, UsernameCheck, UsernameStatus } from '../../../packages/shared/src/types';
-import type { MessageKey } from '../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import { SECURITY_EVENT_KEYS, SECURITY_EVENT_WARNINGS } from '../../../packages/shared/src/security-events';
 import { usernameProblem } from '../../../packages/shared/src/usernames';
-import { SUPPORTED_LOCALES } from '../../../packages/shared/src/i18n';
-import { languageName } from '../../../packages/shared/src/translation';
+import { SUPPORTED_LOCALES } from '../../../packages/shared/src/i18n-core';
+import { autonym, byAutonym } from '../../../packages/shared/src/translation';
 import { LEGAL_DOCS } from '../../../packages/shared/src/legal';
 import { appealStatusText, moderationCaseText } from '../../../packages/shared/src/server-text';
 import { checkNewUsername, client, errorMessage, webUrl } from './api';
@@ -1205,10 +1205,10 @@ export function AppLanguage() {
       <Title sub={t('st.language.appHint')}>{t('settings.language')}</Title>
       {error ? <Notice tone="danger">{error}</Notice> : null}
       <View accessibilityRole="radiogroup" accessibilityLabel={t('settings.language')}>
-        {SUPPORTED_LOCALES.map((l) => {
+        {byAutonym(SUPPORTED_LOCALES).map((l) => {
           const on = current === l;
-          // Each language in itself; the phone has no Intl.DisplayNames, so the table's own names are the fallback.
-          const name = languageName(l, l);
+          // Each language in its own name, from the shared table (the phone has no Intl.DisplayNames).
+          const name = autonym(l);
           return (
             <Pressable
               key={l}
@@ -1232,7 +1232,7 @@ export function AppLanguage() {
               style={{ flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 48 }}
             >
               <Icon name={on ? 'radio-button-on' : 'radio-button-off'} size={22} color={on ? c.yapi : c.inkMuted} />
-              <Text style={{ color: c.ink, fontSize: 16, fontWeight: on ? '700' : '500', flex: 1, textTransform: 'capitalize' }}>{name}</Text>
+              <Text style={{ color: c.ink, fontSize: 16, fontWeight: on ? '700' : '500', flex: 1 }}>{name}</Text>
               {busy === l ? <Loading /> : null}
             </Pressable>
           );

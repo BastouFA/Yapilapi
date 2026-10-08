@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { AccessibilityInfo, Text, View } from 'react-native';
 import { ApiError } from '../../../packages/api-client/src/index';
 import { REPORT_REASONS, REPORT_TARGETS } from '../../../packages/shared/src/constants';
-import type { MessageKey } from '../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import { client, errorMessage } from './api';
 import { useT } from './i18n';
 import { useSession } from './session';

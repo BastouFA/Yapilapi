@@ -25,7 +25,7 @@ There is one copy of the phone code. Yap's own files are in `apps/yap` (the tabs
 - **TypeScript** (`tsconfig.json`) maps every package to `apps/yap/node_modules` (`paths`), for the same reason: one set of React Native types.
 - **The scene life cycle plugin** is `apps/mobile/plugins/with-scene-lifecycle.js`, loaded by `plugins/with-scene-lifecycle.js` so it finds `expo/config-plugins` in Yap's node_modules.
 - **Push**: `apps/mobile/lib/push.ts` reads `extra.app` from the app config; Yap's is `"yap"`, so it registers with `app: 'yap'`, and the API sends that phone only pushes about chats and calls (and sign-in alerts), titled "Yap" (`YAP_APP_PUSH_TYPES` in `apps/api/src/lib/push.ts`). New messages push in both apps, one per chat while it's unread (`apps/api/src/lib/message-push.ts`); tapping one opens the chat.
-- **Strings**: all through the shared catalogs. Yap's few own ones start with `yapApp.` (in all eight languages); the rest are the phone app's.
+- **Strings**: all through the shared catalogs. Yap's few own ones start with `yapApp.` (in every language); the rest are the phone app's.
 
 When you change a shared file in `apps/mobile`, check both apps: `npx tsc --noEmit` in each, and `node scripts/check-targets.mjs` in `apps/mobile` plus `npm run check-targets` here (the same script, pointed at Yap).
 

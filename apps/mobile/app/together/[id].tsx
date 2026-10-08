@@ -2,7 +2,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { AccessibilityInfo, Alert, FlatList, Image, Platform, Pressable, RefreshControl, ScrollView, Share, Text, View } from 'react-native';
-import type { MessageKey } from '../../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../../packages/shared/src/i18n-core';
 import { CHAPTER_AUDIENCES } from '../../../../packages/shared/src/constants';
 import {
   momentDayLabel,

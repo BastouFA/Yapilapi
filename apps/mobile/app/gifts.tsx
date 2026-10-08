@@ -2,7 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import type { TipRecord } from '../../../packages/api-client/src/index';
-import { formatMoney } from '../../../packages/shared/src/i18n';
+import { formatMoney } from '../../../packages/shared/src/i18n-core';
 import { client, errorMessage } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { space } from '../lib/theme';

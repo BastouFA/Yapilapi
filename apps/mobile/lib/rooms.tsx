@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { MediaStream, RTCPeerConnection } from 'react-native-webrtc';
 import type { RoomEnvelope } from '../../../packages/api-client/src/index';
-import type { MessageKey } from '../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import { ROOM_HEARTBEAT_MS, roomMeshLinks, type RoomSignalData } from '../../../packages/shared/src/rooms';
 import type { RoomReaction } from '../../../packages/shared/src/constants';
 import type { RoomDetail, RoomMediaSession, RoomSummary } from '../../../packages/shared/src/types';

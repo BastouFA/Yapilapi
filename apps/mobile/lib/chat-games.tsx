@@ -29,7 +29,7 @@ import {
   type NoughtsState,
   type WordLadderState,
 } from '../../../packages/shared/src/games/index';
-import type { MessageKey } from '../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import type { ChatGame, Conversation, Message, PublicUser } from '../../../packages/shared/src/types';
 import { client, errorMessage } from './api';
 import { ChessBoard, ChessRecord, MiniChess } from './chess-board';

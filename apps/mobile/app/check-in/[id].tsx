@@ -2,8 +2,8 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, FlatList, Text, View } from 'react-native';
-import type { MessageKey } from '../../../../packages/shared/src/i18n';
-import { formatEventWhen, safeTimeZone } from '../../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../../packages/shared/src/i18n-core';
+import { formatEventWhen, safeTimeZone } from '../../../../packages/shared/src/i18n-core';
 import {
   readTicketInput,
   type CheckInCounts,

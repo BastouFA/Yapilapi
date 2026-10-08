@@ -1,6 +1,6 @@
 import { Text, View } from 'react-native';
 import type { Boost } from '../../../packages/api-client/src/index';
-import { formatMoney } from '../../../packages/shared/src/i18n';
+import { formatMoney } from '../../../packages/shared/src/i18n-core';
 import { Pill } from './forms';
 import { useT } from './i18n';
 import { radius, space } from './theme';

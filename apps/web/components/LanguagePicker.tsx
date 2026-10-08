@@ -2,13 +2,11 @@
 
 import { useId, useState } from 'react';
 import { Icon } from '@yapilapi/design-system';
-import { SUPPORTED_LOCALES, TRANSLATION_LANGUAGES } from '@yapilapi/shared';
+import { autonym, byAutonym, SUPPORTED_LOCALES } from '@yapilapi/shared';
 import { useSession } from '@/app/providers';
 
-/** Each language by its own name ("Français", "العربية"), the same on the server and in every browser. */
-function autonym(code: string): string {
-  return TRANSLATION_LANGUAGES.find((l) => l.code === code)?.autonym ?? code;
-}
+/** Each language by its own name ("Français", "العربية"), in that order, the same on the server and in every browser. */
+const LANGUAGES = byAutonym(SUPPORTED_LOCALES);
 
 /**
  * The site's language for someone without an account (landing, log in, sign up, shared pages).
@@ -38,7 +36,7 @@ export function LanguagePicker({ className }: { className?: string }) {
           void chooseLocale(code).finally(() => setPicked(null));
         }}
       >
-        {SUPPORTED_LOCALES.map((code) => (
+        {LANGUAGES.map((code) => (
           <option key={code} value={code} lang={code}>
             {autonym(code)}
           </option>

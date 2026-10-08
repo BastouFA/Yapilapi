@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { CATALOGS, gmtOffsetLabel, isRtl, pluralCategory, pluralIsOne, SUPPORTED_LOCALES, t, tp, zoneOffsetMinutes, type MessageKey } from './i18n.ts';
+import {
+  CATALOGS,
+  gmtOffsetLabel,
+  isRtl,
+  pluralCategory,
+  pluralFormKey,
+  pluralIsOne,
+  SUPPORTED_LOCALES,
+  t,
+  tp,
+  zoneOffsetMinutes,
+  type MessageKey,
+} from './i18n.ts';
 import { fr as frErrors } from './locales/errors/fr.ts';
 
 const en = CATALOGS.en!;
@@ -7,8 +19,10 @@ const keys = Object.keys(en).sort();
 const placeholders = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]!).sort();
 
 describe('message catalogs', () => {
-  it('has the 8 supported languages', () => {
-    expect([...SUPPORTED_LOCALES].sort()).toEqual(['ar', 'en', 'es', 'fr', 'ha', 'pt', 'sw', 'yo']);
+  it('has the 23 supported languages', () => {
+    expect([...SUPPORTED_LOCALES].sort()).toEqual(
+      ['am', 'ar', 'bn', 'de', 'en', 'es', 'fr', 'ha', 'hi', 'id', 'ig', 'it', 'ja', 'ko', 'pt', 'ru', 'sw', 'tr', 'ur', 'vi', 'yo', 'zh', 'zu'].sort(),
+    );
     // The phone and the API load every catalog up front: the same languages the web loads on demand.
     expect(Object.keys(CATALOGS).sort()).toEqual([...SUPPORTED_LOCALES].sort());
   });
@@ -98,7 +112,10 @@ describe('t and tp', () => {
   it('knows the right-to-left languages', () => {
     expect(isRtl('ar')).toBe(true);
     expect(isRtl('ar-EG')).toBe(true);
+    expect(isRtl('ur')).toBe(true);
+    expect(isRtl('ur-PK')).toBe(true);
     expect(isRtl('fr')).toBe(false);
+    expect(SUPPORTED_LOCALES.filter(isRtl).sort()).toEqual(['ar', 'ur']);
   });
 });
 
@@ -160,6 +177,33 @@ describe('plural categories', () => {
           expect(pluralIsOne('pt-BR', 0)).toBe(true);
           expect(pluralIsOne('yo', 1)).toBe(false);
           expect(tp('m.poll.votes', 0, 'fr')).toBe(t('m.poll.votes.one', 'fr', { count: 0 }));
+        });
+      });
+
+      it('shows the number where "one" is more than 1 and `.one` doesn’t say it', () => {
+        run(() => {
+          const ru = CATALOGS.ru! as Record<string, string>;
+          const hi = CATALOGS.hi! as Record<string, string>;
+          const bn = CATALOGS.bn! as Record<string, string>;
+          const form = (c: Record<string, string>, k: string, n: number) => c[k]!.replaceAll('{count}', String(n));
+          // "Used once": Russian counts 21, 31… as one, Hindi and Bengali 0.
+          expect(ru['wrap.songUses.one']).not.toContain('{count}');
+          expect(tp('wrap.songUses', 1, 'ru')).toBe(ru['wrap.songUses.one']);
+          expect(tp('wrap.songUses', 21, 'ru')).toBe(form(ru, 'wrap.songUses.many', 21));
+          expect(tp('wrap.songUses', 101, 'ru')).toBe(form(ru, 'wrap.songUses.many', 101));
+          expect(tp('wrap.songUses', 22, 'ru')).toBe(form(ru, 'wrap.songUses.few', 22));
+          expect(tp('wrap.songUses', 0, 'hi')).toBe(form(hi, 'wrap.songUses.other', 0));
+          expect(tp('wrap.songUses', 1, 'hi')).toBe(hi['wrap.songUses.one']);
+          expect(tp('wrap.songUses', 0, 'bn')).toBe(form(bn, 'wrap.songUses.other', 0));
+          // French counts 0 as one too.
+          expect(tp('wrap.songUses', 0, 'fr')).toBe(form(CATALOGS.fr!, 'wrap.songUses.other', 0));
+          // A `.one` with the number in it is right for every count it covers.
+          expect(tp('m.boost.days', 21, 'ru')).toBe(form(ru, 'm.boost.days.one', 21));
+          expect(tp('m.poll.votes', 0, 'fr')).toBe(form(CATALOGS.fr!, 'm.poll.votes.one', 0));
+          // Without the count, the category alone decides, as before.
+          expect(pluralFormKey('wrap.songUses', 'one', 'ru')).toBe('wrap.songUses.one');
+          expect(pluralFormKey('wrap.songUses', 'one', 'ru', 21)).toBe('wrap.songUses.many');
+          expect(pluralFormKey('wrap.songUses', 'one', 'hi', 0)).toBe('wrap.songUses.other');
         });
       });
 

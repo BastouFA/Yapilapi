@@ -1,16 +1,20 @@
 // The app's language, outside React. lib/i18n.tsx keeps it in sync with the signed-in user's
 // locale and the device languages; code that runs outside a component (alerts from callbacks,
 // errors thrown in lib/api.ts, notification buttons) reads it through `tr`.
+//
+// Only English is evaluated up front: i18n-core, not i18n (which would run every catalog at
+// start-up). The reader's language is loaded with loadLocale() before the first screen draws
+// (lib/i18n.tsx), and again when they pick another one.
 import {
-  CATALOGS,
   isRtl,
   pluralCategory,
   pluralFormKey,
+  SUPPORTED_LOCALES,
   t as translate,
   type MessageKey,
   type PluralCategory,
   type PluralKey,
-} from '../../../packages/shared/src/i18n';
+} from '../../../packages/shared/src/i18n-core';
 
 export type Vars = Record<string, string | number>;
 export type Translate = (key: MessageKey, vars?: Vars) => string;
@@ -30,15 +34,15 @@ const ENGLISH: LocaleInfo = { locale: 'en', lang: 'en', rtl: false };
 /**
  * The first candidate with a catalog wins, so a person whose phone is set to Hebrew and then
  * French gets French. With no match the app is in English. The direction follows the catalog
- * actually shown: an RTL language without a catalog yet (he, fa, ur) shows English, left to
- * right, until its catalog is added; `isRtl` then turns it RTL with no other change.
+ * actually shown: an RTL language without a catalog yet (he, fa) shows English, left to right,
+ * until its catalog is added; `isRtl` then turns it RTL with no other change.
  */
 export function resolveLocale(candidates: readonly (string | null | undefined)[]): LocaleInfo {
   for (const raw of candidates) {
     if (!raw) continue;
     const tag = raw.replace(/_/g, '-');
     const lang = tag.split('-')[0]!.toLowerCase();
-    if (!CATALOGS[lang]) continue;
+    if (!SUPPORTED_LOCALES.includes(lang)) continue;
     let locale = lang;
     try {
       locale = Intl.getCanonicalLocales(tag)[0] ?? lang;
@@ -120,7 +124,7 @@ export function translator(info: LocaleInfo): Translator {
   };
   const tp: Translator['tp'] = (key, count, vars) => {
     const category = pr ? (pr.select(count) as PluralCategory) : pluralCategory(info.locale, count);
-    return t(pluralFormKey(key, category, info.lang) as MessageKey, { ...vars, count });
+    return t(pluralFormKey(key, category, info.lang, count) as MessageKey, { ...vars, count });
   };
 
   const tr: Translator = {

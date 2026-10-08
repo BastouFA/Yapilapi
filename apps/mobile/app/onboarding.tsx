@@ -5,8 +5,8 @@ import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { OnboardingStep } from '../../../packages/api-client/src/index';
-import { SUPPORTED_LOCALES, type MessageKey } from '../../../packages/shared/src/i18n';
-import { languageName, TRANSLATION_LANGUAGES } from '../../../packages/shared/src/translation';
+import { SUPPORTED_LOCALES, type MessageKey } from '../../../packages/shared/src/i18n-core';
+import { autonym as autonymOf, byAutonym, languageName } from '../../../packages/shared/src/translation';
 import type { Community, PeopleSuggestion } from '../../../packages/shared/src/types';
 import { client, errorMessage, mediaUrl } from '../lib/api';
 import { FriendsFinder } from '../lib/friends';
@@ -188,7 +188,7 @@ export default function Onboarding() {
 
 type StepProps = { onNext: () => void; setError: (e: string | null) => void };
 
-/** The app's language: the eight the app speaks, each in its own name, with the current one ticked. */
+/** The app's language: the ones the app speaks, each in its own name (in that order), with the current one ticked. */
 function LanguageStep({ onNext, setError }: StepProps) {
   const c = useColors();
   const { t, lang, locale } = useT();
@@ -214,9 +214,9 @@ function LanguageStep({ onNext, setError }: StepProps) {
     <>
       <Title sub={t('m.onb.language.body')}>{t('m.onb.language.title')}</Title>
       <View accessibilityRole="radiogroup" style={{ gap: space[2] }}>
-        {SUPPORTED_LOCALES.map((code) => {
+        {byAutonym(SUPPORTED_LOCALES).map((code) => {
           const on = code === lang;
-          const autonym = TRANSLATION_LANGUAGES.find((l) => l.code === code)?.autonym ?? code;
+          const autonym = autonymOf(code);
           const local = languageName(code, locale);
           return (
             <Pressable

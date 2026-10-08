@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import type { Boost } from '../../../packages/api-client/src/index';
 import { BOOST_DAYS, BOOST_OPTIONS, currencyForCountry } from '../../../packages/shared/src/constants';
-import { formatMoney } from '../../../packages/shared/src/i18n';
+import { formatMoney } from '../../../packages/shared/src/i18n-core';
 import type { Post } from '../../../packages/shared/src/types';
 import { client, errorMessage, isGone } from '../lib/api';
 import { SectionHeader } from '../lib/chips';

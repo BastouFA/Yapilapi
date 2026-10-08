@@ -1,7 +1,7 @@
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, Linking, Platform, Pressable, RefreshControl, ScrollView, Share, Text, View } from 'react-native';
-import { formatEventWhen, safeTimeZone } from '../../../../packages/shared/src/i18n';
+import { formatEventWhen, safeTimeZone } from '../../../../packages/shared/src/i18n-core';
 import { eventEndsAt } from '../../../../packages/shared/src/tickets';
 import { timeZoneLabel } from '../../../../packages/shared/src/scheduling';
 import type { EventItem, PublicUser } from '../../../../packages/shared/src/types';

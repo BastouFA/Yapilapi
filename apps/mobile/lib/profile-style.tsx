@@ -2,7 +2,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, Image, Linking, Platform, Pressable, Text, View } from 'react-native';
-import type { MessageKey } from '../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import type { MusicTrack, PostMusic } from '../../../packages/shared/src/music';
 import {
   MAX_FEATURED_POSTS,

@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Linking, Platform, Pressable, Text, View } from 'react-native';
-import { formatEventWhen, safeTimeZone } from '../../../packages/shared/src/i18n';
+import { formatEventWhen, safeTimeZone } from '../../../packages/shared/src/i18n-core';
 import {
   directionsUrl,
   eventEndsAt,

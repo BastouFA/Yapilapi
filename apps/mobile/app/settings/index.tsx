@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Linking, ScrollView, Text, TextInput, View } from 'react-native';
-import { t as translate } from '../../../../packages/shared/src/i18n';
+import { t as translate } from '../../../../packages/shared/src/i18n-core';
 import { useConfirmLogout } from '../../lib/account-menu';
 import { webUrl } from '../../lib/api';
 import { useT } from '../../lib/i18n';

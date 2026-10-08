@@ -2,7 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Alert, findNodeHandle, FlatList, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { MessageKey } from '../../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../../packages/shared/src/i18n-core';
 import type { Comment, CommentPage, Post, PublicUser } from '../../../../packages/shared/src/types';
 import type { CommentPolicy, CommentSort } from '../../../../packages/shared/src/constants';
 import { formatReelTime } from '../../../../packages/shared/src/reels';

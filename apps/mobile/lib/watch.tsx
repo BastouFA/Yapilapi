@@ -4,7 +4,7 @@ import { useVideoPlayer } from 'expo-video';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, Pressable, Text, View } from 'react-native';
 import { ApiError } from '../../../packages/api-client/src/index';
-import type { MessageKey } from '../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import { hls360 } from '../../../packages/shared/src/data-saver';
 import type { Conversation, MediaItem, Post } from '../../../packages/shared/src/types';
 import {

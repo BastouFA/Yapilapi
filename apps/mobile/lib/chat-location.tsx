@@ -19,7 +19,7 @@ import {
   type LocationPrecision,
   type LocationShare,
 } from '../../../packages/shared/src/location';
-import type { MessageKey } from '../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import type { Message } from '../../../packages/shared/src/types';
 import { client, errorMessage } from './api';
 import { useT } from './i18n';

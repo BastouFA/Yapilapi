@@ -1,5 +1,5 @@
 import type { Href } from 'expo-router';
-import type { MessageKey } from '../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import type { IconName } from './ui';
 
 /**

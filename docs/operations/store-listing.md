@@ -35,7 +35,7 @@ Each count below was checked by hand. Count again after any edit.
 
 **Google Play short description** (80): Share, chat and meet up with your people. Posts, reels, stories, rooms and more.
 
-**Promotional text** (133): Chapters turn your stories into keepsakes, Boards collect what you save, and Rooms bring people together to talk. Now in 8 languages.
+**Promotional text** (133): Chapters turn your stories into keepsakes, Boards collect what you save, and Rooms bring people together to talk. Now in 23 languages.
 
 **Keywords** (100): social,friends,chat,stories,reels,photos,video,community,events,rooms,voice,messages,creators,africa
 
@@ -62,7 +62,7 @@ What you won't find elsewhere:
 - Games in chats. Four up, Noughts, Word ladder and Chess, turn by turn, right inside a conversation.
 - Ask me. Turn on a question box on your profile and answer the questions you choose to.
 - Data saver. Photos load small until you ask for more, videos wait for a tap, and uploads are made smaller on your phone. It turns on by itself on slow connections if you want.
-- 8 languages. English, French, Arabic, Spanish, Portuguese, Swahili, Yorùbá and Hausa, with right-to-left support. "See translation" translates posts, comments and messages written in a language you don't read.
+- 23 languages. English, French, Arabic, Spanish, Portuguese, Swahili, Yorùbá, Hausa, Chinese, Hindi, Bengali, Russian, Japanese, German, Indonesian, Turkish, Korean, Italian, Vietnamese, Urdu, Amharic, Igbo and Zulu, with right-to-left support. "See translation" translates posts, comments and messages written in a language you don't read.
 
 Also inside:
 
@@ -94,7 +94,7 @@ Community guidelines: https://[your site]/legal/guidelines
 
 ### What's new (1.0.0)
 
-The first release of YAPILAPI. Share posts, reels and stories, chat and call your people, join communities and rooms, keep your stories in Chapters and your saves in Boards, and use it in 8 languages.
+The first release of YAPILAPI. Share posts, reels and stories, chat and call your people, join communities and rooms, keep your stories in Chapters and your saves in Boards, and use it in 23 languages.
 
 ### Support and marketing URLs
 

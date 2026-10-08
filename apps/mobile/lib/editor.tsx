@@ -18,7 +18,7 @@ import {
   type EditorParamsInput,
   type FilterId,
 } from '../../../packages/shared/src/filters';
-import type { MessageKey } from '../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import { useT } from './i18n';
 import { clock, type Picked } from './media';
 import { radius, space } from './theme';
