@@ -6866,6 +6866,8 @@ export const ko: Catalog = {
   'mic.empty': '이 릴레이에는 아직 릴스가 없어요.',
   'mic.unavailable': '이 릴레이를 볼 수 없어요.',
   'mic.pass.none': '여기서 친구가 생기면 마이크를 넘길 수 있어요.',
+  'mic.pass.followingOnly': '팔로우하는 사람에게 마이크를 넘길 수 있어요',
+  'mic.mention': '캡션에서 팔로우하는 사람을 @로 언급하면 마이크를 넘길 수 있어요.',
   'mic.playFromStart': '처음부터 재생',
   'mic.notif.link': '{name}님이 내 릴레이에서 마이크를 받았어요',
   'mic.notif.link.others.one': '{name}님 외 {count}명이 내 릴레이에서 마이크를 받았어요',

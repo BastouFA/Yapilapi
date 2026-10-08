@@ -6847,6 +6847,8 @@ export const am: Catalog = {
   'mic.empty': 'በዚህ ሰንሰለት ውስጥ ገና ሪል የለም።',
   'mic.unavailable': 'ይህ ሰንሰለት አይገኝም።',
   'mic.pass.none': 'እዚህ ጓደኞች ሲኖሩዎት ማይኩን ሊያቀብሏቸው ይችላሉ።',
+  'mic.pass.followingOnly': 'ማይኩን ለሚከተሏቸው ሰዎች ማቀበል ይችላሉ',
+  'mic.mention': 'ማይኩን ለማቀበል በመግለጫው ውስጥ የሚከተሏቸውን ሰዎች በ@ ይጥቀሱ።',
   'mic.playFromStart': 'ከመጀመሪያው ያጫውቱ',
   'mic.notif.link': '{name} በሰንሰለትዎ ውስጥ ማይኩን ወስዷል',
   'mic.notif.link.others.one': '{name} እና {count} ሌላ በሰንሰለትዎ ውስጥ ማይኩን ወስደዋል',

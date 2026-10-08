@@ -90,7 +90,7 @@ export default function ChainPage() {
               {t('mic.playFromStart')}
             </Link>
           ) : null}
-          {me ? (
+          {me && !chain.closed ? (
             <Button variant="ghost" icon="send" onClick={() => setPassing(true)}>
               {t('mic.pass')}
             </Button>

@@ -6927,6 +6927,8 @@ export const es: Catalog = {
   'mic.empty': 'Todavía no hay reels en esta cadena.',
   'mic.unavailable': 'Esta cadena no está disponible.',
   'mic.pass.none': 'Cuando tengas amigos aquí, podrás pasarles el micro.',
+  'mic.pass.followingOnly': 'Puedes pasar el micro a las personas que sigues',
+  'mic.mention': 'Menciona con @ en la descripción a personas que sigues para pasarles el micro.',
   'mic.playFromStart': 'Ver desde el principio',
   'mic.notif.link': '{name} tomó el micro en tu cadena',
   'mic.notif.link.others.one': '{name} y {count} persona más tomaron el micro en tu cadena',

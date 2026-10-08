@@ -16,7 +16,8 @@ type Q = Pool | PoolClient;
  * running at a time. The reel is public, from a public adult account that confirmed its email or
  * phone, isn't limited or suspended, has no open risk flags adding up to a risky account, and the
  * reel itself isn't held, sensitive or an echo. With spam checks on, accounts made from one
- * address have at most FAIR_START.perSignupAddress running at once.
+ * address have at most FAIR_START.perSignupAddress running at once. A reel held for review gets
+ * its fair start when a moderator clears it, within FAIR_START.clearedWithinDays of its posting.
  *
  * Who counts: each real person once (fair_start_views): someone else, with an active account
  * that isn't limited or flagged as risky, who had it on screen (a feed impression, which only
@@ -57,21 +58,37 @@ export async function fairStartOffered(db: Q, userId: string, spam: boolean): Pr
   return !!rows[0];
 }
 
-/** Give a reel that was just published a fair start when it and its author may have one. Returns whether it did. */
-export async function enrollFairStart(db: Q, postId: string, spam: boolean): Promise<boolean> {
+/**
+ * Give a reel that was just published a fair start when it and its author may have one. Returns
+ * whether it did. `postedWithinDays`: only when it was posted that recently (a reel cleared from review).
+ */
+export async function enrollFairStart(db: Q, postId: string, spam: boolean, postedWithinDays?: number): Promise<boolean> {
   if (!(await isEnabled(db, 'FAIR_START'))) return false;
+  const recent = postedWithinDays === undefined ? '' : `AND p.created_at > now() - make_interval(days => ${Math.floor(postedWithinDays)})`;
   const { rowCount } = await db.query(
     `INSERT INTO fair_start_reels (post_id, author_id, target, ends_at)
      SELECT p.id, p.author_id, $2, now() + make_interval(days => $3)
      FROM posts p JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id
      WHERE p.id = $1 AND p.format = 'reel' AND NOT p.is_echo AND p.visibility = 'public' AND p.community_id IS NULL
-       AND p.status = 'published' AND p.deleted_at IS NULL AND p.moderation_status = 'normal'
+       AND p.status = 'published' AND p.deleted_at IS NULL AND p.moderation_status = 'normal' ${recent}
        AND NOT EXISTS (SELECT 1 FROM post_media pm JOIN media m ON m.id = pm.media_id WHERE pm.post_id = p.id AND m.moderation IN ('sensitive', 'blocked'))
        AND ${accountEligibleSql(spam)}
      ON CONFLICT DO NOTHING`,
     [postId, FAIR_START.target, FAIR_START.days],
   );
   return !!rowCount;
+}
+
+/**
+ * Reels held for review that a moderator just cleared: each gets its fair start now, when it and
+ * its author still may have one and it was posted in the last FAIR_START.clearedWithinDays days.
+ * Its FAIR_START.days start now; one runs at a time, so of several the earliest goes first. Call
+ * after the item's (or account's) risk signals are decided.
+ */
+export async function enrollClearedFairStarts(db: Q, postIds: string[], spam: boolean): Promise<void> {
+  if (!postIds.length) return;
+  const { rows } = await db.query<{ id: string }>(`SELECT id FROM posts WHERE id = ANY($1::uuid[]) AND format = 'reel' ORDER BY created_at`, [postIds]);
+  for (const r of rows) if (await enrollFairStart(db, r.id, spam, FAIR_START.clearedWithinDays)) return;
 }
 
 /**

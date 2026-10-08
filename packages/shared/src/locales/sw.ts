@@ -6922,6 +6922,8 @@ export const sw: Catalog = {
   'mic.empty': 'Bado hakuna reel kwenye mnyororo huu.',
   'mic.unavailable': 'Mnyororo huu haupatikani.',
   'mic.pass.none': 'Ukishakuwa na marafiki hapa, utaweza kuwapitishia maikrofoni.',
+  'mic.pass.followingOnly': 'Unaweza kupitisha maikrofoni kwa watu unaowafuata',
+  'mic.mention': 'Wataje watu unaowafuata kwa @ kwenye maelezo ili kuwapitishia maikrofoni.',
   'mic.playFromStart': 'Cheza tangu mwanzo',
   'mic.notif.link': '{name} amechukua maikrofoni kwenye mnyororo wako',
   'mic.notif.link.others.one': '{name} na mwingine {count} wamechukua maikrofoni kwenye mnyororo wako',

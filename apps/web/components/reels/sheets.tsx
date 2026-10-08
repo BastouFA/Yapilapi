@@ -270,7 +270,7 @@ export function OptionsSheet({
         ) : null}
         {mine && post.format === 'reel' ? <FairStartCard postId={post.id} /> : null}
         <ul className="reel-sheet__list">
-          {mic && link ? <SheetItem icon="send" label={t('mic.pass')} onClick={done(() => mic.pass(post))} /> : null}
+          {mic && link && !link.closed ? <SheetItem icon="send" label={t('mic.pass')} onClick={done(() => mic.pass(post))} /> : null}
           {mic && link?.isStarter ? (
             <SheetItem
               icon={link.closed ? 'mic' : 'mic-off'}

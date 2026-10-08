@@ -6903,6 +6903,8 @@ export const ig: Catalog = {
   'mic.empty': 'Ọ dịbeghị reel n’agbụ a.',
   'mic.unavailable': 'Agbụ a adịghị.',
   'mic.pass.none': 'Mgbe ị nwere ndị enyi ebe a, ị nwere ike inyefe ha igwe okwu.',
+  'mic.pass.followingOnly': 'Ị nwere ike inyefe ndị ị na-eso igwe okwu',
+  'mic.mention': 'Kpọọ aha ndị ị na-eso site na @ n’ime ederede iji nyefee ha igwe okwu.',
   'mic.playFromStart': 'Kpọọ site na mmalite',
   'mic.notif.link': '{name} weere igwe okwu n’agbụ gị',
   'mic.notif.link.others.one': '{name} na mmadụ {count} ọzọ weere igwe okwu n’agbụ gị',

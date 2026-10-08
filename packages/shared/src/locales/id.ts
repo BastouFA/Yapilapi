@@ -6939,6 +6939,8 @@ export const id: Catalog = {
   'mic.empty': 'Belum ada reel di rantai ini.',
   'mic.unavailable': 'Rantai ini tidak tersedia.',
   'mic.pass.none': 'Setelah Anda punya teman di sini, Anda bisa mengoper mikrofon kepada mereka.',
+  'mic.pass.followingOnly': 'Anda bisa mengoper mikrofon ke orang yang Anda ikuti',
+  'mic.mention': 'Sebut orang yang Anda ikuti dengan @ di keterangan untuk mengoper mikrofon kepada mereka.',
   'mic.playFromStart': 'Putar dari awal',
   'mic.notif.link': '{name} mengambil mikrofon di rantai Anda',
   'mic.notif.link.others.one': '{name} dan {count} lainnya mengambil mikrofon di rantai Anda',

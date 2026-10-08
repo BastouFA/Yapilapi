@@ -23,6 +23,7 @@ import { decodeCursor, encodeCursor } from '../lib/cursor.ts';
 import { storePurchasePolicy } from '../lib/store-purchases.ts';
 import { applyMediaDecision } from '../lib/media-moderation.ts';
 import { notifyReleasedPosts } from '../lib/collabs.ts';
+import { enrollClearedFairStarts } from '../lib/fair-start.ts';
 import { syncCommentCounts } from '../lib/comments.ts';
 import { answerCards } from '../lib/ask.ts';
 import { MIX_FROM, mixVisibleSql } from '../lib/mixes.ts';
@@ -291,13 +292,18 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
       // An appeal keeps the first decision (upheld: nothing to change) or reverses it before the new one applies.
       const upheld = appeal && input.decision === original;
       if (appeal && !upheld) await undoDecision(c, mc, original);
+      let heldBefore = false;
       if (isAd) await applyAdDecision(c, mc, input.decision === 'approve_ad', mod.id, input.note ?? null);
       else if (upheld) {
         // The decision stands as it is.
       } else if (mc.target_type === 'media') {
         await applyMediaDecision(c, ctx.realtime, mc, input.decision === 'warn' ? 'no_action' : input.decision);
         if (input.decision === 'suspend_user') await applyDecision(c, mc, input.decision);
-      } else await applyDecision(c, mc, input.decision);
+      } else {
+        const previous = await applyDecision(c, mc, input.decision);
+        // Held as it was posted (the automated check), not hidden later after a report.
+        heldBefore = mc.source === 'automated' && (previous === 'review' || previous === 'restricted');
+      }
       // A post cleared from review goes out now: tell the people invited to co-author it or tagged in it.
       if ((input.decision === 'no_action' || input.decision === 'warn') && mc.target_type === 'post')
         await notifyReleasedPosts(c, ctx.realtime, [mc.target_id]);
@@ -307,6 +313,8 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
           `UPDATE risk_signals SET status = $3, reviewed_by = $4, reviewed_at = now() WHERE target_type = $1 AND target_id = $2 AND status = 'open'`,
           [mc.target_type, mc.target_id, input.decision === 'no_action' ? 'cleared' : 'confirmed', mod.id],
         );
+      // A reel held for review and cleared gets the fair start it would have had (lib/fair-start.ts).
+      if (heldBefore && input.decision === 'no_action' && mc.target_type === 'post') await enrollClearedFairStarts(c, [mc.target_id], ctx.config.SPAM_CHECKS);
       await c.query(`UPDATE moderation_cases SET status = $2, decision = $3, reviewer_id = $4, note = $5, decided_at = now() WHERE id = $1`, [
         id,
         appeal ? 'final' : 'decided',
@@ -445,7 +453,8 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
     c: { query: typeof db.query },
     mc: { target_type: string; target_id: string; subject_user_id: string | null },
     decision: string,
-  ) {
+  ): Promise<string | undefined> {
+    let previous: string | undefined; // what a released item was before (returned): 'review' when it was held
     // A question and its answer are one row: a decision on either applies to the card.
     // A restricted mix is seen by its owner alone; a removed one by nobody. So is a Market listing (one
     // held for review shows once cleared), a held Market rating and a story.
@@ -457,6 +466,7 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
         `WITH old AS (SELECT moderation_status FROM ${t} WHERE id = $1) UPDATE ${t} SET moderation_status = 'normal' WHERE id = $1 RETURNING (SELECT moderation_status FROM old) AS before`,
         [mc.target_id],
       );
+      previous = before.rows[0]?.before;
       // A question held when it was asked reaches the person asked, and a held answer its asker, once a moderator lets it
       // through. One hidden after a report was already seen: nobody is told again.
       if ((mc.target_type === 'question' || mc.target_type === 'answer') && before.rows[0]?.before === 'review')
@@ -499,6 +509,7 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
       await c.query(`UPDATE users SET status = 'suspended' WHERE id = $1 AND role = 'user'`, [mc.subject_user_id]);
       await c.query(`UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL`, [mc.subject_user_id]);
     }
+    return previous;
   }
 
   /** Tell the person a released question or answer was meant for. A question without a name has no actor. */
@@ -723,11 +734,23 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
       const decision = input.action === 'clear' ? 'no_action' : 'remove';
       if (input.action === 'clear') {
         await c.query(`UPDATE users SET restricted_at = NULL WHERE id = $1`, [id]);
-        await c.query(`UPDATE posts SET moderation_status = 'normal' WHERE id = ANY($1::uuid[]) AND moderation_status = 'review'`, [flaggedPosts]);
+        const cleared = await c.query<{ id: string }>(
+          `UPDATE posts SET moderation_status = 'normal' WHERE id = ANY($1::uuid[]) AND moderation_status = 'review' RETURNING id`,
+          [flaggedPosts],
+        );
         // Posts made while the account was limited were only visible to their author.
-        await c.query(`UPDATE posts SET moderation_status = 'normal' WHERE id = ANY($1::uuid[]) AND moderation_status = 'restricted'`, [heldPosts]);
+        const released = await c.query<{ id: string }>(
+          `UPDATE posts SET moderation_status = 'normal' WHERE id = ANY($1::uuid[]) AND moderation_status = 'restricted' RETURNING id`,
+          [heldPosts],
+        );
         await releaseMessages(c, flaggedMessages);
         await notifyReleasedPosts(c, ctx.realtime, [...flaggedPosts, ...heldPosts]);
+        // Held reels get the fair start they would have had (the account's signals were cleared above).
+        await enrollClearedFairStarts(
+          c,
+          [...cleared.rows, ...released.rows].map((r) => r.id),
+          ctx.config.SPAM_CHECKS,
+        );
       } else {
         await c.query(`UPDATE users SET restricted_at = coalesce(restricted_at, now()) WHERE id = $1 AND role = 'user'`, [id]);
         await c.query(`UPDATE posts SET moderation_status = 'removed' WHERE id = ANY($1::uuid[]) AND moderation_status IN ('review', 'restricted')`, [

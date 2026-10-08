@@ -654,7 +654,14 @@ Two reasons to make reels (docs/product/pass-the-mic.md has every rule and numbe
 - **Fair start**: a confirmed adult creator's first 3 reels, then one a week under 1,000 followers, one at a time, are shown to up to 1,000 real people through one slot in 9 of For you and Reels, chosen by fit (topics, the languages the viewer understands or reads translated, country, need), never twice to anyone. Slowed (down to a 200-person minimum) when early viewers mostly skip or it's reported, stopped when taken down, finished at its target or after 7 days with one notification and a report on the reel's stats (phone Insights; web the reel's options and page): "1,000 people saw your reel · 630 watched to the end · 24 shared · 12 followed you", with a progress bar while it runs. Anti-abuse: limited, risky and unconfirmed accounts get none, and with spam checks on accounts from one sign-up address have at most 2 running.
 - **Admin**: chain and fair-start counts under Feature flags. **Your data**: chains, links, passes and fair starts are in the download.
 
-**Not done:** a reel cleared from review later gets no fair start; language weighs in the fit but is not a filter; passing the mic by @mention in a caption.
+Gaps closed the same day: an @mention in a chain reel's caption passes the mic (the picker's rules and limits, one notice
+each, not on later edits); a reel held for review gets its fair start when a moderator clears it within 3 days of posting (its 7
+days start then); someone who turned off "Translate automatically" gets no fair-start reels in a language they don't understand.
+On the web, the pass-the-mic picker only takes people you follow or are friends with (others say why), "Pass the mic" is gone from
+closed chains, and the composer says an @mention passes the mic.
+
+**Not done:** the phone's pass-the-mic picker lists friends only (people you follow can be passed it too) and its composer doesn't
+say an @mention passes the mic; a held chain reel that's cleared doesn't tell the starter or the people it mentions.
 
 ## Dutch (2026-10-08, no migration, `packages/shared/src/i18n.test.ts`, `apps/api/test/error-translations.test.ts`)
 

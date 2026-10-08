@@ -712,7 +712,7 @@ function Create() {
               <div className="mic-join__text">
                 <strong dir="auto">{t('mic.joining', { prompt: chain.prompt })}</strong>
                 <span className="muted">{t('mic.startedBy', { name: chain.starter.displayName })}</span>
-                {chain.closed ? <span className="muted">{t('mic.closed')}</span> : null}
+                {chain.closed ? <span className="muted">{t('mic.closed')}</span> : <span className="muted">{t('mic.mention')}</span>}
               </div>
               <Link href={takeMicHref(chain.id, params.get('sound'), '/camera')} className="yp-btn yp-btn--secondary yp-btn--sm">
                 {t('m.create.openCamera')}
@@ -1175,7 +1175,9 @@ function Create() {
                     placeholder={t('mic.prompt.placeholder')}
                     value={chainPrompt}
                     maxLength={CHAIN_RULES.promptMax}
+                    required
                     dir="auto"
+                    hint={t('mic.mention')}
                     error={fields.chainPrompt}
                     onChange={(e) => setChainPrompt(e.currentTarget.value)}
                   />

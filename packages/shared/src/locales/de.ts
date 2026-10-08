@@ -6946,6 +6946,8 @@ export const de: Catalog = {
   'mic.empty': 'Noch keine Reels in dieser Kette.',
   'mic.unavailable': 'Diese Kette ist nicht verfügbar.',
   'mic.pass.none': 'Sobald du hier Freunde hast, kannst du ihnen das Mikro weitergeben.',
+  'mic.pass.followingOnly': 'Du kannst das Mikro an Leute weitergeben, denen du folgst',
+  'mic.mention': 'Erwähne Leute, denen du folgst, mit @ in der Bildunterschrift, um ihnen das Mikro weiterzugeben.',
   'mic.playFromStart': 'Von Anfang an abspielen',
   'mic.notif.link': '{name} hat in deiner Kette das Mikro übernommen',
   'mic.notif.link.others.one': '{name} und {count} weitere Person haben in deiner Kette das Mikro übernommen',

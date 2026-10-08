@@ -6933,6 +6933,8 @@ export const it: Catalog = {
   'mic.empty': 'Ancora nessun reel in questa catena.',
   'mic.unavailable': 'Questa catena non è disponibile.',
   'mic.pass.none': 'Quando avrai degli amici qui, potrai passare loro il microfono.',
+  'mic.pass.followingOnly': 'Puoi passare il microfono alle persone che segui',
+  'mic.mention': 'Menziona con @ nella didascalia le persone che segui per passare loro il microfono.',
   'mic.playFromStart': 'Riproduci dall’inizio',
   'mic.notif.link': '{name} ha preso il microfono nella tua catena',
   'mic.notif.link.others.one': '{name} e {count} altra persona hanno preso il microfono nella tua catena',

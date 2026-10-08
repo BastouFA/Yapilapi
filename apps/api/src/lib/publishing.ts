@@ -32,7 +32,7 @@ import { topicsFor } from '../modules/tags.ts';
 import { langOf } from './translation.ts';
 import type { PreparedMusic } from './music/index.ts';
 import { claimEcho, linkEcho } from './echoes.ts';
-import { announceChainLink, joinChain, startChain, type ChainJoined } from './chains.ts';
+import { announceChainLink, joinChain, passTheMicByMention, startChain, type ChainJoined } from './chains.ts';
 import { enrollFairStart } from './fair-start.ts';
 import { isEnabled } from './services.ts';
 
@@ -460,8 +460,13 @@ export async function announcePost(
   if (p.kind === 'video') await enrollFairStart(db, p.postId, deps.config.SPAM_CHECKS);
   // Pass the Mic: the chain's starter, and the reel before's author, hear someone took the mic.
   if (p.chain) await announceChainLink(db, realtime, { ...p.chain, postId: p.postId, authorId: p.authorId });
+  // People @mentioned in a chain reel's caption are passed the mic, and hear about that instead of the mention.
+  const passed =
+    p.kind === 'video' && (await isEnabled(db, 'PASS_THE_MIC'))
+      ? await passTheMicByMention(db, realtime, { postId: p.postId, authorId: p.authorId, text: p.body })
+      : [];
   // Mentions in the text (posts and reel captions alike), photo tags and co-author invites.
-  await notifyMentions(db, realtime, { text: p.body, actorId: p.authorId, postId: p.postId, skip: [...p.taggedIds, ...p.collaborators] });
+  await notifyMentions(db, realtime, { text: p.body, actorId: p.authorId, postId: p.postId, skip: [...p.taggedIds, ...p.collaborators, ...passed] });
   await notifyPhotoTags(db, realtime, { postId: p.postId, actorId: p.authorId, userIds: p.taggedIds });
   await notifyCollabInvites(db, realtime, { postId: p.postId, actorId: p.authorId, userIds: p.collaborators });
   // Tell the original's creator about a duet or remix, when they can see it.

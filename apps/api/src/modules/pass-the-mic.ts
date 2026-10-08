@@ -4,13 +4,12 @@ import { tx } from '@yapilapi/database';
 import { CHAIN_RULES, chainEditSchema, chainPassSchema, chainStartSchema } from '@yapilapi/shared';
 import type { AppContext } from '../lib/context.ts';
 import { AppError, featureDisabled, notFound, parse } from '../lib/errors.ts';
-import { assertPromptOk, assertStarter, chainBlockSql, chainSeenSql, chainsById, liveLinkSql, startChain, visibleLinkSql } from '../lib/chains.ts';
+import { assertPromptOk, assertStarter, chainSeenSql, chainsById, liveLinkSql, passTheMic, startChain, visibleLinkSql } from '../lib/chains.ts';
 import { fairStartOf, fairStartOffered } from '../lib/fair-start.ts';
-import { byOrWithSql, minorRuleSql } from '../lib/collabs.ts';
+import { byOrWithSql } from '../lib/collabs.ts';
 import { hydratePosts } from '../lib/posts.ts';
 import { seesSensitiveMedia } from '../lib/interactions.ts';
-import { audit, isEnabled, notify } from '../lib/services.ts';
-import { notBlockedSql } from '../lib/visibility.ts';
+import { audit, isEnabled } from '../lib/services.ts';
 import { me, requireAuth, requireRole } from '../plugins/auth.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
@@ -154,7 +153,8 @@ export default async function passTheMicModule(app: FastifyInstance, ctx: AppCon
   /**
    * Pass the mic: invite people you follow or are friends with to add the next reel. Each is told
    * once per chain, and only when they may take the mic (they see the chain, the starter allows
-   * them, minor protection); others are skipped without saying why.
+   * them, minor protection); others are skipped without saying why. An @mention in a chain reel's
+   * caption passes it too (lib/chains.ts passTheMicByMention), within the same limits.
    */
   app.post('/v1/chains/:id/pass', { preHandler: requireAuth, config: { rateLimit: { max: 30, timeWindow: '1 hour' } } }, async (req) => {
     await on();
@@ -166,29 +166,8 @@ export default async function passTheMicModule(app: FastifyInstance, ctx: AppCon
       .n;
     const max = CHAIN_RULES.passesPerChain;
     if (sent + userIds.length > max) throw new AppError(429, 'chain_limit', `You can pass the mic on one chain to up to ${max} people.`);
-    const { rows } = await db.query<{ id: string }>(
-      `SELECT t.id FROM users t CROSS JOIN reel_chains ch
-       WHERE ch.id = $2 AND t.id = ANY($3::uuid[]) AND t.id <> $1 AND t.status = 'active'
-         AND (EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = t.id)
-              OR EXISTS (SELECT 1 FROM friendships fr WHERE (fr.user_a = $1 AND fr.user_b = t.id) OR (fr.user_b = $1 AND fr.user_a = t.id)))
-         AND ${notBlockedSql('t.id', '$1')} AND ${minorRuleSql('$1', 't.id')}
-         AND ${chainSeenSql('t.id')} AND ${chainBlockSql('t.id')} IS NULL
-         AND NOT EXISTS (SELECT 1 FROM reel_chain_passes x WHERE x.chain_id = ch.id AND x.from_id = $1 AND x.to_id = t.id)`,
-      [u.id, id, userIds],
-    );
-    for (const r of rows) {
-      await db.query(`INSERT INTO reel_chain_passes (chain_id, from_id, to_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, [id, u.id, r.id]);
-      await notify(db, ctx.realtime, {
-        userId: r.id,
-        category: 'creators',
-        type: 'chain_pass',
-        actorId: u.id,
-        entityType: 'chain',
-        entityId: id,
-        data: { chainId: id, prompt: chain.prompt },
-      });
-    }
-    return { passed: rows.length };
+    const passed = await passTheMic(db, ctx.realtime, { chainId: id, fromId: u.id, userIds, prompt: chain.prompt });
+    return { passed: passed.length };
   });
 
   // ── Fair start ────────────────────────────────────────────────────────

@@ -223,12 +223,13 @@ export function PassMicSheet({ chainId, onClose }: { chainId: string | null; onC
   return (
     <BottomSheet open onClose={onClose} title={t('mic.pass')}>
       <div className="reel-sheet">
-        {/* The server skips anyone who can't take the mic, without saying who: the count tells how many it reached. */}
+        {/* Only people you follow or are friends with. The server also skips anyone who can't take the mic, without
+            saying who: the count tells how many it reached. */}
         <PeoplePicker
-          label={t('mic.pass')}
           hint={t('mic.pass.hint')}
           max={CHAIN_RULES.passesAtOnce}
-          canPick={() => true}
+          canPick={(s) => s.relation !== null}
+          unavailable={t('mic.pass.followingOnly')}
           picked={people}
           onChange={setPeople}
         />

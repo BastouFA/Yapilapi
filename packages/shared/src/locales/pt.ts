@@ -6919,6 +6919,8 @@ export const pt: Catalog = {
   'mic.empty': 'Ainda não há reels nesta corrente.',
   'mic.unavailable': 'Esta corrente não está disponível.',
   'mic.pass.none': 'Quando você tiver amigos aqui, poderá passar o microfone para eles.',
+  'mic.pass.followingOnly': 'Você pode passar o microfone para pessoas que você segue',
+  'mic.mention': 'Mencione com @ na legenda pessoas que você segue para passar o microfone para elas.',
   'mic.playFromStart': 'Ver desde o início',
   'mic.notif.link': '{name} pegou o microfone na sua corrente',
   'mic.notif.link.others.one': '{name} e mais {count} pessoa pegaram o microfone na sua corrente',

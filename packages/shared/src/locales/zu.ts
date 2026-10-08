@@ -6946,6 +6946,8 @@ export const zu: Catalog = {
   'mic.empty': 'Awekho ama-reel kulolu chungechunge okwamanje.',
   'mic.unavailable': 'Lolu chungechunge alutholakali.',
   'mic.pass.none': 'Uma unabangane lapha, ungabadlulisela imakrofoni.',
+  'mic.pass.followingOnly': 'Ungadlulisela imakrofoni kubantu obalandelayo',
+  'mic.mention': 'Bale ngo-@ embhalweni ongaphansi abantu obalandelayo ukuze ubadlulisele imakrofoni.',
   'mic.playFromStart': 'Dlala kusukela ekuqaleni',
   'mic.notif.link': 'U-{name} uthathe imakrofoni ochungechungeni lwakho',
   'mic.notif.link.others.one': 'U-{name} nomunye ongu-{count} bathathe imakrofoni ochungechungeni lwakho',

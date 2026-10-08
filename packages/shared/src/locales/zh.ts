@@ -6846,6 +6846,8 @@ export const zh: Catalog = {
   'mic.empty': '这个接力里还没有短视频。',
   'mic.unavailable': '这个接力无法查看。',
   'mic.pass.none': '在这里有了好友后，就可以把麦传给他们。',
+  'mic.pass.followingOnly': '你可以把麦传给你关注的人',
+  'mic.mention': '在配文里用 @ 提及你关注的人，就能把麦传给他们。',
   'mic.playFromStart': '从头播放',
   'mic.notif.link': '{name} 在你的接力中接了麦',
   'mic.notif.link.others.one': '{name} 和另外 {count} 人在你的接力中接了麦',

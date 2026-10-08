@@ -6885,6 +6885,8 @@ export const ja: Catalog = {
   'mic.empty': 'このリレーにはまだリールがありません。',
   'mic.unavailable': 'このリレーは表示できません。',
   'mic.pass.none': 'ここで友達ができたら、マイクを渡せます。',
+  'mic.pass.followingOnly': 'マイクを渡せるのはフォローしている人です',
+  'mic.mention': 'キャプションでフォローしている人を@でメンションすると、マイクを渡せます。',
   'mic.playFromStart': '最初から再生',
   'mic.notif.link': '{name}さんがあなたのリレーでマイクを受け取りました',
   'mic.notif.link.others.one': '{name}さん他{count}人があなたのリレーでマイクを受け取りました',

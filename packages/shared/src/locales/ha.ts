@@ -6925,6 +6925,8 @@ export const ha: Catalog = {
   'mic.empty': 'Babu reel a wannan sarƙar tukuna.',
   'mic.unavailable': 'Wannan sarƙar ba ta samuwa.',
   'mic.pass.none': 'Idan kana da abokai a nan, za ka iya mika musu makirufo.',
+  'mic.pass.followingOnly': 'Za ka iya mika makirufo ga mutanen da kake bi',
+  'mic.mention': 'Ambaci mutanen da kake bi da @ a cikin taken don mika musu makirufo.',
   'mic.playFromStart': 'Kalla daga farko',
   'mic.notif.link': '{name} ya karɓi makirufo a sarƙarka',
   'mic.notif.link.others.one': '{name} da wani {count} sun karɓi makirufo a sarƙarka',

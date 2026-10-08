@@ -1,9 +1,10 @@
 import type { Pool, PoolClient } from 'pg';
-import { CHAIN_RULES, type Chain, type ChainBlock, type ChainJoin, type ChainRef, type MediaItem } from '@yapilapi/shared';
+import { CHAIN_RULES, extractMentions, type Chain, type ChainBlock, type ChainJoin, type ChainRef, type MediaItem } from '@yapilapi/shared';
 import { AppError, badRequest, forbidden, notFound } from './errors.ts';
 import { minorRuleSql } from './collabs.ts';
+import { mentionAllowedSql } from './interactions.ts';
 import { notBlockedSql, postVisibleSql } from './visibility.ts';
-import { plusCol, publicUserFrom } from './users.ts';
+import { plusCol, publicUserFrom, usernameInListSql } from './users.ts';
 import { mediaSizesSql, withSmallVariants } from './data-saver.ts';
 import { soundUsableSql } from './sounds.ts';
 import { notify } from './services.ts';
@@ -186,6 +187,95 @@ export async function announceChainLink(db: Q, realtime: RealtimeHub, j: ChainJo
       group: j.chainId,
     });
   }
+}
+
+/**
+ * Person `t` (users) may be passed the mic on chain `ch` by `from`: someone `from` follows or is
+ * friends with, active, not blocked either way, across the minor line only as friends, who may
+ * take the mic (they see the chain, the starter allows them). passedSql: `from` passed it to them already.
+ */
+const passableSql = (from: string, t = 't', ch = 'ch') =>
+  `(${t}.id <> ${from} AND ${t}.status = 'active'
+    AND (EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = ${from} AND f.followee_id = ${t}.id)
+         OR EXISTS (SELECT 1 FROM friendships fr WHERE (fr.user_a = ${from} AND fr.user_b = ${t}.id) OR (fr.user_b = ${from} AND fr.user_a = ${t}.id)))
+    AND ${notBlockedSql(`${t}.id`, from)} AND ${minorRuleSql(from, `${t}.id`)}
+    AND ${chainSeenSql(`${t}.id`, ch)} AND ${chainBlockSql(`${t}.id`, ch)} IS NULL)`;
+const passedSql = (from: string, t = 't', ch = 'ch') =>
+  `EXISTS (SELECT 1 FROM reel_chain_passes x WHERE x.chain_id = ${ch}.id AND x.from_id = ${from} AND x.to_id = ${t}.id)`;
+
+/** Record the passes and tell each person once ("Ada passed you the mic: …"). Returns who was passed it. */
+async function sendPasses(db: Q, realtime: RealtimeHub, chainId: string, fromId: string, prompt: string, toIds: string[]): Promise<string[]> {
+  const passed: string[] = [];
+  for (const to of toIds) {
+    const r = await db.query(`INSERT INTO reel_chain_passes (chain_id, from_id, to_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, [chainId, fromId, to]);
+    if (!r.rowCount) continue;
+    passed.push(to);
+    await notify(db, realtime, {
+      userId: to,
+      category: 'creators',
+      type: 'chain_pass',
+      actorId: fromId,
+      entityType: 'chain',
+      entityId: chainId,
+      data: { chainId, prompt },
+    });
+  }
+  return passed;
+}
+
+/**
+ * Pass the mic on a chain `fromId` sees to some of `userIds` (the picker): only the ones who may be
+ * passed it (passableSql); others are skipped without saying why. The caller checks the limits.
+ */
+export async function passTheMic(db: Q, realtime: RealtimeHub, p: { chainId: string; fromId: string; userIds: string[]; prompt: string }): Promise<string[]> {
+  const { rows } = await db.query<{ id: string }>(
+    `SELECT t.id FROM users t CROSS JOIN reel_chains ch WHERE ch.id = $2 AND t.id = ANY($3::uuid[]) AND ${passableSql('$1')} AND NOT ${passedSql('$1')}`,
+    [p.fromId, p.chainId, p.userIds],
+  );
+  return sendPasses(
+    db,
+    realtime,
+    p.chainId,
+    p.fromId,
+    p.prompt,
+    rows.map((r) => r.id),
+  );
+}
+
+/**
+ * People @mentioned in a chain reel's caption, as it's posted, are passed the mic: the picker's
+ * rules (and their mention setting), the first CHAIN_RULES.passesAtOnce of them in the caption's
+ * order, within CHAIN_RULES.passesPerChain for the chain. Returns who holds the mic from the
+ * author now (just passed, or earlier with the picker): they hear about the chain once, instead of
+ * the mention. Editing the caption never passes it again.
+ */
+export async function passTheMicByMention(db: Q, realtime: RealtimeHub, m: { postId: string; authorId: string; text: string }): Promise<string[]> {
+  const names = extractMentions(m.text);
+  if (!names.length) return [];
+  const { rows: chains } = await db.query<{ id: string; prompt: string; sent: number }>(
+    `SELECT ch.id, ch.prompt, (SELECT count(*) FROM reel_chain_passes x WHERE x.chain_id = ch.id AND x.from_id = $2)::int AS sent
+     FROM reel_chain_links l JOIN reel_chains ch ON ch.id = l.chain_id WHERE l.post_id = $1 AND ${chainSeenSql('$2')}`,
+    [m.postId, m.authorId],
+  );
+  const ch = chains[0];
+  if (!ch) return [];
+  const { rows } = await db.query<{ id: string; passed: boolean }>(
+    `SELECT t.id, ${passedSql('$1')} AS passed FROM profiles pr JOIN users t ON t.id = pr.user_id CROSS JOIN reel_chains ch
+     WHERE ch.id = $2 AND ${usernameInListSql('pr', '$3::text[]')} AND ${passableSql('$1')} AND ${mentionAllowedSql('$1', 't.id')}
+     ORDER BY coalesce(array_position($3::text[], lower(pr.username)), 99), t.id`,
+    [m.authorId, ch.id, names],
+  );
+  const room = Math.max(0, Math.min(CHAIN_RULES.passesAtOnce, CHAIN_RULES.passesPerChain - ch.sent));
+  const fresh = rows.filter((r) => !r.passed).slice(0, room);
+  const passed = await sendPasses(
+    db,
+    realtime,
+    ch.id,
+    m.authorId,
+    ch.prompt,
+    fresh.map((r) => r.id),
+  );
+  return [...rows.filter((r) => r.passed).map((r) => r.id), ...passed];
 }
 
 /** Chains on reels (Post.chain) for a viewer, by post id: only chains the viewer can see. */

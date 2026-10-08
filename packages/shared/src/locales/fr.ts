@@ -6950,6 +6950,8 @@ export const fr: Catalog = {
   'mic.empty': 'Pas encore de reel dans cette chaîne.',
   'mic.unavailable': 'Cette chaîne n’est pas disponible.',
   'mic.pass.none': 'Quand tu auras des amis ici, tu pourras leur passer le micro.',
+  'mic.pass.followingOnly': 'Tu peux passer le micro aux personnes que tu suis',
+  'mic.mention': 'Mentionne avec @ dans la légende des personnes que tu suis pour leur passer le micro.',
   'mic.playFromStart': 'Regarder depuis le début',
   'mic.notif.link': '{name} a pris le micro sur ta chaîne',
   'mic.notif.link.others.one': '{name} et {count} autre personne ont pris le micro sur ta chaîne',

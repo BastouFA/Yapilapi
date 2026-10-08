@@ -6902,6 +6902,8 @@ export const en = {
   'mic.empty': 'No reels in this chain yet.',
   'mic.unavailable': 'This chain isn’t available.',
   'mic.pass.none': 'Once you have friends here, you can pass them the mic.',
+  'mic.pass.followingOnly': 'You can pass the mic to people you follow',
+  'mic.mention': 'Mention people you follow with @ in the caption to pass them the mic.',
   'mic.playFromStart': 'Play from the start',
   'mic.notif.link': '{name} took the mic on your chain',
   'mic.notif.link.others.one': '{name} and {count} other took the mic on your chain',

@@ -442,6 +442,8 @@ export const FAIR_START = {
   target: 1000,
   /** It stops after this many days, whatever it reached. */
   days: 7,
+  /** A reel held for review gets one when a moderator clears it within this many days of its posting (its `days` start then). */
+  clearedWithinDays: 3,
   /** One slot in `slotEvery` of For you and Reels goes to a fair-start reel, the first at `firstSlot` (0-based). */
   slotEvery: 9,
   firstSlot: 3,

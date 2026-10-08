@@ -245,6 +245,57 @@ describe('Pass the Mic: chains', () => {
     expect((await as(t.app, ada).post(`/v1/chains/${chainId}/pass`, { userIds: more.map((m) => m.id) })).status).toBe(429);
   });
 
+  it('passes the mic to people @mentioned in a chain reel’s caption, with the picker’s rules and limits, once', async () => {
+    const ada = await adult();
+    const friend = await adult();
+    const picked = await adult();
+    const stranger = await adult();
+    const blocker = await adult();
+    const many = await Promise.all(Array.from({ length: 9 }, () => adult()));
+    for (const u of [friend, picked, blocker, ...many]) await as(t.app, ada).post(`/v1/users/${u.id}/follow`);
+    await as(t.app, blocker).post(`/v1/users/${ada.id}/block`);
+    const at = (us: TestUser[]) => us.map((u) => `@${u.username}`).join(' ');
+    const passes = async () => Number((await db().query(`SELECT count(*) FROM reel_chain_passes WHERE from_id = $1`, [ada.id])).rows[0].count);
+
+    // A reel that isn't in a chain: only a mention.
+    await reel(ada, { body: `With ${at([friend])}` });
+    expect(await notes(friend, 'chain_pass')).toHaveLength(0);
+    expect(await notes(friend, 'post_mention')).toHaveLength(1);
+
+    // Only people you follow or are friends with who may take the mic; the others get the usual mention (or nothing).
+    const { chainId, postId } = await startChain(ada, { body: `Your turn ${at([friend, stranger, blocker])}` });
+    const got = await notes(friend, 'chain_pass');
+    expect(got).toHaveLength(1);
+    expect(got[0]).toMatchObject({ entityType: 'chain', entityId: chainId, data: { chainId, prompt: 'Show your city’s best street food' } });
+    // Told once: about the chain, instead of the mention.
+    expect(await notes(friend, 'post_mention')).toHaveLength(1);
+    expect(await notes(stranger, 'chain_pass')).toHaveLength(0);
+    expect(await notes(stranger, 'post_mention')).toHaveLength(1);
+    expect(await notes(blocker, 'chain_pass')).toHaveLength(0);
+    expect(await passes()).toBe(1);
+
+    // Editing the caption later doesn't pass it.
+    expect((await as(t.app, ada).patch(`/v1/posts/${postId}`, { body: `Your turn ${at([friend, picked])}` })).status).toBe(200);
+    expect(await notes(picked, 'chain_pass')).toHaveLength(0);
+    expect(await passes()).toBe(1);
+
+    // Picked, then mentioned: no second notice. At most CHAIN_RULES.passesAtOnce at a time, in the caption's order.
+    expect((await as(t.app, ada).post(`/v1/chains/${chainId}/pass`, { userIds: [picked.id] })).body).toEqual({ passed: 1 });
+    expect((await join(ada, chainId, { body: `Next ${at([picked, friend, ...many.slice(0, 6)])}` })).status).toBe(201);
+    expect(await notes(picked, 'chain_pass')).toHaveLength(1);
+    expect(await notes(friend, 'chain_pass')).toHaveLength(1);
+    expect(await passes()).toBe(2 + CHAIN_RULES.passesAtOnce);
+    for (const u of many.slice(0, CHAIN_RULES.passesAtOnce)) expect(await notes(u, 'chain_pass')).toHaveLength(1);
+    expect(await notes(many[5]!, 'chain_pass')).toHaveLength(0);
+    expect(await notes(many[5]!, 'post_mention')).toHaveLength(1);
+
+    // And CHAIN_RULES.passesPerChain in all.
+    expect((await join(ada, chainId, { body: `Last ${at(many.slice(5))}` })).status).toBe(201);
+    expect(await passes()).toBe(CHAIN_RULES.passesPerChain);
+    expect(await notes(many[8]!, 'chain_pass')).toHaveLength(0);
+    expect((await as(t.app, ada).post(`/v1/chains/${chainId}/pass`, { userIds: [many[8]!.id] })).status).toBe(429);
+  });
+
   it('shows active chains in Wander, and turns off with its flag', async () => {
     const ada = await adult();
     const viewer = await adult();
@@ -415,6 +466,67 @@ describe('Fair start', () => {
     const unread = await fit({ understood: ['en'], translated: false });
     expect(reads - translated).toBeCloseTo(1);
     expect(translated - unread).toBeCloseTo(1);
+  });
+
+  it('leaves out reels in a language the viewer doesn’t understand once they turned off "Translate automatically"', async () => {
+    const ada = await creator();
+    const viewer = await adult();
+    const r = await reel(ada, { body: 'Ẹ káàbọ̀' });
+    await db().query(`UPDATE posts SET lang = 'yo' WHERE id = $1`, [r.id]);
+    const picked = async (understood: string[], translated: boolean) =>
+      (
+        await fairStartPicks(db(), {
+          userId: viewer.id,
+          asOf: new Date().toISOString(),
+          surface: 'reels',
+          personalized: true,
+          personal: '',
+          sensitiveOk: true,
+          reader: { understood, translated },
+        })
+      ).some((p) => p.id === r.id);
+    expect(await picked(['en'], true)).toBe(true);
+    expect((await as(t.app, viewer).put('/v1/me/translation', { languages: [], auto: false })).status).toBe(200);
+    expect(await picked(['en'], false)).toBe(false);
+    // A language they added still reaches them.
+    expect(await picked(['en', 'yo'], false)).toBe(true);
+    await as(t.app, viewer).put('/v1/me/translation', { languages: [], auto: true });
+    expect(await picked(['en'], true)).toBe(true);
+  });
+
+  it('gives a reel held for review its fair start when a moderator clears it soon after', async () => {
+    const mod = await adult();
+    await db().query(`UPDATE users SET role = 'moderator' WHERE id = $1`, [mod.id]);
+    const ada = await creator();
+    const held = await reel(ada, { body: 'DM me for prices on my street food' });
+    expect((await db().query(`SELECT moderation_status FROM posts WHERE id = $1`, [held.id])).rows[0].moderation_status).toBe('review');
+    expect(await fair(held.id)).toBeUndefined();
+    const caseOf = async (postId: string) => (await db().query(`SELECT id FROM moderation_cases WHERE target_id = $1`, [postId])).rows[0].id as string;
+    const decide = async (postId: string, decision: string) =>
+      expect((await as(t.app, mod).post(`/v1/admin/moderation/cases/${await caseOf(postId)}/decide`, { decision })).status).toBe(200);
+    // Cleared: it starts now, with its whole time ahead.
+    await db().query(`UPDATE posts SET created_at = now() - interval '2 days' WHERE id = $1`, [held.id]);
+    await decide(held.id, 'no_action');
+    const f = await fair(held.id);
+    expect(f).toMatchObject({ status: 'active', reached: 0 });
+    expect(f.ends_at.getTime() - Date.now()).toBeGreaterThan((FAIR_START.days - 0.1) * 86_400_000);
+    await db().query(`UPDATE fair_start_reels SET status = 'done' WHERE post_id = $1`, [held.id]);
+
+    // Cleared too late, or only with a warning: none.
+    const late = await reel(ada, { body: 'DM me for prices on my jollof' });
+    await db().query(`UPDATE posts SET created_at = now() - make_interval(days => $2) WHERE id = $1`, [late.id, FAIR_START.clearedWithinDays + 1]);
+    await decide(late.id, 'no_action');
+    expect(await fair(late.id)).toBeUndefined();
+    const warned = await reel(ada, { body: 'DM me for prices on my puff puff' });
+    await decide(warned.id, 'warn');
+    expect(await fair(warned.id)).toBeUndefined();
+    // A reel that was out and later reported doesn't get one by being cleared.
+    const bola = await creator();
+    const out = await reel(bola);
+    await db().query(`DELETE FROM fair_start_reels WHERE post_id = $1`, [out.id]);
+    expect((await as(t.app, ada).post('/v1/reports', { targetType: 'post', targetId: out.id, reason: 'spam' })).status).toBe(201);
+    await decide(out.id, 'no_action');
+    expect(await fair(out.id)).toBeUndefined();
   });
 
   it('counts each real person once: not the creator, not blocked or limited accounts', async () => {

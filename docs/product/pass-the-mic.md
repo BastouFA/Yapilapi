@@ -68,7 +68,14 @@ when nobody did, the bar leaves them out.
 - Only people who can see the new reel are told, and a reel held for review tells nobody.
 - **Pass the mic**: anyone who can see the chain can pass the mic to people they follow or are friends with (up to 5 at a time and
   10 per chain): "Ada passed you the mic: Show your city's best street food". Only people who may take the mic are told (not blocked,
-  allowed by the starter, minor protection), once per person per chain; others are skipped without saying why.
+  allowed by the starter, minor protection), once per person per chain; others are skipped without saying why. The web picker only
+  offers people you follow or are friends with (others show "You can pass the mic to people you follow").
+- **@mention passes the mic**: when a chain reel (the starter's or a later one) goes out, people @mentioned in its caption are passed
+  the mic by its author, with the same rules and limits, and their mention setting: the first 5 in the caption's order who may be
+  passed it, within the author's 10 for that chain. They get the "passed you the mic" notification instead of the mention one, once:
+  someone already passed it (with the picker or an earlier reel) isn't told again. Editing the caption later passes nothing, and a
+  reel held for review passes nothing. The composer says so when starting or joining a chain ("Mention people you follow with @ in
+  the caption to pass them the mic.").
 
 All are in the Creators category (Settings, Notifications).
 
@@ -85,6 +92,9 @@ All are in the Creators category (Settings, Notifications).
 - The first **3** reels of an account that can have one (`firstReels`), then **1 every 7 days** (`everyDays`) while it has fewer
   than **1,000** followers (`underFollowers`). One runs at a time: a reel posted while another runs doesn't get one (it doesn't wait).
 - The reel: public, not in a community, not an echo, not held, not marked sensitive.
+- A reel held for review as it was posted gets its fair start when a moderator clears it (no action, or clearing the account's
+  review), if it and its account still may have one and it was posted in the last **3** days (`clearedWithinDays`). Its 7 days
+  start then. Cleared with a warning, cleared later, or hidden only after a report: none.
 - The account: public, 18 or older, with a confirmed email or phone (the app's trust gate), not limited or suspended, and without
   open risk flags that make it a risky account (`SPAM_RULES.riskyAccountScore`). With spam checks on, accounts made from the same
   address (their sign-up) have at most **2** fair starts running at once (`perSignupAddress`): accounts made to farm reach get little.
@@ -97,7 +107,8 @@ The composer says "We'll show it to up to 1,000 people." when the next reel woul
 One slot in **9** of For you and Reels (`slotEvery`), from the 4th (`firstSlot`), goes to the fair-start reel that suits the viewer
 best: topics they picked or engage with, the languages they understand (their app language and the ones they added in Settings,
 Language), their country, and how far each reel still is from its target. A reel in a language they don't understand still fits
-when it reaches them translated ("Translate automatically" on); with that off, it's a weaker fit. Never the viewer's own, never
+when it reaches them translated ("Translate automatically" on, and translation set up); when it isn't set up, it's a weaker fit; and
+someone who turned "Translate automatically" off never gets one (a reel with no detected language still can). Never the viewer's own, never
 one they already saw anywhere (`fair_start_views` and their feed impressions), never from a creator they keep skipping, and every rule of the feed applies (blocks, private accounts, mutes, "Not interested", sensitive videos
 for under-18s, Fewer suggestions). Each appears once in a feed; when there are none left, the slots are ordinary ones again, so a small
 app reaches whoever there is and never repeats anything.
@@ -133,7 +144,7 @@ link or sent in a chat) and followed the creator after seeing it, among the peop
 
 ## 4. Not done
 
-- A reel held for review that a moderator clears later doesn't get a fair start (it wasn't eligible when it went out).
-- The viewer's languages weigh in the fit but aren't a filter: someone who turned off "Translate automatically" can still get a
-  fair-start reel they'd have to translate.
-- Passing the mic is to people you follow or are friends with; there's no @mention in the caption that passes it.
+- A held chain reel that a moderator clears doesn't tell anyone then: not the starter or the reel before's author, and the people
+  its caption mentions aren't passed the mic (mentions in held posts work the same way across the app).
+- The phone: its pass-the-mic picker lists friends only (people you follow can be passed it too, as on the web), it shows "Pass
+  the mic" on closed chains, and its composer doesn't say that an @mention passes the mic (`mic.mention` is translated and ready).

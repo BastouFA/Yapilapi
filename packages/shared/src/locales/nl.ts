@@ -6935,6 +6935,8 @@ export const nl: Catalog = {
   'mic.empty': 'Nog geen reels in deze keten.',
   'mic.unavailable': 'Deze keten is niet beschikbaar.',
   'mic.pass.none': 'Zodra je hier vrienden hebt, kun je hun de mic doorgeven.',
+  'mic.pass.followingOnly': 'Je kunt de mic doorgeven aan mensen die je volgt',
+  'mic.mention': 'Noem mensen die je volgt met @ in het bijschrift om ze de mic door te geven.',
   'mic.playFromStart': 'Afspelen vanaf het begin',
   'mic.notif.link': '{name} pakte de mic in jouw keten',
   'mic.notif.link.others.one': '{name} en {count} ander pakten de mic in jouw keten',

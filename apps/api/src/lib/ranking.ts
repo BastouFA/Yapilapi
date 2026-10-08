@@ -629,7 +629,8 @@ export function withFairStart(list: Arranged[], picks: FairPick[]): Arranged[] {
  * The fair-start reels this viewer may get, with how well each fits them: topics they picked or
  * engage with, their languages, their country, and how far each still is from its target. A reel in
  * a language they don't understand still fits when it reaches them translated ("Translate
- * automatically"); otherwise it comes after the others. Never
+ * automatically"); otherwise it comes after the others, and someone who turned that off doesn't
+ * get it at all. Never
  * their own, never one they already saw (anywhere), never from a creator they keep skipping;
  * slowed ones come after the others and only until FAIR_START.minimum. Every rule of the feed applies.
  */
@@ -644,6 +645,8 @@ export async function fairStartPicks(db: Q, o: RankOptions): Promise<FairPick[]>
     `WITH me AS (SELECT ${taste} AS topics,
                         -- The languages they understand (lib/translation.ts readerLanguages), or their app language.
                         coalesce($4::text[], (SELECT ARRAY[split_part(pr.locale, '-', 1)] FROM profiles pr WHERE pr.user_id = $1)) AS langs,
+                        -- They turned off "Translate automatically" (on until they do).
+                        NOT coalesce((SELECT up.auto_translate FROM user_preferences up WHERE up.user_id = $1), true) AS untranslated,
                         (SELECT pr.country FROM profiles pr WHERE pr.user_id = $1) AS country)
      SELECT p.id, f.reached, f.target, f.slowed,
             (SELECT count(*) FROM unnest(p.topics) t WHERE t = ANY(me.topics))::int AS topic_n,
@@ -653,6 +656,7 @@ export async function fairStartPicks(db: Q, o: RankOptions): Promise<FairPick[]>
      FROM fair_start_reels f JOIN posts p ON p.id = f.post_id JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id CROSS JOIN me
      WHERE f.status = 'active' AND f.ends_at > $2::timestamptz AND p.author_id <> $1 AND p.created_at <= $2::timestamptz
        AND (NOT f.slowed OR f.reached < ${F.minimum})
+       AND NOT (me.untranslated AND p.lang IS NOT NULL AND me.langs IS NOT NULL AND NOT (p.lang = ANY(me.langs)))
        AND NOT EXISTS (SELECT 1 FROM fair_start_views v WHERE v.post_id = p.id AND v.viewer_id = $1)
        AND NOT EXISTS (SELECT 1 FROM feed_events fe WHERE fe.user_id = $1 AND fe.post_id = p.id AND fe.kind = 'impression')
        AND coalesce((SELECT a.score FROM user_creator_affinity a WHERE a.user_id = $1 AND a.author_id = p.author_id), 0) > -2

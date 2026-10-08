@@ -6906,6 +6906,8 @@ export const tr: Catalog = {
   'mic.empty': 'Bu zincirde henüz reel yok.',
   'mic.unavailable': 'Bu zincir kullanılamıyor.',
   'mic.pass.none': 'Burada arkadaşların olduğunda onlara mikrofonu uzatabilirsin.',
+  'mic.pass.followingOnly': 'Mikrofonu takip ettiğin kişilere uzatabilirsin',
+  'mic.mention': 'Mikrofonu uzatmak için açıklamada takip ettiğin kişileri @ ile an.',
   'mic.playFromStart': 'Baştan oynat',
   'mic.notif.link': '{name} zincirinde mikrofonu aldı',
   'mic.notif.link.others.one': '{name} ve {count} kişi daha zincirinde mikrofonu aldı',

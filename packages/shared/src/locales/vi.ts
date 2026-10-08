@@ -6912,6 +6912,8 @@ export const vi: Catalog = {
   'mic.empty': 'Chuỗi này chưa có reel nào.',
   'mic.unavailable': 'Chuỗi này không khả dụng.',
   'mic.pass.none': 'Khi có bạn bè ở đây, bạn có thể chuyền micro cho họ.',
+  'mic.pass.followingOnly': 'Bạn có thể chuyền micro cho những người bạn theo dõi',
+  'mic.mention': 'Nhắc đến những người bạn theo dõi bằng @ trong chú thích để chuyền micro cho họ.',
   'mic.playFromStart': 'Phát từ đầu',
   'mic.notif.link': '{name} đã nhận micro trong chuỗi của bạn',
   'mic.notif.link.others.one': '{name} và {count} người khác đã nhận micro trong chuỗi của bạn',

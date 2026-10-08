@@ -6900,6 +6900,8 @@ export const yo: Catalog = {
   'mic.empty': 'Kò tíì sí reel nínú ẹ̀wọ̀n yìí.',
   'mic.unavailable': 'Ẹ̀wọ̀n yìí kò sí ní àrọ́wọ́tó.',
   'mic.pass.none': 'Tí o bá ní ọ̀rẹ́ níbí, o lè gbé máíkì kọjá sí wọn.',
+  'mic.pass.followingOnly': 'O lè gbé máíkì kọjá sí àwọn tí o ń tẹ̀lé',
+  'mic.mention': 'Dárúkọ àwọn tí o ń tẹ̀lé pẹ̀lú @ nínú àkọlé láti gbé máíkì kọjá sí wọn.',
   'mic.playFromStart': 'Wò ó láti ìbẹ̀rẹ̀',
   'mic.notif.link': '{name} gba máíkì lórí ẹ̀wọ̀n rẹ',
   'mic.notif.link.others.one': '{name} àti ẹlòmíràn {count} gba máíkì lórí ẹ̀wọ̀n rẹ',
