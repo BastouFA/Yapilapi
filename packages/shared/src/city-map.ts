@@ -8,7 +8,8 @@ import type { PublicUser } from './types.ts';
  * The apps ask for a box (south, west, north, east) and the layers they want, and get back the
  * items in it the viewer may see: lives at a place, events today and tonight, Market listings
  * (by pickup area, never closer than MAP_MARKET_METRES), places with many recent public posts,
- * Pass the Mic chains with reels made there, and friends who are out (only friends sharing a
+ * Pass the Mic chains with reels made there, open questions people asked about the area (Ask
+ * the city, by their area only), and friends who are out (only friends sharing a
  * live location with you in a chat, or who turned on "Show me on the map to friends"; always
  * rounded to about a kilometre). The viewer's own position never goes to the server for this:
  * only the box on screen does, and distances are worked out on the device.
@@ -18,7 +19,7 @@ import type { PublicUser } from './types.ts';
  * request schemas are in city-map-schemas.ts).
  */
 
-export const MAP_LAYERS = ['live', 'today', 'market', 'places', 'chains', 'friends'] as const;
+export const MAP_LAYERS = ['live', 'today', 'market', 'places', 'chains', 'questions', 'friends'] as const;
 export type MapLayer = (typeof MAP_LAYERS)[number];
 
 /** The largest box the map answers for, in degrees each way (about 100 km): zoom in for more. */
@@ -61,6 +62,8 @@ export type MapTarget =
   | { kind: 'listing'; id: string }
   | { kind: 'place'; id: string }
   | { kind: 'chain'; id: string }
+  /** Ask the city: a question (a post). */
+  | { kind: 'post'; id: string }
   | { kind: 'chat'; id: string }
   | { kind: 'user'; username: string };
 
@@ -79,7 +82,7 @@ export interface MapItem {
   /** Events: when it ends, if said. Friends: when they stop showing. */
   endsAt: string | null;
   thumbUrl: string | null;
-  /** Places: recent posts there. Chains: reels made there. Market: always 1. */
+  /** Places: recent posts there. Chains: reels made there. Questions: answers so far. Market: always 1. */
   count: number | null;
   /** Lives: the host. Friends: the friend. */
   user: PublicUser | null;
@@ -252,6 +255,8 @@ export function mapTargetPath(t: MapTarget): string {
       return `/places/${t.id}`;
     case 'chain':
       return `/chains/${t.id}`;
+    case 'post':
+      return `/p/${t.id}`;
     case 'chat':
       return `/inbox/${t.id}`;
     case 'user':
@@ -267,6 +272,7 @@ export const MAP_LAYER_KEYS: Record<MapLayer, MessageKey> = {
   market: 'market.title',
   places: 'map.layer.places',
   chains: 'map.layer.chains',
+  questions: 'map.layer.questions',
   friends: 'map.layer.friends',
 };
 

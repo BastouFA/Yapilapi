@@ -32,6 +32,7 @@ import type { AppContext } from '../lib/context.ts';
 import { decodeCursor, encodeCursor } from '../lib/cursor.ts';
 import { isEnabled, notify, personalizationAllowed, track } from '../lib/services.ts';
 import { claimVoice, forgetVoice, startTranscript, voiceClipSql } from '../lib/voice.ts';
+import { localHelperOf } from '../lib/ask-city.ts';
 import { learn, learnQuietly } from '../lib/affinity.ts';
 import { emitWebhook } from '../lib/webhooks.ts';
 import { ageOf, areFriends, blockUser, isBlockedEitherWay, PUBLIC_USER_COLS, toPublicUser, usernameMatchSql, type PublicUserRow } from '../lib/users.ts';
@@ -297,6 +298,8 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
       song: await songOut(r, viewer),
       ask: await profileAskBox(db, userId, viewer),
       voiceIntro: r.voice_intro ?? null,
+      // Ask the city: "Helped 12 people in Lagos" (it names a city, so never on others' views of an under-18's profile).
+      localHelper: isSelf || !r.is_minor ? await localHelperOf(db, userId) : null,
       relationship: {
         isSelf: viewer === userId,
         following: r.following_them,

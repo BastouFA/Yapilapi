@@ -42,6 +42,7 @@ const PAGES: [string, (d: SeedData) => string][] = [
   ['record a Yap', () => '/create?mode=yap'],
   ['market', () => '/market'],
   ['near you', () => '/map'],
+  ['ask the city', () => '/ask?ask=1'],
   ['market listing', (d) => `/market/${d.listingId}`],
   ['event', (d) => `/events/${d.eventId}`],
   ['together album', (d) => `/together/${d.togetherId}`],

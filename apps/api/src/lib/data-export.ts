@@ -209,6 +209,16 @@ export async function exportSections(db: Q, userId: string) {
               EXISTS (SELECT 1 FROM profiles pr WHERE pr.voice_intro_media_id = vc.media_id) AS is_intro
        FROM voice_clips vc JOIN media m ON m.id = vc.media_id WHERE vc.owner_id = $1 ORDER BY vc.created_at DESC`,
     ),
+    // Ask the city: your questions' topic, area and end (the questions themselves are posts), the answers you found
+    // helpful, the answers of yours others found helpful, and "Help answer questions near me".
+    askCity: {
+      questions: await q(
+        `SELECT post_id, topic, city, area, place_id, expires_at, created_at FROM ask_city_questions WHERE author_id = $1 ORDER BY created_at DESC`,
+      ),
+      markedHelpful: await q(`SELECT post_id, comment_id, created_at FROM ask_city_helpful WHERE asker_id = $1 ORDER BY created_at DESC`),
+      yourHelpfulAnswers: await q(`SELECT post_id, comment_id, city, created_at FROM ask_city_helpful WHERE helper_id = $1 ORDER BY created_at DESC`),
+      helping: await q(`SELECT city, topics, created_at, updated_at FROM ask_city_helpers WHERE user_id = $1`),
+    },
     captions: await q(
       `SELECT t.media_id, t.lang, t.label, t.source, t.status, t.cue_count, CASE WHEN t.status = 'ready' THEN t.url END AS url, t.created_at
        FROM caption_tracks t JOIN media m ON m.id = t.media_id WHERE m.owner_id = $1 OR t.created_by = $1`,
@@ -602,7 +612,7 @@ export const EXPORT_README = {
     passTheMic: 'Pass the Mic chains you started, your reels in chains, the people you passed the mic to (by username), and your reels’ fair starts.',
     squads: 'Squads you’re in or were invited to: their names, your role, and when you were invited and joined. What you shared with them is under content.',
     content:
-      'Stories, chapters, boards, saves, memories, recaps, lives, rooms, products, drops, places, businesses, photos and videos, your Yaps, voice replies and voice intro (recordings and transcripts), and more you made; your event tickets, tickets given or received, events you co-host and how many people you checked in.',
+      'Stories, chapters, boards, saves, memories, recaps, lives, rooms, products, drops, places, businesses, photos and videos, your Yaps, voice replies and voice intro (recordings and transcripts), your Ask the city questions and helpful answers, and more you made; your event tickets, tickets given or received, events you co-host and how many people you checked in.',
     chats:
       'Chats you are in, the transcripts of your own voice messages, and the polls, lists, plans, games, calls and watch together sessions you took part in (your side only), and when you shared where you were, with whom (never the place).',
     activity:

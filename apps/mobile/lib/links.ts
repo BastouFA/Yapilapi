@@ -1,6 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { useEffect } from 'react';
+import { askNoticePost } from '../../../packages/shared/src/ask-city';
 import { micNoticeHref } from '../../../packages/shared/src/pass-the-mic';
 import { squadNoticeHref } from '../../../packages/shared/src/squads';
 import { useSession } from './session';
@@ -27,6 +28,9 @@ export function notificationHref(n: NotificationTarget): string | null {
   // Squads: an invite, someone joining, new posts and the weekly memory open the squad.
   const squad = squadNoticeHref({ type: n.type, entityId: n.entityId });
   if (squad) return `/squad/${encodeURIComponent(squad)}`;
+  // Ask the city: a new question near you, or your answer marked helpful, opens the question with its answers.
+  const question = askNoticePost({ type: n.type, entityId: n.entityId });
+  if (question) return `/p/${encodeURIComponent(question)}`;
   // Pass the Mic: a finished fair start opens the reel's insights (the report); someone taking the
   // mic opens their reel, several of them or a pass opens the chain. A push carries no data: a pass
   // names the chain itself (entity 'chain').
@@ -203,6 +207,8 @@ export function appPath(link: string): string {
   if (first === 'events' && second && parts[2] === 'check-in') return `/check-in/${encodeURIComponent(second)}`;
   if (first === 'c' && second && parts[2] === 'settings') return `/community-settings?slug=${encodeURIComponent(second)}`;
   if (first === 'plus') return '/plus';
+  // Ask the city keeps its path, with the part of the map it was opened from (?ask=1&south=…&east=…).
+  if (first === 'ask') return `/ask${q}`;
   // Squads: the list keeps its path; one squad is /squad/<id> in the app.
   if (first === 'squads') return second ? `/squad/${encodeURIComponent(second)}` : '/squads';
   // Market: selling and changing a listing have their own screen; your listings and saved ones keep their paths.

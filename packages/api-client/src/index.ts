@@ -123,6 +123,10 @@ import type {
   MapLayer,
   MapPresence,
   MapPresenceInput,
+  AskCityInput,
+  AskHelperInput,
+  AskHelperSettings,
+  AskTopic,
   ChainEditInput,
   ChainJoin,
   FairStart,
@@ -927,6 +931,23 @@ export function createClient(opts: ClientOptions) {
       /** Turn it on (or move it, without `duration`); the point is rounded to about a kilometre before it's kept. */
       showMe: (b: MapPresenceInput) => put<{ presence: MapPresence }>('/v1/map/presence', b),
       stop: () => del<{ presence: null }>('/v1/map/presence'),
+    },
+    /**
+     * Ask the city (docs/product/ask-the-city.md): questions to people nearby. A question is a post;
+     * answers are its comments (posts.comment, with `voiceId` for a spoken one).
+     */
+    askCity: {
+      ask: (b: AskCityInput) => post<{ post: Post; moderation?: ModerationNotice }>('/v1/ask', b),
+      /** Open questions in a city (yours when left out) or with their area in a box on the map. `city` is the city listed. */
+      list: (o: { city?: string; box?: MapBox; topic?: AskTopic; cursor?: string } = {}) =>
+        get<Page<Post> & { city: string | null }>(`/v1/ask${qs({ city: o.city, ...(o.box ?? {}), topic: o.topic, cursor: o.cursor })}`),
+      mine: (cursor?: string) => get<Page<Post>>(`/v1/ask/mine${qs({ cursor })}`),
+      /** The asker only: mark (or unmark) an answer helpful. */
+      helpful: (postId: string, commentId: string, on: boolean) =>
+        on ? put<{ helpful: boolean }>(`/v1/ask/${postId}/helpful/${commentId}`) : del<{ helpful: boolean }>(`/v1/ask/${postId}/helpful/${commentId}`),
+      /** "Help answer questions near me". */
+      settings: () => get<{ settings: AskHelperSettings }>('/v1/me/ask-settings'),
+      setSettings: (b: AskHelperInput) => put<{ settings: AskHelperSettings }>('/v1/me/ask-settings', b),
     },
     /** Fair start: whether your next reel gets one, and how one of yours is doing. */
     fairStart: {

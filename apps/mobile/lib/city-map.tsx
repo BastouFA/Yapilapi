@@ -1,7 +1,7 @@
 import Constants from 'expo-constants';
 import * as Location from 'expo-location';
 import { router } from 'expo-router';
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Image, Linking, PanResponder, Pressable, ScrollView, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import {
   clampZoom,
@@ -24,15 +24,16 @@ import {
   type MapTarget,
 } from '../../../packages/shared/src/city-map';
 import { clockTime, distanceMetres, type LatLng } from '../../../packages/shared/src/location';
-import { mediaUrl, webUrl } from './api';
+import { client, mediaUrl, webUrl } from './api';
 import { useT } from './i18n';
 import { elevation, radius, space } from './theme';
-import { Avatar, Icon, useColors, userText, type IconName } from './ui';
+import { Avatar, Button, Field, Icon, useColors, userText, type IconName } from './ui';
 
 /**
  * Near you on the phone (docs/product/city-map.md): the map drawn with React Native's own Image for
  * 256-pixel tiles (no map library), dragged to pan and zoomed with buttons, pins grouped when they
- * are close on screen; the rows the list and the pin cards use; and reading where you are.
+ * are close on screen; the rows the list and the pin cards use; reading where you are; and "Add a place",
+ * which puts a post on the map.
  *
  * Where you are stays on the phone: it centres the map and works out distances. Only the box on
  * screen is sent for the map ("Show me on the map to friends" sends a point, rounded by the server).
@@ -49,6 +50,7 @@ const LAYER_ICONS: Record<MapLayer, IconName> = {
   market: 'pricetag-outline',
   places: 'flame-outline',
   chains: 'mic-outline',
+  questions: 'help-circle-outline',
   friends: 'person-outline',
 };
 
@@ -80,6 +82,8 @@ export function openMapTarget(target: MapTarget) {
       return router.push(`/place/${target.id}`);
     case 'chain':
       return router.push(`/chain/${target.id}`);
+    case 'post':
+      return router.push(`/p/${target.id}`);
     case 'chat':
       return router.push(`/chat/${target.id}`);
     case 'user':
@@ -100,20 +104,28 @@ export function useItemMeta() {
     else if (item.layer === 'friends' && item.endsAt) parts.push(t('location.until', { time: clockTime(item.endsAt, locale) }));
     else if (item.layer === 'places' && item.count) parts.push(tp('map.recent', item.count, { count: number(item.count) }));
     else if (item.layer === 'chains' && item.count) parts.push(tp('m.sound.reelCount', item.count, { count: number(item.count) }));
+    else if (item.layer === 'questions') parts.push(item.count ? tp('askCity.answers', item.count) : t('askCity.needsAnswer'));
     else if (item.layer === 'live' && item.at) parts.push(timeAgo(item.at));
     return parts.join(' · ');
   };
+}
+
+/** What an item is called: its title, or its layer's name when it has none (a spoken question without words). */
+export function useItemTitle() {
+  const { t } = useT();
+  return (item: MapItem) => item.title || t(MAP_LAYER_KEYS[item.layer]);
 }
 
 /** One item, in the list and on a pin's card: picture, title, where, and the meta line. Opens the item. */
 export function MapItemRow({ item, from }: { item: MapItem; from: LatLng | null }) {
   const c = useColors();
   const meta = useItemMeta();
+  const title = useItemTitle()(item);
   const line = meta(item, from);
   return (
     <Pressable
       accessibilityRole="link"
-      accessibilityLabel={[item.title, item.subtitle, line].filter(Boolean).join(', ')}
+      accessibilityLabel={[title, item.subtitle, line].filter(Boolean).join(', ')}
       onPress={() => openMapTarget(item.target)}
       style={({ pressed }) => ({
         flexDirection: 'row',
@@ -137,7 +149,7 @@ export function MapItemRow({ item, from }: { item: MapItem; from: LatLng | null 
       )}
       <View style={{ flex: 1, gap: 2 }}>
         <Text style={[{ color: c.ink, fontWeight: '700', fontSize: 15 }, userText]} numberOfLines={1}>
-          {item.title}
+          {title}
         </Text>
         {item.subtitle ? (
           <Text style={[{ color: c.inkMuted, fontSize: 13 }, userText]} numberOfLines={1}>
@@ -240,6 +252,7 @@ export function CityMapView({
   const clusters = width && height ? clusterItems(items, center, zoom, width, height) : [];
   const you = here && width && height ? screenPoint(here, center, zoom, width, height) : null;
   const meta = useItemMeta();
+  const titleOf = useItemTitle();
   const from = here ?? center;
 
   return (
@@ -263,7 +276,7 @@ export function CityMapView({
         const on = selected === cl.key;
         const label = many
           ? tp('map.cluster', cl.items.length, { count: number(cl.items.length) })
-          : [first.title, mapDistance(t, distanceMetres(from, first.point), locale)].filter(Boolean).join(', ');
+          : [titleOf(first), mapDistance(t, distanceMetres(from, first.point), locale)].filter(Boolean).join(', ');
         return (
           <Pressable
             key={cl.key}
@@ -415,5 +428,65 @@ export function LayerChip({ layer, on, onPress }: { layer: MapLayer; on: boolean
         {t(MAP_LAYER_KEYS[layer])}
       </Text>
     </Pressable>
+  );
+}
+
+/** A place page found by name, as tagging one sends it (`placeId`). */
+export type PlacePick = { id: string; name: string; city: string | null };
+
+/**
+ * "Add a place": a place page found by name (a Yap made there, a question about it), shown on the
+ * post and on the Near you map. `label` names the search field.
+ */
+export function PlacePicker({ value, onChange, label }: { value: PlacePick | null; onChange: (p: PlacePick | null) => void; label?: string }) {
+  const c = useColors();
+  const { t } = useT();
+  const [q, setQ] = useState('');
+  const [places, setPlaces] = useState<PlacePick[]>([]);
+  useEffect(() => {
+    if (value || q.trim().length < 2) return setPlaces([]);
+    const timer = setTimeout(() => {
+      void client()
+        .then((api) => api.search(q.trim(), 'places'))
+        .then(
+          (r) => setPlaces(((r.results.places as PlacePick[] | undefined) ?? []).slice(0, 5)),
+          () => setPlaces([]),
+        );
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [q, value]);
+  if (value)
+    return (
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+        <Icon name="location-outline" size={18} color={c.inkMuted} />
+        <Text style={[{ color: c.ink, flex: 1, fontWeight: '600' }, userText]} numberOfLines={1}>
+          {value.city ? `${value.name}, ${value.city}` : value.name}
+        </Text>
+        <Button label={t('m.common.remove')} variant="ghost" size="sm" icon="close" onPress={() => onChange(null)} />
+      </View>
+    );
+  return (
+    <View style={{ gap: space[2] }}>
+      <Field label={label ?? t('m.sticker.findPlace')} value={q} onChangeText={setQ} maxLength={100} />
+      {places.map((p) => (
+        <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+          <Icon name="location-outline" size={16} color={c.inkMuted} />
+          <Text style={[{ color: c.ink, flex: 1 }, userText]} numberOfLines={1}>
+            {p.name}
+            {p.city ? ` · ${p.city}` : ''}
+          </Text>
+          <Button
+            label={t('m.sticker.add')}
+            size="sm"
+            variant="secondary"
+            onPress={() => {
+              onChange(p);
+              setQ('');
+            }}
+          />
+        </View>
+      ))}
+      {q.trim().length >= 2 && !places.length ? <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t('m.sticker.noPlaces')}</Text> : null}
+    </View>
   );
 }

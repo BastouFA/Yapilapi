@@ -25,6 +25,7 @@ export const POST_REASON_KEYS: Record<PostReasonCode, MessageKey> = {
   similar_people: 'feed.reason.similarPeople',
   trending: 'feed.reason.trending',
   new_creator: 'feed.reason.newCreator',
+  ask_city: 'askCity.reason',
 };
 
 /** Why lines that list topics: each comes in a plural pair, by how many topics it's in. */

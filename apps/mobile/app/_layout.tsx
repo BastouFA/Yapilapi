@@ -152,6 +152,7 @@ function Screens() {
         <Stack.Screen name="mixes/index" options={{ title: t('mixes.title') }} />
         <Stack.Screen name="mixes/[id]" options={{ title: t('mixes.card.kind') }} />
         <Stack.Screen name="map" options={{ title: t('map.title') }} />
+        <Stack.Screen name="ask" options={{ title: t('askCity.title') }} />
         <Stack.Screen name="radio" options={{ title: t('radio.title') }} />
         <Stack.Screen name="market/index" options={{ title: t('m.market.title') }} />
         <Stack.Screen name="market/[id]" options={{ title: t('m.market.listing') }} />

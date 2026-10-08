@@ -140,6 +140,11 @@ function Discover() {
               <Icon name="map-pin" size={16} /> {t('map.title')}
             </Link>
           ) : null}
+          {flags.ASK_CITY !== false ? (
+            <Link href="/ask" className="yp-btn yp-btn--ghost yp-btn--sm" title={t('askCity.hint')}>
+              <Icon name="help" size={16} /> {t('askCity.title')}
+            </Link>
+          ) : null}
           <Link href="/market" className="yp-btn yp-btn--ghost yp-btn--sm">
             {t('market.title')}
           </Link>

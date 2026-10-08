@@ -41,6 +41,7 @@ import { AddToMemorySheet } from './memories';
 import { useReport } from './report';
 import { canWatch, useWatchStart } from './watch';
 import { QuestionQuoteView } from './ask';
+import { AskCityTag } from './ask-city';
 import { MixTile } from './mixes';
 import { clock } from './media';
 import { recordFeedEvent, useFeedSurface } from './feed-events';
@@ -640,6 +641,8 @@ function PostCardView({
       ) : null}
 
       {post.question ? <QuestionQuoteView question={post.question} /> : null}
+      {/* Ask the city: a question to people nearby, with its topic, area and how it's going. */}
+      {post.askCity ? <AskCityTag ask={post.askCity} /> : null}
       {post.body ? (
         <TranslatableText
           kind="post"

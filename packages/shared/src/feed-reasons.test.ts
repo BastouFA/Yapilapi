@@ -22,6 +22,7 @@ describe('feed reasons', () => {
     similar_people: true,
     trending: true,
     new_creator: true,
+    ask_city: true,
   };
   const whyCodes: Record<WhyReasonCode, true> = {
     personalization_off: true,

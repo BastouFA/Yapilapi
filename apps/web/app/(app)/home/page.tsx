@@ -105,6 +105,15 @@ export default function Home() {
 
       <Segments label={t('m.feed.label')} value={mode} onChange={setMode} options={modes.map((m) => ({ id: m, label: t(`feed.${m}`) }))} />
 
+      {/* Yaps: questions people nearby asked out loud are one tap away (Ask the city). */}
+      {mode === 'yaps' && flags.ASK_CITY !== false ? (
+        <div className="row">
+          <Link href="/ask" className="yp-btn yp-btn--secondary yp-btn--sm" title={t('askCity.hint')}>
+            <Icon name="help" size={16} /> {t('askCity.title')}
+          </Link>
+        </div>
+      ) : null}
+
       {/* Someone who follows fewer than three people still gets a full Home: reels to start with and trending tags. */}
       <StarterRow />
 

@@ -50,6 +50,8 @@ type CommentHandlers = {
   remove: (x: Comment) => void;
   report: (x: Comment) => void;
   toggleThread: (x: Comment, more?: boolean) => void;
+  /** Ask the city: the person who asked marks (or unmarks) an answer helpful. */
+  helpful: (x: Comment) => void;
 };
 
 /** The edit box or likers list, for the row it's about: the comment itself or one of its replies. */
@@ -156,6 +158,8 @@ export default function PostScreen() {
   const meId = me?.id;
   const canReply = !!me && !!controls?.canComment;
   const isPostAuthor = !!controls?.isPostAuthor;
+  // Ask the city: the person who asked can mark answers helpful.
+  const asker = isPostAuthor && !!post?.askCity;
   const renderTop = useCallback(
     ({ item }: { item: Comment }) => {
       const th = threads[item.id];
@@ -166,6 +170,7 @@ export default function PostScreen() {
           meId={meId}
           canReply={canReply}
           isPostAuthor={isPostAuthor}
+          asker={asker}
           thread={th}
           editing={forRow(editing, item, th)}
           likers={forRow(likers, item, th)}
@@ -173,7 +178,7 @@ export default function PostScreen() {
         />
       );
     },
-    [threads, meId, canReply, isPostAuthor, editing, likers],
+    [threads, meId, canReply, isPostAuthor, asker, editing, likers],
   );
 
   if (post === undefined) return loadError ? <ScreenError message={loadError} onRetry={loadPost} /> : <Loading />;
@@ -366,6 +371,13 @@ export default function PostScreen() {
       await loadComments();
     });
 
+  const markHelpful = (x: Comment) =>
+    run(async () => {
+      const helpful = !x.helpful;
+      await (await client()).askCity.helpful(post.id, x.id, helpful);
+      update(x.id, (y) => ({ ...y, helpful }));
+    });
+
   latest.current = {
     like: (x) => void like(x),
     reply: startReply,
@@ -389,6 +401,7 @@ export default function PostScreen() {
     remove: (x) => remove(x),
     report: (x) => report.open({ type: 'comment', id: x.id, authorId: x.author.id, authorName: x.author.displayName }),
     toggleThread: (x, more) => void toggleThread(x, more),
+    helpful: (x) => void markHelpful(x),
   };
 
   const header = (
@@ -670,19 +683,32 @@ export default function PostScreen() {
  */
 const COMMENT_ACTION_SLOP = { top: 4, bottom: 4, left: 6, right: 6 };
 
-/** A small text button under a comment (Reply, Edit, Pin, Delete…). */
-function LinkAction({ label, onPress, a11y, buttonRef }: { label: string; onPress: () => void; a11y?: string; buttonRef?: (v: View | null) => void }) {
+/** A small text button under a comment (Reply, Edit, Pin, Delete…); with `selected`, one that stays on or off. */
+function LinkAction({
+  label,
+  onPress,
+  a11y,
+  buttonRef,
+  selected,
+}: {
+  label: string;
+  onPress: () => void;
+  a11y?: string;
+  buttonRef?: (v: View | null) => void;
+  selected?: boolean;
+}) {
   const c = useColors();
   return (
     <Pressable
       ref={buttonRef}
       accessibilityRole="button"
       accessibilityLabel={a11y ?? label}
+      accessibilityState={selected === undefined ? undefined : { selected }}
       onPress={onPress}
       hitSlop={COMMENT_ACTION_SLOP}
       style={{ minWidth: 32, minHeight: 36, justifyContent: 'center' }}
     >
-      <Text style={{ color: c.inkMuted, fontWeight: '700', fontSize: 12 }}>{label}</Text>
+      <Text style={{ color: selected ? c.yapi : c.inkMuted, fontWeight: '700', fontSize: 12 }}>{label}</Text>
     </Pressable>
   );
 }
@@ -698,6 +724,7 @@ const CommentRow = memo(function CommentRow({
   meId,
   canReply,
   isPostAuthor,
+  asker,
   thread: th,
   editing,
   likers,
@@ -709,6 +736,8 @@ const CommentRow = memo(function CommentRow({
   /** Signed in, and comments are open to you. */
   canReply: boolean;
   isPostAuthor: boolean;
+  /** Ask the city: the post is a question and you asked it, so you can mark answers helpful. */
+  asker: boolean;
   thread: Thread | undefined;
   editing: Editing | null;
   likers: Likers | null;
@@ -736,6 +765,13 @@ const CommentRow = memo(function CommentRow({
               <Text style={{ color: c.inkMuted, fontSize: 12, fontWeight: '700' }} accessibilityRole="text">
                 {t('comments.pinned')}
               </Text>
+            ) : null}
+            {x.helpful ? (
+              // Ask the city: the person who asked found this answer helpful.
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Icon name="checkmark-circle" size={12} color={c.yapi} />
+                <Text style={{ color: c.inkMuted, fontSize: 12, fontWeight: '700' }}>{t('askCity.helpful')}</Text>
+              </View>
             ) : null}
             <Text style={[{ color: c.ink, fontWeight: '700', fontSize: 13 }, userText]}>
               {name}{' '}
@@ -827,6 +863,7 @@ const CommentRow = memo(function CommentRow({
             ) : null}
             {x.viewer.canEdit && editing?.id !== x.id ? <LinkAction label={t('comments.edit')} onPress={() => h.current?.edit(x)} /> : null}
             {isPostAuthor && !reply ? <LinkAction label={t(x.pinned ? 'comments.unpin' : 'comments.pin')} onPress={() => h.current?.pin(x)} /> : null}
+            {asker && !reply && !own ? <LinkAction label={t('askCity.markHelpful')} selected={!!x.helpful} onPress={() => h.current?.helpful(x)} /> : null}
             {own && x.likes > 0 ? <LinkAction label={t('comments.likers.show')} onPress={() => h.current?.showLikers(x)} /> : null}
             {x.viewer.canDelete ? <LinkAction label={t('m.common.delete')} onPress={() => h.current?.remove(x)} /> : null}
             {meId && !own ? <LinkAction label={t('post.report')} onPress={() => h.current?.report(x)} a11y={t('m.report.commentBy', { name })} /> : null}
@@ -886,6 +923,7 @@ const CommentRow = memo(function CommentRow({
                       meId={meId}
                       canReply={canReply}
                       isPostAuthor={isPostAuthor}
+                      asker={asker}
                       thread={undefined}
                       editing={editing?.id === r.id ? editing : null}
                       likers={likers?.id === r.id ? likers : null}

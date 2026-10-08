@@ -180,6 +180,10 @@
 .citymap__pin--friends {
   border-color: var(--close-friends);
 }
+.citymap__pin--questions {
+  border-color: var(--ink-muted);
+  border-style: dashed;
+}
 .citymap__pin--group {
   border-color: var(--surface);
   background: var(--ink);

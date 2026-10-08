@@ -129,7 +129,8 @@ export default async function commentsModule(app: FastifyInstance, ctx: AppConte
 
   /**
    * Top-level comments, Top (default) or Newest. The pinned comment comes
-   * first on the first page. Replies are loaded per thread (GET /v1/comments/:id/replies).
+   * first on the first page; under an Ask the city question, Top puts the answers the asker
+   * found helpful first. Replies are loaded per thread (GET /v1/comments/:id/replies).
    */
   app.get('/v1/posts/:id/comments', async (req): Promise<CommentPage> => {
     const viewer = req.user?.id ?? null;
@@ -157,7 +158,8 @@ export default async function commentsModule(app: FastifyInstance, ctx: AppConte
       if (typeof c.o !== 'number' || c.o < 0 || Number.isNaN(Date.parse(c.asOf))) throw badRequest('Invalid cursor.');
       const { rows } = await db.query(
         `SELECT cm.id ${base} AND cm.created_at <= $3::timestamptz
-         ORDER BY ${topScoreSql('$3')} DESC, cm.created_at DESC, cm.id DESC LIMIT $4 OFFSET $5`,
+         ORDER BY EXISTS (SELECT 1 FROM ask_city_helpful ah WHERE ah.comment_id = cm.id) DESC, ${topScoreSql('$3')} DESC, cm.created_at DESC, cm.id DESC
+         LIMIT $4 OFFSET $5`,
         [viewer, id, c.asOf, q.limit + 1, c.o],
       );
       ids = rows.slice(0, q.limit).map((r) => r.id);

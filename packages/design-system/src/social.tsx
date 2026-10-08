@@ -48,6 +48,7 @@ import {
   squadColor,
   SQUAD_INK,
 } from '@yapilapi/shared';
+import { AskCityTag } from './ask-city.tsx';
 import { Icon, type IconName } from './icons.tsx';
 import { Avatar, Badge, Button, cx, PlusBadge, useModalFocus } from './primitives.tsx';
 import { useDataSaver } from './data-saver.tsx';
@@ -1459,6 +1460,7 @@ export function PostCard({
       ) : null}
 
       {post.question ? <QuestionQuote question={post.question} locale={locale} linkAs={L} /> : null}
+      {post.askCity ? <AskCityTag ask={post.askCity} locale={locale} /> : null}
       {post.body ? (
         <TranslatableText
           kind="post"

@@ -77,6 +77,7 @@ import passTheMicModule from './modules/pass-the-mic.ts';
 import squadsModule from './modules/squads.ts';
 import voiceModule from './modules/voice.ts';
 import cityMapModule from './modules/city-map.ts';
+import askCityModule from './modules/ask-city.ts';
 import todayModule from './modules/today.ts';
 import radioModule from './modules/radio.ts';
 import tagsModule from './modules/tags.ts';
@@ -511,6 +512,7 @@ export async function buildApp(
     squadsModule,
     voiceModule,
     cityMapModule,
+    askCityModule,
     todayModule,
     radioModule,
     plusModule,

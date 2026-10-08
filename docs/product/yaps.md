@@ -171,6 +171,6 @@ page) where a reel's says "saw your reel"; its report says "listened to the end"
 
 - **Yap Radio** (hands-free listening): built, docs/product/yap-radio.md (stations over the same
   posts and clips, `listen_*` events with surface `radio`, `voice.speech` for "Listen in my language").
-- **Ask the city**: Yaps with a `place_id`, found through `posts_place_idx` and the transcript search.
+- **Ask the city**: built (docs/product/ask-the-city.md): spoken questions are Yaps with an `ask_city_questions` row.
 - **Yapilapi Today** (built: docs/product/yapilapi-today.md): a daily spoken briefing ranked with
   `post_stats.listen_completes`, written from transcripts.

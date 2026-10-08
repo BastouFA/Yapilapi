@@ -22,7 +22,7 @@ import { TodayCard } from '../../lib/today';
 import { FollowingDrops } from '../../lib/drops';
 import { space } from '../../lib/theme';
 import { useFlag } from '../../lib/flags';
-import { ErrorState, feedListProps, Icon, Loading, Segmented, SkeletonList, slop, useColors, useTabBarSpace } from '../../lib/ui';
+import { Button, ErrorState, feedListProps, Icon, Loading, Segmented, SkeletonList, slop, useColors, useTabBarSpace } from '../../lib/ui';
 
 const MODES = [
   { id: 'for_you', label: 'feed.for_you' },
@@ -53,6 +53,7 @@ function Feed() {
   const bottom = useTabBarSpace();
   const [mode, setMode] = useState<(typeof MODES)[number]['id']>('for_you');
   const yapsOn = useFlag('YAPS') !== false;
+  const askOn = useFlag('ASK_CITY') !== false;
   const modes = yapsOn ? MODES : MODES.filter((m) => m.id !== 'yaps');
   // Yaps turned off while showing them: back to For you.
   useEffect(() => {
@@ -191,10 +192,20 @@ function Feed() {
             {/* With nothing in the feed, the empty state below does the starter row's job. */}
             {posts?.length ? <StarterRow /> : null}
             <Segmented label={t('m.feed.label')} options={modes.map((m) => ({ id: m.id, label: t(m.label) }))} value={mode} onChange={setMode} />
-            {/* Yaps: listen to them one after another, hands-free. */}
+            {/* Yaps: listen to them one after another, hands-free, and questions people nearby asked out loud (Ask the city). */}
             {mode === 'yaps' ? (
-              <View style={{ alignItems: 'flex-start' }}>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
                 <RadioButton station={{ kind: 'for_you' }} />
+                {askOn ? (
+                  <Button
+                    label={t('askCity.title')}
+                    accessibilityLabel={`${t('askCity.title')}. ${t('askCity.hint')}`}
+                    icon="help-circle-outline"
+                    size="sm"
+                    variant="secondary"
+                    onPress={() => router.push('/ask')}
+                  />
+                ) : null}
               </View>
             ) : null}
             {error ? <ErrorState message={error} onRetry={() => Promise.all([load(), loadStories()])} /> : null}

@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
-import { Button, Select, Switch, TextField } from '@yapilapi/design-system';
+import Link from 'next/link';
+import { Button, Icon, Select, Switch, TextField } from '@yapilapi/design-system';
 import {
   MAP_DEFAULT_ZOOM,
   MAP_LAYER_KEYS,
@@ -31,6 +32,10 @@ const zone = () => {
     return undefined;
   }
 };
+
+/** Ask the city about this part of the map: the box goes along, and only its middle (on a 2 km grid) is kept. */
+const askHref = (b: { south: number; west: number; north: number; east: number }) =>
+  `/ask?ask=1&south=${b.south}&west=${b.west}&north=${b.north}&east=${b.east}`;
 
 /** Whether this site may already read where the browser is (so the page can start there without asking). */
 async function geoAllowed(): Promise<boolean> {
@@ -194,6 +199,14 @@ export default function MapPage() {
           </Button>
         </form>
       </div>
+      {/* Ask the city about the part of the map on screen (only its middle, on a 2 km grid, is kept). */}
+      {view && me && flags.ASK_CITY !== false ? (
+        <div className="row">
+          <Link href={askHref(queryBox(viewBox(view.center, view.zoom, size.width, size.height)))} className="yp-btn yp-btn--ghost yp-btn--sm">
+            <Icon name="help" size={16} /> {t('askCity.ask')}
+          </Link>
+        </div>
+      ) : null}
       <p id="citymap-why" className="muted citymap-page__note">
         {t('map.locationWhy')}
       </p>
@@ -205,7 +218,13 @@ export default function MapPage() {
 
       <fieldset className="citymap-layers">
         <legend>{t('map.layers')}</legend>
-        {MAP_LAYERS.filter((l) => (l !== 'friends' || me) && (l !== 'live' || flags.LIVE) && (l !== 'chains' || flags.PASS_THE_MIC !== false)).map((l) => (
+        {MAP_LAYERS.filter(
+          (l) =>
+            (l !== 'friends' || me) &&
+            (l !== 'live' || flags.LIVE) &&
+            (l !== 'chains' || flags.PASS_THE_MIC !== false) &&
+            (l !== 'questions' || flags.ASK_CITY !== false),
+        ).map((l) => (
           <label key={l} className="citymap-layer">
             <input type="checkbox" checked={layers.includes(l)} onChange={(e) => toggle(l, e.currentTarget.checked)} />
             {t(MAP_LAYER_KEYS[l])}

@@ -34,6 +34,10 @@ export const FEATURE_FLAGS = {
   },
   SQUADS: { default: true, description: 'Squads: small private groups of friends with a shared feed, story, chat and weekly memory.' },
   FAIR_START: { default: true, description: "Fair start: a new creator's first reels are shown to up to 1,000 people." },
+  ASK_CITY: {
+    default: true,
+    description: 'Ask the city: questions to people nearby, answered by voice or text, with helpful answers first and a Questions layer on the map.',
+  },
   TODAY: {
     default: true,
     description: 'Yapilapi Today: a short daily briefing of what your people and your city are talking about, read aloud (needs a real AI model).',

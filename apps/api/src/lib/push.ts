@@ -2,7 +2,7 @@ import webpush from 'web-push';
 import type { Pool } from 'pg';
 // Every language, loaded up front: a push is written in its recipient's.
 import { t, tp, type MessageKey } from '@yapilapi/shared/i18n';
-import { messagePreviewText, milestoneNoticeText, type MessagePreview } from '@yapilapi/shared';
+import { ASK_TOPIC_KEYS, messagePreviewText, milestoneNoticeText, type AskTopic, type MessagePreview } from '@yapilapi/shared';
 import type { Config } from '../config.ts';
 
 export interface PushMessage {
@@ -256,6 +256,13 @@ const TEXT: Record<string, Text> = {
   // Questions asked without a name have no actor, so they read "Someone asked you a question".
   question_received: say('push.question_received'),
   question_answered: say('push.question_answered'),
+  // Ask the city: a new question near you (at most a few a day), and an answer of yours the asker found helpful.
+  ask_nearby: (_n, d, locale) =>
+    t('push.ask_nearby', locale, {
+      area: String(d.area ?? ''),
+      topic: ASK_TOPIC_KEYS[d.topic as AskTopic] ? t(ASK_TOPIC_KEYS[d.topic as AskTopic], locale) : '',
+    }),
+  ask_helpful: say('push.ask_helpful'),
   drop_opened: say('push.drop_opened'),
   drop_cancelled: say('push.drop_cancelled'),
   drop_sold_out: say('push.drop_sold_out'),

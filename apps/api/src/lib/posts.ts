@@ -20,6 +20,7 @@ import { isRising, risingCutoff, RISING } from './rising.ts';
 import { chainRefs } from './chains.ts';
 import { isEnabled } from './services.ts';
 import { voiceClipSql } from './voice.ts';
+import { attachAskCity } from './ask-city.ts';
 
 type Q = Pool | PoolClient;
 
@@ -163,6 +164,8 @@ export async function hydratePosts(db: Q, ids: string[], viewer: string | null, 
     );
     for (const r of mixing) byId.get(r.id)!.mix = cards.get(r.mix_id) ?? null;
   }
+  // Ask the city: a question's topic, area, end and helpful answers (lib/ask-city.ts).
+  await attachAskCity(db, posts);
   // Pass the Mic: the chain a reel is in, while the viewer can see the chain (lib/chains.ts).
   const reelIds = rows.filter((r) => r.format === 'reel' && r.unlocked && r.status === 'published').map((r) => r.id as string);
   if (reelIds.length) {

@@ -9,6 +9,7 @@ import type { TrendingTag } from '../../../../packages/api-client/src/index';
 import { client, errorMessage } from '../../lib/api';
 import { ChainShelf } from '../../lib/chains';
 import { Chip, ChipRow, SectionHeader } from '../../lib/chips';
+import { useFlag } from '../../lib/flags';
 import { useT } from '../../lib/i18n';
 import { PostCard } from '../../lib/post';
 import { useRadioOn } from '../../lib/radio';
@@ -75,6 +76,7 @@ export default function Wander() {
   const c = useColors();
   const { t, tp, number, dateTime, locale } = useT();
   const bottom = useTabBarSpace();
+  const askOn = useFlag('ASK_CITY') !== false;
   const radioOn = useRadioOn();
   const params = useLocalSearchParams<{ q?: string }>();
   const input = useRef<TextInput>(null);
@@ -207,6 +209,8 @@ export default function Wander() {
     { label: t('communities.title'), icon: 'people-circle-outline', href: '/communities' },
     { label: t('m.market.title'), icon: 'storefront-outline', href: '/market' },
     { label: t('map.title'), icon: 'map-outline', href: '/map' },
+    // Ask the city: questions people nearby asked, and asking one.
+    ...(askOn ? [{ label: t('askCity.title'), icon: 'help-circle-outline' as const, href: '/ask' }] : []),
     { label: t('m.title.assistant'), icon: 'sparkles-outline', href: '/assistant' },
     // Yap Radio: its stations, and Yaps one after another.
     ...(radioOn ? [{ label: t('radio.title'), icon: 'radio-outline' as const, href: '/radio' }] : []),

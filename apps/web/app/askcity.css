@@ -1,0 +1,168 @@
+/* ── Ask the city (app/(app)/ask/page.tsx, components/AskCity.tsx, design-system AskCityTag) ── */
+
+/* What a question post shows above its words: topic, area, whether it needs an answer. */
+.yp-askcity {
+  display: grid;
+  gap: 4px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+.yp-askcity p {
+  margin: 0;
+}
+.yp-askcity__line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink);
+}
+.yp-askcity__kind {
+  font-weight: 700;
+}
+.yp-askcity__area {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+.yp-askcity__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+.yp-askcity__needs {
+  font-weight: 700;
+  color: var(--ink);
+}
+.yp-askcity__helpful {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--success);
+}
+.yp-askcity__safety {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink);
+}
+.yp-askcity__safety svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+/* Topic, voice or words, and other one-of choices: toggles at least 44px tall. */
+.askcity-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.askcity-chip {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.askcity-chip[aria-pressed='true'] {
+  border-color: var(--yapi);
+  background: var(--yapi-soft);
+  font-weight: 600;
+}
+.askcity-chip:focus-visible,
+.askcity-radio:has(input:focus-visible) {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.askcity-chip:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.askcity-fieldset {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.askcity-fieldset legend,
+.askcity-legend {
+  margin-block: 0 var(--space-2);
+  font-size: 14px;
+  font-weight: 600;
+}
+.askcity-where {
+  display: grid;
+  gap: var(--space-2);
+}
+.askcity-radio {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  border-radius: var(--radius-md);
+  font-size: 15px;
+  cursor: pointer;
+}
+.askcity-radio input {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--yapi);
+}
+.askcity-hint,
+.askcity-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+}
+.askcity-note {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--saffron-soft);
+  color: var(--ink);
+}
+.askcity-city {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-end;
+}
+.askcity-city .yp-field {
+  flex: 1;
+  min-width: 0;
+}
+.askcity-in {
+  margin: 0;
+  font-size: 17px;
+  line-height: 24px;
+}
+
+/* An answer the asker found helpful, and the helper line on a profile. */
+.comment__label--helpful {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--success);
+}
+.profile-helper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 14px;
+}

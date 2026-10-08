@@ -57,6 +57,7 @@ export function commentCols(v: string): string {
           CASE WHEN cm.voice_media_id IS NOT NULL THEN ${voiceClipSql('cm.voice_media_id')} END AS voice,
           pr.user_id AS a_id, pr.username AS a_username, pr.display_name AS a_display_name, pr.avatar_url AS a_avatar_url, pr.mode AS a_mode, ${plusCol('a_')},
           coalesce(p.pinned_comment_id = cm.id, false) AS pinned,
+          EXISTS (SELECT 1 FROM ask_city_helpful ah WHERE ah.comment_id = cm.id) AS helpful,
           (cm.author_id <> p.author_id AND EXISTS (SELECT 1 FROM comment_likes cl WHERE cl.comment_id = cm.id AND cl.user_id = p.author_id)) AS author_liked,
           coalesce(EXISTS (SELECT 1 FROM comment_likes cl WHERE cl.comment_id = cm.id AND cl.user_id = ${v}), false) AS liked,
           coalesce(cm.author_id = ${v} AND cm.created_at > now() - make_interval(mins => ${COMMENT_EDIT_MINUTES}), false) AS can_edit,
@@ -96,6 +97,7 @@ export function toComment(r: Record<string, any>, opts: { hidden?: boolean } = {
     ...(opts.hidden ? { hidden: true } : {}),
     ...(r.at_ms === null || r.at_ms === undefined ? {} : { atMs: r.at_ms }),
     ...(r.voice ? { voice: r.voice } : {}),
+    ...(r.helpful ? { helpful: true } : {}),
     viewer: { liked: !!r.liked, canEdit: !!r.can_edit, canDelete: !!r.can_delete },
   };
 }

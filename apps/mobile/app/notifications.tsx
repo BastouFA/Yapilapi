@@ -9,6 +9,7 @@ import { togetherNoticeText } from '../../../packages/shared/src/together';
 import { echoNoticeText } from '../../../packages/shared/src/echoes';
 import { micNoticeText } from '../../../packages/shared/src/pass-the-mic';
 import { squadNoticeText } from '../../../packages/shared/src/squads';
+import { askNoticeText } from '../../../packages/shared/src/ask-city';
 import { scheduledPostFailedText } from '../../../packages/shared/src/job-failures';
 import { signInNoticeText } from '../../../packages/shared/src/server-text';
 import { fullCount, milestoneNoticeText } from '../../../packages/shared/src/post-stats';
@@ -164,6 +165,9 @@ function describe(g: Group, tr: Translator): string {
   // Squads: an invite, someone joining, new posts (batched) and the weekly memory.
   const squad = squadNoticeText(n, t, tp);
   if (squad) return squad;
+  // Ask the city: "New question in Yaba, Lagos: Food", "Ada found your answer helpful".
+  const asked = askNoticeText(n, t);
+  if (asked) return asked;
   // Market: offers and answers to them, a sale to you, a rating, and listings ending.
   const market = marketNoticeText(n, t, tp);
   if (market) return market;

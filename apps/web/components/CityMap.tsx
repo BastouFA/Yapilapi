@@ -43,6 +43,7 @@ export const LAYER_ICONS: Record<MapLayer, IconName> = {
   market: 'bag',
   places: 'star',
   chains: 'mic',
+  questions: 'help',
   friends: 'user',
 };
 
@@ -188,7 +189,7 @@ export function TileMap({
               type="button"
               className={`citymap__pin citymap__pin--${many ? 'group' : first.layer}`}
               style={{ left: c.x, top: c.y }}
-              aria-label={many ? tp('map.cluster', c.items.length) : `${first.title}, ${t(MAP_LAYER_KEYS[first.layer])}`}
+              aria-label={many ? tp('map.cluster', c.items.length) : `${first.title || t(MAP_LAYER_KEYS[first.layer])}, ${t(MAP_LAYER_KEYS[first.layer])}`}
               aria-expanded={open?.key === c.key}
               onClick={() => setOpen(open?.key === c.key ? null : c)}
             >
@@ -239,7 +240,11 @@ export function MapItemRow({ item, from }: { item: MapItem; from: LatLng }) {
           ? tp('map.recent', item.count)
           : item.layer === 'chains' && item.count
             ? tp('m.sound.reelCount', item.count)
-            : null;
+            : item.layer === 'questions'
+              ? item.count
+                ? tp('askCity.answers', item.count)
+                : t('askCity.needsAnswer')
+              : null;
   const meta = [t(MAP_LAYER_KEYS[item.layer]), distance, when, item.approximate ? t('location.precision.approximate') : null].filter(Boolean);
   return (
     <Link href={mapTargetPath(item.target)} className="citymap-row">
@@ -247,7 +252,7 @@ export function MapItemRow({ item, from }: { item: MapItem; from: LatLng }) {
         {item.thumbUrl ? <img src={item.thumbUrl} alt="" /> : <Icon name={LAYER_ICONS[item.layer]} size={20} />}
       </span>
       <span className="citymap-row__text">
-        <span className="citymap-row__title">{item.title}</span>
+        <span className="citymap-row__title">{item.title || t(MAP_LAYER_KEYS[item.layer])}</span>
         {item.subtitle ? <span className="citymap-row__sub">{item.subtitle}</span> : null}
         <span className="citymap-row__meta">{meta.join(' · ')}</span>
       </span>

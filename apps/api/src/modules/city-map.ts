@@ -10,7 +10,7 @@ import { me, requireAuth } from '../plugins/auth.ts';
 
 /**
  * Near you (docs/product/city-map.md, lib/city-map.ts): what's happening in a box on the map, and
- * "Show me on the map to friends". Behind CITY_MAP. Lives need LIVE and chains PASS_THE_MIC too.
+ * "Show me on the map to friends". Behind CITY_MAP. Lives need LIVE, chains PASS_THE_MIC and questions ASK_CITY too.
  */
 export default async function cityMapModule(app: FastifyInstance, ctx: AppContext) {
   const db = ctx.db;
@@ -30,6 +30,7 @@ export default async function cityMapModule(app: FastifyInstance, ctx: AppContex
     const off = new Set<MapLayer>();
     if (!(await isEnabled(db, 'LIVE'))) off.add('live');
     if (!(await isEnabled(db, 'PASS_THE_MIC'))) off.add('chains');
+    if (!(await isEnabled(db, 'ASK_CITY'))) off.add('questions');
     const answer = await mapItems(db, cache, {
       box: { south: q.south, west: q.west, north: q.north, east: q.east },
       layers: q.layers,

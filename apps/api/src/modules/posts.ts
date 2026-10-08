@@ -62,6 +62,7 @@ import { messageFailureCode, messageFailureEnglish } from '../lib/failures.ts';
 import { asSameUser } from './moments.ts';
 import { recordShare } from './recommendations.ts';
 import { assertYapPace, forgetVoice } from '../lib/voice.ts';
+import { mixInQuestions } from '../lib/ask-city.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
 
@@ -718,13 +719,16 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
   ) {
     const reader = await readerLanguages(db, userId, ctx.ai.machineTranslation);
     const ranked = await rankedPage(db, { userId, surface, personalized, personal, reduced, reader }, cursor, limit);
+    // Ask the city: now and then, an open question in your city (lib/ask-city.ts).
+    const offset = decodeCursor<{ o?: number }>(cursor)?.o;
+    const items = await mixInQuestions(db, userId, surface, typeof offset === 'number' ? offset : 0, ranked.items, personal);
     return {
       mode: surface,
       items: await hydratePosts(
         db,
-        ranked.items.map((r) => r.id),
+        items.map((r) => r.id),
         userId,
-        new Map(ranked.items.map((r) => [r.id, r.reason])),
+        new Map(items.map((r) => [r.id, r.reason])),
       ),
       nextCursor: ranked.nextCursor,
     };

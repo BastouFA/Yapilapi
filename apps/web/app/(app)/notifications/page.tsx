@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Avatar, Button, EmptyState, Icon, List, ListItem, Skeleton } from '@yapilapi/design-system';
 import {
+  askNoticePost,
+  askNoticeText,
   echoNoticeText,
   formatRelativeTime,
   fullCount,
@@ -122,6 +124,9 @@ function hrefFor(n: NotificationItem, meUsername?: string): string | undefined {
   // Squads: the squad's page (its feed, story, chat and weekly memory).
   const squad = squadNoticeHref(n);
   if (squad) return `/squads/${squad}`;
+  // Ask the city: the question, with its answers open.
+  const question = askNoticePost(n);
+  if (question) return `/p/${question}?comments=1`;
   // Pass the Mic and Fair start: the chain's page, or the reel.
   const mic = micNoticeHref(n);
   if (mic) return 'chain' in mic ? `/chains/${mic.chain}` : 'post' in mic ? `/p/${mic.post}` : `/reels?start=${mic.reel}`;
@@ -207,6 +212,9 @@ function batchedText(n: NotificationItem, t: Session['t'], tp: Session['tp']): s
   // "Ada invited you to join Crew", "Ada and 2 others shared in Crew", "Your week in Crew is ready".
   const squad = squadNoticeText(n, t, tp);
   if (squad) return squad;
+  // Ask the city: "New question in Yaba, Lagos: Food", "Ada found your answer helpful".
+  const asked = askNoticeText(n, t);
+  if (asked) return asked;
   // Whole sentences in your language (the name, when there is one, is part of them).
   if (n.type === 'weekly_wrap') return t('wrap.notif');
   if (n.type === 'today_ready') return t('push.today_ready');

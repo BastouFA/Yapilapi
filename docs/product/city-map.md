@@ -36,6 +36,7 @@ post or live shows it, and it can't be changed after posting, like media). Nothi
 | Market | listed things with a pickup point (not sold, not ended, not held) | the 2 km grid (`marketPoint`) | title, area, photo |
 | Places buzzing | places where at least 3 different people posted publicly in the last 24 hours | the place | name, city, number of recent posts, the newest picture the viewer may see |
 | Chains near you | active chains (a reel in the last 7 days) with reels made at a place here | the place most of them were made at | prompt, place, reels there, cover |
+| Questions | open Ask the city questions with an area here (docs/product/ask-the-city.md), behind `ASK_CITY` | a place page's point, the map's middle on the 2 km grid, or the middle of the city's place pages | the question's words, area, asker, answers so far |
 | Friends out | friends sharing a live location with a chat you're in, and friends who turned on "Show me on the map to friends" | always the 1 km grid (`friendPoint`) | name, avatar, until when; opens the chat or their profile |
 
 Each layer gives at most 40 items (`MAP_LAYER_LIMIT`, the most relevant first) and the answer says which layers had more
@@ -109,7 +110,7 @@ return it as `place`. A draft keeps its place.
 
 ## 7. Not done yet
 
-- "Add a place" in the phone's composer and go-live screen (the phone shows places on posts, and the API takes `placeId`).
+- "Add a place" in the phone's go-live screen (the phone's Yap composer and Ask the city have one: `PlacePicker` in `apps/mobile/lib/city-map.tsx`).
 - The phone screen is type-checked but not yet run on a device (dragging, tile loading).
 - Places buzzing counts posts only; stories and check-ins could count too.
 - A geocoder for cities without place pages.

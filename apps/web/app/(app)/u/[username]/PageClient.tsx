@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { Avatar, Badge, Button, EmptyState, Menu, PlusBadge, Segments, Skeleton, VoicePlayer } from '@yapilapi/design-system';
+import { Avatar, Badge, Button, EmptyState, Icon, Menu, PlusBadge, Segments, Skeleton, VoicePlayer } from '@yapilapi/design-system';
 import { PlayAsRadio } from '@/components/Radio';
 import { FollowList } from '@/components/FollowList';
 import type { Profile, ProfileTab } from '@yapilapi/shared';
@@ -31,7 +31,7 @@ import { useSession } from '../../../providers';
  */
 export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
   const { username } = useParams<{ username: string }>();
-  const { me, t, toast, setMe, flags, locale } = useSession();
+  const { me, t, tp, toast, setMe, flags, locale } = useSession();
   const signIn = useSignIn();
   const signedOut = !me;
   const router = useRouter();
@@ -322,6 +322,12 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
             <PlayAsRadio station={{ kind: 'person', key: profile.username }} />
           </div>
         )}
+        {/* Ask the city: "Helped 12 people in Lagos", quietly, never a ranking. */}
+        {profile.localHelper && flags.ASK_CITY !== false ? (
+          <p className="muted profile-helper">
+            <Icon name="check-circle" size={16} /> {tp('askCity.helped', profile.localHelper.people, { city: profile.localHelper.city })}
+          </p>
+        ) : null}
         <ProfileLinks links={profile.links} />
         <ProfileAbout profile={profile} />
         {/* Someone you blocked shows nothing of theirs, not even counts. */}

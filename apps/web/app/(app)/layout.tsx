@@ -30,7 +30,8 @@ function currentTab(path: string, username?: string, yaps = true): NavEntry['id'
     path.startsWith('/events') ||
     path.startsWith('/places') ||
     path.startsWith('/market') ||
-    path.startsWith('/map')
+    path.startsWith('/map') ||
+    path.startsWith('/ask')
   )
     return 'discover';
   // The middle button: Yap (it opens the recorder, and holds the other ways to create), or Spark while Yaps are off.

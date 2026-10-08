@@ -347,6 +347,16 @@ export function Comments({
     }
   };
 
+  /** Ask the city: the person who asked marks an answer helpful (it moves to the top next time the answers load). */
+  const markHelpful = async (c: Comment) => {
+    try {
+      await api.askCity.helpful(post.id, c.id, !c.helpful);
+      update(c.id, (x) => ({ ...x, helpful: !c.helpful }));
+    } catch (e) {
+      toast(errorMessage(e));
+    }
+  };
+
   const showLikers = async (c: Comment) => {
     returnTo.current = `likes-${c.id}`;
     setLikers({ comment: c, items: null });
@@ -424,6 +434,11 @@ export function Comments({
         <div className="comment__main">
           <div className="comment__bubble">
             {c.pinned ? <span className="comment__label">{t('comments.pinned')}</span> : null}
+            {c.helpful ? (
+              <span className="comment__label comment__label--helpful">
+                <Icon name="check-circle" size={12} /> {t('askCity.helpful')}
+              </span>
+            ) : null}
             <strong>
               <Link href={`/u/${c.author.username}`} className="comment__name">
                 {name}
@@ -541,6 +556,11 @@ export function Comments({
             {page?.isPostAuthor && !reply ? (
               <button type="button" id={`pin-${c.id}`} className="comment__action" onClick={() => void pin(c)}>
                 {t(c.pinned ? 'comments.unpin' : 'comments.pin')}
+              </button>
+            ) : null}
+            {post.askCity && page?.isPostAuthor && !reply && !own ? (
+              <button type="button" className="comment__action" aria-pressed={!!c.helpful} onClick={() => void markHelpful(c)}>
+                {t('askCity.markHelpful')}
               </button>
             ) : null}
             {own && c.likes > 0 ? (

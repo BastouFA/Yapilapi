@@ -100,6 +100,7 @@ const NEW_PAGES: [string, (d: SeedData) => string][] = [
   // Market, tickets and check-in, Together albums and echoes.
   ['market', () => '/market'],
   ['near you', () => '/map'],
+  ['ask the city', () => '/ask?ask=1'],
   ['market: sell something', () => '/market/new'],
   ['market listing', (d) => `/market/${d.listingId}`],
   ['your market listing', (d) => `/market/${d.myListingId}`],

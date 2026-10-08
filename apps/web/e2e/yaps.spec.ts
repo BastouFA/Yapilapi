@@ -52,9 +52,9 @@ test('records, posts, plays and transcribes a Yap, and takes a voice reply', asy
   // Pulse, Yaps only: the card, its player and its transcript.
   await page.waitForURL(/\/home/);
   if (!/mode=yaps/.test(page.url())) await page.goto('/home?mode=yaps');
-  const card = page.getByTestId('yap-card').first();
+  // Other Yaps (an Ask the city question from another spec, say) may rank above it: find this one by its line.
+  const card = page.getByTestId('yap-card').filter({ hasText: 'Good morning from the test microphone' }).first();
   await expect(card).toBeVisible({ timeout: 20_000 });
-  await expect(card).toContainText('Good morning from the test microphone');
   const play = card.getByTestId('yap-play');
   await play.click();
   await expect(card.getByTestId('yap-play')).toHaveAccessibleName('Pause');

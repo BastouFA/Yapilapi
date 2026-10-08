@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, FlatList, Keyboard, Pressable, ScrollView, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { ApiError } from '../../../packages/api-client/src/index';
@@ -18,6 +19,7 @@ import {
 import { clockTime, type LatLng } from '../../../packages/shared/src/location';
 import { client, errorMessage } from '../lib/api';
 import { CityMapView, LayerChip, MapItemRow, PinCard, readHere } from '../lib/city-map';
+import { useFlag } from '../lib/flags';
 import { useT } from '../lib/i18n';
 import { useSession } from '../lib/session';
 import { radius, space } from '../lib/theme';
@@ -28,7 +30,8 @@ import { BottomSheet, Button, EmptyState, ErrorState, Icon, Loading, Notice, Seg
  * nearest first. It starts where you are when location was allowed before, else your profile's
  * city, else a city search; "Use my location" asks first. Only the box on screen goes to the
  * server, never your position, except through "Show me on the map to friends" (signed in), which
- * sends a point the server rounds to about a kilometre.
+ * sends a point the server rounds to about a kilometre. Signed in, "Ask a question" asks the city
+ * about the part of the map on screen (only its middle, on a 2 km grid, is kept).
  */
 
 const timeZone = () => {
@@ -64,7 +67,10 @@ export default function MapScreen() {
   const [locating, setLocating] = useState(false);
   const [locateError, setLocateError] = useState<string | null>(null);
 
-  const layers = MAP_LAYERS.filter((l) => !hidden.includes(l) && (l !== 'friends' || !!me));
+  // Questions (Ask the city) are left out while that feature is off.
+  const askOn = useFlag('ASK_CITY') !== false;
+  const offered = MAP_LAYERS.filter((l) => (l !== 'friends' || !!me) && (l !== 'questions' || askOn));
+  const layers = offered.filter((l) => !hidden.includes(l));
   const layersKey = layers.join(',');
 
   // Where to start: here when location was allowed before (no prompt), else the profile's city, else a search.
@@ -389,7 +395,7 @@ export default function MapScreen() {
           accessibilityLabel={t('map.layers')}
           contentContainerStyle={{ gap: space[2], paddingVertical: 4 }}
         >
-          {MAP_LAYERS.filter((l) => l !== 'friends' || !!me).map((l) => (
+          {offered.map((l) => (
             <LayerChip
               key={l}
               layer={l}
@@ -418,6 +424,22 @@ export default function MapScreen() {
           {fetching ? <ActivityIndicator size="small" color={c.yapi} /> : null}
         </View>
         {presenceRow}
+        {me && askOn ? (
+          <Button
+            label={t('askCity.ask')}
+            icon="help-circle-outline"
+            size="sm"
+            variant="secondary"
+            style={{ alignSelf: 'flex-start' }}
+            onPress={() => {
+              const b = queryBox(viewBox(center, zoom, size.width, size.height));
+              router.push({
+                pathname: '/ask',
+                params: { ask: '1', south: String(b.south), west: String(b.west), north: String(b.north), east: String(b.east) },
+              });
+            }}
+          />
+        ) : null}
         {presenceError && !presenceSheet ? (
           <Text accessibilityLiveRegion="polite" style={{ color: c.danger, fontSize: 13, fontWeight: '600' }}>
             {presenceError}

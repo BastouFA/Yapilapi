@@ -53,6 +53,7 @@ import { CaptionIdeasPanel, SuggestAltText } from '../../lib/ai-helpers';
 import { PostAudio } from '../../lib/post';
 import { useFlag } from '../../lib/flags';
 import { FairStartPromise, JoinChoice } from '../../lib/chains';
+import { PlacePicker, type PlacePick } from '../../lib/city-map';
 import { noticeText } from '../../../../packages/shared/src/server-text';
 import { VOICE_MAX_MS, YAP_TEXT_MAX, type VoiceClip } from '../../../../packages/shared/src/voice';
 import { uploadVoice, VoiceRecorder } from '../../lib/voice';
@@ -94,8 +95,6 @@ type Original = { id: string; username: string; media: MediaItem | null; soundTi
 const kindFrom = (mode: string | undefined): Kind | null => (mode === 'reel' || mode === 'story' || mode === 'post' || mode === 'yap' ? mode : null);
 /** Where music opened from a sound or song page goes (a Yap has none: a post then). */
 const musicUse = (k: Kind | null, fallback: Exclude<Kind, 'yap'>): Exclude<Kind, 'yap'> => (k && k !== 'yap' ? k : fallback);
-/** A place a Yap was made at, found by name. */
-type PlacePick = { id: string; name: string; city: string | null };
 
 /**
  * Create: a Yap (a voice post of up to a minute), a text post, a reel (one video up to 3 minutes,
@@ -1086,7 +1085,8 @@ export default function Create() {
               style={{ minHeight: 72, textAlignVertical: 'top', paddingTop: 12 }}
             />
             {ac.list}
-            <YapPlace value={yapPlace} onChange={setYapPlace} />
+            {/* The place a Yap was made at (optional): shown on the Yap and on the Near you map. */}
+            <PlacePicker value={yapPlace} onChange={setYapPlace} />
             {audienceAndComments}
             {error ? <Notice tone="danger">{error}</Notice> : null}
             {needsVerify || (me?.needsVerification && visibility === 'public') ? <VerifyPrompt action="post" /> : null}
@@ -1692,60 +1692,6 @@ function RecordAudio({
         onPress={() => void start()}
         style={{ alignSelf: 'flex-start' }}
       />
-    </View>
-  );
-}
-
-/** The place a Yap was made at (optional): found by name, shown on the Yap and on the Near you map. */
-function YapPlace({ value, onChange }: { value: PlacePick | null; onChange: (p: PlacePick | null) => void }) {
-  const c = useColors();
-  const { t } = useT();
-  const [q, setQ] = useState('');
-  const [places, setPlaces] = useState<PlacePick[]>([]);
-  useEffect(() => {
-    if (value || q.trim().length < 2) return setPlaces([]);
-    const timer = setTimeout(() => {
-      void client()
-        .then((api) => api.search(q.trim(), 'places'))
-        .then(
-          (r) => setPlaces(((r.results.places as PlacePick[] | undefined) ?? []).slice(0, 5)),
-          () => setPlaces([]),
-        );
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [q, value]);
-  if (value)
-    return (
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
-        <Icon name="location-outline" size={18} color={c.inkMuted} />
-        <Text style={[{ color: c.ink, flex: 1, fontWeight: '600' }, userText]} numberOfLines={1}>
-          {value.city ? `${value.name}, ${value.city}` : value.name}
-        </Text>
-        <Button label={t('m.common.remove')} variant="ghost" size="sm" icon="close" onPress={() => onChange(null)} />
-      </View>
-    );
-  return (
-    <View style={{ gap: space[2] }}>
-      <Field label={t('m.sticker.findPlace')} value={q} onChangeText={setQ} maxLength={100} />
-      {places.map((p) => (
-        <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
-          <Icon name="location-outline" size={16} color={c.inkMuted} />
-          <Text style={[{ color: c.ink, flex: 1 }, userText]} numberOfLines={1}>
-            {p.name}
-            {p.city ? ` · ${p.city}` : ''}
-          </Text>
-          <Button
-            label={t('m.sticker.add')}
-            size="sm"
-            variant="secondary"
-            onPress={() => {
-              onChange(p);
-              setQ('');
-            }}
-          />
-        </View>
-      ))}
-      {q.trim().length >= 2 && !places.length ? <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t('m.sticker.noPlaces')}</Text> : null}
     </View>
   );
 }

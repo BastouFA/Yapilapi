@@ -7,6 +7,7 @@ import type { ReelHighlight } from './reels.ts';
 import type { ProfileStyle, ProfileTab } from './profile-style.ts';
 import type { ChatTheme } from './chat-theme.ts';
 import type { ProfileAskBox, QuotedQuestion } from './ask.ts';
+import type { AskCityInfo, LocalHelper } from './ask-city.ts';
 import type { DrawReason, GameKind, GameState } from './games/types.ts';
 import type { MixCard } from './mixes.ts';
 import type { LocationShare } from './location.ts';
@@ -150,6 +151,8 @@ export interface Profile extends PublicUser {
   ask: ProfileAskBox | null;
   /** A voice intro of up to 15 seconds, played from the profile header. */
   voiceIntro?: VoiceClip | null;
+  /** Ask the city: "Helped 12 people in Lagos", when people found their answers helpful (never on others' views of an under-18's profile). */
+  localHelper?: LocalHelper | null;
   relationship: {
     isSelf: boolean;
     following: boolean;
@@ -261,7 +264,9 @@ export type PostReasonCode =
   | 'watched_topic'
   | 'similar_people'
   | 'trending'
-  | 'new_creator';
+  | 'new_creator'
+  /** Ask the city: an open question in your city (a slot now and then in For you and the Yaps filter). */
+  | 'ask_city';
 
 /** The names a feed reason mentions: `name` a person, `community` a community's name, `topic` a topic. */
 export interface PostReasonParams {
@@ -390,6 +395,8 @@ export interface Post {
   product: { id: string; title: string; priceCents: number; currency: string } | null;
   /** The place it was tagged at (a place page), which also puts it on the Near you map. */
   place?: { id: string; name: string; city: string | null } | null;
+  /** Ask the city: this post is a question to people nearby (docs/product/ask-the-city.md). */
+  askCity?: AskCityInfo | null;
   /**
    * The numbers under a post (docs/product/post-stats.md). Views: different people other than the
    * author who had it on screen or watched it, each counted once. Shares: times it was sent to a
@@ -587,6 +594,8 @@ export interface Comment {
   atMs?: number | null;
   /** A voice reply: the recording, with its waveform and transcript. `body` may then be empty. */
   voice?: VoiceClip | null;
+  /** Ask the city: the person who asked marked this answer helpful. */
+  helpful?: boolean;
   viewer: {
     liked: boolean;
     /** The writer, until COMMENT_EDIT_MINUTES after posting. */

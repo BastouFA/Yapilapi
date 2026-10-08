@@ -57,6 +57,7 @@ import { AnswersList, AskCard } from './ask';
 import { VoicePlayer } from './voice';
 import { ProfileMixes } from './mixes';
 import { ProfileMarket } from './market';
+import { useFlag } from './flags';
 
 /**
  * A profile: name, bio, counts, Follow and Message for other people, and
@@ -79,7 +80,8 @@ export function ProfileView({
   onMoved?: (username: string) => void;
 }) {
   const c = useColors();
-  const { t, number } = useT();
+  const { t, tp, number } = useT();
+  const askOn = useFlag('ASK_CITY') !== false;
   const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
   // Why it couldn't load, when that isn't because it's gone; a profile already showing stays.
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -381,6 +383,15 @@ export function ProfileView({
           <View style={{ alignSelf: 'stretch', gap: space[1] }}>
             <Text style={{ color: c.inkMuted, fontSize: 12, fontWeight: '700', textAlign: 'center' }}>{t('voice.intro')}</Text>
             <VoicePlayer compact clip={profile.voiceIntro} label={t('voice.intro.play')} own={rel.isSelf} />
+          </View>
+        ) : null}
+        {profile.localHelper && askOn ? (
+          // Ask the city: "Helped 12 people in Lagos", quietly, never a ranking.
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Icon name="checkmark-circle-outline" size={16} color={c.inkMuted} />
+            <Text style={[{ color: c.inkMuted, fontSize: 14, flexShrink: 1 }, userText]}>
+              {tp('askCity.helped', profile.localHelper.people, { city: profile.localHelper.city })}
+            </Text>
           </View>
         ) : null}
         <ProfileLinks links={profile.links} tint={tint} />

@@ -15,6 +15,7 @@ import {
   type MapPresence,
   type MapPresenceDuration,
 } from '@yapilapi/shared';
+import { ASK_MAP_CANDIDATES, questionMapItems } from './ask-city.ts';
 import { chainsById } from './chains.ts';
 import { listingListedSql, listingPhotos, LISTING_FROM } from './market.ts';
 import { plusCol, publicUserFrom } from './users.ts';
@@ -30,7 +31,7 @@ type Q = Pool | PoolClient;
  * the same for everyone, kept in memory for MAP_CACHE_MS. Then, every time and never cached,
  * the candidates this viewer may see, with what their card shows, through the same visibility
  * rules as everywhere else (postVisibleSql, eventVisibleSql, liveVisibleSql, listingListedSql,
- * chainsById), so blocks, private accounts, audiences, minors and regional rules apply as they
+ * chainsById, askListedSql), so blocks, private accounts, audiences, minors and regional rules apply as they
  * do in feeds. Friends out is never cached: it's only ever about this viewer.
  *
  * Points: places (lives, events, buzzing places, chains) are public place pages already. Market
@@ -155,6 +156,8 @@ const CANDIDATE_SQL: Record<Exclude<MapLayer, 'friends'>, string> = {
                  GROUP BY l.chain_id, lp.place_id) x
            JOIN places pl ON pl.id = x.place_id
            ORDER BY x.chain_id, x.n DESC, x.at DESC LIMIT $5`,
+  // Ask the city: open questions whose area is here (lib/ask-city.ts).
+  questions: ASK_MAP_CANDIDATES,
 };
 
 async function candidates(db: Q, cache: MapCache, layer: Exclude<MapLayer, 'friends'>, box: MapBox, dayEnd: Date): Promise<Candidate[]> {
@@ -423,6 +426,14 @@ export async function mapItems(db: Q, cache: MapCache, req: MapRequest): Promise
       if (layer === 'today') return eventItems(db, req.viewer, c, dayEnd);
       if (layer === 'market') return marketItems(db, req.viewer, c);
       if (layer === 'places') return placeItems(db, req.viewer, c);
+      if (layer === 'questions')
+        return cut(
+          await questionMapItems(
+            db,
+            req.viewer,
+            c.map((x) => x.id),
+          ),
+        );
       return chainItems(db, req.viewer, c, req.sensitive);
     }),
   );

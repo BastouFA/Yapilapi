@@ -42,7 +42,7 @@ const EMPTY: Record<AskFilter, MessageKey> = { new: 'ask.inbox.empty.new', answe
  * here either; blocking from one stops that person asking again without telling you who it is.
  */
 export default function QuestionsPage() {
-  const { t, toast, locale } = useSession();
+  const { t, toast, locale, flags } = useSession();
   const [filter, setFilter] = useState<AskFilter>('new');
   const [items, setItems] = useState<InboxQuestion[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -157,6 +157,12 @@ export default function QuestionsPage() {
         <Link href="/settings/account#ask" className="yp-btn yp-btn--ghost yp-btn--sm">
           {t('ask.box.title')}
         </Link>
+        {/* Questions to everyone nearby, rather than to you: Ask the city. */}
+        {flags.ASK_CITY !== false ? (
+          <Link href="/ask" className="yp-btn yp-btn--ghost yp-btn--sm">
+            {t('askCity.title')}
+          </Link>
+        ) : null}
       </div>
       {box && !box.enabled ? (
         <Alert tone="info">

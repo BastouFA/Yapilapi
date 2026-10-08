@@ -17,6 +17,7 @@ export {
   type TranslationContextValue,
 } from './translation.tsx';
 export { VoicePlayer, VoiceTranscript, type VoiceListenEvent, type VoicePlayerProps } from './voice.tsx';
+export { AskCityTag } from './ask-city.tsx';
 export {
   Alert,
   Avatar,
