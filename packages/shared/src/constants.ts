@@ -1,11 +1,11 @@
 /** Who can see a moment or an event-style item. */
 export const VISIBILITIES = ['public', 'followers', 'friends', 'circle', 'selected', 'private'] as const;
 /** Posts and reels can also be for subscribers: others see a locked card. Needs a subscription plan. */
-export const POST_VISIBILITIES = [...VISIBILITIES, 'subscribers'] as const;
+export const POST_VISIBILITIES = [...VISIBILITIES, 'subscribers', 'squad'] as const;
 export type Visibility = (typeof POST_VISIBILITIES)[number];
 
 /** Stories can also go to your close friends list only. */
-export const STORY_VISIBILITIES = [...VISIBILITIES, 'close_friends'] as const;
+export const STORY_VISIBILITIES = [...VISIBILITIES, 'close_friends', 'squad'] as const;
 export type StoryVisibility = (typeof STORY_VISIBILITIES)[number];
 
 /** 'duet' plays side by side with the original reel; 'remix' reuses its sound only. */
@@ -456,3 +456,26 @@ export const FAIR_START = {
   /** Accounts made from one address (their sign-up) have at most this many fair-start reels running at once. */
   perSignupAddress: 2,
 } as const;
+
+/**
+ * Squads (docs/product/squads.md): a small private group of friends with a shared feed, a shared
+ * story, a group chat and a weekly memory. At most MAX_SQUAD_MEMBERS people in one, invites
+ * included; a new squad starts by inviting minInvites to MAX_SQUAD_MEMBERS - 1 people.
+ */
+export const MAX_SQUAD_MEMBERS = 10;
+export const SQUAD_RULES = {
+  /** A new squad invites at least this many people. */
+  minInvites: 2,
+  nameMax: 40,
+  /** One person is in (or invited to) at most this many squads. */
+  maxSquads: 20,
+  /** A squad's story lasts this many hours. */
+  storyHours: 24,
+  /** The weekly memory shows up to this many top moments. */
+  memoryTop: 3,
+} as const;
+/** Cover colours, for a squad without a cover photo (SQUAD_COLOR_HEX in squads.ts has their values; named like profile accents). */
+export const SQUAD_COLORS = ['coral', 'saffron', 'leaf', 'teal', 'ocean', 'indigo', 'violet', 'orchid', 'graphite'] as const;
+export type SquadColor = (typeof SQUAD_COLORS)[number];
+export const SQUAD_ROLES = ['owner', 'admin', 'member'] as const;
+export type SquadRole = (typeof SQUAD_ROLES)[number];

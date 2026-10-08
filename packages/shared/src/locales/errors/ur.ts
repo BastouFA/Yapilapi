@@ -1220,4 +1220,17 @@ export const ur: Record<string, string> = {
   // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
   'Near you is not enabled.': 'آپ کے آس پاس فعال نہیں ہے۔',
   'Zoom in to see what’s here.': 'یہاں کیا ہے دیکھنے کے لیے زوم ان کریں۔',
+  // Squads (lib/squads.ts, and where posts, stories, chats and chains meet them)
+  "Squad doesn't exist or isn't visible to you.": 'یہ اسکواڈ موجود نہیں یا آپ اسے نہیں دیکھ سکتے۔',
+  'Squads is not enabled.': 'اسکواڈ فعال نہیں ہیں۔',
+  'Choose a squad.': 'ایک اسکواڈ منتخب کریں۔',
+  'You can be in up to {max} squads.': 'آپ زیادہ سے زیادہ {max} اسکواڈز میں ہو سکتے ہیں۔',
+  'You can invite people you follow who follow you back, and your friends.':
+    'آپ اپنے دوستوں کو، اور ان لوگوں کو مدعو کر سکتے ہیں جنہیں آپ فالو کرتے ہیں اور جو آپ کو فالو کرتے ہیں۔',
+  'A squad can have up to 10 people.': 'ایک اسکواڈ میں زیادہ سے زیادہ 10 لوگ ہو سکتے ہیں۔',
+  'You can’t join this squad now.': 'آپ ابھی اس اسکواڈ میں شامل نہیں ہو سکتے۔',
+  'Make someone else the owner before you leave.': 'چھوڑنے سے پہلے کسی اور کو مالک بنائیں۔',
+  'This chat belongs to a squad. Change who’s in it from the squad.': 'یہ چیٹ ایک اسکواڈ کی ہے۔ اس میں کون ہے، یہ اسکواڈ سے بدلیں۔',
+  'Posts shared with a squad stay with it.': 'اسکواڈ کے ساتھ شیئر کی گئی پوسٹس اسکواڈ میں ہی رہتی ہیں۔',
+  'Reels in a squad’s chain are shared with that squad.': 'اسکواڈ کے سلسلے کی ریلز اسی اسکواڈ کے ساتھ شیئر ہوتی ہیں۔',
 };

@@ -300,6 +300,14 @@ export async function exportSections(db: Q, userId: string) {
     ),
   };
 
+  // Squads you're in or invited to: their names, your role and when you joined. Not who else is in them: that's theirs.
+  const squads = {
+    squads: await q(
+      `SELECT sq.id, sq.name, sm.role, sm.status, sm.invited_at, sm.joined_at FROM squad_members sm JOIN squads sq ON sq.id = sm.squad_id
+       WHERE sm.user_id = $1 ORDER BY sm.invited_at DESC`,
+    ),
+  };
+
   const activity = {
     reposts: await q(`SELECT post_id, created_at FROM post_reposts WHERE user_id = $1 ORDER BY created_at DESC`),
     pollVotes: await q(`SELECT v.post_id, o.label AS option FROM poll_votes v JOIN poll_options o ON o.id = v.option_id WHERE v.user_id = $1`),
@@ -561,7 +569,7 @@ export async function exportSections(db: Q, userId: string) {
     ),
   };
 
-  return { content, chats, activity, relationships, money, safety, ai, security, developer, invites, settings, market, passTheMic };
+  return { content, chats, activity, relationships, money, safety, ai, security, developer, invites, settings, market, passTheMic, squads };
 }
 
 /** A short guide at the top of the file: what each part holds, the limits, and what is left out. */
@@ -573,6 +581,7 @@ export const EXPORT_README = {
     profile: 'Your profile as others see it, and its settings.',
     'posts, comments, messagesSent': 'What you shared. Messages include only the ones you sent.',
     passTheMic: 'Pass the Mic chains you started, your reels in chains, the people you passed the mic to (by username), and your reels’ fair starts.',
+    squads: 'Squads you’re in or were invited to: their names, your role, and when you were invited and joined. What you shared with them is under content.',
     content:
       'Stories, chapters, boards, saves, memories, recaps, lives, rooms, products, drops, places, businesses, photos and videos, and more you made; your event tickets, tickets given or received, events you co-host and how many people you checked in.',
     chats:

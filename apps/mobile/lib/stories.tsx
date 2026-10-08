@@ -26,6 +26,8 @@ import type { Story, StoryGroup } from '../../../packages/api-client/src/index';
 import type { StickerResults, StorySticker } from '../../../packages/shared/src/stories';
 import type { PublicUser } from '../../../packages/shared/src/types';
 import { compactCount } from '../../../packages/shared/src/post-stats';
+import { SQUAD_INK, squadColor } from '../../../packages/shared/src/squads';
+import { useSession } from './session';
 import { client, errorMessage, mediaUrl, webUrl } from './api';
 import { useDataSaver } from './data-saver';
 import { useT } from './i18n';
@@ -77,16 +79,25 @@ export function StoriesStrip({ groups, onOpen, onCreate }: { groups: StoryGroup[
         </Pressable>
       ) : null}
       {groups.map((g, i) => {
-        const name = g.mine ? t('m.stories.yours') : g.author.displayName;
+        const name = g.squad ? g.squad.name : g.mine ? t('m.stories.yours') : g.author.displayName;
         // A green ring for close friends stories you haven't seen (or your own).
         const close = g.moments.some((m) => m.closeFriends && (g.mine || !m.seen));
-        const avatar = (
+        const avatar = g.squad ? (
+          // A squad's ring: its cover photo, or its colour with its first letter (white on each colour is AA).
+          <View style={[st.inner, { backgroundColor: squadColor(g.squad.color), borderRadius: 18, overflow: 'hidden' }]}>
+            {g.squad.coverUrl ? (
+              <Image source={{ uri: mediaUrl(g.squad.coverUrl) }} style={{ width: '100%', height: '100%' }} />
+            ) : (
+              <Text style={{ color: SQUAD_INK, fontWeight: '800', fontSize: 24 }}>{Array.from(g.squad.name.trim())[0]?.toUpperCase()}</Text>
+            )}
+          </View>
+        ) : (
           <View style={[st.inner, { backgroundColor: c.ground }]}>
             <Avatar name={g.author.displayName} url={g.author.avatarUrl} size={RING - 10} />
           </View>
         );
         return (
-          <View key={g.author.id} style={st.item}>
+          <View key={g.squad ? `squad:${g.squad.id}` : g.author.id} style={st.item}>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`${g.allSeen ? t('m.stories.a11y.seen', { name }) : t('m.stories.a11y.new', { name })}${close ? `, ${t('m.closeFriends.title')}` : ''}`}
@@ -177,6 +188,7 @@ function Viewer({
 }) {
   const c = useColors();
   const { t, tp, timeAgo, locale } = useT();
+  const { me } = useSession();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const [g, setG] = useState(start);
@@ -207,8 +219,10 @@ function Viewer({
     if (viewers) return (setViewers(null), true);
     return false;
   };
-  const group = groups[g];
-  const story = group?.moments[i];
+  const ring = groups[g];
+  const story = ring?.moments[i];
+  // A squad's ring holds several people's stories: each one is shown as its author's (yours with your tools).
+  const group = ring?.squad && story?.author ? { ...ring, author: story.author, mine: story.author.id === me?.id } : ring;
   // Sensitive stories wait, blurred and paused, until the viewer chooses to see them.
   const [revealed, setRevealed] = useState<string[]>([]);
   const covered = !!story?.sensitive && !revealed.includes(story.id);
@@ -524,6 +538,14 @@ function Viewer({
               </Text>
               <Text style={st.when}>{timeAgo(story.createdAt)}</Text>
             </View>
+            {ring?.squad ? (
+              <View style={[st.closeFriends, { backgroundColor: squadColor(ring.squad.color) }]}>
+                <Icon name="people" size={12} color={SQUAD_INK} />
+                <Text style={[{ color: SQUAD_INK, fontSize: 12, fontWeight: '700' }, userText]} numberOfLines={1}>
+                  {ring.squad.name}
+                </Text>
+              </View>
+            ) : null}
             {story.closeFriends ? (
               <View style={[st.closeFriends, { backgroundColor: c.closeFriends }]}>
                 <Icon name="people" size={12} color={c.onCloseFriends} />

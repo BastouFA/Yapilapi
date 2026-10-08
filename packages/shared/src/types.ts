@@ -14,6 +14,7 @@ import type { FeedEventKind, FeedEventSurface } from './constants.ts';
 import type { CoverRecipe } from './cover.ts';
 import type { EchoPermission, EchoRef } from './echoes.ts';
 import type { ChainRef } from './pass-the-mic.ts';
+import type { SquadRef } from './squads.ts';
 import type {
   BoardVisibility,
   CircleKind,
@@ -454,6 +455,8 @@ export interface Post {
   pendingCollaborators?: PublicUser[];
   /** Only on the author's own posts shared with a circle: which one. Members of the circle never see its name. */
   circle?: { id: string; name: string } | null;
+  /** Shared with a squad: which one, for its members (and its author). Nobody else ever gets the post. */
+  squad?: SquadRef | null;
   aiAssisted: boolean;
   /** Set on Real posts: captured in-app moments before posting, unedited. */
   real?: { capturedAt: string; dual: boolean; locationText: string | null } | null;
@@ -629,6 +632,8 @@ export interface Conversation {
    * your messages. People who blocked you, or whom you blocked, aren't listed.
    */
   readBy?: { userId: string; lastReadAt: string }[];
+  /** A squad's chat: who is in it follows the squad, so people join and leave there, not here. */
+  squadId?: string | null;
 }
 
 /**

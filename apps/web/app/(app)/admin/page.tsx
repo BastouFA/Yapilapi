@@ -202,6 +202,7 @@ export default function Admin() {
             <div className="stack">
               <Flags />
               <PassTheMicStats />
+              <SquadStats />
               <PhonePurchases />
             </div>
           ) : tab === 'miniapps' ? (
@@ -702,6 +703,26 @@ function PassTheMicStats() {
             {t('admin.mic.fairStart', { active: n(data.fairStart.active), slowed: n(data.fairStart.slowed), done: n(data.fairStart.done) })}
           </p>
         </div>
+      )}
+    </Card>
+  );
+}
+
+/** Squads at a glance. What is shared in them is moderated through reports, like any post. */
+function SquadStats() {
+  const { t, locale } = useSession();
+  const { data, error, reload } = useLoad(() => api.admin.squads(), []);
+  const n = (v: number) => fullCount(v, locale);
+  return (
+    <Card title={t('squads.title')}>
+      {error ? (
+        <LoadFailed error={error} onRetry={reload} />
+      ) : !data ? (
+        <Skeleton height={40} />
+      ) : (
+        <p style={{ margin: 0 }}>
+          {t('admin.squads', { squads: n(data.squads), members: n(data.members), invites: n(data.invites), posts: n(data.postsThisWeek) })}
+        </p>
       )}
     </Card>
   );

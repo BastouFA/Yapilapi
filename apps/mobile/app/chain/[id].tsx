@@ -102,6 +102,7 @@ export default function ChainScreen() {
         <Text style={[{ color: c.ink, fontWeight: '600' }, userText]}>{t('mic.startedBy', { name: chain.starter.displayName })}</Text>
       </Pressable>
       <Text style={{ color: c.inkMuted, fontSize: 14 }}>{countsText(chain.counts)}</Text>
+      {chain.squad ? <Text style={[{ color: c.inkMuted, fontSize: 14 }, userText]}>{t('squads.chainOnly', { name: chain.squad.name })}</Text> : null}
       {chain.viewer.canJoin ? (
         <Button label={t('mic.take')} icon="mic-outline" onPress={() => takeTheMic(chain.id)} />
       ) : chain.closed || chain.viewer.why === 'closed' ? (
@@ -126,7 +127,7 @@ export default function ChainScreen() {
             style={{ alignSelf: 'flex-start' }}
             onPress={() => setWho(chain.closed ? 'everyone' : 'nobody')}
           />
-          <JoinChoice value={chain.whoCanJoin} onChange={(v) => v && void setWho(v)} withNobody />
+          {chain.squad ? null : <JoinChoice value={chain.whoCanJoin} onChange={(v) => v && void setWho(v)} withNobody />}
         </View>
       ) : null}
       {status ? (

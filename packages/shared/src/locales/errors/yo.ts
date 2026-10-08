@@ -1306,4 +1306,16 @@ export const yo: Record<string, string> = {
   // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
   'Near you is not enabled.': 'Nítòsí rẹ kò ṣiṣẹ́.',
   'Zoom in to see what’s here.': 'Sún mọ́ láti rí ohun tó wà níbí.',
+  // Squads (lib/squads.ts, and where posts, stories, chats and chains meet them)
+  "Squad doesn't exist or isn't visible to you.": 'Squad yìí kò sí tàbí o kò lè rí i.',
+  'Squads is not enabled.': 'A kò tíì tan àwọn squad.',
+  'Choose a squad.': 'Yan squad kan.',
+  'You can be in up to {max} squads.': 'O lè wà nínú squad tó tó {max} jù lọ.',
+  'You can invite people you follow who follow you back, and your friends.': 'O lè pe àwọn ọ̀rẹ́ rẹ, àti àwọn tí o ń tẹ̀lé tí wọ́n sì ń tẹ̀lé ọ.',
+  'A squad can have up to 10 people.': 'Squad kan lè ní ènìyàn tó tó 10 jù lọ.',
+  'You can’t join this squad now.': 'O kò lè darapọ̀ mọ́ squad yìí báyìí.',
+  'Make someone else the owner before you leave.': 'Sọ ẹlòmíràn di olùní kí o tó kúrò.',
+  'This chat belongs to a squad. Change who’s in it from the squad.': 'Ìjíròrò yìí jẹ́ ti squad kan. Yí àwọn tó wà nínú rẹ̀ padà láti inú squad.',
+  'Posts shared with a squad stay with it.': 'Àwọn ìfiránṣẹ́ tí a pín pẹ̀lú squad máa ń wà nínú rẹ̀.',
+  'Reels in a squad’s chain are shared with that squad.': 'Àwọn reel nínú ẹ̀wọ̀n squad ni a ń pín pẹ̀lú squad náà.',
 };

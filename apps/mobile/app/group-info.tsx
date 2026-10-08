@@ -83,10 +83,12 @@ export default function GroupInfo() {
   if (loadError) return <ErrorState message={loadError} onRetry={load} />;
   if (!conv) return <ActivityIndicator color={c.yapi} accessibilityLabel={t('common.loading')} style={{ marginTop: space[6] }} />;
 
-  const admin = conv.myRole === 'admin';
+  // A squad's chat follows the squad: who is in it, its name and leaving are managed there.
+  const squad = !!conv.squadId;
+  const admin = conv.myRole === 'admin' && !squad;
   const admins = new Set(conv.adminIds ?? []);
   const inGroup = new Set(conv.members.map((m) => m.id));
-  const shown = (items ?? []).filter((s) => !inGroup.has(s.user.id));
+  const shown = squad ? [] : (items ?? []).filter((s) => !inGroup.has(s.user.id));
   const people = [...conv.members].sort((a, b) => (a.id === me?.id ? -1 : b.id === me?.id ? 1 : Number(admins.has(b.id)) - Number(admins.has(a.id))));
 
   const personOptions = (p: PublicUser) =>
@@ -184,17 +186,20 @@ export default function GroupInfo() {
                 </Pressable>
               );
             })}
-            <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('chat.group.adminsNote')}</Text>
-            <Field
-              label={t('chat.group.add')}
-              placeholder={t('m.group.placeholder')}
-              value={q}
-              onChangeText={setQ}
-              autoCapitalize="none"
-              autoCorrect={false}
-              returnKeyType="search"
-            />
-            {items !== null && !shown.length && q.trim() ? (
+            {squad ? <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('squads.chatNote')}</Text> : null}
+            {squad ? null : <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('chat.group.adminsNote')}</Text>}
+            {squad ? null : (
+              <Field
+                label={t('chat.group.add')}
+                placeholder={t('m.group.placeholder')}
+                value={q}
+                onChangeText={setQ}
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="search"
+              />
+            )}
+            {!squad && items !== null && !shown.length && q.trim() ? (
               <Text accessibilityLiveRegion="polite" style={{ color: c.inkMuted }}>
                 {t('m.group.noMatch', { query: q.trim() })}
               </Text>
@@ -232,9 +237,11 @@ export default function GroupInfo() {
           </Pressable>
         )}
         ListFooterComponent={
-          <View style={{ marginTop: space[4] }}>
-            <Button label={t('chat.group.leave')} variant="danger" disabled={busy} onPress={leave} />
-          </View>
+          squad ? null : (
+            <View style={{ marginTop: space[4] }}>
+              <Button label={t('chat.group.leave')} variant="danger" disabled={busy} onPress={leave} />
+            </View>
+          )
         }
       />
     </KeyboardAvoid>

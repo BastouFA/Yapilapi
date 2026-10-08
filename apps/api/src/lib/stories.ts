@@ -13,6 +13,7 @@ import {
   type StoryCard,
   type StoryMusic,
   type StoryMusicStyle,
+  type StorySquad,
   type StorySticker,
   type StoryStickerInput,
   type storyStickerInputSchema,
@@ -25,7 +26,7 @@ import type { RealtimeHub } from './realtime.ts';
 import { notify } from './services.ts';
 import { soundVisibleSql } from './sounds.ts';
 import { publicUserFrom, usernameMatchSql, usersByIds } from './users.ts';
-import { notBlockedSql } from './visibility.ts';
+import { notBlockedSql, squadMemberSql } from './visibility.ts';
 import { mentionAllowedSql, seesSensitiveSql } from './interactions.ts';
 import { mediaSizesSql, withSmallVariants } from './data-saver.ts';
 import { trackMusic, tracksByIds, viewerCountries, type TrackRow } from './music/view.ts';
@@ -35,7 +36,7 @@ type Q = Pool | PoolClient;
 /**
  * Stories (moments aliased `m`, author user aliased `au`) the viewer `v` may see: their own, and active ones from people
  * they follow or are friends with. Close friends stories reach only the people on the author's close friends list who
- * still follow them. A story hidden after a minor-safety report or limited by a moderator is seen by its author alone.
+ * still follow them, and a squad's story only the squad's members. A story hidden after a minor-safety report or limited by a moderator is seen by its author alone.
  * Stories whose photo or video was blocked are gone for everyone; sensitive ones are never shown to
  * people under 18 (or people whose age isn't known).
  *
@@ -52,6 +53,7 @@ export function storyVisibleSql(v: string, opts: { open?: boolean } = {}): strin
         AND EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = ${v} AND f.followee_id = m.author_id))
     OR (m.visibility IN ('public','followers') AND EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = ${v} AND f.followee_id = m.author_id))
     OR (m.visibility IN ('public','followers','friends') AND EXISTS (SELECT 1 FROM friendships fr WHERE (fr.user_a = ${v} AND fr.user_b = m.author_id) OR (fr.user_b = ${v} AND fr.user_a = m.author_id)))
+    OR (m.visibility = 'squad' AND ${squadMemberSql('m.squad_id', v)})
     ${opts.open ? `OR (m.visibility = 'public' AND NOT EXISTS (SELECT 1 FROM profiles px WHERE px.user_id = m.author_id AND px.is_private))` : ''})
   AND NOT EXISTS (SELECT 1 FROM media x WHERE x.id = m.media_id AND (x.moderation = 'blocked'
     OR (x.moderation = 'sensitive' AND NOT ${seesSensitiveSql(v)})))`;
@@ -76,9 +78,13 @@ export const STORY_SELECT = `m.id, m.author_id, m.body, m.lang, m.media_url, m.m
   CASE WHEN m.author_id = $1 THEN (SELECT count(*) FROM messages mm WHERE mm.meta ? 'storyReply' AND (mm.meta->'storyReply'->>'storyId') = m.id::text AND mm.deleted_at IS NULL) END AS replies,
   CASE WHEN m.author_id = $1 THEN (SELECT count(*) FROM messages mm WHERE mm.story_id = m.id AND mm.deleted_at IS NULL)
                                 + (SELECT count(*) FROM moments rm WHERE rm.reshare_of = m.id AND rm.deleted_at IS NULL) END AS shares,
-  pr.user_id AS a_id, pr.username AS a_username, pr.display_name AS a_display_name, pr.avatar_url AS a_avatar_url, pr.mode AS a_mode`;
+  pr.user_id AS a_id, pr.username AS a_username, pr.display_name AS a_display_name, pr.avatar_url AS a_avatar_url, pr.mode AS a_mode,
+  -- A squad's story: the squad, for its ring (only members get these stories at all).
+  sq.id AS sq_id, sq.name AS sq_name, sq.color AS sq_color,
+  (SELECT coalesce(cv.variants->>'thumb', cv.url) FROM media cv WHERE cv.id = sq.cover_media_id AND cv.moderation NOT IN ('blocked', 'sensitive')) AS sq_cover`;
 export const STORY_FROM = `FROM moments m JOIN profiles pr ON pr.user_id = m.author_id JOIN users au ON au.id = m.author_id
   LEFT JOIN media md ON md.id = m.media_id
+  LEFT JOIN squads sq ON sq.id = m.squad_id AND m.visibility = 'squad'
   LEFT JOIN moment_views v ON v.moment_id = m.id AND v.viewer_id = $1`;
 
 /** A sticker as stored on the story. */
@@ -281,6 +287,9 @@ export interface StoryOut {
   allowReshare?: boolean;
   /** A sound playing with the story, while the viewer can see that sound. */
   music: StoryMusic | null;
+  /** On a squad's story: the squad, and whose story it is. */
+  squadId?: string;
+  author?: PublicUser;
 }
 
 /** A story's music as stored (the sound is moments.sound_id). */
@@ -487,9 +496,12 @@ export async function hydrateStories(db: Q, rows: Record<string, any>[], viewer:
       stickers,
       reshareOf: r.reshare_of ? (cards.get(r.reshare_of) ?? { id: r.reshare_of, available: false }) : null,
       mentionsYou,
-      canReshare: !!viewer && !isAuthor && r.allow_reshare && !r.reshare_of && (r.visibility === 'public' || mentionsYou),
+      // A squad's story stays in the squad: never reshared, even by someone it mentions.
+      canReshare: !!viewer && !isAuthor && r.allow_reshare && !r.reshare_of && r.visibility !== 'squad' && (r.visibility === 'public' || mentionsYou),
       ...(isAuthor ? { allowReshare: !!r.allow_reshare } : {}),
       music: sound && stored ? { sound, startMs: stored.startMs, durationMs: stored.durationMs, style: stored.style, x: stored.x, y: stored.y } : null,
+      // In a squad's ring, each story says whose it is.
+      ...(r.sq_id ? { squadId: r.sq_id as string, author: publicUserFrom(r, 'a_') } : {}),
     };
   });
 }
@@ -499,23 +511,31 @@ export interface StoryGroupOut {
   mine: boolean;
   allSeen: boolean;
   moments: StoryOut[];
+  /** A squad's ring: every member's stories for the squad, with its cover. */
+  squad?: StorySquad;
 }
 
-/** Group stories by author: yours first, then people with stories you haven't seen, newest first. */
+/**
+ * Group stories by author, and a squad's stories into one ring for the squad: yours first, then
+ * your squads, then people with stories you haven't seen, newest first.
+ */
 export async function groupStories(db: Q, rows: Record<string, any>[], viewer: string | null): Promise<StoryGroupOut[]> {
   const stories = await hydrateStories(db, rows, viewer);
   const groups = new Map<string, StoryGroupOut & { latest: number }>();
   rows.forEach((r, i) => {
     const s = stories[i]!;
-    const mine = !!viewer && r.a_id === viewer;
-    const g = groups.get(r.a_id) ?? { author: publicUserFrom(r, 'a_'), mine, allSeen: true, latest: 0, moments: [] };
+    const key = r.sq_id ? `squad:${r.sq_id}` : (r.a_id as string);
+    const mine = !r.sq_id && !!viewer && r.a_id === viewer;
+    const fresh: StoryGroupOut & { latest: number } = { author: publicUserFrom(r, 'a_'), mine, allSeen: true, latest: 0, moments: [] };
+    if (r.sq_id) fresh.squad = { id: r.sq_id, name: r.sq_name, color: r.sq_color, coverUrl: r.sq_cover ?? null };
+    const g = groups.get(key) ?? fresh;
     g.moments.push(s);
     g.allSeen &&= s.seen;
     g.latest = Math.max(g.latest, new Date(r.created_at).getTime());
-    groups.set(r.a_id, g);
+    groups.set(key, g);
   });
   return [...groups.values()]
-    .sort((a, b) => Number(b.mine) - Number(a.mine) || Number(a.allSeen) - Number(b.allSeen) || b.latest - a.latest)
+    .sort((a, b) => Number(b.mine) - Number(a.mine) || Number(!!b.squad) - Number(!!a.squad) || Number(a.allSeen) - Number(b.allSeen) || b.latest - a.latest)
     .map(({ latest: _latest, ...g }) => g);
 }
 

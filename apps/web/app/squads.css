@@ -1,0 +1,106 @@
+/* Squads (components/Squads.tsx): covers, the colour picker and the list. White text on every squad colour is AA. */
+.squad-cover {
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  flex: none;
+  font-family: var(--font-display);
+  font-weight: 800;
+}
+.squad-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.squad-cover--sm {
+  width: 48px;
+  height: 48px;
+  font-size: 20px;
+}
+.squad-cover--md {
+  width: 100%;
+  max-width: 360px;
+  aspect-ratio: 3 / 1;
+  font-size: 36px;
+}
+.squad-cover--lg {
+  width: 120px;
+  height: 120px;
+  font-size: 48px;
+}
+.squad-head {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.squad-colors {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.squad-colors__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.squad-colors__swatch {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+}
+.squad-colors__swatch input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.squad-colors__swatch:has(input:checked) {
+  box-shadow:
+    0 0 0 3px var(--surface-sunken),
+    0 0 0 5px var(--ink);
+}
+.squad-colors__swatch:has(input:focus-visible) {
+  box-shadow: var(--focus-ring);
+}
+.squad-pick {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  cursor: pointer;
+}
+.squad-pick input {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+.squads__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.squads__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  flex-wrap: wrap;
+}
+.squads__faces {
+  display: flex;
+  margin-inline-start: auto;
+}
+.squads__faces > * + * {
+  margin-inline-start: -8px;
+}

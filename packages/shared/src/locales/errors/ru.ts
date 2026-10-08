@@ -1215,4 +1215,16 @@ export const ru: Record<string, string> = {
   // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
   'Near you is not enabled.': 'Функция «Рядом с вами» не включена.',
   'Zoom in to see what’s here.': 'Приблизьте карту, чтобы увидеть, что здесь есть.',
+  // Squads (lib/squads.ts, and where posts, stories, chats and chains meet them)
+  "Squad doesn't exist or isn't visible to you.": 'Такого сквада нет, или он вам недоступен.',
+  'Squads is not enabled.': 'Сквады не включены.',
+  'Choose a squad.': 'Выберите сквад.',
+  'You can be in up to {max} squads.': 'Можно состоять не более чем в {max} сквадах.',
+  'You can invite people you follow who follow you back, and your friends.': 'Пригласить можно друзей и людей, с которыми у вас взаимная подписка.',
+  'A squad can have up to 10 people.': 'В скваде может быть не больше 10 человек.',
+  'You can’t join this squad now.': 'Сейчас вы не можете вступить в этот сквад.',
+  'Make someone else the owner before you leave.': 'Прежде чем выйти, сделайте владельцем кого-то другого.',
+  'This chat belongs to a squad. Change who’s in it from the squad.': 'Этот чат принадлежит скваду. Состав меняется в самом скваде.',
+  'Posts shared with a squad stay with it.': 'Публикации для сквада остаются в скваде.',
+  'Reels in a squad’s chain are shared with that squad.': 'Рилсы в цепочке сквада публикуются для этого сквада.',
 };

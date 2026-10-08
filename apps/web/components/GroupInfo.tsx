@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Avatar, BottomSheet, Button, List, ListItem, Menu, TextField, type MenuAction } from '@yapilapi/design-system';
 import type { Conversation, Message, PublicUser } from '@yapilapi/shared';
@@ -28,7 +29,9 @@ export function GroupInfoSheet({
   onLeft: () => void;
 }) {
   const { t, me, toast } = useSession();
-  const admin = conversation.myRole === 'admin';
+  // A squad's chat follows the squad: who is in it, its name and leaving are managed on the squad's page.
+  const squad = conversation.squadId ?? null;
+  const admin = conversation.myRole === 'admin' && !squad;
   const admins = new Set(conversation.adminIds ?? []);
   const [title, setTitle] = useState(conversation.title ?? '');
   const [adding, setAdding] = useState<PublicUser[]>([]);
@@ -113,52 +116,62 @@ export function GroupInfoSheet({
             ))}
           </List>
           <p className="muted" style={{ fontSize: 13, margin: 0 }}>
-            {t('chat.group.adminsNote')}
+            {squad ? (
+              <>
+                {t('squads.chatNote')} <Link href={`/squads/${squad}`}>{t('squads.title')}</Link>
+              </>
+            ) : (
+              t('chat.group.adminsNote')
+            )}
           </p>
         </section>
 
-        <section className="stack-sm">
-          <PeoplePicker picked={adding} onChange={setAdding} label={t('chat.group.add')} exclude={conversation.members.map((m) => m.id)} />
+        {squad ? null : (
+          <section className="stack-sm">
+            <PeoplePicker picked={adding} onChange={setAdding} label={t('chat.group.add')} exclude={conversation.members.map((m) => m.id)} />
+            <div>
+              <Button
+                size="sm"
+                icon="users"
+                disabled={!adding.length}
+                loading={busy === 'add'}
+                onClick={async () => {
+                  const ok = await run('add', () =>
+                    api.conversations.addMembers(
+                      conversation.id,
+                      adding.map((p) => p.id),
+                    ),
+                  );
+                  if (ok) setAdding([]);
+                }}
+              >
+                {t('chat.group.addButton')}
+              </Button>
+            </div>
+          </section>
+        )}
+
+        {squad ? null : (
           <div>
             <Button
-              size="sm"
-              icon="users"
-              disabled={!adding.length}
-              loading={busy === 'add'}
+              variant="danger"
+              loading={busy === 'leave'}
               onClick={async () => {
-                const ok = await run('add', () =>
-                  api.conversations.addMembers(
-                    conversation.id,
-                    adding.map((p) => p.id),
-                  ),
-                );
-                if (ok) setAdding([]);
+                if (!confirm(t('chat.group.leaveConfirm'))) return;
+                setBusy('leave');
+                try {
+                  await api.conversations.leave(conversation.id);
+                  onLeft();
+                } catch (e) {
+                  toast(errorMessage(e));
+                  setBusy(null);
+                }
               }}
             >
-              {t('chat.group.addButton')}
+              {t('chat.group.leave')}
             </Button>
           </div>
-        </section>
-
-        <div>
-          <Button
-            variant="danger"
-            loading={busy === 'leave'}
-            onClick={async () => {
-              if (!confirm(t('chat.group.leaveConfirm'))) return;
-              setBusy('leave');
-              try {
-                await api.conversations.leave(conversation.id);
-                onLeft();
-              } catch (e) {
-                toast(errorMessage(e));
-                setBusy(null);
-              }
-            }}
-          >
-            {t('chat.group.leave')}
-          </Button>
-        </div>
+        )}
       </div>
     </BottomSheet>
   );

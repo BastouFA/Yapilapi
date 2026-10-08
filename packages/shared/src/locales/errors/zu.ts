@@ -1235,4 +1235,16 @@ export const zu: Record<string, string> = {
   // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
   'Near you is not enabled.': 'Eduze nawe akuvuliwe.',
   'Zoom in to see what’s here.': 'Sondeza ukuze ubone okulapha.',
+  // Squads (lib/squads.ts, and where posts, stories, chats and chains meet them)
+  "Squad doesn't exist or isn't visible to you.": 'Le squad ayikho noma awukwazi ukuyibona.',
+  'Squads is not enabled.': 'Ama-squad awavuliwe.',
+  'Choose a squad.': 'Khetha i-squad.',
+  'You can be in up to {max} squads.': 'Ungaba kuma-squad angafika ku-{max}.',
+  'You can invite people you follow who follow you back, and your friends.': 'Ungamema abangani bakho, nabantu obalandelayo nabakulandelayo.',
+  'A squad can have up to 10 people.': 'I-squad ingaba nabantu abafika ku-10.',
+  'You can’t join this squad now.': 'Awukwazi ukujoyina le squad manje.',
+  'Make someone else the owner before you leave.': 'Yenza omunye umuntu abe umnikazi ngaphambi kokuthi uhambe.',
+  'This chat belongs to a squad. Change who’s in it from the squad.': 'Le ngxoxo ingeye-squad. Shintsha abakuyo ku-squad.',
+  'Posts shared with a squad stay with it.': 'Okuthunyelwe okwabelwe ne-squad kuhlala kuyo.',
+  'Reels in a squad’s chain are shared with that squad.': 'Ama-reel asochungechungeni lwe-squad abelwa naleyo squad.',
 };

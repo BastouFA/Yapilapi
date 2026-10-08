@@ -15,6 +15,8 @@ import {
   appealDecidedText,
   scheduledPostFailedText,
   signInNoticeText,
+  squadNoticeHref,
+  squadNoticeText,
   togetherNoticeText,
   type MessageKey,
   type NotificationItem,
@@ -117,6 +119,9 @@ const COMMENT_TYPES = new Set(['post_comment', 'comment_reply', 'comment_like', 
 
 function hrefFor(n: NotificationItem, meUsername?: string): string | undefined {
   if (n.type === 'new_sign_in') return '/settings/security?review=sign-in';
+  // Squads: the squad's page (its feed, story, chat and weekly memory).
+  const squad = squadNoticeHref(n);
+  if (squad) return `/squads/${squad}`;
   // Pass the Mic and Fair start: the chain's page, or the reel.
   const mic = micNoticeHref(n);
   if (mic) return 'chain' in mic ? `/chains/${mic.chain}` : `/reels?start=${mic.reel}`;
@@ -197,6 +202,9 @@ function batchedText(n: NotificationItem, t: Session['t'], tp: Session['tp']): s
   // "Ada and 2 others took the mic on your chain", "Fair start finished: 1,000 people saw your reel".
   const mic = micNoticeText(n, t, tp);
   if (mic) return mic;
+  // "Ada invited you to join Crew", "Ada and 2 others shared in Crew", "Your week in Crew is ready".
+  const squad = squadNoticeText(n, t, tp);
+  if (squad) return squad;
   // Whole sentences in your language (the name, when there is one, is part of them).
   if (n.type === 'weekly_wrap') return t('wrap.notif');
   if (n.type === 'watch_invite') return t('watch.invite', { name: n.actor?.displayName ?? t('m.calls.someone') });

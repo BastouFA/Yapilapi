@@ -126,6 +126,12 @@ import type {
   ChainEditInput,
   ChainJoin,
   FairStart,
+  Squad,
+  SquadCard,
+  SquadCreateInput,
+  SquadEditInput,
+  SquadMemory,
+  StorySquad,
   EchoRender,
   ChatTheme,
   ScheduledMessage,
@@ -838,6 +844,30 @@ export function createClient(opts: ClientOptions) {
       pass: (id: string, userIds: string[]) => post<{ passed: number }>(`/v1/chains/${id}/pass`, { userIds }),
     },
     /**
+     * Squads: small private groups of friends (docs/product/squads.md). Share to one with
+     * posts.create({ visibility: 'squad', squadId }) or moments.create({ visibility: 'squad', squadId }).
+     */
+    squads: {
+      /** Your squads, and invites waiting for you first. */
+      list: () => get<{ items: SquadCard[] }>('/v1/squads'),
+      create: (b: SquadCreateInput) => post<{ squad: Squad }>('/v1/squads', b),
+      get: (id: string) => get<{ squad: Squad }>(`/v1/squads/${id}`),
+      /** People you could invite (friends, and people you follow who follow you back), for a new squad or this one. */
+      candidates: (q?: { squadId?: string; q?: string }) => get<{ items: PublicUser[] }>(`/v1/squads/candidates${qs(q ?? {})}`),
+      edit: (id: string, b: SquadEditInput) => patch<{ squad: Squad }>(`/v1/squads/${id}`, b),
+      remove: (id: string) => del<{ ok: true }>(`/v1/squads/${id}`),
+      invite: (id: string, userIds: string[]) => post<{ invited: number; squad: Squad }>(`/v1/squads/${id}/invites`, { userIds }),
+      accept: (id: string) => post<{ squad: Squad }>(`/v1/squads/${id}/accept`),
+      decline: (id: string) => post<{ ok: true }>(`/v1/squads/${id}/decline`),
+      leave: (id: string) => post<{ ok: true }>(`/v1/squads/${id}/leave`),
+      /** Take someone out, or take back an invite (the owner; admins for members). */
+      removeMember: (id: string, userId: string) => del<{ ok: true; squad?: Squad }>(`/v1/squads/${id}/members/${userId}`),
+      setRole: (id: string, userId: string, role: 'admin' | 'member') => put<{ squad: Squad }>(`/v1/squads/${id}/members/${userId}/role`, { role }),
+      makeOwner: (id: string, userId: string) => post<{ squad: Squad }>(`/v1/squads/${id}/owner`, { userId }),
+      posts: (id: string, cursor?: string) => get<Page<Post>>(`/v1/squads/${id}/posts${qs({ cursor })}`),
+      memory: (id: string, memoryId: string) => get<{ memory: SquadMemory }>(`/v1/squads/${id}/memories/${memoryId}`),
+    },
+    /**
      * Near you: what's happening in a box on the map (docs/product/city-map.md). Only the box goes to
      * the server, never where you are; `layers` left out means all of them.
      */
@@ -914,6 +944,8 @@ export function createClient(opts: ClientOptions) {
         /** With expiresIn 'custom': how many hours, 1 to 720. */
         customHours?: number;
         visibility?: string;
+        /** With visibility 'squad': the squad's story (24 hours, its members only). */
+        squadId?: string;
         stickers?: StoryStickerInput[];
         allowReshare?: boolean;
         /** A sound from the library, played in a loop (on a video, instead of its own sound). */
@@ -2023,6 +2055,8 @@ export function createClient(opts: ClientOptions) {
         post<{ minutesToday: number; dailyLimitMinutes: number | null; overLimit: boolean; quietNow: boolean; supervised: boolean }>('/v1/me/usage/heartbeat'),
     },
     admin: {
+      /** How many squads, people in them, open invites, and posts shared to squads this week. */
+      squads: () => get<{ squads: number; members: number; invites: number; postsThisWeek: number }>('/v1/admin/squads'),
       /** Chains this week and the fair-start pool. */
       passTheMic: () =>
         get<{
@@ -2852,6 +2886,9 @@ export interface Story {
   allowReshare?: boolean;
   /** Music playing with the story (null when there is none, or you can't see its sound). */
   music: StoryMusic | null;
+  /** On a squad's story: the squad, and whose story it is. */
+  squadId?: string;
+  author?: PublicUser;
 }
 
 export interface StoryGroup {
@@ -2859,6 +2896,8 @@ export interface StoryGroup {
   mine: boolean;
   allSeen: boolean;
   moments: Story[];
+  /** A squad's ring: every member's stories for the squad (each says whose it is), shown with its cover. */
+  squad?: StorySquad;
 }
 
 export interface TrendingTag {

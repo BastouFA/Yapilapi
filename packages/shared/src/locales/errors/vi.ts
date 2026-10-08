@@ -1211,4 +1211,16 @@ export const vi: Record<string, string> = {
   // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
   'Near you is not enabled.': 'Gần bạn chưa được bật.',
   'Zoom in to see what’s here.': 'Phóng to để xem có gì ở đây.',
+  // Squads (lib/squads.ts, and where posts, stories, chats and chains meet them)
+  "Squad doesn't exist or isn't visible to you.": 'Squad này không tồn tại hoặc bạn không xem được.',
+  'Squads is not enabled.': 'Squad chưa được bật.',
+  'Choose a squad.': 'Hãy chọn một squad.',
+  'You can be in up to {max} squads.': 'Bạn có thể ở trong tối đa {max} squad.',
+  'You can invite people you follow who follow you back, and your friends.': 'Bạn có thể mời bạn bè, và những người bạn theo dõi cũng theo dõi lại bạn.',
+  'A squad can have up to 10 people.': 'Một squad có tối đa 10 người.',
+  'You can’t join this squad now.': 'Bạn không thể tham gia squad này lúc này.',
+  'Make someone else the owner before you leave.': 'Hãy đặt người khác làm chủ trước khi rời đi.',
+  'This chat belongs to a squad. Change who’s in it from the squad.': 'Cuộc trò chuyện này thuộc về một squad. Hãy thay đổi thành viên từ squad.',
+  'Posts shared with a squad stay with it.': 'Bài đăng chia sẻ với squad sẽ ở lại trong squad.',
+  'Reels in a squad’s chain are shared with that squad.': 'Reel trong chuỗi của squad được chia sẻ với squad đó.',
 };

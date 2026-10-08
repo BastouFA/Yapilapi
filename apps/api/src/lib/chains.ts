@@ -3,7 +3,7 @@ import { CHAIN_RULES, extractMentions, type Chain, type ChainBlock, type ChainJo
 import { AppError, badRequest, forbidden, notFound } from './errors.ts';
 import { minorRuleSql } from './collabs.ts';
 import { mentionAllowedSql } from './interactions.ts';
-import { notBlockedSql, postVisibleSql } from './visibility.ts';
+import { notBlockedSql, postVisibleSql, squadMemberSql } from './visibility.ts';
 import { plusCol, publicUserFrom, usernameInListSql } from './users.ts';
 import { mediaSizesSql, withSmallVariants } from './data-saver.ts';
 import { soundUsableSql } from './sounds.ts';
@@ -34,9 +34,16 @@ export const liveLinkSql = (l = 'l') =>
   `EXISTS (SELECT 1 FROM posts lp JOIN users lu ON lu.id = lp.author_id
            WHERE lp.id = ${l}.post_id AND lp.deleted_at IS NULL AND lp.status = 'published' AND lp.moderation_status = 'normal' AND lu.status = 'active')`;
 
-/** Chain `ch` is there for viewer `v`: its starter's account is active and neither blocked the other. */
+/**
+ * Chain `ch` is there for viewer `v`: its starter's account is active and neither blocked the other.
+ * A squad's chain (lib/squads.ts) is there for the squad's members only.
+ */
 export const chainSeenSql = (v: string, ch = 'ch') =>
-  `(EXISTS (SELECT 1 FROM users su WHERE su.id = ${ch}.starter_id AND su.status = 'active') AND ${notBlockedSql(`${ch}.starter_id`, v)})`;
+  `(EXISTS (SELECT 1 FROM users su WHERE su.id = ${ch}.starter_id AND su.status = 'active') AND ${notBlockedSql(`${ch}.starter_id`, v)}
+    AND (${ch}.squad_id IS NULL OR ${squadMemberSql(`${ch}.squad_id`, v)}))`;
+
+/** The squad of chain `ch`, for its members (Chain.squad): a json object, or NULL. */
+const squadRefSql = (ch = 'ch') => `(SELECT json_build_object('id', sq.id, 'name', sq.name, 'color', sq.color) FROM squads sq WHERE sq.id = ${ch}.squad_id)`;
 
 /** Why viewer `v` can't take the mic on chain `ch` now (a ChainBlock), or NULL when they can. The chain is seen (chainSeenSql). */
 export const chainBlockSql = (v: string, ch = 'ch') =>
@@ -85,9 +92,17 @@ export function assertPromptOk(prompt: string): void {
     );
 }
 
-/** The shape a reel must have to start or join a chain, with the message when it hasn't. */
-function assertChainable(p: { format: string; visibility: string; community_id: string | null }) {
+/**
+ * The shape a reel must have to start or join a chain, with the message when it hasn't. A squad's
+ * chain takes reels shared with that squad, and a reel shared with a squad only starts one for it.
+ */
+function assertChainable(p: { format: string; visibility: string; community_id: string | null; squad_id?: string | null }, chainSquad?: string | null) {
   if (p.format !== 'reel') throw badRequest('Chains are made of reels posted right away.');
+  if (chainSquad || (chainSquad === undefined && p.visibility === 'squad')) {
+    if (p.visibility !== 'squad' || !p.squad_id || (chainSquad && p.squad_id !== chainSquad))
+      throw badRequest('Reels in a squad’s chain are shared with that squad.');
+    return;
+  }
   if (p.community_id || !['public', 'followers', 'friends'].includes(p.visibility))
     throw badRequest('Only reels shared publicly, with followers or with friends can be in a chain.');
 }
@@ -104,8 +119,8 @@ export interface ChainJoined {
  * as its next link, after checking they may take the mic. Hidden chains are "not found".
  */
 export async function joinChain(c: PoolClient, userId: string, chainId: string, postId: string): Promise<ChainJoined> {
-  const { rows } = await c.query<{ starter_id: string; block: ChainBlock | null }>(
-    `SELECT ch.starter_id, ${chainBlockSql('$1')} AS block FROM reel_chains ch WHERE ch.id = $2 AND ${chainSeenSql('$1')} FOR UPDATE`,
+  const { rows } = await c.query<{ starter_id: string; squad_id: string | null; block: ChainBlock | null }>(
+    `SELECT ch.starter_id, ch.squad_id, ${chainBlockSql('$1')} AS block FROM reel_chains ch WHERE ch.id = $2 AND ${chainSeenSql('$1')} FOR UPDATE`,
     [userId, chainId],
   );
   const ch = rows[0];
@@ -115,8 +130,8 @@ export async function joinChain(c: PoolClient, userId: string, chainId: string, 
     userId,
   ]);
   if (today.rows[0]!.n >= CHAIN_RULES.linksPerDay) throw new AppError(429, 'chain_limit', 'You’ve added a lot of reels to chains today. Try again tomorrow.');
-  const p = (await c.query(`SELECT format, visibility, community_id FROM posts WHERE id = $1`, [postId])).rows[0];
-  assertChainable(p);
+  const p = (await c.query(`SELECT format, visibility, community_id, squad_id FROM posts WHERE id = $1`, [postId])).rows[0];
+  assertChainable(p, ch.squad_id);
   const prev = await c.query<{ author_id: string }>(
     `SELECT l.author_id FROM reel_chain_links l WHERE l.chain_id = $1 AND ${liveLinkSql()} ORDER BY l.position DESC LIMIT 1`,
     [chainId],
@@ -136,7 +151,7 @@ export async function joinChain(c: PoolClient, userId: string, chainId: string, 
 export async function startChain(c: Q, userId: string, postId: string, prompt: string, whoCanJoin?: ChainJoin): Promise<string> {
   const p = (
     await c.query(
-      `SELECT p.format, p.visibility, p.community_id, p.sound_id, EXISTS (SELECT 1 FROM reel_chain_links l WHERE l.post_id = p.id) AS chained
+      `SELECT p.format, p.visibility, p.community_id, p.sound_id, p.squad_id, EXISTS (SELECT 1 FROM reel_chain_links l WHERE l.post_id = p.id) AS chained
        FROM posts p WHERE p.id = $1 AND p.author_id = $2 AND p.deleted_at IS NULL AND p.status = 'published'`,
       [postId, userId],
     )
@@ -145,10 +160,12 @@ export async function startChain(c: Q, userId: string, postId: string, prompt: s
   assertChainable(p);
   if (p.chained) throw new AppError(409, 'conflict', 'That reel is already in a chain.');
   assertPromptOk(prompt);
-  const join = whoCanJoin ?? (await defaultChainJoin(c, userId));
+  // A squad's chain is for everyone in the squad (and nobody else sees it).
+  const squadId = p.visibility === 'squad' ? (p.squad_id as string) : null;
+  const join = whoCanJoin ?? (squadId ? 'everyone' : await defaultChainJoin(c, userId));
   const { rows } = await c.query<{ id: string }>(
-    `INSERT INTO reel_chains (starter_id, first_post_id, prompt, sound_id, who_can_join, next_position) VALUES ($1, $2, $3, $4, $5, 2) RETURNING id`,
-    [userId, postId, prompt, p.sound_id ?? null, join],
+    `INSERT INTO reel_chains (starter_id, first_post_id, prompt, sound_id, who_can_join, next_position, squad_id) VALUES ($1, $2, $3, $4, $5, 2, $6) RETURNING id`,
+    [userId, postId, prompt, p.sound_id ?? null, join, squadId],
   );
   await c.query(`INSERT INTO reel_chain_links (post_id, chain_id, author_id, position) VALUES ($1, $2, $3, 1)`, [postId, rows[0]!.id, userId]);
   return rows[0]!.id;
@@ -320,6 +337,7 @@ export async function chainsById(db: Q, ids: string[], viewer: string | null, se
   if (!ids.length) return [];
   const { rows } = await db.query(
     `SELECT ch.id, ch.prompt, ch.who_can_join, ch.created_at, ch.last_link_at, (ch.starter_id IS NOT DISTINCT FROM $1) AS is_starter, ${chainBlockSql('$1')} AS block,
+            ${squadRefSql()} AS squad,
             ${countsSql()},
             CASE WHEN ${soundUsableSql('$1')} THEN json_build_object('id', s.id, 'title', s.title) END AS sound,
             first.post_id AS first_post_id,
@@ -350,6 +368,7 @@ export async function chainsById(db: Q, ids: string[], viewer: string | null, se
         cover: r.cover ? withSmallVariants(r.cover as MediaItem) : null,
         firstPostId: r.first_post_id ?? null,
         viewer: { canJoin: !r.block, isStarter: r.is_starter, why: r.block ?? null },
+        ...(r.squad ? { squad: r.squad } : {}),
       } satisfies Chain,
     ]),
   );

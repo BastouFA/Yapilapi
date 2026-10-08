@@ -7,6 +7,7 @@ import { Alert, Image, Linking, ScrollView, Text, View } from 'react-native';
 import type { EditorParamsInput } from '../../../../packages/shared/src/filters';
 import type { MessageKey } from '../../../../packages/shared/src/i18n-core';
 import type { CaptionIdeas, Circle, MediaItem, PublicUser } from '../../../../packages/shared/src/types';
+import type { SquadCard } from '../../../../packages/shared/src/squads';
 import {
   AUDIO_POST_MAX_MS,
   AUDIO_POST_MIN_MS,
@@ -77,7 +78,7 @@ const EXPIRES = [
 
 type Kind = (typeof KINDS)[number]['id'];
 /** 'circle' is offered for posts and reels once you have a circle; the post goes to the one chosen. */
-type Visibility = (typeof VISIBILITY)[number]['id'] | 'circle';
+type Visibility = (typeof VISIBILITY)[number]['id'] | 'circle' | 'squad';
 type Attached = Uploaded & { local: string; seconds: number | null };
 /** A photo or video after the first in a post (a carousel). `tags`: a draft's photo tags, kept as they are. */
 type Extra = Attached & { altText: string; tags?: { userId: string; x: number; y: number }[] };
@@ -106,10 +107,12 @@ export default function Create() {
     remixOf?: string;
     remixMode?: string;
     chain?: string;
+    /** From a squad's screen: shared with that squad. */
+    squad?: string;
   }>();
   const [kind, setKind] = useState<Kind>(kindFrom(params.mode) ?? 'post');
   const [body, setBody] = useState('');
-  const [visibility, setVisibility] = useState<Visibility>(kind === 'story' ? 'friends' : 'public');
+  const [visibility, setVisibility] = useState<Visibility>(params.squad ? 'squad' : kind === 'story' ? 'friends' : 'public');
   const [expiresIn, setExpiresIn] = useState<(typeof EXPIRES)[number]['id']>('24h');
   // With a chosen length: how many hours the story stays up (1 to 720), as typed.
   const [customHours, setCustomHours] = useState('48');
@@ -173,7 +176,7 @@ export default function Create() {
   const [originalMissing, setOriginalMissing] = useState(false);
   // Pass the Mic: the chain this reel joins ("Take the mic"), or a new chain it starts (a prompt, and who can take the mic).
   const micOn = useFlag('PASS_THE_MIC') === true;
-  const [joining, setJoining] = useState<{ id: string; prompt: string; closed: boolean } | null>(null);
+  const [joining, setJoining] = useState<{ id: string; prompt: string; closed: boolean; squadId: string | null } | null>(null);
   const [starting, setStarting] = useState(false);
   const [chainPrompt, setChainPrompt] = useState('');
   const [chainJoin, setChainJoin] = useState<ChainJoin | null>(null);
@@ -218,6 +221,9 @@ export default function Create() {
   // Your circles, for sharing a post or reel with one of them. null until loaded.
   const [circles, setCircles] = useState<Circle[] | null>(null);
   const [circleId, setCircleId] = useState<string | null>(null);
+  // Squads you're in: posts, reels and stories can go to one ("Squad: Crew"). null until loaded.
+  const [squads, setSquads] = useState<SquadCard[] | null>(null);
+  const [squadId, setSquadId] = useState<string | null>(params.squad || null);
 
   function switchTo(k: Kind) {
     setKind(k);
@@ -295,6 +301,16 @@ export default function Create() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.remixOf]);
 
+  // "Share with the squad" (a squad's screen) opens this tab with that squad as the audience.
+  useEffect(() => {
+    if (!params.squad) return;
+    setVisibility('squad');
+    setSquadId(params.squad);
+    setCloseFriends(false);
+    setKeptAudience(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.squad]);
+
   // "Take the mic" (Reels, a chain's page, through the camera) opens this tab as a reel joining that
   // chain, with the chain's sound when there is one.
   useEffect(() => {
@@ -310,9 +326,12 @@ export default function Create() {
     client()
       .then(async (api) => {
         const { chain } = await api.chains.get(id);
-        setJoining({ id: chain.id, prompt: chain.prompt, closed: chain.closed });
-        // Joining a chain is sharing it with people: a reel for everyone, followers or friends.
-        setVisibility((v) => (v === 'public' || v === 'followers' || v === 'friends' ? v : 'public'));
+        setJoining({ id: chain.id, prompt: chain.prompt, closed: chain.closed, squadId: chain.squad?.id ?? null });
+        // Joining a chain is sharing it with people: a reel for everyone, followers or friends; a squad's chain, for the squad.
+        if (chain.squad) {
+          setVisibility('squad');
+          setSquadId(chain.squad.id);
+        } else setVisibility((v) => (v === 'public' || v === 'followers' || v === 'friends' ? v : 'public'));
         setKeptAudience(null);
         if (chain.sound) {
           const r = await api.sounds.get(chain.sound.id);
@@ -432,6 +451,15 @@ export default function Create() {
         if (!r.items.length) setVisibility((v) => (v === 'circle' ? 'public' : v));
       })
       .catch(() => setCircles((cur) => cur ?? []));
+    void client()
+      .then((api) => api.squads.list())
+      .then((r) => {
+        const mine = r.items.filter((x) => x.role);
+        setSquads(mine);
+        setSquadId((cur) => (cur && mine.some((x) => x.id === cur) ? cur : mine.length === 1 ? mine[0]!.id : null));
+        if (!mine.length) setVisibility((v) => (v === 'squad' ? 'public' : v));
+      })
+      .catch(() => setSquads((cur) => cur ?? []));
   }, [me, focused]);
   const [incoming, setIncoming] = useState<ReturnType<typeof takePendingAsset>>(null);
   useEffect(() => {
@@ -614,7 +642,7 @@ export default function Create() {
           circleId: keptAudience.circleId ?? undefined,
           audience: keptAudience.audience.length ? keptAudience.audience : undefined,
         }
-      : { visibility, ...(visibility === 'circle' && circleId ? { circleId } : {}) };
+      : { visibility, ...(visibility === 'circle' && circleId ? { circleId } : {}), ...(visibility === 'squad' && squadId ? { squadId } : {}) };
     const described = altText.trim() ? { altText: altText.trim() } : {};
     const assisted = aiUsed ? { aiAssisted: true } : {};
     // Only when it differs from the account's choice: left out, the post follows the account.
@@ -644,7 +672,7 @@ export default function Create() {
         ...(joining && chainable
           ? { chainId: joining.id }
           : starting && chainable && chainPrompt.trim()
-            ? { chainPrompt: chainPrompt.trim(), ...(chainJoin ? { chainJoin } : {}) }
+            ? { chainPrompt: chainPrompt.trim(), ...(chainJoin && visibility !== 'squad' ? { chainJoin } : {}) }
             : {}),
       };
     }
@@ -756,6 +784,7 @@ export default function Create() {
           expiresIn,
           customHours: expiresIn === 'custom' ? Math.min(720, Math.max(1, Math.round(Number(customHours)) || 24)) : undefined,
           visibility: closeFriends ? 'close_friends' : visibility === 'subscribers' || visibility === 'circle' ? 'friends' : visibility,
+          ...(!closeFriends && visibility === 'squad' && squadId ? { squadId } : {}),
           allowReshare,
           stickers: stickers.map(({ key: _key, label: _label, ...s }) => s),
           music: music ? musicInput(music) : undefined,
@@ -797,15 +826,20 @@ export default function Create() {
     !draftId &&
     !keptAudience &&
     !keptParts?.fields.communityId &&
-    (visibility === 'public' || visibility === 'followers' || visibility === 'friends');
+    (joining?.squadId
+      ? visibility === 'squad' && squadId === joining.squadId
+      : visibility === 'public' || visibility === 'followers' || visibility === 'friends' || (visibility === 'squad' && !!squadId && !joining));
   const inChain = chainable && (!!joining || (starting && !!chainPrompt.trim()));
   const forCircle = kind !== 'story' && !keptAudience && visibility === 'circle';
   const chosenCircle = circles?.find((x) => x.id === circleId) ?? null;
+  const forSquad = !keptAudience && !(kind === 'story' && closeFriends) && visibility === 'squad';
+  const chosenSquad = squads?.find((x) => x.id === squadId) ?? null;
   const canPublish =
     !busy &&
     !keeping &&
     !uploading &&
     (!forCircle || !!chosenCircle) &&
+    (!forSquad || !!chosenSquad) &&
     (kind !== 'reel' || !remix || !!original) &&
     (!starting || !chainable || !!chainPrompt.trim()) &&
     (kind !== 'post' || !poll || pollOptions.length >= 2) &&
@@ -817,9 +851,12 @@ export default function Create() {
         (kind === 'story' && (stickers.length > 0 || !!music)));
   const audienceOptions: { id: Visibility; label: string }[] = [
     ...VISIBILITY.filter((v) => v.id !== 'subscribers' || (hasPlans && kind !== 'story'))
-      // Taking the mic: the reel is shared with everyone, followers or friends.
-      .filter((v) => !(kind === 'reel' && joining) || v.id === 'public' || v.id === 'followers' || v.id === 'friends')
+      // Taking the mic: the reel is shared with everyone, followers or friends (a squad's chain: the squad, below).
+      .filter((v) => !(kind === 'reel' && joining) || (!joining.squadId && (v.id === 'public' || v.id === 'followers' || v.id === 'friends')))
       .map((v) => ({ id: v.id, label: t(v.label) })),
+    ...(squads?.length && !(kind === 'reel' && joining && !joining.squadId)
+      ? [{ id: 'squad' as const, label: forSquad && chosenSquad ? t('squads.audience', { name: chosenSquad.name }) : t('visibility.squad') }]
+      : []),
     ...(kind !== 'story' && !(kind === 'reel' && joining) && circles?.length
       ? [{ id: 'circle' as const, label: forCircle && chosenCircle ? t('m.create.circle', { name: chosenCircle.name }) : t('visibility.circle') }]
       : []),
@@ -1214,6 +1251,14 @@ export default function Create() {
                   />
                 </View>
               ) : null}
+              {forSquad && squads && squads.length > 1 && !joining?.squadId ? (
+                <Chips
+                  label={t('visibility.squad')}
+                  options={squads.map((x) => ({ id: x.id, label: x.name, icon: 'people-outline' as const }))}
+                  value={squadId}
+                  onChange={setSquadId}
+                />
+              ) : null}
               {kind !== 'story' && circles && !circles.length ? (
                 <Button
                   label={t('m.create.makeCircle')}
@@ -1273,7 +1318,12 @@ export default function Create() {
                     maxLength={CHAIN_RULES.promptMax}
                     hint={t('mic.mention')}
                   />
-                  <JoinChoice value={chainJoin} onChange={setChainJoin} />
+                  {visibility === 'squad' ? (
+                    // A squad's chain is for the squad: only its people see it and take the mic.
+                    <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('squads.chainOnly', { name: chosenSquad?.name ?? '' })}</Text>
+                  ) : (
+                    <JoinChoice value={chainJoin} onChange={setChainJoin} />
+                  )}
                 </>
               ) : null}
             </View>

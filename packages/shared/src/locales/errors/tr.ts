@@ -1219,4 +1219,16 @@ export const tr: Record<string, string> = {
   // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
   'Near you is not enabled.': 'Yakınında özelliği etkin değil.',
   'Zoom in to see what’s here.': 'Burada ne olduğunu görmek için yakınlaştır.',
+  // Squads (lib/squads.ts, and where posts, stories, chats and chains meet them)
+  "Squad doesn't exist or isn't visible to you.": 'Bu ekip yok ya da onu göremiyorsun.',
+  'Squads is not enabled.': 'Ekipler etkin değil.',
+  'Choose a squad.': 'Bir ekip seç.',
+  'You can be in up to {max} squads.': 'En fazla {max} ekipte olabilirsin.',
+  'You can invite people you follow who follow you back, and your friends.': 'Arkadaşlarını ve karşılıklı takipleştiğin kişileri davet edebilirsin.',
+  'A squad can have up to 10 people.': 'Bir ekipte en fazla 10 kişi olabilir.',
+  'You can’t join this squad now.': 'Şu anda bu ekibe katılamazsın.',
+  'Make someone else the owner before you leave.': 'Ayrılmadan önce başka birini sahip yap.',
+  'This chat belongs to a squad. Change who’s in it from the squad.': 'Bu sohbet bir ekibe ait. Kimlerin içinde olduğunu ekipten değiştir.',
+  'Posts shared with a squad stay with it.': 'Bir ekiple paylaşılan gönderiler ekipte kalır.',
+  'Reels in a squad’s chain are shared with that squad.': 'Bir ekibin zincirindeki reel’ler o ekiple paylaşılır.',
 };

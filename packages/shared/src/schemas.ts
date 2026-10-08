@@ -262,6 +262,8 @@ export const createPostSchema = z
     body: z.string().trim().max(5000).default(''),
     visibility: z.enum(POST_VISIBILITIES).default('public'),
     circleId: uuid.optional(),
+    /** With visibility 'squad': the squad (you're in) it's shared with. */
+    squadId: uuid.optional(),
     audience: z.array(uuid).max(200).optional(),
     communityId: uuid.optional(),
     eventId: uuid.optional(),
@@ -341,7 +343,7 @@ export const createPostSchema = z
     if (v.chainId || v.chainPrompt) {
       const refuse = (message: string) => ctx.addIssue({ code: 'custom', message, path: [v.chainId ? 'chainId' : 'chainPrompt'] });
       if (v.format !== 'reel' || v.draft || v.scheduledAt || v.echo || (v.chainId && v.chainPrompt)) refuse('Chains are made of reels posted right away.');
-      else if (v.communityId || !['public', 'followers', 'friends'].includes(v.visibility))
+      else if (v.communityId || !['public', 'followers', 'friends', 'squad'].includes(v.visibility))
         refuse('Only reels shared publicly, with followers or with friends can be in a chain.');
     }
     if (v.allowEchoes && v.format !== 'reel') ctx.addIssue({ code: 'custom', message: 'Only reels can be echoed.', path: ['allowEchoes'] });
@@ -350,6 +352,7 @@ export const createPostSchema = z
     if (!v.body && v.media.length === 0 && !v.linkUrl && !v.poll)
       ctx.addIssue({ code: 'custom', message: 'A post needs text, media, a link or a poll.', path: ['body'] });
     if (v.visibility === 'circle' && !v.circleId) ctx.addIssue({ code: 'custom', message: 'Choose a circle.', path: ['circleId'] });
+    if (v.visibility === 'squad' && (!v.squadId || v.communityId)) ctx.addIssue({ code: 'custom', message: 'Choose a squad.', path: ['squadId'] });
     if (v.visibility === 'selected' && !v.audience?.length) ctx.addIssue({ code: 'custom', message: 'Choose at least one person.', path: ['audience'] });
     if (v.kind === 'poll' && !v.poll) ctx.addIssue({ code: 'custom', message: 'Add poll options.', path: ['poll'] });
     if (v.format === 'reel' && (v.media.length !== 1 || v.media[0]!.kind !== 'video'))
@@ -828,8 +831,9 @@ export const createMomentSchema = z.object({
     .min(1)
     .max(24 * 30)
     .optional(),
-  /** 'close_friends': only the people on your close friends list. */
+  /** 'close_friends': only the people on your close friends list. 'squad': the squad's story (squadId), for 24 hours. */
   visibility: z.enum(STORY_VISIBILITIES).default('friends'),
+  squadId: uuid.optional(),
   locationText: z.string().max(200).optional(),
   /** Mentions, hashtags and interactive stickers placed on the story. */
   stickers: storyStickersSchema,
@@ -843,7 +847,8 @@ export const createMomentSchema = z.object({
 export const reshareMomentSchema = z.object({
   body: z.string().trim().max(500).default(''),
   expiresIn: z.enum(['1h', '24h', 'permanent']).default('24h'),
-  visibility: z.enum(STORY_VISIBILITIES).default('friends'),
+  /** A reshare goes to your own people: never to a squad's story. */
+  visibility: z.enum(STORY_VISIBILITIES).exclude(['squad']).default('friends'),
   stickers: storyStickersSchema,
 });
 

@@ -245,6 +245,8 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     const visibility: string = input.visibility ?? post.visibility;
     if (visibility !== post.visibility) {
       if (post.community_id) throw badRequest('Posts in a community are shared with its members.');
+      // What members said under a squad's post was said to the squad: it never opens up to more people.
+      if (post.visibility === 'squad') throw badRequest('Posts shared with a squad stay with it.');
       if (post.has_collabs && !['public', 'followers', 'friends'].includes(visibility))
         throw badRequest('Posts with co-authors can be shared publicly, with followers or with friends.');
       if (visibility === 'subscribers' && post.is_echo) throw badRequest("An echo can't be for subscribers only: it shows someone else's reel.");

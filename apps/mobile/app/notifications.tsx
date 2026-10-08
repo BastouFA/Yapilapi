@@ -8,6 +8,7 @@ import { miniAppNoticeText } from '../../../packages/shared/src/mini-apps';
 import { togetherNoticeText } from '../../../packages/shared/src/together';
 import { echoNoticeText } from '../../../packages/shared/src/echoes';
 import { micNoticeText } from '../../../packages/shared/src/pass-the-mic';
+import { squadNoticeText } from '../../../packages/shared/src/squads';
 import { scheduledPostFailedText } from '../../../packages/shared/src/job-failures';
 import { signInNoticeText } from '../../../packages/shared/src/server-text';
 import { fullCount, milestoneNoticeText } from '../../../packages/shared/src/post-stats';
@@ -159,6 +160,9 @@ function describe(g: Group, tr: Translator): string {
   // Pass the Mic: "Ada took the mic on your chain", a pass, and a finished fair start.
   const mic = micNoticeText(n, t, tp);
   if (mic) return mic;
+  // Squads: an invite, someone joining, new posts (batched) and the weekly memory.
+  const squad = squadNoticeText(n, t, tp);
+  if (squad) return squad;
   // Market: offers and answers to them, a sale to you, a rating, and listings ending.
   const market = marketNoticeText(n, t, tp);
   if (market) return market;

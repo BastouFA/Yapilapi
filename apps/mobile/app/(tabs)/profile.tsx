@@ -23,6 +23,7 @@ export default function ProfileScreen() {
   const memories = useFlag('MEMORY');
   const together = useFlag('REAL_TOGETHER');
   const live = useFlag('LIVE');
+  const squadsOn = useFlag('SQUADS');
 
   if (me === null)
     return (
@@ -37,6 +38,7 @@ export default function ProfileScreen() {
     { label: t('m.you.archive'), icon: 'archive-outline', href: '/archive' },
     { label: t('memories.title'), icon: 'images-outline', href: '/memories', on: memories === true },
     { label: t('m.you.recaps'), icon: 'film-outline', href: '/recaps' },
+    { label: t('squads.title'), icon: 'people-outline', href: '/squads', on: squadsOn !== false },
     { label: t('m.circles.title'), icon: 'ellipse-outline', href: '/circles' },
     { label: t('m.closeFriends.title'), icon: 'star-outline', href: '/close-friends' },
     { label: t('events.title'), icon: 'calendar-outline', href: '/events' },

@@ -1187,4 +1187,16 @@ export const ko: Record<string, string> = {
   // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
   'Near you is not enabled.': '내 주변 기능이 켜져 있지 않아요.',
   'Zoom in to see what’s here.': '확대하면 여기에 무엇이 있는지 볼 수 있어요.',
+  // Squads (lib/squads.ts, and where posts, stories, chats and chains meet them)
+  "Squad doesn't exist or isn't visible to you.": '이 스쿼드는 없거나 볼 수 없어요.',
+  'Squads is not enabled.': '스쿼드가 켜져 있지 않아요.',
+  'Choose a squad.': '스쿼드를 선택하세요.',
+  'You can be in up to {max} squads.': '스쿼드는 최대 {max}개까지 참여할 수 있어요.',
+  'You can invite people you follow who follow you back, and your friends.': '친구와 서로 팔로우하는 사람을 초대할 수 있어요.',
+  'A squad can have up to 10 people.': '스쿼드는 최대 10명까지예요.',
+  'You can’t join this squad now.': '지금은 이 스쿼드에 참여할 수 없어요.',
+  'Make someone else the owner before you leave.': '나가기 전에 다른 사람을 소유자로 지정하세요.',
+  'This chat belongs to a squad. Change who’s in it from the squad.': '이 채팅은 스쿼드의 채팅이에요. 멤버는 스쿼드에서 바꾸세요.',
+  'Posts shared with a squad stay with it.': '스쿼드에 공유한 게시물은 스쿼드에 남아요.',
+  'Reels in a squad’s chain are shared with that squad.': '스쿼드 릴레이의 릴스는 그 스쿼드에 공유돼요.',
 };

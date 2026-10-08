@@ -58,5 +58,7 @@ export * from './app-links.ts';
 export * from './post-stats.ts';
 export * from './pass-the-mic.ts';
 export * from './pass-the-mic-schemas.ts';
+export * from './squads.ts';
+export * from './squad-schemas.ts';
 export * from './city-map.ts';
 export * from './city-map-schemas.ts';

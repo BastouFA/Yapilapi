@@ -1218,4 +1218,16 @@ export const id: Record<string, string> = {
   // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
   'Near you is not enabled.': 'Di dekat Anda tidak diaktifkan.',
   'Zoom in to see what’s here.': 'Perbesar untuk melihat apa yang ada di sini.',
+  // Squads (lib/squads.ts, and where posts, stories, chats and chains meet them)
+  "Squad doesn't exist or isn't visible to you.": 'Squad ini tidak ada atau tidak terlihat oleh Anda.',
+  'Squads is not enabled.': 'Squad belum diaktifkan.',
+  'Choose a squad.': 'Pilih squad.',
+  'You can be in up to {max} squads.': 'Anda bisa berada di paling banyak {max} squad.',
+  'You can invite people you follow who follow you back, and your friends.': 'Anda bisa mengundang teman, dan orang yang Anda ikuti dan mengikuti Anda.',
+  'A squad can have up to 10 people.': 'Satu squad bisa berisi paling banyak 10 orang.',
+  'You can’t join this squad now.': 'Anda tidak bisa bergabung ke squad ini sekarang.',
+  'Make someone else the owner before you leave.': 'Jadikan orang lain pemilik sebelum Anda keluar.',
+  'This chat belongs to a squad. Change who’s in it from the squad.': 'Chat ini milik sebuah squad. Ubah siapa yang ada di dalamnya dari squad.',
+  'Posts shared with a squad stay with it.': 'Postingan yang dibagikan ke squad tetap ada di squad itu.',
+  'Reels in a squad’s chain are shared with that squad.': 'Reel dalam rantai squad dibagikan ke squad itu.',
 };

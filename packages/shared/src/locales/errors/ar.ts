@@ -1292,4 +1292,16 @@ export const ar: Record<string, string> = {
   // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
   'Near you is not enabled.': 'ميزة «بالقرب منك» غير مفعّلة.',
   'Zoom in to see what’s here.': 'كبّر الخريطة لترى ما هنا.',
+  // Squads (lib/squads.ts, and where posts, stories, chats and chains meet them)
+  "Squad doesn't exist or isn't visible to you.": 'هذه الشلّة غير موجودة أو لا يمكنك رؤيتها.',
+  'Squads is not enabled.': 'الشلل غير مفعّلة.',
+  'Choose a squad.': 'اختر شلّة.',
+  'You can be in up to {max} squads.': 'يمكنك أن تكون في {max} شلّة على الأكثر.',
+  'You can invite people you follow who follow you back, and your friends.': 'يمكنك دعوة أصدقائك، ومن تتابعهم ويتابعونك.',
+  'A squad can have up to 10 people.': 'يمكن أن تضم الشلّة 10 أشخاص على الأكثر.',
+  'You can’t join this squad now.': 'لا يمكنك الانضمام إلى هذه الشلّة الآن.',
+  'Make someone else the owner before you leave.': 'اجعل شخصًا آخر هو المالك قبل أن تغادر.',
+  'This chat belongs to a squad. Change who’s in it from the squad.': 'هذه الدردشة تابعة لشلّة. غيّر من فيها من الشلّة نفسها.',
+  'Posts shared with a squad stay with it.': 'المنشورات التي شوركت مع شلّة تبقى فيها.',
+  'Reels in a squad’s chain are shared with that squad.': 'المقاطع في سلسلة الشلّة تُشارك مع تلك الشلّة.',
 };

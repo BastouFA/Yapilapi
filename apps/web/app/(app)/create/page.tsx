@@ -44,6 +44,7 @@ import {
   fullCount,
   type Chain,
   type ChainJoin,
+  type SquadCard,
 } from '@yapilapi/shared';
 
 /** Posts can be for subscribers, stories for close friends; one picker holds either. */
@@ -121,7 +122,8 @@ function Create() {
           : 'post';
   const [kind, setKind] = useState<'post' | 'reel' | 'story'>(initialMode);
   const [body, setBody] = useState(() => (params.get('text') ?? '').slice(0, 5000));
-  const [visibility, setVisibility] = useState<Audience>(initialMode === 'story' ? 'friends' : 'public');
+  // From a squad's page (?squad=): shared with that squad.
+  const [visibility, setVisibility] = useState<Audience>(params.get('squad') ? 'squad' : initialMode === 'story' ? 'friends' : 'public');
   const [original, setOriginal] = useState<Post | null>(null);
   const [originalMissing, setOriginalMissing] = useState(false);
   const [soundTitle, setSoundTitle] = useState('');
@@ -136,6 +138,9 @@ function Create() {
   const [communities, setCommunities] = useState<Community[]>([]);
   const [circles, setCircles] = useState<{ id: string; name: string }[]>([]);
   const [circleId, setCircleId] = useState('');
+  // Squads you're in: each is its own audience ("Squad: Crew"), for posts, reels and stories.
+  const [squads, setSquads] = useState<SquadCard[]>([]);
+  const [squadId, setSquadId] = useState(params.get('squad') ?? '');
   // Posting for subscribers needs a subscription plan (set up in Studio).
   const [hasPlans, setHasPlans] = useState(false);
   const [media, setMedia] = useState<Uploaded[]>([]);
@@ -233,14 +238,18 @@ function Create() {
       live = false;
     };
   }, [me, flags.FAIR_START, kind, draftId]);
-  // A chain reel goes up now, to everyone, followers or friends, outside communities.
-  const chainAudience = kind === 'reel' && !communityId && chainableAudience(visibility);
+  // A chain reel goes up now, to everyone, followers or friends, outside communities; or to a squad, for a chain of that squad's.
+  const chainAudience = kind === 'reel' && !communityId && (chainableAudience(visibility) || (visibility === 'squad' && !!squadId));
   const joining = kind === 'reel' && !!chainId;
   const starting = kind === 'reel' && micOn && !chainId && startChain && chainAudience && !!chainPrompt.trim();
-  // Taking the mic: the audience picker keeps to what a chain allows.
+  // Taking the mic: the audience picker keeps to what a chain allows (a squad's chain: that squad).
   useEffect(() => {
-    if (joining && !chainableAudience(visibility)) setVisibility('public');
-  }, [joining, visibility]);
+    if (!joining || !chain) return;
+    if (chain.squad) {
+      if (visibility !== 'squad') setVisibility('squad');
+      if (squadId !== chain.squad.id) setSquadId(chain.squad.id);
+    } else if (!chainableAudience(visibility)) setVisibility('public');
+  }, [joining, chain, visibility, squadId]);
 
   useEffect(() => {
     if (!draftId) return;
@@ -335,6 +344,10 @@ function Create() {
       .circles()
       .then((r) => setCircles(r.items))
       .catch(() => {});
+    api.squads.list().then(
+      (r) => setSquads(r.items.filter((s) => s.role)),
+      () => {},
+    );
     api.me.sharing().then(
       (r) => setHideCountsDefault(!!r.settings.hideCounts),
       () => {},
@@ -511,6 +524,7 @@ function Create() {
         body,
         visibility,
         circleId: visibility === 'circle' ? circleId || undefined : undefined,
+        squadId: visibility === 'squad' ? squadId || undefined : undefined,
         allowRemix,
         ...(allowEchoes ? { allowEchoes } : {}),
         commentPolicy,
@@ -537,6 +551,7 @@ function Create() {
       visibility,
       communityId: communityId || undefined,
       circleId: visibility === 'circle' ? circleId || undefined : undefined,
+      squadId: visibility === 'squad' && !communityId ? squadId || undefined : undefined,
       audience: visibility === 'selected' && audience.length ? audience : undefined,
       media: media.map((m) => ({
         id: m.id,
@@ -561,7 +576,7 @@ function Create() {
   /** Pass the Mic, for a reel published now: the chain it joins, or the chain it starts. */
   function chainFields(): Record<string, unknown> {
     if (joining && chainId && chainAudience) return { chainId };
-    if (starting) return { chainPrompt: chainPrompt.trim(), ...(chainJoin ? { chainJoin } : {}) };
+    if (starting) return { chainPrompt: chainPrompt.trim(), ...(chainJoin && visibility !== 'squad' ? { chainJoin } : {}) };
     return {};
   }
 
@@ -605,6 +620,7 @@ function Create() {
           expiresIn,
           customHours: expiresIn === 'custom' ? Math.min(720, Math.max(1, Math.round(Number(customHours)) || 24)) : undefined,
           visibility,
+          squadId: visibility === 'squad' ? squadId || undefined : undefined,
           allowReshare,
           stickers: stickers.map(({ key: _key, label: _label, ...s }) => s),
           music: music ? musicInput(music) : undefined,
@@ -1076,12 +1092,15 @@ function Create() {
             <Select
               label={t('create.visibility')}
               // Each circle is its own choice ("Circle: Family"), so the picker shows which one.
-              value={visibility === 'circle' ? `circle:${circleId}` : visibility}
+              value={visibility === 'circle' ? `circle:${circleId}` : visibility === 'squad' ? `squad:${squadId}` : visibility}
               onChange={(e) => {
                 const v = e.currentTarget.value;
                 if (v.startsWith('circle:')) {
                   setVisibility('circle');
                   setCircleId(v.slice('circle:'.length));
+                } else if (v.startsWith('squad:')) {
+                  setVisibility('squad');
+                  setSquadId(v.slice('squad:'.length));
                 } else setVisibility(v as Audience);
               }}
             >
@@ -1091,27 +1110,36 @@ function Create() {
                   (v) =>
                     (kind !== 'story' || (v !== 'selected' && v !== 'subscribers' && v !== 'circle')) &&
                     (v !== 'subscribers' || hasPlans) &&
-                    // Taking the mic: only the audiences a chain allows.
-                    (!joining || chainableAudience(v)),
+                    // Taking the mic: only the audiences a chain allows (a squad's chain: its squad).
+                    (!joining || (chain?.squad ? v === 'squad' : chainableAudience(v))) &&
+                    (v !== 'squad' || squads.length > 0),
                 )
                 .flatMap((v) =>
-                  v === 'circle'
-                    ? circles.length
-                      ? circles.map((c) => (
-                          <option key={`circle:${c.id}`} value={`circle:${c.id}`}>
-                            {t('m.create.circle', { name: c.name })}
+                  v === 'squad'
+                    ? squads
+                        .filter((sq) => !joining || !chain?.squad || sq.id === chain.squad.id)
+                        .map((sq) => (
+                          <option key={`squad:${sq.id}`} value={`squad:${sq.id}`}>
+                            {t('squads.audience', { name: sq.name })}
                           </option>
                         ))
+                    : v === 'circle'
+                      ? circles.length
+                        ? circles.map((c) => (
+                            <option key={`circle:${c.id}`} value={`circle:${c.id}`}>
+                              {t('m.create.circle', { name: c.name })}
+                            </option>
+                          ))
+                        : [
+                            <option key="circle" value="circle:" disabled>
+                              {t('compose.circleMakeFirst')}
+                            </option>,
+                          ]
                       : [
-                          <option key="circle" value="circle:" disabled>
-                            {t('compose.circleMakeFirst')}
+                          <option key={v} value={v}>
+                            {t(`visibility.${v}` as MessageKey)}
                           </option>,
-                        ]
-                    : [
-                        <option key={v} value={v}>
-                          {t(`visibility.${v}` as MessageKey)}
-                        </option>,
-                      ],
+                        ],
                 )}
             </Select>
           ) : null}
@@ -1189,7 +1217,14 @@ function Create() {
                     error={fields.chainPrompt}
                     onChange={(e) => setChainPrompt(e.currentTarget.value)}
                   />
-                  <ChainJoinSelect value={chainJoin ?? guessChainJoin(me?.under18)} onChange={setChainJoin} withNobody={false} />
+                  {visibility === 'squad' ? (
+                    // A squad's chain is for the squad: only its people see it and take the mic.
+                    <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+                      {t('squads.chainOnly', { name: squads.find((sq) => sq.id === squadId)?.name ?? '' })}
+                    </p>
+                  ) : (
+                    <ChainJoinSelect value={chainJoin ?? guessChainJoin(me?.under18)} onChange={setChainJoin} withNobody={false} />
+                  )}
                 </>
               ) : null}
             </div>

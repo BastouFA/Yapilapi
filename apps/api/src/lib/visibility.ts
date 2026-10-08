@@ -14,6 +14,14 @@ export function notBlockedSql(otherUserCol: string, v: string): string {
 }
 
 /**
+ * Viewer `v` is in the squad whose id is in `col` (and has accepted the invite). Squads are seen only
+ * by their members: posts, reels, stories and chains shared with one, and the squad itself.
+ */
+export function squadMemberSql(col: string, v: string): string {
+  return `EXISTS (SELECT 1 FROM squad_members sqm WHERE sqm.squad_id = ${col} AND sqm.user_id = ${v} AND sqm.status = 'active')`;
+}
+
+/**
  * Posts aliased `p`, author's profile aliased `ap`, author user aliased `au`: public, unflagged posts anyone may see,
  * which is what counts towards trending tags, hashtag suggestions and topic search. Not a private account's posts,
  * and not posts in a private (or deleted) community, even when their audience says public: their tags would say
@@ -88,6 +96,8 @@ export function postVisibleSql(v: string): string {
       OR (p.visibility = 'friends' AND EXISTS (SELECT 1 FROM friendships fr WHERE (fr.user_a = ${v} AND fr.user_b = p.author_id) OR (fr.user_b = ${v} AND fr.user_a = p.author_id)))
       OR (p.visibility = 'circle' AND EXISTS (SELECT 1 FROM circle_members cm WHERE cm.circle_id = p.circle_id AND cm.user_id = ${v}))
       OR (p.visibility = 'selected' AND EXISTS (SELECT 1 FROM post_audience pa WHERE pa.post_id = p.id AND pa.user_id = ${v}))
+      /* A squad's posts: its members only. A deleted squad's (squad_id NULL) are its authors' alone. */
+      OR (p.visibility = 'squad' AND ${squadMemberSql('p.squad_id', v)})
       /* Subscriber-only posts are listed wherever a public post would be; postUnlockedSql decides who sees the content. */
       OR (p.visibility = 'subscribers' AND (NOT ap.is_private OR EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = ${v} AND f.followee_id = p.author_id)))
     )

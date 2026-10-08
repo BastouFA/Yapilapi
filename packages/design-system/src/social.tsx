@@ -41,6 +41,8 @@ import {
   type PostMusic,
   type PostVersion,
   type PublicUser,
+  squadColor,
+  SQUAD_INK,
 } from '@yapilapi/shared';
 import { Icon, type IconName } from './icons.tsx';
 import { Avatar, Badge, Button, cx, PlusBadge, useModalFocus } from './primitives.tsx';
@@ -1208,6 +1210,7 @@ const VIS_ICON: Record<string, IconName> = {
   selected: 'user',
   private: 'lock',
   subscribers: 'star',
+  squad: 'users',
 };
 
 export function PostCard({
@@ -1358,6 +1361,12 @@ export function PostCard({
             <Icon name={VIS_ICON[post.visibility] ?? 'globe'} size={12} label={t(`visibility.${post.visibility}` as MessageKey, locale)} />
             {/* Only the author gets the circle's name; people in it never see which circle. */}
             {post.circle ? <bdi className="yp-post__circle">{post.circle.name}</bdi> : null}
+            {/* Shared with a squad: its name, for its members (nobody else gets the post). */}
+            {post.squad ? (
+              <L href={`/squads/${post.squad.id}`} className="yp-post__circle">
+                <bdi>{post.squad.name}</bdi>
+              </L>
+            ) : null}
           </span>
         </div>
         {menu.length ? <Menu label={tt('post.options')} actions={menu} /> : null}
@@ -2002,6 +2011,8 @@ export function MomentsStrip({
     moments: { closeFriends?: boolean; seen?: boolean }[];
     allSeen?: boolean;
     mine?: boolean;
+    /** A squad's ring: its name and cover instead of a person. */
+    squad?: { id: string; name: string; color: string; coverUrl: string | null };
   }[];
   onOpen: (index: number) => void;
   onCreate?: () => void;
@@ -2023,24 +2034,38 @@ export function MomentsStrip({
       {groups.map((g, i) => {
         // A green ring for close friends stories you haven't seen (or your own).
         const close = g.moments.some((m) => m.closeFriends && (g.mine || !m.seen));
+        const name = g.squad ? g.squad.name : g.mine ? yours : g.author.displayName;
         return (
-          <li key={g.author.id}>
+          <li key={g.squad ? `squad:${g.squad.id}` : g.author.id}>
             <button
               type="button"
               className="yp-moment"
               onClick={() => onOpen(i)}
               aria-label={[
-                g.mine ? yours : g.author.displayName,
+                name,
                 trp('ds.stories.count', g.moments.length, locale),
                 t(g.allSeen ? 'ds.stories.seen' : 'ds.stories.new', locale),
                 ...(close ? [t('ds.stories.closeFriends', locale)] : []),
               ].join(t('m.collab.joinSep', locale))}
             >
-              <span className={close ? 'yp-moment__ring yp-moment__ring--close' : g.allSeen ? 'yp-moment__ring yp-moment__ring--seen' : 'yp-moment__ring'}>
-                <Avatar name={g.author.displayName} src={g.author.avatarUrl} size="lg" />
+              <span
+                className={cx(
+                  'yp-moment__ring',
+                  close ? 'yp-moment__ring--close' : g.allSeen ? 'yp-moment__ring--seen' : undefined,
+                  g.squad ? 'yp-moment__ring--squad' : undefined,
+                )}
+              >
+                {g.squad ? (
+                  // A squad's ring: its cover photo, or its colour with its first letter (white on each colour is AA).
+                  <span className="yp-avatar yp-avatar--lg yp-moment__squad" style={{ background: squadColor(g.squad.color), color: SQUAD_INK }} aria-hidden>
+                    {g.squad.coverUrl ? <img src={g.squad.coverUrl} alt="" /> : Array.from(g.squad.name.trim())[0]?.toUpperCase()}
+                  </span>
+                ) : (
+                  <Avatar name={g.author.displayName} src={g.author.avatarUrl} size="lg" />
+                )}
               </span>
               <span className="yp-moment__name">
-                <bdi>{g.mine ? yours : g.author.displayName}</bdi>
+                <bdi>{name}</bdi>
               </span>
             </button>
             {g.mine && onCreate ? (

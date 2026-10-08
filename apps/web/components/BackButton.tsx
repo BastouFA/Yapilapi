@@ -32,6 +32,7 @@ const LISTS = [
   '/admin',
   '/archive',
   '/circles',
+  '/squads',
   '/communities',
   '/drafts',
   '/drops',

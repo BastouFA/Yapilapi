@@ -828,6 +828,11 @@ export function EditPostSheet({ post, onClose, onSaved }: { post: Post; onClose:
           <p className="muted" style={{ margin: 0, fontSize: 13 }}>
             {t('postList.communityAudience')}
           </p>
+        ) : post.visibility === 'squad' ? (
+          // A squad's post stays with the squad.
+          <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+            {post.squad ? t('squads.audience', { name: post.squad.name }) : t('visibility.squad')}
+          </p>
         ) : (
           <Select label={t('create.visibility')} value={visibility} onChange={(e) => setVisibility(e.currentTarget.value as Post['visibility'])}>
             {!(EDIT_AUDIENCES as readonly string[]).includes(post.visibility) ? (

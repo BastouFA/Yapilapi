@@ -14,6 +14,7 @@ import { refundUnspentBudget } from '../lib/ad-refunds.ts';
 import { releaseDropOrder } from '../lib/drops.ts';
 import { audit, notify, securityEvent } from '../lib/services.ts';
 import { forgetLearnedTaste } from '../lib/affinity.ts';
+import { leaveSquadsOnDeletion } from '../lib/squads.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
 /** Privacy Center: inspect, export and delete your data; manage consent. */
@@ -209,6 +210,8 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
     const address = last?.email;
     const locale = recipientLocale(last?.locale);
     let endedCampaigns: string[] = [];
+    // Their squads go on without them: one they owned goes to its longest-standing admin (or member), or is deleted when nobody else is in it.
+    await leaveSquadsOnDeletion({ db, realtime: ctx.realtime }, u.id);
     await tx(db, async (c) => {
       await c.query(
         `UPDATE users SET status = 'deleted', deleted_at = now(), email = 'deleted+' || id || '@deleted.invalid', password_hash = NULL, birth_date = NULL,

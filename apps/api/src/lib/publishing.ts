@@ -35,6 +35,7 @@ import { claimEcho, linkEcho } from './echoes.ts';
 import { announceChainLink, joinChain, passTheMicByMention, startChain, type ChainJoined } from './chains.ts';
 import { enrollFairStart } from './fair-start.ts';
 import { isEnabled } from './services.ts';
+import { announceSquadPost, assertCanShare } from './squads.ts';
 
 type Q = Pool | PoolClient;
 type Deps = Pick<AppContext, 'db' | 'config' | 'realtime' | 'music'> & Partial<Pick<AppContext, 'transcription'>>;
@@ -164,6 +165,9 @@ export async function writePost(
     const owns = await c.query(`SELECT 1 FROM circles WHERE id = $1 AND owner_id = $2`, [input.circleId, userId]);
     if (!owns.rowCount) throw notFound('Circle');
   }
+  // Shared with a squad: one the author is in (lib/squads.ts). Only its members ever get it.
+  const squadId = input.visibility === 'squad' ? await assertCanShare(c, input.squadId, userId) : null;
+  if (squadId && !(await isEnabled(c, 'SQUADS'))) throw featureDisabled('Squads');
   if (input.productId) {
     const own = await c.query(`SELECT 1 FROM products WHERE id = $1 AND seller_id = $2 AND deleted_at IS NULL`, [input.productId, userId]);
     if (!own.rowCount) throw forbidden('You can only link products you sell.');
@@ -236,6 +240,7 @@ export async function writePost(
     );
     id = rows[0]!.id;
   }
+  await c.query(`UPDATE posts SET squad_id = $2 WHERE id = $1 AND squad_id IS DISTINCT FROM $2`, [id, squadId]);
   // "Hide like and view counts" for this post; left out, the account's choice applies (and a draft keeps its own).
   if (input.hideCounts !== undefined) await c.query(`UPDATE posts SET hide_counts = $2 WHERE id = $1`, [id, input.hideCounts]);
   // A draft saved again takes the place it has now (or none).
@@ -467,6 +472,8 @@ export async function announcePost(
   if (p.kind === 'video') await enrollFairStart(db, p.postId, deps.config.SPAM_CHECKS);
   // Pass the Mic: the chain's starter, and the reel before's author, hear someone took the mic.
   if (p.chain) await announceChainLink(db, realtime, { ...p.chain, postId: p.postId, authorId: p.authorId });
+  // Shared with a squad: the others in it hear (batched per squad).
+  if (p.visibility === 'squad') await announceSquadPost(deps, p.postId, p.authorId);
   // People @mentioned in a chain reel's caption are passed the mic, and hear about that instead of the mention.
   const passed =
     p.kind === 'video' && (await isEnabled(db, 'PASS_THE_MIC'))
@@ -527,7 +534,7 @@ export async function publishDraft(deps: Deps, postId: string, authorId: string)
   const d = (
     await db.query(
       `SELECT p.id, p.kind, p.body, p.visibility, p.community_id, p.format, p.moderation_status, p.remix_of_post_id, p.remix_mode,
-              p.sound_id, p.music_track_id, p.music,
+              p.sound_id, p.music_track_id, p.music, p.squad_id,
               (SELECT string_agg(o.label, ' ' ORDER BY o.position) FROM poll_options o WHERE o.post_id = p.id) AS poll_text,
               EXISTS (SELECT 1 FROM post_media pm JOIN media m ON m.id = pm.media_id WHERE pm.post_id = p.id AND m.moderation = 'blocked') AS blocked_media
        FROM posts p WHERE p.id = $1 AND p.author_id = $2 AND p.status <> 'published' AND p.deleted_at IS NULL`,
@@ -544,6 +551,8 @@ export async function publishDraft(deps: Deps, postId: string, authorId: string)
     const plan = await db.query(`SELECT 1 FROM creator_plans WHERE creator_id = $1 AND active LIMIT 1`, [authorId]);
     if (!plan.rowCount) throw badRequest('Add a subscription plan in Studio before posting for subscribers.', { failure: 'no_plan' });
   }
+  // Still in the squad it's for (a squad that was deleted, or that the author left, takes nobody's post).
+  if (d.visibility === 'squad') await assertCanShare(db, d.squad_id, authorId);
   const remixAuthor = d.format === 'reel' && d.remix_of_post_id ? (await assertRemixable(db, d.remix_of_post_id, authorId)).authorId : null;
   // Music: the song's licence (and the author's account type and country) or the sound are checked again as it goes out.
   if (d.music && d.music_track_id) await deps.music.checkTrack(authorId, d.music_track_id, d.music.durationMs);

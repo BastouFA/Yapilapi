@@ -73,6 +73,7 @@ import editorModule from './modules/editor.ts';
 import collagesModule from './modules/collages.ts';
 import echoesModule from './modules/echoes.ts';
 import passTheMicModule from './modules/pass-the-mic.ts';
+import squadsModule from './modules/squads.ts';
 import cityMapModule from './modules/city-map.ts';
 import tagsModule from './modules/tags.ts';
 import collabsModule from './modules/collabs.ts';
@@ -113,6 +114,7 @@ import { sweepRooms } from './lib/rooms.ts';
 import { sweepLives } from './lib/live.ts';
 import { sweepWatch } from './lib/watch.ts';
 import { sweepWeeklyWraps } from './lib/wrap.ts';
+import { sweepSquadMemories } from './lib/squads.ts';
 import { maybeRunRetention } from './lib/retention.ts';
 import { sweepMarket } from './lib/market.ts';
 import { sweepFairStarts } from './lib/fair-start.ts';
@@ -494,6 +496,7 @@ export async function buildApp(
     collagesModule,
     echoesModule,
     passTheMicModule,
+    squadsModule,
     cityMapModule,
     plusModule,
     invitesModule,
@@ -584,6 +587,8 @@ export async function buildApp(
         await sweepMarket({ db, realtime: ctx.realtime }).catch((e) => app.log.warn({ err: e.message }, 'market sweep'));
         // Fair starts whose week is over (or that reached their target) finish, and their creators get the report (lib/fair-start.ts).
         await sweepFairStarts({ db, realtime: ctx.realtime }).catch((e) => app.log.warn({ err: e.message }, 'fair start sweep'));
+        // Squads that shared something last week get "Your squad's week" (lib/squads.ts).
+        await sweepSquadMemories({ db, realtime: ctx.realtime }).catch((e) => app.log.warn({ err: e.message }, 'squad memories'));
         // "Show me on the map to friends" past its time: the point is deleted (lib/city-map.ts).
         await sweepPresence(db).catch((e) => app.log.warn({ err: e.message }, 'map presence sweep'));
       }

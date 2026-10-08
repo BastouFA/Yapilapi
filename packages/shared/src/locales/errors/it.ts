@@ -1222,4 +1222,16 @@ export const it: Record<string, string> = {
   // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
   'Near you is not enabled.': 'Vicino a te non è attivo.',
   'Zoom in to see what’s here.': 'Ingrandisci per vedere cosa c’è qui.',
+  // Squads (lib/squads.ts, and where posts, stories, chats and chains meet them)
+  "Squad doesn't exist or isn't visible to you.": 'Questa squad non esiste o non puoi vederla.',
+  'Squads is not enabled.': 'Le squad non sono attive.',
+  'Choose a squad.': 'Scegli una squad.',
+  'You can be in up to {max} squads.': 'Puoi far parte di massimo {max} squad.',
+  'You can invite people you follow who follow you back, and your friends.': 'Puoi invitare i tuoi amici e le persone che segui e che ti seguono.',
+  'A squad can have up to 10 people.': 'Una squad può avere massimo 10 persone.',
+  'You can’t join this squad now.': 'Ora non puoi unirti a questa squad.',
+  'Make someone else the owner before you leave.': 'Rendi proprietario qualcun altro prima di andartene.',
+  'This chat belongs to a squad. Change who’s in it from the squad.': 'Questa chat appartiene a una squad. Cambia chi ne fa parte dalla squad.',
+  'Posts shared with a squad stay with it.': 'I post condivisi con una squad restano nella squad.',
+  'Reels in a squad’s chain are shared with that squad.': 'I reel nella catena di una squad sono condivisi con quella squad.',
 };

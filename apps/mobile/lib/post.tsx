@@ -622,6 +622,17 @@ function PostCardView({
           <Text style={[{ color: c.yapi, fontSize: 12, fontWeight: '700' }, userText]}>{post.community.name}</Text>
         </Pressable>
       ) : null}
+      {post.squad ? (
+        // Shared with a squad: its name, for its members (nobody else gets the post).
+        <Pressable
+          accessibilityRole="link"
+          hitSlop={10}
+          onPress={() => router.push({ pathname: '/squad/[id]', params: { id: post.squad!.id } })}
+          style={{ alignSelf: 'flex-start', backgroundColor: c.yapiSoft, borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 4 }}
+        >
+          <Text style={[{ color: c.yapi, fontSize: 12, fontWeight: '700' }, userText]}>{t('squads.audience', { name: post.squad.name })}</Text>
+        </Pressable>
+      ) : null}
 
       {post.question ? <QuestionQuoteView question={post.question} /> : null}
       {post.body ? (

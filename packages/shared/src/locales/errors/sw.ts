@@ -1321,4 +1321,16 @@ export const sw: Record<string, string> = {
   // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
   'Near you is not enabled.': 'Karibu nawe haijawashwa.',
   'Zoom in to see what’s here.': 'Kuza ili uone kilichopo hapa.',
+  // Squads (lib/squads.ts, and where posts, stories, chats and chains meet them)
+  "Squad doesn't exist or isn't visible to you.": 'Kikosi hiki hakipo au huwezi kukiona.',
+  'Squads is not enabled.': 'Vikosi havijawashwa.',
+  'Choose a squad.': 'Chagua kikosi.',
+  'You can be in up to {max} squads.': 'Unaweza kuwa kwenye vikosi visivyozidi {max}.',
+  'You can invite people you follow who follow you back, and your friends.': 'Unaweza kuwaalika marafiki zako, na watu unaowafuata ambao wanakufuata pia.',
+  'A squad can have up to 10 people.': 'Kikosi kinaweza kuwa na watu wasiozidi 10.',
+  'You can’t join this squad now.': 'Huwezi kujiunga na kikosi hiki sasa hivi.',
+  'Make someone else the owner before you leave.': 'Mfanye mtu mwingine mmiliki kabla ya kuondoka.',
+  'This chat belongs to a squad. Change who’s in it from the squad.': 'Gumzo hili ni la kikosi. Badilisha walio ndani yake kutoka kwenye kikosi.',
+  'Posts shared with a squad stay with it.': 'Machapisho yaliyoshirikiwa na kikosi yanabaki kwenye kikosi hicho.',
+  'Reels in a squad’s chain are shared with that squad.': 'Reel kwenye mnyororo wa kikosi zinashirikiwa na kikosi hicho.',
 };

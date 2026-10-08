@@ -40,7 +40,7 @@ export default async function passTheMicModule(app: FastifyInstance, ctx: AppCon
     return { chain: await chainFor(id, u.id) };
   });
 
-  /** Active chains for Wander: a new reel in the last CHAIN_RULES.activeDays days, the busiest first. */
+  /** Active chains for Wander: a new reel in the last CHAIN_RULES.activeDays days, the busiest first. Squads' chains stay in their squads. */
   app.get('/v1/chains/active', { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (req) => {
     if (!(await isEnabled(db, 'PASS_THE_MIC'))) return { items: [] };
     const viewer = req.user?.id ?? null;
@@ -48,7 +48,7 @@ export default async function passTheMicModule(app: FastifyInstance, ctx: AppCon
     const sensitive = await seesSensitiveMedia(db, viewer);
     const { rows } = await db.query<{ id: string }>(
       `SELECT ch.id FROM reel_chains ch
-       WHERE ch.last_link_at > now() - make_interval(days => $3) AND ${chainSeenSql('$1')}
+       WHERE ch.last_link_at > now() - make_interval(days => $3) AND ch.squad_id IS NULL AND ${chainSeenSql('$1')}
          AND EXISTS (SELECT 1 FROM reel_chain_links l WHERE l.chain_id = ch.id AND ${visibleLinkSql('$4')})
        ORDER BY (SELECT count(*) FROM reel_chain_links l WHERE l.chain_id = ch.id AND l.created_at > now() - make_interval(days => $3) AND ${liveLinkSql()}) DESC,
                 ch.last_link_at DESC

@@ -198,6 +198,9 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
               <Link href="/circles" className="yp-btn yp-btn--ghost yp-btn--sm">
                 {t('m.circles.title')}
               </Link>
+              <Link href="/squads" className="yp-btn yp-btn--ghost yp-btn--sm">
+                {t('squads.title')}
+              </Link>
               <Button size="sm" variant="ghost" icon="link" onClick={() => setSheet('share')}>
                 {t('m.profile.share')}
               </Button>

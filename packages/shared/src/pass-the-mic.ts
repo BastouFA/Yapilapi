@@ -1,6 +1,7 @@
 import type { ChainJoin } from './constants.ts';
 import type { MessageKey, PluralKey } from './i18n-core.ts';
 import type { MediaItem, PublicUser } from './types.ts';
+import type { SquadRef } from './squads.ts';
 
 /**
  * Pass the Mic and Fair start (docs/product/pass-the-mic.md), the parts both apps and the API
@@ -50,6 +51,8 @@ export interface Chain {
   /** The first reel of the chain the viewer can see: where "Play" starts. */
   firstPostId: string | null;
   viewer: { canJoin: boolean; isStarter: boolean; why: ChainBlock | null };
+  /** A squad's chain: only its members see it and take the mic. */
+  squad?: SquadRef | null;
 }
 
 /** What a finished fair start says to the creator. */

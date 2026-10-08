@@ -1220,4 +1220,17 @@ export const hi: Record<string, string> = {
   // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
   'Near you is not enabled.': 'आपके आस-पास चालू नहीं है।',
   'Zoom in to see what’s here.': 'यहाँ क्या है यह देखने के लिए ज़ूम इन करें।',
+  // Squads (lib/squads.ts, and where posts, stories, chats and chains meet them)
+  "Squad doesn't exist or isn't visible to you.": 'यह स्क्वाड मौजूद नहीं है या आपको नहीं दिखता।',
+  'Squads is not enabled.': 'स्क्वाड चालू नहीं हैं।',
+  'Choose a squad.': 'एक स्क्वाड चुनें।',
+  'You can be in up to {max} squads.': 'आप ज़्यादा से ज़्यादा {max} स्क्वाड में रह सकते हैं।',
+  'You can invite people you follow who follow you back, and your friends.':
+    'आप अपने दोस्तों को, और उन लोगों को बुला सकते हैं जिन्हें आप फ़ॉलो करते हैं और जो आपको फ़ॉलो करते हैं।',
+  'A squad can have up to 10 people.': 'एक स्क्वाड में ज़्यादा से ज़्यादा 10 लोग हो सकते हैं।',
+  'You can’t join this squad now.': 'आप अभी इस स्क्वाड में नहीं जुड़ सकते।',
+  'Make someone else the owner before you leave.': 'छोड़ने से पहले किसी और को मालिक बनाएं।',
+  'This chat belongs to a squad. Change who’s in it from the squad.': 'यह चैट एक स्क्वाड की है। इसमें कौन है, यह स्क्वाड से बदलें।',
+  'Posts shared with a squad stay with it.': 'स्क्वाड के साथ शेयर की गई पोस्ट स्क्वाड में ही रहती हैं।',
+  'Reels in a squad’s chain are shared with that squad.': 'स्क्वाड की चेन की रील उसी स्क्वाड के साथ शेयर होती हैं।',
 };

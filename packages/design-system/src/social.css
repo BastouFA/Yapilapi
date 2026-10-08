@@ -1783,6 +1783,22 @@ a.yp-ecard:hover {
   border: 2px dashed var(--line-strong);
   background: var(--surface) !important;
 }
+/* A squad's ring (its stories in one place): rounded square, the squad's cover inside. */
+.yp-moment__ring--squad,
+.yp-moment__ring--squad .yp-avatar {
+  border-radius: 20px;
+}
+.yp-moment__squad {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  font-weight: 800;
+}
+.yp-moment__squad img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 .yp-moment__name {
   max-width: 100%;
   overflow: hidden;

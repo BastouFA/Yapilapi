@@ -1165,4 +1165,16 @@ export const zh: Record<string, string> = {
   // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
   'Near you is not enabled.': '“你附近”未启用。',
   'Zoom in to see what’s here.': '放大地图即可查看这里有什么。',
+  // Squads (lib/squads.ts, and where posts, stories, chats and chains meet them)
+  "Squad doesn't exist or isn't visible to you.": '这个小队不存在，或者你无法查看。',
+  'Squads is not enabled.': '小队功能未开启。',
+  'Choose a squad.': '请选择一个小队。',
+  'You can be in up to {max} squads.': '你最多可以加入 {max} 个小队。',
+  'You can invite people you follow who follow you back, and your friends.': '你可以邀请朋友，以及和你互相关注的人。',
+  'A squad can have up to 10 people.': '一个小队最多 10 人。',
+  'You can’t join this squad now.': '你现在无法加入这个小队。',
+  'Make someone else the owner before you leave.': '离开前请先把别人设为队长。',
+  'This chat belongs to a squad. Change who’s in it from the squad.': '这个聊天属于一个小队。请在小队里更改成员。',
+  'Posts shared with a squad stay with it.': '分享到小队的帖子会留在小队里。',
+  'Reels in a squad’s chain are shared with that squad.': '小队接力里的短视频会分享给这个小队。',
 };

@@ -1205,4 +1205,17 @@ export const bn: Record<string, string> = {
   // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
   'Near you is not enabled.': 'আপনার কাছাকাছি চালু নেই।',
   'Zoom in to see what’s here.': 'এখানে কী আছে দেখতে জুম ইন করুন।',
+  // Squads (lib/squads.ts, and where posts, stories, chats and chains meet them)
+  "Squad doesn't exist or isn't visible to you.": 'এই স্কোয়াড নেই, অথবা আপনি এটি দেখতে পারবেন না।',
+  'Squads is not enabled.': 'স্কোয়াড চালু নেই।',
+  'Choose a squad.': 'একটি স্কোয়াড বেছে নিন।',
+  'You can be in up to {max} squads.': 'আপনি সর্বোচ্চ {max}টি স্কোয়াডে থাকতে পারেন।',
+  'You can invite people you follow who follow you back, and your friends.':
+    'আপনি বন্ধুদের, আর যাঁদের আপনি ফলো করেন এবং যাঁরা আপনাকে ফলো করেন তাঁদের আমন্ত্রণ জানাতে পারেন।',
+  'A squad can have up to 10 people.': 'একটি স্কোয়াডে সর্বোচ্চ 10 জন থাকতে পারেন।',
+  'You can’t join this squad now.': 'আপনি এখন এই স্কোয়াডে যোগ দিতে পারবেন না।',
+  'Make someone else the owner before you leave.': 'ছাড়ার আগে অন্য কাউকে মালিক বানান।',
+  'This chat belongs to a squad. Change who’s in it from the squad.': 'এই চ্যাটটি একটি স্কোয়াডের। এতে কে আছেন তা স্কোয়াড থেকে বদলান।',
+  'Posts shared with a squad stay with it.': 'স্কোয়াডের সঙ্গে শেয়ার করা পোস্ট স্কোয়াডেই থাকে।',
+  'Reels in a squad’s chain are shared with that squad.': 'স্কোয়াডের চেইনের রিল সেই স্কোয়াডের সঙ্গেই শেয়ার হয়।',
 };

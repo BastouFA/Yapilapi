@@ -67,7 +67,7 @@ export function StoryViewer({
   /** Called after local changes (seen, liked, deleted, answered) so the strip can update. */
   onChange: (groups: StoryGroup[]) => void;
 }) {
-  const { toast, locale, t, tp } = useSession();
+  const { toast, locale, t, tp, me } = useSession();
   const router = useRouter();
   const [musicOn, setMusicOn] = useStoryMusicOn();
   const [g, setG] = useState(start);
@@ -87,8 +87,10 @@ export function StoryViewer({
   const [addingToChapter, setAddingToChapter] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const group = groups[g];
-  const story = group?.moments[i];
+  const ring = groups[g];
+  const story = ring?.moments[i];
+  // A squad's ring holds several people's stories: each one is shown as its author's (yours with your tools).
+  const group = ring?.squad && story?.author ? { ...ring, author: story.author, mine: story.author.id === me?.id } : ring;
   // Sensitive stories wait, blurred and paused, until the viewer chooses to see them.
   const [revealed, setRevealed] = useState<string[]>([]);
   const covered = !!story?.sensitive && !revealed.includes(story.id);
@@ -245,6 +247,12 @@ export function StoryViewer({
             <span className="story__close-friends">
               <Icon name="users" size={14} />
               {t('visibility.close_friends')}
+            </span>
+          ) : null}
+          {ring?.squad ? (
+            <span className="story__close-friends">
+              <Icon name="users" size={14} />
+              <bdi>{ring.squad.name}</bdi>
             </span>
           ) : null}
           {story.music ? (

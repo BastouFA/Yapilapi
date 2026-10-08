@@ -2,6 +2,7 @@ import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { useEffect } from 'react';
 import { micNoticeHref } from '../../../packages/shared/src/pass-the-mic';
+import { squadNoticeHref } from '../../../packages/shared/src/squads';
 import { useSession } from './session';
 
 /** What a notification (from the list, or the data of a push) says about where it leads. */
@@ -23,6 +24,9 @@ export type NotificationTarget = {
 export function notificationHref(n: NotificationTarget): string | null {
   const id = n.entityId ? encodeURIComponent(n.entityId) : null;
   if ((n.type === 'reel_duet' || n.type === 'reel_remix') && id) return `/reels?start=${id}`;
+  // Squads: an invite, someone joining, new posts and the weekly memory open the squad.
+  const squad = squadNoticeHref({ type: n.type, entityId: n.entityId });
+  if (squad) return `/squad/${encodeURIComponent(squad)}`;
   // Pass the Mic: a finished fair start opens the reel's insights (the report); someone taking the
   // mic opens their reel, several of them or a pass opens the chain. A push carries no data: a pass
   // names the chain itself (entity 'chain').
@@ -192,6 +196,8 @@ export function appPath(link: string): string {
   if (first === 'events' && second && parts[2] === 'check-in') return `/check-in/${encodeURIComponent(second)}`;
   if (first === 'c' && second && parts[2] === 'settings') return `/community-settings?slug=${encodeURIComponent(second)}`;
   if (first === 'plus') return '/plus';
+  // Squads: the list keeps its path; one squad is /squad/<id> in the app.
+  if (first === 'squads') return second ? `/squad/${encodeURIComponent(second)}` : '/squads';
   // Market: selling and changing a listing have their own screen; your listings and saved ones keep their paths.
   if (first === 'market' && second === 'new') return '/market-edit';
   if (first === 'market' && second && parts[2] === 'edit') return `/market-edit?id=${encodeURIComponent(second)}`;

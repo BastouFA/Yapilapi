@@ -1,13 +1,14 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { createMomentSchema, pollPercents, reshareMomentSchema, type MessageFailureCode } from '@yapilapi/shared';
+import { createMomentSchema, pollPercents, reshareMomentSchema, SQUAD_RULES, type MessageFailureCode } from '@yapilapi/shared';
 import { z } from 'zod';
-import { AppError, conflict, forbidden, notFound, parse } from '../lib/errors.ts';
+import { AppError, conflict, featureDisabled, forbidden, notFound, parse } from '../lib/errors.ts';
 import { messageFailureCode, messageFailureEnglish } from '../lib/failures.ts';
 import type { AppContext } from '../lib/context.ts';
 import { analyzeText } from '../lib/moderation.ts';
 import { MEDIA_BLOCKED_MESSAGE } from '../lib/media-moderation.ts';
 import { assertRecapUse } from '../lib/recap-sharing.ts';
-import { notify, track } from '../lib/services.ts';
+import { isEnabled, notify, track } from '../lib/services.ts';
+import { assertCanShare } from '../lib/squads.ts';
 import { isStoredMediaUrl } from '../lib/storage.ts';
 import { plusCol, publicUserFrom } from '../lib/users.ts';
 import { notBlockedSql } from '../lib/visibility.ts';
@@ -84,14 +85,16 @@ export default async function momentsModule(app: FastifyInstance, ctx: AppContex
       allowReshare: boolean;
       reshareOf?: string;
       music?: { soundId: string | null; trackId: string | null; stored: StoredMusic } | null;
+      /** A squad's story: the squad (checked by the caller). */
+      squadId?: string | null;
     },
   ) {
     if (analyzeText(input.body).risk !== 'normal') throw new AppError(422, 'content_blocked', "This story can't be shared.");
     const prepared = await prepareStory(db, authorId, input.body, input.stickers);
     const { rows } = await db.query(
       `INSERT INTO moments (author_id, body, media_url, media_kind, media_id, visibility, location_text, expires_at, stickers, tags, mentions, reshare_of, allow_reshare,
-                            sound_id, music, lang, music_track_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7, CASE WHEN $8::int IS NULL THEN NULL ELSE now() + make_interval(hours => $8::int) END, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+                            sound_id, music, lang, music_track_id, squad_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7, CASE WHEN $8::int IS NULL THEN NULL ELSE now() + make_interval(hours => $8::int) END, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
        RETURNING id, expires_at, created_at, tags`,
       [
         authorId,
@@ -111,6 +114,7 @@ export default async function momentsModule(app: FastifyInstance, ctx: AppContex
         input.music ? JSON.stringify(input.music.stored) : null,
         langOf(input.body),
         input.music?.trackId ?? null,
+        input.squadId ?? null,
       ],
     );
     const moment = rows[0] as { id: string; expires_at: Date | null; created_at: Date; tags: string[] };
@@ -155,6 +159,10 @@ export default async function momentsModule(app: FastifyInstance, ctx: AppContex
     if (!input.body && !mediaUrl && !input.stickers.length && !input.music)
       throw new AppError(400, 'validation_failed', 'Add text, a photo or a video to your story.');
     const music = input.music ? await storyMusic(u.id, input.music, mediaKind) : null;
+    // A squad's story: for a squad you're in, seen by its members only, for 24 hours.
+    const squad = input.visibility === 'squad';
+    if (squad && !(await isEnabled(db, 'SQUADS'))) throw featureDisabled('Squads');
+    const squadId = squad ? await assertCanShare(db, input.squadId, u.id) : null;
     const moment = await createStory(u.id, {
       body: input.body,
       mediaUrl,
@@ -162,10 +170,11 @@ export default async function momentsModule(app: FastifyInstance, ctx: AppContex
       mediaId: input.mediaId ?? null,
       visibility: input.visibility,
       locationText: input.locationText ?? null,
-      hours: hoursFor(input.expiresIn, input.customHours),
+      hours: squad ? SQUAD_RULES.storyHours : hoursFor(input.expiresIn, input.customHours),
       stickers: input.stickers,
-      allowReshare: input.allowReshare,
+      allowReshare: squad ? false : input.allowReshare,
       music,
+      squadId,
     });
     track(db, u.id, 'moment_created', { expiresIn: input.expiresIn, stickers: input.stickers.length, music: !!music });
     reply.code(201);
@@ -222,7 +231,7 @@ export default async function momentsModule(app: FastifyInstance, ctx: AppContex
     if (s.author_id === u.id) throw new AppError(400, 'validation_failed', "You can't reshare your own story.");
     if (s.reshare_of) throw new AppError(400, 'validation_failed', 'Open the original story to reshare it.');
     if (!s.allow_reshare) throw new AppError(403, 'reshare_off', `${s.author_name} turned off resharing for this story.`);
-    if (s.visibility !== 'public' && !s.mentions.includes(u.id))
+    if (s.visibility === 'squad' || (s.visibility !== 'public' && !s.mentions.includes(u.id)))
       throw new AppError(403, 'reshare_not_allowed', 'You can reshare public stories, and stories you’re mentioned in.');
     const moment = await createStory(u.id, {
       body: input.body,

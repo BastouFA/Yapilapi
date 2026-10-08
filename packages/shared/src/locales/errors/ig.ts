@@ -1205,4 +1205,16 @@ export const ig: Record<string, string> = {
   // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
   'Near you is not enabled.': 'Agbanyeghị Nso gị.',
   'Zoom in to see what’s here.': 'Mee ka ọ buo ibu ka ị hụ ihe dị ebe a.',
+  // Squads (lib/squads.ts, and where posts, stories, chats and chains meet them)
+  "Squad doesn't exist or isn't visible to you.": 'Squad a adịghị ma ọ bụ na ị nweghị ike ịhụ ya.',
+  'Squads is not enabled.': 'Agbanyebeghị squad.',
+  'Choose a squad.': 'Họrọ squad.',
+  'You can be in up to {max} squads.': 'Ị nwere ike ịnọ na squad ruru {max}.',
+  'You can invite people you follow who follow you back, and your friends.': 'Ị nwere ike ịkpọ ndị enyi gị, na ndị ị na-eso ndị na-esokwa gị.',
+  'A squad can have up to 10 people.': 'Squad nwere ike inwe mmadụ ruru 10.',
+  'You can’t join this squad now.': 'Ị nweghị ike isonye na squad a ugbu a.',
+  'Make someone else the owner before you leave.': 'Mee onye ọzọ onye nwe tupu ị pụọ.',
+  'This chat belongs to a squad. Change who’s in it from the squad.': 'Mkparịta ụka a bụ nke squad. Gbanwee ndị nọ n’ime ya site na squad.',
+  'Posts shared with a squad stay with it.': 'Ozi e kesara na squad na-anọ na squad ahụ.',
+  'Reels in a squad’s chain are shared with that squad.': 'A na-ekesa reel ndị dị n’agbụ squad na squad ahụ.',
 };

@@ -77,6 +77,10 @@ export async function hydratePosts(db: Q, ids: string[], viewer: string | null, 
             (p.visibility = 'circle' AND p.author_id IS NOT DISTINCT FROM $2) AS own_circle_post,
             CASE WHEN p.visibility = 'circle' AND p.author_id IS NOT DISTINCT FROM $2
                  THEN (SELECT json_build_object('id', ci.id, 'name', ci.name) FROM circles ci WHERE ci.id = p.circle_id) END AS own_circle,
+            -- Which squad a post went to, for its members (only they get the post at all) and its author.
+            CASE WHEN p.visibility = 'squad' THEN (SELECT json_build_object('id', sq.id, 'name', sq.name, 'color', sq.color) FROM squads sq
+                 WHERE sq.id = p.squad_id AND (p.author_id IS NOT DISTINCT FROM $2
+                   OR EXISTS (SELECT 1 FROM squad_members sqm WHERE sqm.squad_id = sq.id AND sqm.user_id = $2 AND sqm.status = 'active'))) END AS squad,
             CASE WHEN p.format = 'reel' THEN (SELECT count(*) FROM posts rx WHERE rx.remix_of_post_id = p.id AND rx.deleted_at IS NULL AND rx.status = 'published')::int END AS remix_count,
             -- Echoes: how many are up, whether the viewer may echo it, the author's own setting, and (on an echo) what it answers.
             CASE WHEN p.format = 'reel' AND NOT p.is_echo THEN (SELECT count(*) FROM posts ex WHERE ex.echo_of_post_id = p.id AND ex.is_echo AND ex.deleted_at IS NULL
@@ -284,6 +288,7 @@ function toPost(r: Record<string, any>, originals: Map<string, NonNullable<Remix
     ...(r.downloadable === null ? {} : { downloadable: !!r.downloadable }),
     ...(r.boost ? { boost: r.boost } : {}),
     ...(r.own_circle_post ? { circle: r.own_circle ?? null } : {}),
+    ...(r.visibility === 'squad' ? { squad: r.squad ?? null } : {}),
   } satisfies Post;
 }
 

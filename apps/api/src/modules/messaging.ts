@@ -218,6 +218,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
             AND m.moderation_status = 'normal' AND (m.kind <> 'system' OR (m.meta->>'type' = 'call' AND m.meta->>'outcome' = 'missed'))) AS unread,
          (SELECT array_agg(user_id) FROM conversation_members WHERE conversation_id = c.id AND left_at IS NULL) AS member_ids,
          (SELECT array_agg(user_id) FROM conversation_members WHERE conversation_id = c.id AND left_at IS NULL AND role = 'admin') AS admin_ids,
+         (SELECT sq.id FROM squads sq WHERE sq.conversation_id = c.id) AS squad_id,
          -- Read receipts go both ways: nobody's show while yours are off, and theirs don't while theirs are.
          CASE WHEN c.kind <> 'community' AND ${READ_RECEIPTS_ON('$1')} THEN
            (SELECT json_agg(json_build_object('userId', o.user_id, 'lastReadAt', o.last_read_at)) FROM conversation_members o
@@ -307,6 +308,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
         : {}),
       smartReplies: smartRepliesState(r.kind, r.smart_replies ?? null, smartEverywhere, smartFlag),
       theme: chatTheme({ wallpaper: r.wallpaper, accent: r.accent }),
+      ...(r.squad_id ? { squadId: r.squad_id as string } : {}),
     }));
   }
 
@@ -399,6 +401,12 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     return r;
   }
 
+  /** A squad's chat follows who is in the squad (lib/squads.ts): its people and name change there, not here. */
+  async function assertNotSquadChat(conversationId: string) {
+    const r = await db.query(`SELECT 1 FROM squads WHERE conversation_id = $1`, [conversationId]);
+    if (r.rowCount) throw new AppError(409, 'squad_chat', 'This chat belongs to a squad. Change who’s in it from the squad.');
+  }
+
   async function assertGroupAdmin(conversationId: string, userId: string, what: string) {
     const r = await groupRole(conversationId, userId);
     if (r.kind !== 'group') throw new AppError(400, 'not_a_group', 'This works in groups only.');
@@ -411,6 +419,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     const { id } = parse(idParam, req.params);
     const { title } = parse(renameConversationSchema, req.body);
     await assertGroupAdmin(id, u.id, 'rename the group');
+    await assertNotSquadChat(id);
     const r = await db.query(`UPDATE conversations SET title = $2 WHERE id = $1 AND title IS DISTINCT FROM $2 RETURNING id`, [id, title]);
     const message = r.rowCount ? await groupLine(id, u.id, { type: 'group', action: 'renamed', title }) : null;
     return { conversation: (await loadConversations(u.id, [id]))[0], message };
@@ -423,6 +432,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     const { userIds } = parse(z.object({ userIds: z.array(z.string().uuid()).min(1).max(50) }), req.body);
     const conv = await groupRole(id, u.id);
     if (conv.kind !== 'group') throw badRequest('You can only add people to group conversations.');
+    await assertNotSquadChat(id);
     const current = await memberIds(id);
     const adding = [...new Set(userIds)].filter((x) => x !== u.id && !current.includes(x));
     if (!adding.length) return { ok: true, added: 0, message: null };
@@ -452,6 +462,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     const u = me(req);
     const { id, userId } = parse(z.object({ id: z.string().uuid(), userId: z.string().uuid() }), req.params);
     await assertGroupAdmin(id, u.id, 'remove people');
+    await assertNotSquadChat(id);
     if (userId === u.id) throw new AppError(400, 'remove_self', 'To go, leave the group instead.');
     const r = await db.query(
       `UPDATE conversation_members SET left_at = now(), role = 'member' WHERE conversation_id = $1 AND user_id = $2 AND left_at IS NULL`,
@@ -474,6 +485,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       const { id, userId } = parse(z.object({ id: z.string().uuid(), userId: z.string().uuid() }), req.params);
       const { role } = parse(memberRoleSchema, req.body);
       await assertGroupAdmin(id, u.id, 'choose admins');
+      await assertNotSquadChat(id);
       const changed = await tx(db, async (c) => {
         // One change at a time per group, so two admins can't both step down at once.
         await c.query(`SELECT 1 FROM conversations WHERE id = $1 FOR UPDATE`, [id]);
@@ -505,6 +517,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     const u = me(req);
     const { id } = parse(idParam, req.params);
     const conv = await groupRole(id, u.id);
+    await assertNotSquadChat(id);
     const promoted = await tx(db, async (c) => {
       await c.query(`SELECT 1 FROM conversations WHERE id = $1 FOR UPDATE`, [id]);
       await c.query(`UPDATE conversation_members SET left_at = now(), role = 'member' WHERE conversation_id = $1 AND user_id = $2`, [id, u.id]);

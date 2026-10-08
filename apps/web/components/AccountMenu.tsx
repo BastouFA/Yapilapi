@@ -240,7 +240,7 @@ function OtherAccounts({ onClose, logout, onLoaded }: { onClose: () => void; log
 
 /**
  * What the account menu holds: who you are and the other accounts on this browser (switch, add,
- * log out of one), then View profile, Settings, Saved, Drafts, Your drops, Your mixes, Appearance,
+ * log out of one), then View profile, Settings, Saved, Drafts, Communities, Squads, Tickets, Your drops, Your mixes, Appearance,
  * Language, Help and legal, Log out, and Log out of all accounts when there are others. `onClose`
  * runs when a link is followed.
  */
@@ -254,6 +254,7 @@ function AccountMenuBody({ onClose, logout }: { onClose: () => void; logout: Log
     { href: '/saved', icon: 'bookmark', label: t('m.saved.title') },
     { href: '/drafts', icon: 'edit', label: t('m.drafts.title') },
     { href: '/communities', icon: 'users', label: t('communities.title') },
+    { href: '/squads', icon: 'users', label: t('squads.title') },
     { href: '/tickets', icon: 'ticket', label: t('tickets.title') },
     { href: '/drops', icon: 'bag', label: t('m.drops.yours') },
     { href: '/mixes', icon: 'mix', label: t('mixes.yours') },

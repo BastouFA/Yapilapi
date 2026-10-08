@@ -178,6 +178,11 @@ const TEXT: Record<string, Text> = {
   chain_pass: say('push.chain_pass'),
   // The report is in the app; the push says it's ready.
   fair_start_done: say('push.fair_start_done'),
+  // Squads. New posts are batched per squad, so each squad pushes once until it's read.
+  squad_invite: (name, d, locale) => t('push.squad_invite', locale, { name, squad: String(d.name ?? '') }),
+  squad_joined: (name, d, locale) => t('push.squad_joined', locale, { name, squad: String(d.name ?? '') }),
+  squad_post: (name, d, locale) => t('push.squad_post', locale, { name, squad: String(d.name ?? '') }),
+  squad_memory: (_n, d, locale) => t('push.squad_memory', locale, { squad: String(d.name ?? '') }),
   post_mention: say('push.post_mention'),
   comment_mention: say('push.comment_mention'),
   comment_like: say('push.comment_like'),

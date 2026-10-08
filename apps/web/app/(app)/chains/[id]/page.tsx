@@ -72,6 +72,11 @@ export default function ChainPage() {
           <span>{t('mic.startedBy', { name: chain.starter.displayName })}</span>
         </Link>
         <p className="muted chain-head__counts">{chainCounts(chain, tp, num)}</p>
+        {chain.squad ? (
+          <p className="muted" style={{ margin: 0 }}>
+            <Link href={`/squads/${chain.squad.id}`}>{t('squads.chainOnly', { name: chain.squad.name })}</Link>
+          </p>
+        ) : null}
         <div className="row chain-head__actions">
           {chain.viewer.canJoin ? (
             <Link href={takeMicHref(chain.id, chain.sound?.id)} className="yp-btn yp-btn--primary">
@@ -106,7 +111,7 @@ export default function ChainPage() {
 
       {chain.viewer.isStarter ? (
         <section className="chain-manage stack-sm">
-          <ChainJoinSelect value={chain.whoCanJoin} disabled={busy} onChange={(v) => void setJoin(v)} />
+          {chain.squad ? null : <ChainJoinSelect value={chain.whoCanJoin} disabled={busy} onChange={(v) => void setJoin(v)} />}
           <div className="row">
             <Button
               variant="secondary"

@@ -90,6 +90,8 @@ function Screens() {
         <Stack.Screen name="close-friends" options={{ title: t('m.closeFriends.title') }} />
         <Stack.Screen name="circles" options={{ title: t('m.circles.title') }} />
         <Stack.Screen name="circle/[id]" options={{ title: t('m.circles.title') }} />
+        <Stack.Screen name="squads" options={{ title: t('squads.title') }} />
+        <Stack.Screen name="squad/[id]" options={{ title: t('squads.title') }} />
         <Stack.Screen name="now-status" options={{ title: t('m.now.title'), presentation: 'modal', headerLeft: closeButton }} />
         <Stack.Screen name="archive" options={{ title: t('m.archive.title') }} />
         <Stack.Screen name="drafts" options={{ title: t('m.drafts.title') }} />

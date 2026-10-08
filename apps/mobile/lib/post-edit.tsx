@@ -161,7 +161,7 @@ export function EditPostSheet({ post, onClose, onSaved }: { post: Post; onClose:
           <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('postCover.chooseHint')}</Text>
         </View>
       ) : null}
-      {post.community ? null : (
+      {post.community || post.visibility === 'squad' ? null : (
         <>
           <Text style={{ color: c.ink, fontWeight: '600' }}>{t('create.visibility')}</Text>
           <Segmented

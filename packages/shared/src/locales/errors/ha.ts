@@ -1325,4 +1325,16 @@ export const ha: Record<string, string> = {
   // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
   'Near you is not enabled.': 'Ba a kunna Kusa da kai ba.',
   'Zoom in to see what’s here.': 'Zuƙo don ganin abin da ke nan.',
+  // Squads (lib/squads.ts, and where posts, stories, chats and chains meet them)
+  "Squad doesn't exist or isn't visible to you.": 'Wannan squad ɗin babu shi ko ba za ka iya ganinsa ba.',
+  'Squads is not enabled.': 'Ba a kunna squad ba.',
+  'Choose a squad.': 'Zaɓi squad.',
+  'You can be in up to {max} squads.': 'Za ka iya kasancewa a cikin squad har {max}.',
+  'You can invite people you follow who follow you back, and your friends.': 'Za ka iya gayyatar abokanka, da mutanen da kake bi waɗanda su ma suke binka.',
+  'A squad can have up to 10 people.': 'Squad zai iya samun mutane har 10.',
+  'You can’t join this squad now.': 'Ba za ka iya shiga wannan squad ɗin yanzu ba.',
+  'Make someone else the owner before you leave.': 'Mai da wani mamallaki kafin ka fita.',
+  'This chat belongs to a squad. Change who’s in it from the squad.': 'Wannan hirar ta wani squad ce. Canza waɗanda ke ciki daga squad ɗin.',
+  'Posts shared with a squad stay with it.': 'Rubuce-rubucen da aka raba da squad suna zama a cikinsa.',
+  'Reels in a squad’s chain are shared with that squad.': 'Reel a cikin sarƙar squad ana raba su da wannan squad ɗin.',
 };

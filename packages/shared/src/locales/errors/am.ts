@@ -1170,4 +1170,16 @@ export const am: Record<string, string> = {
   // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
   'Near you is not enabled.': 'በአቅራቢያዎ አልበራም።',
   'Zoom in to see what’s here.': 'እዚህ ያለውን ለማየት ያጉሉ።',
+  // Squads (lib/squads.ts, and where posts, stories, chats and chains meet them)
+  "Squad doesn't exist or isn't visible to you.": 'ይህ ስኳድ የለም ወይም ሊያዩት አይችሉም።',
+  'Squads is not enabled.': 'ስኳዶች አልበሩም።',
+  'Choose a squad.': 'ስኳድ ይምረጡ።',
+  'You can be in up to {max} squads.': 'ቢበዛ በ{max} ስኳዶች ውስጥ መሆን ይችላሉ።',
+  'You can invite people you follow who follow you back, and your friends.': 'ጓደኞችዎን፣ እና እርስዎ የሚከተሏቸው እርስዎንም የሚከተሉ ሰዎችን መጋበዝ ይችላሉ።',
+  'A squad can have up to 10 people.': 'አንድ ስኳድ ቢበዛ 10 ሰዎች ሊኖሩት ይችላሉ።',
+  'You can’t join this squad now.': 'አሁን ይህን ስኳድ መቀላቀል አይችሉም።',
+  'Make someone else the owner before you leave.': 'ከመውጣትዎ በፊት ሌላ ሰው ባለቤት ያድርጉ።',
+  'This chat belongs to a squad. Change who’s in it from the squad.': 'ይህ ውይይት የስኳድ ነው። በውስጡ ያሉትን ከስኳዱ ይቀይሩ።',
+  'Posts shared with a squad stay with it.': 'ለስኳድ የተጋሩ ልጥፎች በስኳዱ ውስጥ ይቆያሉ።',
+  'Reels in a squad’s chain are shared with that squad.': 'በስኳድ ሰንሰለት ውስጥ ያሉ ሪሎች ለዚያው ስኳድ ይጋራሉ።',
 };
