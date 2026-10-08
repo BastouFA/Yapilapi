@@ -25,7 +25,8 @@ const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60))
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /**
- * The camera that Spark (the navigation's centre button) opens. Choose Post, Reel or Story at the bottom, then:
+ * The camera that Spark (the navigation's centre button) opens. Choose Yap, Post, Reel or Story at the bottom, then:
+ * - Yap: no camera; it opens Create in Yap mode, to record a voice post.
  * - Post and Story: tap the shutter for a photo, hold it to record a video.
  * - Reel: tap to start recording, tap again to stop (up to the reel limit).
  * - Both sides (Post and Story, on devices with two cameras): a back camera photo, then the
@@ -61,6 +62,11 @@ function Camera() {
   useEffect(() => {
     if (chainId) setMode('reel');
   }, [chainId]);
+  // Yaps need no camera: /camera?mode=yap goes straight to recording one.
+  const yapsOn = flags.YAPS !== false && !echoOf && !chainId;
+  useEffect(() => {
+    if (yapsOn && params.get('mode') === 'yap') router.replace('/create?mode=yap');
+  }, [yapsOn, params, router]);
   const [facing, setFacing] = useState<'user' | 'environment'>('environment');
   const [status, setStatus] = useState<'starting' | 'ready' | 'denied' | 'none'>('starting');
   const [hasAudio, setHasAudio] = useState(false);
@@ -437,24 +443,31 @@ function Camera() {
           </span>
         </div>
         {fixed ? null : (
-          <div className="cam__modes" role="tablist" aria-label={t('m.create.mode')} onKeyDown={onTabsKey}>
-            {MODES.map((m) => (
-              <button
-                key={m.id}
-                ref={(el) => {
-                  modeTabs.current[m.id] = el;
-                }}
-                type="button"
-                role="tab"
-                aria-selected={m.id === mode}
-                tabIndex={m.id === mode ? 0 : -1}
-                disabled={recording || dualBusy}
-                className="cam__mode"
-                onClick={() => setMode(m.id)}
-              >
-                {t(m.label)}
-              </button>
-            ))}
+          <div className="cam__modes">
+            {yapsOn ? (
+              <Link href="/create?mode=yap" className="cam__mode" replace>
+                {t('m.create.mode.yap')}
+              </Link>
+            ) : null}
+            <div className="cam__modes" role="tablist" aria-label={t('m.create.mode')} onKeyDown={onTabsKey}>
+              {MODES.map((m) => (
+                <button
+                  key={m.id}
+                  ref={(el) => {
+                    modeTabs.current[m.id] = el;
+                  }}
+                  type="button"
+                  role="tab"
+                  aria-selected={m.id === mode}
+                  tabIndex={m.id === mode ? 0 : -1}
+                  disabled={recording || dualBusy}
+                  className="cam__mode"
+                  onClick={() => setMode(m.id)}
+                >
+                  {t(m.label)}
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>

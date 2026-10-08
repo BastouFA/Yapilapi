@@ -1,0 +1,165 @@
+/* Yaps (components/YapRecorder.tsx): the big round record button, the live waveform and the preview. */
+.yap-rec {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+}
+.yap-rec > .yp-voice {
+  align-self: stretch;
+  background: var(--surface);
+}
+.yap-rec__stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+}
+.yap-rec__btn {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 2px;
+  width: 112px;
+  height: 112px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--grad);
+  color: var(--on-yapi);
+  font: 800 18px/1 var(--font-display);
+  cursor: pointer;
+  /* Holding it to talk shouldn't select text, scroll or open a menu. */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+.yap-rec__btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.yap-rec__btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.yap-rec__btn--live {
+  transform: scale(1.06);
+  background: var(--danger);
+  color: var(--on-danger);
+  animation: yap-rec-pulse 1.4s ease-in-out infinite;
+}
+@keyframes yap-rec-pulse {
+  50% {
+    box-shadow: 0 0 0 10px var(--danger-soft);
+  }
+}
+.yap-rec__live {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  width: 100%;
+  max-width: 320px;
+}
+.yap-rec__wave {
+  display: block;
+  width: 100%;
+  height: 40px;
+}
+.yap-rec__wave rect {
+  fill: var(--danger);
+}
+.yap-rec__left {
+  font: 600 14px/1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+.yap-rec__hint {
+  margin: 0;
+  font-size: 14px;
+  text-align: center;
+}
+.yap-rec__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+}
+.yap-rec__problem {
+  margin: 0;
+  color: var(--danger);
+  font-size: 14px;
+  text-align: center;
+}
+.yap-rec__problem:empty {
+  display: none;
+}
+/* Compact: a voice reply under a post, or a voice intro in settings. */
+.yap-rec--compact {
+  align-items: stretch;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+}
+.yap-rec--compact .yap-rec__stage {
+  flex-direction: row;
+}
+.yap-rec--compact .yap-rec__btn {
+  width: 56px;
+  height: 56px;
+  flex: none;
+}
+.yap-rec--compact .yap-rec__actions {
+  justify-content: flex-start;
+}
+.yap-rec--compact .yap-rec__hint,
+.yap-rec--compact .yap-rec__problem {
+  text-align: start;
+}
+/* Create, in Yap mode: the recorder first, the line and the audience under it. */
+.yap-compose {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+/* Photos, polls, links and music aren't for Yaps: the post composer stays out of the way. */
+.composer-box[hidden] {
+  display: none;
+}
+/* Yap in the camera's modes is a link to Create. */
+a.cam__mode {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+/* Comments: voice replies in the thread. */
+.comment__voice {
+  margin-top: var(--space-1);
+}
+.comment__voice .yp-voice {
+  background: var(--surface);
+}
+/* A profile's voice intro, under the bio. */
+.profile-intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-width: 420px;
+}
+.profile-intro__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+@media (prefers-reduced-motion: reduce) {
+  .yap-rec__btn {
+    transition: none;
+  }
+  .yap-rec__btn--live {
+    animation: none;
+    transform: none;
+  }
+}

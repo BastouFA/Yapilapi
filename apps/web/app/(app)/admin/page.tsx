@@ -203,6 +203,7 @@ export default function Admin() {
               <Flags />
               <PassTheMicStats />
               <SquadStats />
+              <YapStats />
               <PhonePurchases />
             </div>
           ) : tab === 'miniapps' ? (
@@ -723,6 +724,36 @@ function SquadStats() {
         <p style={{ margin: 0 }}>
           {t('admin.squads', { squads: n(data.squads), members: n(data.members), invites: n(data.invites), posts: n(data.postsThisWeek) })}
         </p>
+      )}
+    </Card>
+  );
+}
+
+/**
+ * Yaps at a glance: voice posts, voice replies, voice intros, and how their transcripts are
+ * doing (many failed or unavailable means speech-to-text needs a look). The wording is in
+ * English for now: only operators see it.
+ */
+function YapStats() {
+  const { t, locale } = useSession();
+  const { data, error, reload } = useLoad(() => api.admin.yaps(), []);
+  const n = (v: number) => fullCount(v, locale);
+  return (
+    <Card title={t('feed.yaps')}>
+      {error ? (
+        <LoadFailed error={error} onRetry={reload} />
+      ) : !data ? (
+        <Skeleton height={60} />
+      ) : (
+        <div className="stack-sm">
+          <p style={{ margin: 0 }}>
+            Yaps: {n(data.yaps)}, {n(data.thisWeek)} this week. Voice replies: {n(data.voiceReplies)}. Voice intros: {n(data.intros)}.
+          </p>
+          <p style={{ margin: 0 }}>
+            Transcripts: {n(data.transcripts.ready ?? 0)} ready, {n(data.transcripts.pending ?? 0)} being made, {n(data.transcripts.failed ?? 0)} failed,{' '}
+            {n(data.transcripts.unavailable ?? 0)} not available.
+          </p>
+        </div>
       )}
     </Card>
   );

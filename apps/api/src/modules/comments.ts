@@ -18,7 +18,7 @@ import {
 } from '@yapilapi/shared';
 import type { PoolClient } from 'pg';
 import { z } from 'zod';
-import { AppError, badRequest, forbidden, notFound, parse } from '../lib/errors.ts';
+import { AppError, badRequest, featureDisabled, forbidden, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { decodeCursor, encodeCursor, keyCursorOf, type KeyCursor } from '../lib/cursor.ts';
 import {
@@ -38,7 +38,8 @@ import {
 } from '../lib/comments.ts';
 import { notifyMentions } from '../lib/mentions.ts';
 import { langOf } from '../lib/translation.ts';
-import { notify, track } from '../lib/services.ts';
+import { claimVoice, forgetVoice, startTranscript } from '../lib/voice.ts';
+import { isEnabled, notify, track } from '../lib/services.ts';
 import { learn, learnFromPost, learnQuietly } from '../lib/affinity.ts';
 import { bumpStats, TREND } from '../lib/post-stats.ts';
 import { flagContent, recordSignals } from '../lib/spam.ts';
@@ -276,11 +277,14 @@ export default async function commentsModule(app: FastifyInstance, ctx: AppConte
         if (!root.rowCount) throw notFound('The comment you replied to');
       }
     }
+    // Talk back: a voice reply (lib/voice.ts). Its words are checked again once they're transcribed.
+    if (input.voiceId && !(await isEnabled(db, 'YAPS'))) throw featureDisabled('Yaps');
     const screening = await screenComment(db, ctx.config, { userId: u.id, postId: id, postAuthorId: post.author_id, body: input.body });
     const commentId = await tx(db, async (c) => {
+      if (input.voiceId) await claimVoice(c, u.id, input.voiceId, 'comment');
       const { rows } = await c.query(
-        `INSERT INTO comments (post_id, author_id, parent_id, reply_to_id, body, moderation_status, topics, hidden_at, lang, at_ms)
-         VALUES ($1,$2,$3,$4,$5,$6,$7, CASE WHEN $8 THEN now() END, $9, $10) RETURNING id`,
+        `INSERT INTO comments (post_id, author_id, parent_id, reply_to_id, body, moderation_status, topics, hidden_at, lang, at_ms, voice_media_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7, CASE WHEN $8 THEN now() END, $9, $10, $11) RETURNING id`,
         // #tags in a comment count on the tag's page; its language drives "See translation".
         [
           id,
@@ -293,12 +297,14 @@ export default async function commentsModule(app: FastifyInstance, ctx: AppConte
           screening.hidden,
           langOf(input.body),
           input.atMs ?? null,
+          input.voiceId ?? null,
         ],
       );
       await syncCommentCounts(c, id);
       await recordCommentFlags(c, u.id, rows[0].id, screening);
       return rows[0].id as string;
     });
+    if (input.voiceId) await startTranscript(ctx, input.voiceId);
     // Commenting teaches the recommender about the post (with Personalization on); comments others see add to its momentum.
     await learnQuietly(learnFromPost(db, u.id, id, 'comment'), req.log);
     if (reachesOthers(screening)) await bumpStats(db, [{ postId: id, trend: TREND.weights.comment }]);
@@ -408,6 +414,17 @@ export default async function commentsModule(app: FastifyInstance, ctx: AppConte
       await syncCommentCounts(c, r.rows[0].post_id);
       return r.rows[0].post_id as string;
     });
+    // Voice replies that went with it: their audio is deleted (lib/voice.ts).
+    const voices = await db.query<{ voice_media_id: string }>(
+      `SELECT voice_media_id FROM comments WHERE (id = $1 OR parent_id = $1) AND voice_media_id IS NOT NULL AND deleted_at IS NOT NULL`,
+      [id],
+    );
+    if (voices.rows.length)
+      await forgetVoice(
+        ctx,
+        voices.rows.map((r) => r.voice_media_id),
+        { type: 'comment', id },
+      );
     const count = (await db.query(`SELECT comment_count FROM posts WHERE id = $1`, [postId])).rows[0]?.comment_count ?? 0;
     return { ok: true, comments: count };
   });

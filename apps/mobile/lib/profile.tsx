@@ -54,6 +54,7 @@ import { ProfileMenu } from './profile-menu';
 import { FeaturedRow, ProfileAbout, ProfileLinks, ProfileSongChip, tabLabel, useTint } from './profile-style';
 import type { Tint } from './ui';
 import { AnswersList, AskCard } from './ask';
+import { VoicePlayer } from './voice';
 import { ProfileMixes } from './mixes';
 import { ProfileMarket } from './market';
 
@@ -375,6 +376,13 @@ export function ProfileView({
         {status ? <NowStatusLine status={status} center /> : null}
         {profile.bio ? <RichText text={profile.bio} style={{ color: c.ink, fontSize: 15, lineHeight: 22, textAlign: 'center' }} /> : null}
         {profile.song ? <ProfileSongChip song={profile.song} tint={tint} /> : null}
+        {profile.voiceIntro && !rel.blocked ? (
+          // Their voice intro (up to 15 seconds): plays only when asked.
+          <View style={{ alignSelf: 'stretch', gap: space[1] }}>
+            <Text style={{ color: c.inkMuted, fontSize: 12, fontWeight: '700', textAlign: 'center' }}>{t('voice.intro')}</Text>
+            <VoicePlayer compact clip={profile.voiceIntro} label={t('voice.intro.play')} own={rel.isSelf} />
+          </View>
+        ) : null}
         <ProfileLinks links={profile.links} tint={tint} />
         <ProfileAbout profile={profile} />
         {/* Someone you blocked shows nothing of theirs, not even counts. */}

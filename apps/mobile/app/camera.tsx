@@ -25,7 +25,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import type { DualCorner } from '../../../packages/shared/src/dual';
 import { client } from '../lib/api';
-import { createModeFrom, deliverEchoAsset, deliverPendingAsset, type CreateMode } from '../lib/create-sheet';
+import { createModeFrom, deliverEchoAsset, deliverPendingAsset, type CameraMode, type CreateMode } from '../lib/create-sheet';
+import { useFlag } from '../lib/flags';
 import { composeOnServer, DualReview, type Shot } from '../lib/dual';
 import { useT } from '../lib/i18n';
 import { CLIP_MAX_SECONDS, clock, pickOne, PLUS_REEL_MAX_SECONDS, REEL_MAX_SECONDS, type Picked } from '../lib/media';
@@ -34,6 +35,8 @@ import { palette, radius, space } from '../lib/theme';
 import { Button, Icon, type IconName } from '../lib/ui';
 
 const MODES = [
+  // A Yap needs no camera: choosing it goes to Create, which records it.
+  { id: 'yap', label: 'm.create.mode.yap' },
   { id: 'post', label: 'm.create.mode.post' },
   { id: 'reel', label: 'm.create.mode.reel' },
   { id: 'story', label: 'm.create.mode.story' },
@@ -152,7 +155,13 @@ export default function Camera() {
   }, [chainId]);
   // An echo or a chain is always a reel: the mode switcher is hidden.
   const reelOnly = !!echoOf || !!chainId;
-  const [mode, setMode] = useState<CreateMode>(reelOnly ? 'reel' : (createModeFrom(params.mode) ?? 'post'));
+  const asked = createModeFrom(params.mode);
+  const [mode, setMode] = useState<CameraMode>(reelOnly ? 'reel' : asked && asked !== 'yap' ? asked : 'post');
+  // Yap is offered first while Yaps are on.
+  const yapsOn = useFlag('YAPS') !== false;
+  const modes = yapsOn ? MODES : MODES.filter((m) => m.id !== 'yap');
+  const modesRef = useRef(modes);
+  modesRef.current = modes;
   const [facing, setFacing] = useState<CameraType>('back');
   const [flash, setFlash] = useState<Flash>('off');
   // Post and Story take photos; the camera switches to video only while holding the shutter.
@@ -247,11 +256,12 @@ export default function Camera() {
   }, [getCam, getMic]);
 
   // The selected mode sits in the middle of the switcher.
-  const modeIndex = MODES.findIndex((m) => m.id === mode);
+  const modeIndex = modes.findIndex((m) => m.id === mode);
+  const modeCount = modes.length;
   useEffect(() => {
-    const position = I18nManager.isRTL ? MODES.length - 1 - modeIndex : modeIndex;
-    Animated.spring(modeX, { toValue: (1 - position) * MODE_WIDTH, useNativeDriver: true, speed: 18, bounciness: 4 }).start();
-  }, [modeIndex, modeX]);
+    const position = I18nManager.isRTL ? modeCount - 1 - modeIndex : modeIndex;
+    Animated.spring(modeX, { toValue: ((modeCount - 1) / 2 - position) * MODE_WIDTH, useNativeDriver: true, speed: 18, bounciness: 4 }).start();
+  }, [modeIndex, modeCount, modeX]);
 
   // The timer, and a backstop for the length limit.
   useEffect(() => {
@@ -266,6 +276,8 @@ export default function Camera() {
 
   function choose(next: CreateMode) {
     if (recordingRef.current || busyRef.current || reelOnly) return;
+    // A Yap is recorded in Create: no camera needed.
+    if (next === 'yap') return void router.dismissTo({ pathname: '/create', params: { mode: 'yap' } });
     setMode(next);
     setVideoMode(false);
     if (next === 'reel') setDual(false);
@@ -282,8 +294,8 @@ export default function Camera() {
           if (Math.abs(g.dx) < 40) return;
           // Swiping left brings the entry on the right to the middle; the order is mirrored in RTL.
           const step = (g.dx < 0 ? 1 : -1) * (I18nManager.isRTL ? -1 : 1);
-          const i = MODES.findIndex((m) => m.id === modeRef.current) + step;
-          const next = MODES[i];
+          const i = modesRef.current.findIndex((m) => m.id === modeRef.current) + step;
+          const next = modesRef.current[i];
           if (next) choose(next.id);
         },
       }),
@@ -679,7 +691,7 @@ export default function Camera() {
           {...swipe.panHandlers}
         >
           <Animated.View style={[s.modeRow, { transform: [{ translateX: modeX }] }]}>
-            {MODES.map((m) => {
+            {modes.map((m) => {
               const on = m.id === mode;
               return (
                 <Pressable

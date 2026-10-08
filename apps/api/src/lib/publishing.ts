@@ -36,6 +36,7 @@ import { announceChainLink, joinChain, passTheMicByMention, startChain, type Cha
 import { enrollFairStart } from './fair-start.ts';
 import { isEnabled } from './services.ts';
 import { announceSquadPost, assertCanShare } from './squads.ts';
+import { assertYapPace, claimVoice, startPostTranscripts } from './voice.ts';
 
 type Q = Pool | PoolClient;
 type Deps = Pick<AppContext, 'db' | 'config' | 'realtime' | 'music'> & Partial<Pick<AppContext, 'transcription'>>;
@@ -109,6 +110,8 @@ export async function writePost(
   // Pass the Mic: a reel that starts a chain or takes the mic on one (lib/chains.ts) is posted right away.
   if ((input.chainId || input.chainPrompt) && !(await isEnabled(c, 'PASS_THE_MIC'))) throw featureDisabled('Pass the Mic');
   if ((input.chainId || input.chainPrompt) && (opts.id || opts.state !== 'published')) throw badRequest('Chains are made of reels posted right away.');
+  // Yaps (lib/voice.ts): a voice clip recorded for one, through POST /v1/voice.
+  if (input.format === 'yap' && !(await isEnabled(c, 'YAPS'))) throw featureDisabled('Yaps');
   const kind = postKind(input);
   // A recording is a post of its own: not a reel, and without photos, videos or a poll.
   if (input.media.some((m) => m.kind === 'audio')) {
@@ -258,6 +261,8 @@ export async function writePost(
       ]);
       if (!own.rowCount) throw notFound('One of the photos or videos');
       if (own.rows[0].moderation === 'blocked') throw new AppError(422, 'media_blocked', MEDIA_BLOCKED_MESSAGE);
+      // A Yap's clip: recorded for a Yap, and not used anywhere else (a draft saved again keeps its own).
+      if (input.format === 'yap') await claimVoice(c, userId, mediaId, 'yap', { postId: opts.id });
     } else {
       // An address alone is for files elsewhere: one stored here goes by its id, so the checks above apply to it.
       if (isStoredMediaUrl(m.url)) throw new AppError(400, 'validation_failed', 'Attach photos and videos uploaded here by their id.');
@@ -430,7 +435,9 @@ async function transcribeRecording(deps: Deps, postId: string): Promise<void> {
   const { rows } = await deps.db.query<{ media_id: string; author_id: string; locale: string }>(
     `SELECT pm.media_id, p.author_id, pr.locale
      FROM post_media pm JOIN media m ON m.id = pm.media_id JOIN posts p ON p.id = pm.post_id JOIN profiles pr ON pr.user_id = p.author_id
-     WHERE pm.post_id = $1 AND m.kind = 'audio' AND m.owner_id = p.author_id`,
+     WHERE pm.post_id = $1 AND m.kind = 'audio' AND m.owner_id = p.author_id
+       -- A Yap's clip gets its own transcript (lib/voice.ts).
+       AND NOT EXISTS (SELECT 1 FROM voice_clips vc WHERE vc.media_id = pm.media_id)`,
     [postId],
   );
   for (const r of rows) {
@@ -467,6 +474,8 @@ export async function announcePost(
   track(db, p.authorId, 'post_created', { kind: p.kind, visibility: p.visibility, community: !!p.communityId });
   await emitWebhook(db, p.authorId, 'post.created', { postId: p.postId, kind: p.kind, visibility: p.visibility });
   if (p.kind === 'audio') await transcribeRecording(deps, p.postId);
+  // A Yap's transcript, which is also checked (its fair start waits for it: lib/voice.ts).
+  if (p.kind === 'audio') await startPostTranscripts(deps, p.postId);
   if (p.status !== 'normal') return;
   // A new creator's reel: a fair start to its first audience, when it and its author may have one (lib/fair-start.ts).
   if (p.kind === 'video') await enrollFairStart(db, p.postId, deps.config.SPAM_CHECKS);
@@ -553,6 +562,7 @@ export async function publishDraft(deps: Deps, postId: string, authorId: string)
   }
   // Still in the squad it's for (a squad that was deleted, or that the author left, takes nobody's post).
   if (d.visibility === 'squad') await assertCanShare(db, d.squad_id, authorId);
+  if (d.format === 'yap') await assertYapPace(db, authorId);
   const remixAuthor = d.format === 'reel' && d.remix_of_post_id ? (await assertRemixable(db, d.remix_of_post_id, authorId)).authorId : null;
   // Music: the song's licence (and the author's account type and country) or the sound are checked again as it goes out.
   if (d.music && d.music_track_id) await deps.music.checkTrack(authorId, d.music_track_id, d.music.durationMs);

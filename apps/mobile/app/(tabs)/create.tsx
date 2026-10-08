@@ -54,6 +54,8 @@ import { PostAudio } from '../../lib/post';
 import { useFlag } from '../../lib/flags';
 import { FairStartPromise, JoinChoice } from '../../lib/chains';
 import { noticeText } from '../../../../packages/shared/src/server-text';
+import { VOICE_MAX_MS, YAP_TEXT_MAX, type VoiceClip } from '../../../../packages/shared/src/voice';
+import { uploadVoice, VoiceRecorder } from '../../lib/voice';
 
 const VISIBILITY = [
   { id: 'public', label: 'visibility.public' },
@@ -64,6 +66,8 @@ const VISIBILITY = [
 ] as const satisfies readonly { id: string; label: MessageKey }[];
 
 const KINDS = [
+  // A voice post of up to a minute (not offered while the YAPS flag is off).
+  { id: 'yap', label: 'm.create.mode.yap', hint: 'voice.recordA11y' },
   { id: 'post', label: 'm.create.mode.post', hint: 'm.create.hint.post' },
   { id: 'reel', label: 'm.create.mode.reel', hint: 'm.create.hint.reel' },
   { id: 'story', label: 'm.create.mode.story', hint: 'm.create.hint.story' },
@@ -87,12 +91,17 @@ const MAX_POST_MEDIA = 10;
 /** The reel a duet plays beside, or a remix takes its sound from. */
 type Original = { id: string; username: string; media: MediaItem | null; soundTitle: string | null };
 
-const kindFrom = (mode: string | undefined): Kind | null => (mode === 'reel' || mode === 'story' || mode === 'post' ? mode : null);
+const kindFrom = (mode: string | undefined): Kind | null => (mode === 'reel' || mode === 'story' || mode === 'post' || mode === 'yap' ? mode : null);
+/** Where music opened from a sound or song page goes (a Yap has none: a post then). */
+const musicUse = (k: Kind | null, fallback: Exclude<Kind, 'yap'>): Exclude<Kind, 'yap'> => (k && k !== 'yap' ? k : fallback);
+/** A place a Yap was made at, found by name. */
+type PlacePick = { id: string; name: string; city: string | null };
 
 /**
- * Create: a text post, a reel (one video up to 3 minutes, optionally with a sound from the
- * sound page) or a story (optionally for close friends only), like the web composer. Posts
- * and reels can be saved as a draft or scheduled instead; Drafts opens one here to continue.
+ * Create: a Yap (a voice post of up to a minute), a text post, a reel (one video up to 3 minutes,
+ * optionally with a sound from the sound page) or a story (optionally for close friends only),
+ * like the web composer. Posts and reels can be saved as a draft or scheduled instead; Drafts
+ * opens one here to continue.
  */
 export default function Create() {
   const c = useColors();
@@ -224,6 +233,13 @@ export default function Create() {
   // Squads you're in: posts, reels and stories can go to one ("Squad: Crew"). null until loaded.
   const [squads, setSquads] = useState<SquadCard[] | null>(null);
   const [squadId, setSquadId] = useState<string | null>(params.squad || null);
+  // Yaps: the recording (kept until posted or discarded), a new recorder after posting, and the place it was made at.
+  const yapsOn = useFlag('YAPS') !== false;
+  const [yap, setYap] = useState<{ uri: string; ms: number } | null>(null);
+  const [yapKey, setYapKey] = useState(0);
+  const [yapPlace, setYapPlace] = useState<PlacePick | null>(null);
+  // Uploaded once: trying again after a refused post doesn't send the recording twice.
+  const uploadedYap = useRef<{ uri: string; voice: VoiceClip } | null>(null);
 
   function switchTo(k: Kind) {
     setKind(k);
@@ -239,14 +255,14 @@ export default function Create() {
     setMedia((m) => (k === 'reel' && m?.kind !== 'video' ? null : m));
     if (k === 'story' && (visibility === 'public' || visibility === 'subscribers' || visibility === 'circle')) setVisibility('friends');
     // The part keeps within what the new kind plays (15 seconds on stories).
-    setMusic((m) => (m ? { ...m, durationMs: Math.min(m.durationMs, clipMax(m.track, k)) } : m));
+    setMusic((m) => (m ? { ...m, durationMs: Math.min(m.durationMs, clipMax(m.track, k === 'yap' ? 'post' : k)) } : m));
   }
 
   // "Use this sound" on a sound page opens this tab as a reel with that sound; "Add to your story" as a story with it.
   useEffect(() => {
     if (!params.sound) return;
     const soundId = params.sound;
-    const use = kindFrom(params.mode) ?? 'reel';
+    const use = musicUse(kindFrom(params.mode), 'reel');
     router.setParams({ sound: '' });
     client()
       .then((api) => api.sounds.get(soundId))
@@ -261,7 +277,7 @@ export default function Create() {
   useEffect(() => {
     if (!params.track) return;
     const trackId = params.track;
-    const use = kindFrom(params.mode) ?? 'post';
+    const use = musicUse(kindFrom(params.mode), 'post');
     router.setParams({ track: '' });
     client()
       .then((api) => api.music.track(trackId))
@@ -425,6 +441,12 @@ export default function Create() {
         (e) => setError(errorMessage(e)),
       );
   }, [params.draft]);
+
+  // Yaps turned off while one is being made: back to a post.
+  useEffect(() => {
+    if (!yapsOn && kind === 'yap') switchTo('post');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [yapsOn, kind]);
 
   // Home ("Your story") and Reels ("Make a reel") open this tab in a given mode.
   useEffect(() => {
@@ -634,15 +656,20 @@ export default function Create() {
     }
   }
 
-  /** What the post or reel says and shows. */
-  function content(): Record<string, unknown> {
-    const audience = keptAudience
+  /** Who the post, reel or Yap is for. */
+  function audienceFields(): Record<string, unknown> {
+    return keptAudience
       ? {
           visibility: keptAudience.visibility,
           circleId: keptAudience.circleId ?? undefined,
           audience: keptAudience.audience.length ? keptAudience.audience : undefined,
         }
       : { visibility, ...(visibility === 'circle' && circleId ? { circleId } : {}), ...(visibility === 'squad' && squadId ? { squadId } : {}) };
+  }
+
+  /** What the post or reel says and shows. */
+  function content(): Record<string, unknown> {
+    const audience = audienceFields();
     const described = altText.trim() ? { altText: altText.trim() } : {};
     const assisted = aiUsed ? { aiAssisted: true } : {};
     // Only when it differs from the account's choice: left out, the post follows the account.
@@ -818,6 +845,50 @@ export default function Create() {
     }
   }
 
+  /** Post the Yap: upload the recording (once), then the post with its line, audience and place. */
+  async function postYap() {
+    if (!yap) return;
+    setBusy(true);
+    setError(null);
+    setNote(null);
+    setNeedsVerify(false);
+    try {
+      let voice = uploadedYap.current?.uri === yap.uri ? uploadedYap.current.voice : null;
+      if (!voice) {
+        setProgress(0);
+        voice = await uploadVoice(yap.uri, 'yap', setProgress);
+        uploadedYap.current = { uri: yap.uri, voice };
+        setProgress(null);
+      }
+      const r = await (
+        await client()
+      ).posts.create({
+        format: 'yap',
+        body: body.trim(),
+        ...audienceFields(),
+        ...(yapPlace ? { placeId: yapPlace.id } : {}),
+        commentPolicy,
+        ...(hideCounts !== hideCountsDefault ? { hideCounts } : {}),
+        media: [{ id: voice.id, url: mediaUrl(voice.url), kind: 'audio' }],
+      });
+      clear();
+      setYap(null);
+      setYapPlace(null);
+      uploadedYap.current = null;
+      // A fresh recorder for the next one.
+      setYapKey((k) => k + 1);
+      if (r.moderation) setNote(noticeText(r.moderation, t) ?? r.moderation.message);
+      // Home shows the new Yap at the top, whatever the feed's ranking.
+      else router.navigate({ pathname: '/', params: { posted: r.post.id } });
+    } catch (e) {
+      if (isVerificationError(e)) setNeedsVerify(true);
+      else setError(errorMessage(e));
+    } finally {
+      setProgress(null);
+      setBusy(false);
+    }
+  }
+
   const hint = KINDS.find((k) => k.id === kind)!.hint;
   // A reel can join or start a chain when it's posted now, for everyone, followers or friends, outside a community.
   const chainable =
@@ -849,6 +920,7 @@ export default function Create() {
         !!media ||
         (kind === 'post' && (more.length > 0 || !!poll || !!link?.trim())) ||
         (kind === 'story' && (stickers.length > 0 || !!music)));
+  const canPostYap = !busy && !uploading && !!yap && (!forCircle || !!chosenCircle) && (!forSquad || !!chosenSquad);
   const audienceOptions: { id: Visibility; label: string }[] = [
     ...VISIBILITY.filter((v) => v.id !== 'subscribers' || (hasPlans && kind !== 'story'))
       // Taking the mic: the reel is shared with everyone, followers or friends (a squad's chain: the squad, below).
@@ -865,6 +937,82 @@ export default function Create() {
       ? [{ id: keptAudience.visibility as Visibility, label: t(`visibility.${keptAudience.visibility}` as MessageKey) }]
       : []),
   ];
+
+  // Who it's for (with the circle or squad), who can comment, and whether counts show: posts, reels and Yaps alike (a story has fewer).
+  const audienceAndComments = (
+    <>
+      {kind === 'story' && closeFriends ? null : (
+        <>
+          <Text style={{ color: c.ink, fontWeight: '600' }}>{t('create.visibility')}</Text>
+          <Chips
+            label={t('create.visibility')}
+            options={audienceOptions}
+            value={keptAudience && kind !== 'story' ? (keptAudience.visibility as Visibility) : visibility}
+            onChange={(v) => {
+              if (!v) return;
+              if (keptAudience && v === keptAudience.visibility) return;
+              setKeptAudience(null);
+              setVisibility(v);
+              // With a single circle there is nothing to choose.
+              if (v === 'circle' && !circleId && circles?.length === 1) setCircleId(circles[0]!.id);
+            }}
+          />
+          {forCircle && circles?.length ? (
+            <View style={{ gap: space[2] }}>
+              <Text style={{ color: c.ink, fontWeight: '600', fontSize: 13 }}>{t('m.create.chooseCircle')}</Text>
+              <Chips
+                label={t('m.create.chooseCircle')}
+                options={circles.map((x) => ({ id: x.id, label: x.name, icon: 'ellipse-outline' as const }))}
+                value={circleId}
+                onChange={setCircleId}
+              />
+              <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('m.create.circleHint')}</Text>
+              <Button
+                label={t('m.create.editCircles')}
+                variant="ghost"
+                size="sm"
+                icon="people-outline"
+                onPress={() => router.push('/circles')}
+                style={{ alignSelf: 'flex-start' }}
+              />
+            </View>
+          ) : null}
+          {forSquad && squads && squads.length > 1 && !joining?.squadId ? (
+            <Chips
+              label={t('visibility.squad')}
+              options={squads.map((x) => ({ id: x.id, label: x.name, icon: 'people-outline' as const }))}
+              value={squadId}
+              onChange={setSquadId}
+            />
+          ) : null}
+          {kind !== 'story' && circles && !circles.length ? (
+            <Button
+              label={t('m.create.makeCircle')}
+              variant="ghost"
+              size="sm"
+              icon="add-circle-outline"
+              onPress={() => router.push('/circles')}
+              style={{ alignSelf: 'flex-start' }}
+            />
+          ) : null}
+        </>
+      )}
+      {kind !== 'story' ? (
+        <View style={{ gap: space[2] }}>
+          <Text style={{ color: c.ink, fontWeight: '600' }}>{t('comments.settings.title')}</Text>
+          <Chips
+            label={t('comments.settings.title')}
+            options={COMMENT_POLICIES.map((p) => ({ id: p, label: t(`comments.policy.${p}`) }))}
+            value={commentPolicy}
+            onChange={(p) => p && setCommentPolicy(p)}
+          />
+        </View>
+      ) : null}
+      {kind !== 'story' ? (
+        <SwitchRow label={t('post.hideCounts')} hint={t('post.hideCounts.hint')} value={hideCounts} onValueChange={chooseHideCounts} />
+      ) : null}
+    </>
+  );
 
   return (
     <KeyboardAvoid>
@@ -885,11 +1033,11 @@ export default function Create() {
         </View>
         <Segmented
           label={t('m.create.mode')}
-          options={KINDS.map((k) => ({ id: k.id, label: t(k.label) }))}
+          options={KINDS.filter((k) => k.id !== 'yap' || yapsOn).map((k) => ({ id: k.id, label: t(k.label) }))}
           value={kind}
           onChange={switchTo}
-          // A quick double tap on Post, Reel or Story opens the camera in that mode.
-          onDoublePress={(k) => router.push({ pathname: '/camera', params: { mode: k } })}
+          // A quick double tap on Post, Reel or Story opens the camera in that mode (a Yap needs none).
+          onDoublePress={(k) => k !== 'yap' && router.push({ pathname: '/camera', params: { mode: k } })}
           doublePressLabel={t('m.create.openCamera')}
         />
         <Text style={{ color: c.inkMuted, fontSize: 14, lineHeight: 20 }}>{t(hint)}</Text>
@@ -920,447 +1068,416 @@ export default function Create() {
           </Notice>
         ) : null}
         <FairStartPromise active={kind === 'reel' && !draftId} />
-        <Card style={{ gap: space[3] }}>
-          <Field
-            label={kind === 'reel' ? t('m.create.reel.caption') : kind === 'story' ? t('m.create.story.body') : t('create.placeholder')}
-            {...ac.inputProps}
-            multiline
-            maxLength={kind === 'story' ? 500 : kind === 'reel' ? 2200 : 5000}
-            style={{ minHeight: kind === 'post' ? 140 : 96, textAlignVertical: 'top', paddingTop: 12 }}
-          />
-          {ac.list}
-          {captionsOn && kind !== 'story' ? (
-            <Button
-              label={t('create.aiCaption')}
-              icon="sparkles-outline"
-              size="sm"
-              variant="ghost"
-              disabled={!body.trim() && media?.kind !== 'image'}
-              style={{ alignSelf: 'flex-start' }}
-              onPress={async () => {
-                setError(null);
-                try {
-                  const r = await (
-                    await client()
-                  ).ai.captions({ text: body, mediaIds: media?.kind === 'image' ? [media.id] : [], format: kind === 'reel' ? 'reel' : 'post' });
-                  setIdeas(r.ideas);
-                } catch (e) {
-                  setError(errorMessage(e));
-                }
-              }}
+        {kind === 'yap' ? (
+          <Card style={{ gap: space[3] }}>
+            <VoiceRecorder
+              key={yapKey}
+              maxMs={VOICE_MAX_MS}
+              purpose="yap"
+              busy={busy}
+              onDone={(uri, ms) => setYap({ uri, ms })}
+              onCancel={() => setYap(null)}
             />
-          ) : null}
-          {ideas ? (
-            <CaptionIdeasPanel
-              ideas={ideas}
-              onUse={(caption) => {
-                // Keep the hashtags already written; the idea replaces the rest.
-                const tags = body.match(/(^|\s)#[\p{L}\p{M}\p{N}_]+/gu)?.join('') ?? '';
-                setBody(`${caption}${tags}`.slice(0, 5000));
-                setAiUsed(true);
-              }}
-              onAddTag={(tag) => setBody((b) => `${b.trimEnd()} #${tag}`.trimStart())}
-              onClose={() => setIdeas(null)}
+            <Field
+              label={t('voice.lineLabel')}
+              {...ac.inputProps}
+              multiline
+              maxLength={YAP_TEXT_MAX}
+              style={{ minHeight: 72, textAlignVertical: 'top', paddingTop: 12 }}
             />
-          ) : null}
-
-          <View style={{ gap: space[2] }}>
-            {media ? <Preview media={media} onRemove={() => setMedia(null)} /> : null}
+            {ac.list}
+            <YapPlace value={yapPlace} onChange={setYapPlace} />
+            {audienceAndComments}
+            {error ? <Notice tone="danger">{error}</Notice> : null}
+            {needsVerify || (me?.needsVerification && visibility === 'public') ? <VerifyPrompt action="post" /> : null}
+            {note ? <Notice>{note}</Notice> : null}
             <Button
               label={
-                applying
-                  ? t('m.editor.applying')
-                  : uploading
-                    ? t('m.create.uploading', { progress: number(progress ?? 0, { style: 'percent' }) })
-                    : kind === 'reel'
-                      ? media
-                        ? t('m.create.replaceVideo')
-                        : t('m.create.chooseVideo')
-                      : media
-                        ? t('m.create.replaceMedia')
-                        : t('m.create.choosePhotoVideo')
+                uploading
+                  ? t('m.create.uploading', { progress: number(progress ?? 0, { style: 'percent' }) })
+                  : busy
+                    ? t('m.create.publishing')
+                    : t('voice.post')
               }
-              icon={kind === 'reel' ? 'videocam-outline' : 'image-outline'}
-              variant="secondary"
-              size="sm"
-              disabled={uploading || busy}
-              onPress={() => choose()}
-              style={{ alignSelf: 'flex-start' }}
+              icon="mic-outline"
+              disabled={!canPostYap}
+              onPress={() => postYap()}
             />
-            {kind === 'post' && !media && !more.length && !poll ? (
-              <RecordAudio
-                maxMs={me.plus ? PLUS_AUDIO_POST_MAX_MS : AUDIO_POST_MAX_MS}
-                disabled={uploading || busy}
-                onError={setError}
-                onRecorded={(uri, ms) => void uploadRecording(uri, ms)}
-              />
-            ) : null}
-            {kind === 'post'
-              ? more.map((x, i) => (
-                  <View key={x.id} style={{ gap: space[2] }}>
-                    <Preview media={x} onRemove={() => setMore((cur) => cur.filter((y) => y.id !== x.id))} />
-                    {x.kind !== 'audio' ? (
-                      <Field
-                        label={t('compose.altTextLabel', { number: i + 2 })}
-                        placeholder={t('m.create.altTextPlaceholder')}
-                        value={x.altText}
-                        onChangeText={(v) => setMore((cur) => cur.map((y) => (y.id === x.id ? { ...y, altText: v } : y)))}
-                        maxLength={500}
-                      />
-                    ) : null}
-                  </View>
-                ))
-              : null}
-            {kind === 'post' && (media || more.length) && (media ? 1 : 0) + more.length < MAX_POST_MEDIA && media?.kind !== 'audio' ? (
+          </Card>
+        ) : (
+          <Card style={{ gap: space[3] }}>
+            <Field
+              label={kind === 'reel' ? t('m.create.reel.caption') : kind === 'story' ? t('m.create.story.body') : t('create.placeholder')}
+              {...ac.inputProps}
+              multiline
+              maxLength={kind === 'story' ? 500 : kind === 'reel' ? 2200 : 5000}
+              style={{ minHeight: kind === 'post' ? 140 : 96, textAlignVertical: 'top', paddingTop: 12 }}
+            />
+            {ac.list}
+            {captionsOn && kind !== 'story' ? (
               <Button
-                label={t('compose.addMore')}
-                icon="add-circle-outline"
-                variant="secondary"
+                label={t('create.aiCaption')}
+                icon="sparkles-outline"
                 size="sm"
-                disabled={uploading || busy}
-                onPress={() => void addMore()}
-                style={{ alignSelf: 'flex-start' }}
-              />
-            ) : null}
-            {kind !== 'reel' ? (
-              <Button
-                label={t(kind === 'story' ? 'collage.fromPhotos' : 'collage.make')}
-                icon="grid-outline"
-                variant="secondary"
-                size="sm"
-                disabled={uploading || busy}
-                onPress={makeCollage}
-                style={{ alignSelf: 'flex-start' }}
-              />
-            ) : null}
-            {kind === 'post' && ((!poll && media?.kind !== 'audio') || link === null) ? (
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
-                {!poll && media?.kind !== 'audio' ? (
-                  <Button label={t('m.sticker.kind.poll')} icon="stats-chart-outline" variant="secondary" size="sm" onPress={() => setPoll(['', ''])} />
-                ) : null}
-                {link === null ? (
-                  <Button label={t('m.sticker.kind.link')} icon="link-outline" variant="secondary" size="sm" onPress={() => setLink('')} />
-                ) : null}
-              </View>
-            ) : null}
-            {kind === 'post' && poll ? (
-              <View style={{ gap: space[2] }}>
-                {poll.map((o, i) => (
-                  <Field
-                    key={i}
-                    label={t('compose.pollOption', { number: i + 1 })}
-                    placeholder={t('m.sticker.option', { number: i + 1 })}
-                    value={o}
-                    maxLength={80}
-                    onChangeText={(v) => setPoll((p) => p!.map((x, j) => (j === i ? v : x)))}
-                  />
-                ))}
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
-                  {poll.length < 6 ? (
-                    <Button label={t('compose.addOption')} icon="add" variant="ghost" size="sm" onPress={() => setPoll((p) => [...p!, ''])} />
-                  ) : null}
-                  <Button label={t('compose.removePoll')} icon="close" variant="ghost" size="sm" onPress={() => setPoll(null)} />
-                </View>
-              </View>
-            ) : null}
-            {kind === 'post' && link !== null ? (
-              <View style={{ gap: space[2] }}>
-                <Field
-                  label={t('m.sticker.url')}
-                  placeholder="https://"
-                  hint={t('compose.linkHint')}
-                  value={link}
-                  onChangeText={setLink}
-                  keyboardType="url"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  maxLength={1000}
-                  // A web address reads left to right, also in Arabic.
-                  style={{ writingDirection: 'ltr', textAlign: 'left' }}
-                />
-                <Button
-                  label={t('compose.removeLink')}
-                  icon="close"
-                  variant="ghost"
-                  size="sm"
-                  onPress={() => setLink(null)}
-                  style={{ alignSelf: 'flex-start' }}
-                />
-              </View>
-            ) : null}
-            {confirmVideo ? (
-              <Notice tone="warn" title={t('dataSaver.title')}>
-                <Text style={{ color: c.ink, lineHeight: 20 }}>
-                  {confirmVideo.fileSize ? `${t('dataSaver.videoSize', { size: formatBytes(confirmVideo.fileSize) })} ` : ''}
-                  {t('dataSaver.videoWifi')}
-                </Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
-                  <Button
-                    label={t('dataSaver.uploadNow')}
-                    size="sm"
-                    onPress={() => {
-                      const a = confirmVideo;
-                      setConfirmVideo(null);
-                      handlePicked(a, { confirmed: true });
-                    }}
-                  />
-                  <Button
-                    label={t('dataSaver.uploadLater')}
-                    size="sm"
-                    variant="secondary"
-                    onPress={async () => {
-                      const a = confirmVideo;
-                      setConfirmVideo(null);
-                      try {
-                        await queueVideo(a);
-                        setLater(await listQueuedVideos());
-                        setNote(t('dataSaver.queued'));
-                      } catch (e) {
-                        setError(errorMessage(e));
-                      }
-                    }}
-                  />
-                </View>
-              </Notice>
-            ) : null}
-            {later.length ? (
-              <View style={{ gap: space[2] }}>
-                <Text style={{ color: c.ink, fontWeight: '700', fontSize: 14 }}>{t('dataSaver.queueTitle')}</Text>
-                <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('dataSaver.queueHint')}</Text>
-                {later.map((q) => (
-                  <View key={q.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
-                    <Icon name="videocam-outline" size={18} color={c.inkMuted} />
-                    <Text style={{ color: c.ink, flex: 1, fontSize: 14 }} numberOfLines={1}>
-                      {[q.duration ? clock(q.duration / 1000) : null, q.fileSize ? formatBytes(q.fileSize) : null].filter(Boolean).join(' · ') || q.fileName}
-                    </Text>
-                    <Button
-                      label={t('dataSaver.uploadNow')}
-                      size="sm"
-                      variant="secondary"
-                      disabled={uploading || busy}
-                      onPress={() => {
-                        fromQueue.current = q.id;
-                        handlePicked(queuedAsAsset(q), { confirmed: true });
-                      }}
-                    />
-                    <Button
-                      label={t('dataSaver.remove')}
-                      size="sm"
-                      variant="ghost"
-                      onPress={async () => {
-                        await removeQueuedVideo(q.id);
-                        setLater(await listQueuedVideos());
-                      }}
-                    />
-                  </View>
-                ))}
-              </View>
-            ) : null}
-            {denied ? (
-              <Notice tone="warn">
-                <Text style={{ color: c.ink, lineHeight: 20 }}>{t('m.create.photosPermission')}</Text>
-                <Button
-                  label={t('m.common.openSettings')}
-                  size="sm"
-                  variant="secondary"
-                  onPress={() => Linking.openSettings()}
-                  style={{ alignSelf: 'flex-start' }}
-                />
-              </Notice>
-            ) : null}
-          </View>
-
-          {media && media.kind !== 'audio' && kind !== 'story' ? (
-            <>
-              <Field label={t('m.create.altText')} placeholder={t('m.create.altTextPlaceholder')} value={altText} onChangeText={setAltText} maxLength={500} />
-              {media.kind === 'image' ? <SuggestAltText mediaId={media.id} onSuggested={setAltText} onError={setError} /> : null}
-            </>
-          ) : null}
-          {kind === 'post' && media?.kind === 'image' ? <PhotoTagger uri={media.local} value={photoTags} onChange={setPhotoTags} /> : null}
-          {kind !== 'story' ? <CoauthorPicker value={coauthors} onChange={setCoauthors} /> : null}
-
-          {kind === 'reel' && !remix ? <MusicField use="reel" value={music} onChange={setMusic} /> : null}
-          {kind === 'post' && postCanHaveMusic ? <MusicField use="post" value={music} onChange={setMusic} /> : null}
-
-          {kind === 'story' ? (
-            <>
-              {media?.kind !== 'audio' ? <MusicField use="story" value={music} onChange={setMusic} video={media?.kind === 'video'} /> : null}
-              <StickerEditor
-                stickers={stickers}
-                onChange={setStickers}
-                preview={{ uri: media?.local, kind: media?.kind, body }}
-                music={music ? { label: `${music.track.title} · ${music.track.artist}`, x: music.x, y: music.y } : null}
-                onMoveMusic={(x, y) => setMusic((m) => (m ? { ...m, x, y } : m))}
-              />
-              <SwitchRow label={t('m.stories.allowReshare')} hint={t('m.stories.allowReshareHint')} value={allowReshare} onValueChange={setAllowReshare} />
-              <SwitchRow label={t('m.closeFriends.title')} hint={t('m.closeFriends.storyHint')} value={closeFriends} onValueChange={setCloseFriends} />
-              <Button
-                label={t('m.closeFriends.manage')}
                 variant="ghost"
-                size="sm"
-                icon="people-outline"
-                onPress={() => router.push('/close-friends')}
+                disabled={!body.trim() && media?.kind !== 'image'}
                 style={{ alignSelf: 'flex-start' }}
-              />
-              <Text style={{ color: c.ink, fontWeight: '600' }}>{t('m.create.expires')}</Text>
-              <Segmented
-                label={t('m.create.expires')}
-                options={EXPIRES.map((e) => ({ id: e.id, label: t(e.label) }))}
-                value={expiresIn}
-                onChange={setExpiresIn}
-              />
-              {expiresIn === 'custom' ? (
-                <Field label={t('m.create.expires.hours')} value={customHours} onChangeText={setCustomHours} keyboardType="number-pad" maxLength={3} />
-              ) : null}
-            </>
-          ) : null}
-
-          {kind === 'story' && closeFriends ? null : (
-            <>
-              <Text style={{ color: c.ink, fontWeight: '600' }}>{t('create.visibility')}</Text>
-              <Chips
-                label={t('create.visibility')}
-                options={audienceOptions}
-                value={keptAudience && kind !== 'story' ? (keptAudience.visibility as Visibility) : visibility}
-                onChange={(v) => {
-                  if (!v) return;
-                  if (keptAudience && v === keptAudience.visibility) return;
-                  setKeptAudience(null);
-                  setVisibility(v);
-                  // With a single circle there is nothing to choose.
-                  if (v === 'circle' && !circleId && circles?.length === 1) setCircleId(circles[0]!.id);
+                onPress={async () => {
+                  setError(null);
+                  try {
+                    const r = await (
+                      await client()
+                    ).ai.captions({ text: body, mediaIds: media?.kind === 'image' ? [media.id] : [], format: kind === 'reel' ? 'reel' : 'post' });
+                    setIdeas(r.ideas);
+                  } catch (e) {
+                    setError(errorMessage(e));
+                  }
                 }}
               />
-              {forCircle && circles?.length ? (
+            ) : null}
+            {ideas ? (
+              <CaptionIdeasPanel
+                ideas={ideas}
+                onUse={(caption) => {
+                  // Keep the hashtags already written; the idea replaces the rest.
+                  const tags = body.match(/(^|\s)#[\p{L}\p{M}\p{N}_]+/gu)?.join('') ?? '';
+                  setBody(`${caption}${tags}`.slice(0, 5000));
+                  setAiUsed(true);
+                }}
+                onAddTag={(tag) => setBody((b) => `${b.trimEnd()} #${tag}`.trimStart())}
+                onClose={() => setIdeas(null)}
+              />
+            ) : null}
+
+            <View style={{ gap: space[2] }}>
+              {media ? <Preview media={media} onRemove={() => setMedia(null)} /> : null}
+              <Button
+                label={
+                  applying
+                    ? t('m.editor.applying')
+                    : uploading
+                      ? t('m.create.uploading', { progress: number(progress ?? 0, { style: 'percent' }) })
+                      : kind === 'reel'
+                        ? media
+                          ? t('m.create.replaceVideo')
+                          : t('m.create.chooseVideo')
+                        : media
+                          ? t('m.create.replaceMedia')
+                          : t('m.create.choosePhotoVideo')
+                }
+                icon={kind === 'reel' ? 'videocam-outline' : 'image-outline'}
+                variant="secondary"
+                size="sm"
+                disabled={uploading || busy}
+                onPress={() => choose()}
+                style={{ alignSelf: 'flex-start' }}
+              />
+              {kind === 'post' && !media && !more.length && !poll ? (
+                <RecordAudio
+                  maxMs={me.plus ? PLUS_AUDIO_POST_MAX_MS : AUDIO_POST_MAX_MS}
+                  disabled={uploading || busy}
+                  onError={setError}
+                  onRecorded={(uri, ms) => void uploadRecording(uri, ms)}
+                />
+              ) : null}
+              {kind === 'post'
+                ? more.map((x, i) => (
+                    <View key={x.id} style={{ gap: space[2] }}>
+                      <Preview media={x} onRemove={() => setMore((cur) => cur.filter((y) => y.id !== x.id))} />
+                      {x.kind !== 'audio' ? (
+                        <Field
+                          label={t('compose.altTextLabel', { number: i + 2 })}
+                          placeholder={t('m.create.altTextPlaceholder')}
+                          value={x.altText}
+                          onChangeText={(v) => setMore((cur) => cur.map((y) => (y.id === x.id ? { ...y, altText: v } : y)))}
+                          maxLength={500}
+                        />
+                      ) : null}
+                    </View>
+                  ))
+                : null}
+              {kind === 'post' && (media || more.length) && (media ? 1 : 0) + more.length < MAX_POST_MEDIA && media?.kind !== 'audio' ? (
+                <Button
+                  label={t('compose.addMore')}
+                  icon="add-circle-outline"
+                  variant="secondary"
+                  size="sm"
+                  disabled={uploading || busy}
+                  onPress={() => void addMore()}
+                  style={{ alignSelf: 'flex-start' }}
+                />
+              ) : null}
+              {kind !== 'reel' ? (
+                <Button
+                  label={t(kind === 'story' ? 'collage.fromPhotos' : 'collage.make')}
+                  icon="grid-outline"
+                  variant="secondary"
+                  size="sm"
+                  disabled={uploading || busy}
+                  onPress={makeCollage}
+                  style={{ alignSelf: 'flex-start' }}
+                />
+              ) : null}
+              {kind === 'post' && ((!poll && media?.kind !== 'audio') || link === null) ? (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+                  {!poll && media?.kind !== 'audio' ? (
+                    <Button label={t('m.sticker.kind.poll')} icon="stats-chart-outline" variant="secondary" size="sm" onPress={() => setPoll(['', ''])} />
+                  ) : null}
+                  {link === null ? (
+                    <Button label={t('m.sticker.kind.link')} icon="link-outline" variant="secondary" size="sm" onPress={() => setLink('')} />
+                  ) : null}
+                </View>
+              ) : null}
+              {kind === 'post' && poll ? (
                 <View style={{ gap: space[2] }}>
-                  <Text style={{ color: c.ink, fontWeight: '600', fontSize: 13 }}>{t('m.create.chooseCircle')}</Text>
-                  <Chips
-                    label={t('m.create.chooseCircle')}
-                    options={circles.map((x) => ({ id: x.id, label: x.name, icon: 'ellipse-outline' as const }))}
-                    value={circleId}
-                    onChange={setCircleId}
+                  {poll.map((o, i) => (
+                    <Field
+                      key={i}
+                      label={t('compose.pollOption', { number: i + 1 })}
+                      placeholder={t('m.sticker.option', { number: i + 1 })}
+                      value={o}
+                      maxLength={80}
+                      onChangeText={(v) => setPoll((p) => p!.map((x, j) => (j === i ? v : x)))}
+                    />
+                  ))}
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+                    {poll.length < 6 ? (
+                      <Button label={t('compose.addOption')} icon="add" variant="ghost" size="sm" onPress={() => setPoll((p) => [...p!, ''])} />
+                    ) : null}
+                    <Button label={t('compose.removePoll')} icon="close" variant="ghost" size="sm" onPress={() => setPoll(null)} />
+                  </View>
+                </View>
+              ) : null}
+              {kind === 'post' && link !== null ? (
+                <View style={{ gap: space[2] }}>
+                  <Field
+                    label={t('m.sticker.url')}
+                    placeholder="https://"
+                    hint={t('compose.linkHint')}
+                    value={link}
+                    onChangeText={setLink}
+                    keyboardType="url"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    maxLength={1000}
+                    // A web address reads left to right, also in Arabic.
+                    style={{ writingDirection: 'ltr', textAlign: 'left' }}
                   />
-                  <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('m.create.circleHint')}</Text>
                   <Button
-                    label={t('m.create.editCircles')}
+                    label={t('compose.removeLink')}
+                    icon="close"
                     variant="ghost"
                     size="sm"
-                    icon="people-outline"
-                    onPress={() => router.push('/circles')}
+                    onPress={() => setLink(null)}
                     style={{ alignSelf: 'flex-start' }}
                   />
                 </View>
               ) : null}
-              {forSquad && squads && squads.length > 1 && !joining?.squadId ? (
-                <Chips
-                  label={t('visibility.squad')}
-                  options={squads.map((x) => ({ id: x.id, label: x.name, icon: 'people-outline' as const }))}
-                  value={squadId}
-                  onChange={setSquadId}
-                />
+              {confirmVideo ? (
+                <Notice tone="warn" title={t('dataSaver.title')}>
+                  <Text style={{ color: c.ink, lineHeight: 20 }}>
+                    {confirmVideo.fileSize ? `${t('dataSaver.videoSize', { size: formatBytes(confirmVideo.fileSize) })} ` : ''}
+                    {t('dataSaver.videoWifi')}
+                  </Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+                    <Button
+                      label={t('dataSaver.uploadNow')}
+                      size="sm"
+                      onPress={() => {
+                        const a = confirmVideo;
+                        setConfirmVideo(null);
+                        handlePicked(a, { confirmed: true });
+                      }}
+                    />
+                    <Button
+                      label={t('dataSaver.uploadLater')}
+                      size="sm"
+                      variant="secondary"
+                      onPress={async () => {
+                        const a = confirmVideo;
+                        setConfirmVideo(null);
+                        try {
+                          await queueVideo(a);
+                          setLater(await listQueuedVideos());
+                          setNote(t('dataSaver.queued'));
+                        } catch (e) {
+                          setError(errorMessage(e));
+                        }
+                      }}
+                    />
+                  </View>
+                </Notice>
               ) : null}
-              {kind !== 'story' && circles && !circles.length ? (
+              {later.length ? (
+                <View style={{ gap: space[2] }}>
+                  <Text style={{ color: c.ink, fontWeight: '700', fontSize: 14 }}>{t('dataSaver.queueTitle')}</Text>
+                  <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('dataSaver.queueHint')}</Text>
+                  {later.map((q) => (
+                    <View key={q.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+                      <Icon name="videocam-outline" size={18} color={c.inkMuted} />
+                      <Text style={{ color: c.ink, flex: 1, fontSize: 14 }} numberOfLines={1}>
+                        {[q.duration ? clock(q.duration / 1000) : null, q.fileSize ? formatBytes(q.fileSize) : null].filter(Boolean).join(' · ') || q.fileName}
+                      </Text>
+                      <Button
+                        label={t('dataSaver.uploadNow')}
+                        size="sm"
+                        variant="secondary"
+                        disabled={uploading || busy}
+                        onPress={() => {
+                          fromQueue.current = q.id;
+                          handlePicked(queuedAsAsset(q), { confirmed: true });
+                        }}
+                      />
+                      <Button
+                        label={t('dataSaver.remove')}
+                        size="sm"
+                        variant="ghost"
+                        onPress={async () => {
+                          await removeQueuedVideo(q.id);
+                          setLater(await listQueuedVideos());
+                        }}
+                      />
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+              {denied ? (
+                <Notice tone="warn">
+                  <Text style={{ color: c.ink, lineHeight: 20 }}>{t('m.create.photosPermission')}</Text>
+                  <Button
+                    label={t('m.common.openSettings')}
+                    size="sm"
+                    variant="secondary"
+                    onPress={() => Linking.openSettings()}
+                    style={{ alignSelf: 'flex-start' }}
+                  />
+                </Notice>
+              ) : null}
+            </View>
+
+            {media && media.kind !== 'audio' && kind !== 'story' ? (
+              <>
+                <Field label={t('m.create.altText')} placeholder={t('m.create.altTextPlaceholder')} value={altText} onChangeText={setAltText} maxLength={500} />
+                {media.kind === 'image' ? <SuggestAltText mediaId={media.id} onSuggested={setAltText} onError={setError} /> : null}
+              </>
+            ) : null}
+            {kind === 'post' && media?.kind === 'image' ? <PhotoTagger uri={media.local} value={photoTags} onChange={setPhotoTags} /> : null}
+            {kind !== 'story' ? <CoauthorPicker value={coauthors} onChange={setCoauthors} /> : null}
+
+            {kind === 'reel' && !remix ? <MusicField use="reel" value={music} onChange={setMusic} /> : null}
+            {kind === 'post' && postCanHaveMusic ? <MusicField use="post" value={music} onChange={setMusic} /> : null}
+
+            {kind === 'story' ? (
+              <>
+                {media?.kind !== 'audio' ? <MusicField use="story" value={music} onChange={setMusic} video={media?.kind === 'video'} /> : null}
+                <StickerEditor
+                  stickers={stickers}
+                  onChange={setStickers}
+                  preview={{ uri: media?.local, kind: media?.kind, body }}
+                  music={music ? { label: `${music.track.title} · ${music.track.artist}`, x: music.x, y: music.y } : null}
+                  onMoveMusic={(x, y) => setMusic((m) => (m ? { ...m, x, y } : m))}
+                />
+                <SwitchRow label={t('m.stories.allowReshare')} hint={t('m.stories.allowReshareHint')} value={allowReshare} onValueChange={setAllowReshare} />
+                <SwitchRow label={t('m.closeFriends.title')} hint={t('m.closeFriends.storyHint')} value={closeFriends} onValueChange={setCloseFriends} />
                 <Button
-                  label={t('m.create.makeCircle')}
+                  label={t('m.closeFriends.manage')}
                   variant="ghost"
                   size="sm"
-                  icon="add-circle-outline"
-                  onPress={() => router.push('/circles')}
+                  icon="people-outline"
+                  onPress={() => router.push('/close-friends')}
                   style={{ alignSelf: 'flex-start' }}
                 />
-              ) : null}
-            </>
-          )}
-          {kind !== 'story' ? (
-            <View style={{ gap: space[2] }}>
-              <Text style={{ color: c.ink, fontWeight: '600' }}>{t('comments.settings.title')}</Text>
-              <Chips
-                label={t('comments.settings.title')}
-                options={COMMENT_POLICIES.map((p) => ({ id: p, label: t(`comments.policy.${p}`) }))}
-                value={commentPolicy}
-                onChange={(p) => p && setCommentPolicy(p)}
-              />
-            </View>
-          ) : null}
-          {kind !== 'story' ? (
-            <SwitchRow label={t('post.hideCounts')} hint={t('post.hideCounts.hint')} value={hideCounts} onValueChange={chooseHideCounts} />
-          ) : null}
-          {kind === 'reel' ? (
-            <SwitchRow label={t('compose.allowRemix')} hint={t('compose.allowRemixHint')} value={allowRemix} onValueChange={setAllowRemix} />
-          ) : null}
-          {kind === 'reel' ? (
-            <View style={{ gap: space[2] }}>
-              <Text style={{ color: c.ink, fontWeight: '600' }}>{t('echo.settings')}</Text>
-              <Chips
-                label={t('echo.settings')}
-                options={[
-                  { id: 'default' as const, label: t('echo.settings.default') },
-                  ...ECHO_PERMISSIONS.map((p) => ({ id: p, label: t(`echo.settings.${p}`) })),
-                ]}
-                value={allowEchoes}
-                onChange={(p) => p && setAllowEchoes(p)}
-              />
-              <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>
-                {allowEchoes === 'default' ? t('echo.settings.defaultHint') : t('echo.settings.hint')}
-              </Text>
-            </View>
-          ) : null}
-          {chainable && !joining ? (
-            <View style={{ gap: space[2] }}>
-              <SwitchRow label={t('mic.start')} hint={t('mic.start.hint')} value={starting} onValueChange={setStarting} />
-              {starting ? (
-                <>
-                  <Field
-                    label={t('mic.prompt')}
-                    placeholder={t('mic.prompt.placeholder')}
-                    value={chainPrompt}
-                    onChangeText={setChainPrompt}
-                    maxLength={CHAIN_RULES.promptMax}
-                    hint={t('mic.mention')}
-                  />
-                  {visibility === 'squad' ? (
-                    // A squad's chain is for the squad: only its people see it and take the mic.
-                    <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('squads.chainOnly', { name: chosenSquad?.name ?? '' })}</Text>
-                  ) : (
-                    <JoinChoice value={chainJoin} onChange={setChainJoin} />
-                  )}
-                </>
-              ) : null}
-            </View>
-          ) : null}
-          {error ? <Notice tone="danger">{error}</Notice> : null}
-          {needsVerify || (me?.needsVerification && kind !== 'story' && visibility === 'public') ? <VerifyPrompt action="post" /> : null}
-          {note ? <Notice>{note}</Notice> : null}
-          <Button
-            label={
-              busy
-                ? t('m.create.publishing')
-                : kind === 'story'
-                  ? t('m.create.shareStory')
-                  : kind === 'reel'
-                    ? remix
-                      ? t(remix.mode === 'duet' ? 'compose.publishDuet' : 'compose.publishRemix')
-                      : t('m.create.publishReel')
-                    : t('create.publish')
-            }
-            disabled={!canPublish}
-            onPress={() => publish()}
-          />
-          {kind !== 'story' && !inChain ? (
-            <View style={{ flexDirection: 'row', gap: space[2] }}>
-              <Button label={t('m.create.saveDraft')} variant="secondary" size="sm" disabled={!canPublish} onPress={() => keep(null)} style={{ flex: 1 }} />
-              <Button
-                label={t('m.create.schedule')}
-                icon="calendar-outline"
-                variant="secondary"
-                size="sm"
-                disabled={!canPublish}
-                onPress={() => setScheduling(true)}
-                style={{ flex: 1 }}
-              />
-            </View>
-          ) : null}
-        </Card>
+                <Text style={{ color: c.ink, fontWeight: '600' }}>{t('m.create.expires')}</Text>
+                <Segmented
+                  label={t('m.create.expires')}
+                  options={EXPIRES.map((e) => ({ id: e.id, label: t(e.label) }))}
+                  value={expiresIn}
+                  onChange={setExpiresIn}
+                />
+                {expiresIn === 'custom' ? (
+                  <Field label={t('m.create.expires.hours')} value={customHours} onChangeText={setCustomHours} keyboardType="number-pad" maxLength={3} />
+                ) : null}
+              </>
+            ) : null}
+
+            {audienceAndComments}
+            {kind === 'reel' ? (
+              <SwitchRow label={t('compose.allowRemix')} hint={t('compose.allowRemixHint')} value={allowRemix} onValueChange={setAllowRemix} />
+            ) : null}
+            {kind === 'reel' ? (
+              <View style={{ gap: space[2] }}>
+                <Text style={{ color: c.ink, fontWeight: '600' }}>{t('echo.settings')}</Text>
+                <Chips
+                  label={t('echo.settings')}
+                  options={[
+                    { id: 'default' as const, label: t('echo.settings.default') },
+                    ...ECHO_PERMISSIONS.map((p) => ({ id: p, label: t(`echo.settings.${p}`) })),
+                  ]}
+                  value={allowEchoes}
+                  onChange={(p) => p && setAllowEchoes(p)}
+                />
+                <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>
+                  {allowEchoes === 'default' ? t('echo.settings.defaultHint') : t('echo.settings.hint')}
+                </Text>
+              </View>
+            ) : null}
+            {chainable && !joining ? (
+              <View style={{ gap: space[2] }}>
+                <SwitchRow label={t('mic.start')} hint={t('mic.start.hint')} value={starting} onValueChange={setStarting} />
+                {starting ? (
+                  <>
+                    <Field
+                      label={t('mic.prompt')}
+                      placeholder={t('mic.prompt.placeholder')}
+                      value={chainPrompt}
+                      onChangeText={setChainPrompt}
+                      maxLength={CHAIN_RULES.promptMax}
+                      hint={t('mic.mention')}
+                    />
+                    {visibility === 'squad' ? (
+                      // A squad's chain is for the squad: only its people see it and take the mic.
+                      <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('squads.chainOnly', { name: chosenSquad?.name ?? '' })}</Text>
+                    ) : (
+                      <JoinChoice value={chainJoin} onChange={setChainJoin} />
+                    )}
+                  </>
+                ) : null}
+              </View>
+            ) : null}
+            {error ? <Notice tone="danger">{error}</Notice> : null}
+            {needsVerify || (me?.needsVerification && kind !== 'story' && visibility === 'public') ? <VerifyPrompt action="post" /> : null}
+            {note ? <Notice>{note}</Notice> : null}
+            <Button
+              label={
+                busy
+                  ? t('m.create.publishing')
+                  : kind === 'story'
+                    ? t('m.create.shareStory')
+                    : kind === 'reel'
+                      ? remix
+                        ? t(remix.mode === 'duet' ? 'compose.publishDuet' : 'compose.publishRemix')
+                        : t('m.create.publishReel')
+                      : t('create.publish')
+              }
+              disabled={!canPublish}
+              onPress={() => publish()}
+            />
+            {kind !== 'story' && !inChain ? (
+              <View style={{ flexDirection: 'row', gap: space[2] }}>
+                <Button label={t('m.create.saveDraft')} variant="secondary" size="sm" disabled={!canPublish} onPress={() => keep(null)} style={{ flex: 1 }} />
+                <Button
+                  label={t('m.create.schedule')}
+                  icon="calendar-outline"
+                  variant="secondary"
+                  size="sm"
+                  disabled={!canPublish}
+                  onPress={() => setScheduling(true)}
+                  style={{ flex: 1 }}
+                />
+              </View>
+            ) : null}
+          </Card>
+        )}
         <SchedulePicker visible={scheduling} onClose={() => setScheduling(false)} onPick={(at) => void keep(at)} />
         {kind === 'post' ? <Button label={t('m.real.capture')} icon="camera-outline" variant="secondary" onPress={() => router.push('/real')} /> : null}
         {collage ? (
@@ -1575,6 +1692,60 @@ function RecordAudio({
         onPress={() => void start()}
         style={{ alignSelf: 'flex-start' }}
       />
+    </View>
+  );
+}
+
+/** The place a Yap was made at (optional): found by name, shown on the Yap and on the Near you map. */
+function YapPlace({ value, onChange }: { value: PlacePick | null; onChange: (p: PlacePick | null) => void }) {
+  const c = useColors();
+  const { t } = useT();
+  const [q, setQ] = useState('');
+  const [places, setPlaces] = useState<PlacePick[]>([]);
+  useEffect(() => {
+    if (value || q.trim().length < 2) return setPlaces([]);
+    const timer = setTimeout(() => {
+      void client()
+        .then((api) => api.search(q.trim(), 'places'))
+        .then(
+          (r) => setPlaces(((r.results.places as PlacePick[] | undefined) ?? []).slice(0, 5)),
+          () => setPlaces([]),
+        );
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [q, value]);
+  if (value)
+    return (
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+        <Icon name="location-outline" size={18} color={c.inkMuted} />
+        <Text style={[{ color: c.ink, flex: 1, fontWeight: '600' }, userText]} numberOfLines={1}>
+          {value.city ? `${value.name}, ${value.city}` : value.name}
+        </Text>
+        <Button label={t('m.common.remove')} variant="ghost" size="sm" icon="close" onPress={() => onChange(null)} />
+      </View>
+    );
+  return (
+    <View style={{ gap: space[2] }}>
+      <Field label={t('m.sticker.findPlace')} value={q} onChangeText={setQ} maxLength={100} />
+      {places.map((p) => (
+        <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+          <Icon name="location-outline" size={16} color={c.inkMuted} />
+          <Text style={[{ color: c.ink, flex: 1 }, userText]} numberOfLines={1}>
+            {p.name}
+            {p.city ? ` · ${p.city}` : ''}
+          </Text>
+          <Button
+            label={t('m.sticker.add')}
+            size="sm"
+            variant="secondary"
+            onPress={() => {
+              onChange(p);
+              setQ('');
+            }}
+          />
+        </View>
+      ))}
+      {q.trim().length >= 2 && !places.length ? <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t('m.sticker.noPlaces')}</Text> : null}
     </View>
   );
 }

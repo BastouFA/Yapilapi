@@ -53,8 +53,11 @@ function Words({ id, transcript, own, tint }: { id: string; transcript: Transcri
   );
 }
 
-/** "Listen in English": the translation read out, made the first time anyone asks and then shared. */
-function Listen({ id, target, tint }: { id: string; target: string; tint: string }) {
+/**
+ * "Listen in English": the translation read out, made the first time anyone asks and then shared.
+ * `kind` 'voice' is a Yap's, a voice reply's or an intro's transcript (lib/voice.tsx).
+ */
+export function Listen({ id, target, tint, kind = 'transcript' }: { id: string; target: string; tint: string; kind?: 'transcript' | 'voice' }) {
   const { t, locale } = useT();
   const [url, setUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -79,7 +82,8 @@ function Listen({ id, target, tint }: { id: string; target: string; tint: string
     if (url) return player.play();
     setLoading(true);
     try {
-      setUrl(mediaUrl((await (await client()).messages.transcriptSpeech(id, target)).url));
+      const api = await client();
+      setUrl(mediaUrl((kind === 'voice' ? await api.voice.speech(id, target) : await api.messages.transcriptSpeech(id, target)).url));
     } catch (e) {
       setError(errorMessage(e));
     } finally {

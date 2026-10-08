@@ -3,11 +3,12 @@
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Avatar, BottomSheet, Button, Card, Select, TextField } from '@yapilapi/design-system';
+import { Alert, Avatar, BottomSheet, Button, Card, Select, TextField, VoicePlayer } from '@yapilapi/design-system';
 import {
   IMAGE_ACCEPT,
   PROFILE_MODES,
   usernameProblem,
+  VOICE_INTRO_MAX_MS,
   type AccountInfo,
   type MessageKey,
   type Profile,
@@ -18,13 +19,14 @@ import { api, errorMessage, fieldErrors } from '@/lib/api';
 import { PasswordField } from '@/components/PasswordField';
 import { useSession } from '@/app/providers';
 import { EditorLoading } from '@/components/Loading';
+import { uploadVoice, voiceError, YapRecorder, type Recording } from '@/components/YapRecorder';
 import { Anchor, SettingsLink } from './Shell';
 
 const PhotoEditor = dynamic(() => import('@/components/editor/PhotoEditor').then((m) => m.PhotoEditor), { ssr: false, loading: () => <EditorLoading /> });
 
 /** Your photo, name, bio and profile type: how people see you. */
 export function ProfileCard() {
-  const { me, refresh, toast, t } = useSession();
+  const { me, refresh, toast, t, flags } = useSession();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -131,8 +133,111 @@ export function ProfileCard() {
             </Link>
           </div>
         </form>
+        {flags.YAPS !== false ? <VoiceIntroField profile={profile} onChange={setProfile} /> : null}
       </Card>
     </Anchor>
+  );
+}
+
+/**
+ * A voice intro of up to 15 seconds, played from your profile's header: record one (or a new
+ * one), hear it back, save it, or remove it.
+ */
+function VoiceIntroField({ profile, onChange }: { profile: Profile; onChange: (p: Profile) => void }) {
+  const { t, toast, locale } = useSession();
+  const [recording, setRecording] = useState(!profile.voiceIntro);
+  const [clip, setClip] = useState<Recording | null>(null);
+  const [busy, setBusy] = useState<'save' | 'remove' | null>(null);
+  const intro = profile.voiceIntro ?? null;
+
+  const save = async () => {
+    if (!clip) return;
+    setBusy('save');
+    try {
+      let voiceId: string;
+      try {
+        voiceId = (await uploadVoice(clip, 'intro')).id;
+      } catch (err) {
+        toast(voiceError(err, t));
+        return;
+      }
+      const r = await api.me.updateProfile({ voiceIntroId: voiceId });
+      onChange(r.profile);
+      setClip(null);
+      setRecording(false);
+      toast(t('settings.profileSaved'));
+    } catch (err) {
+      toast(errorMessage(err));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const remove = async () => {
+    setBusy('remove');
+    try {
+      const r = await api.me.updateProfile({ voiceIntroId: null });
+      onChange(r.profile);
+      setRecording(true);
+      toast(t('settings.profileSaved'));
+    } catch (err) {
+      toast(errorMessage(err));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <section className="stack-sm" aria-labelledby="voice-intro-title" style={{ marginTop: 16 }}>
+      <h3 id="voice-intro-title" className="section-title" style={{ margin: 0 }}>
+        {t('voice.intro')}
+      </h3>
+      {intro && !recording ? (
+        <>
+          <VoicePlayer clip={intro} label={t('voice.intro.play')} locale={locale} size="sm" own />
+          <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+            <Button size="sm" variant="secondary" icon="mic" onClick={() => setRecording(true)}>
+              {t('voice.rerecord')}
+            </Button>
+            <Button size="sm" variant="ghost" icon="trash" loading={busy === 'remove'} disabled={!!busy} onClick={() => void remove()}>
+              {t('voice.intro.remove')}
+            </Button>
+          </div>
+        </>
+      ) : (
+        <>
+          <YapRecorder
+            compact
+            maxMs={VOICE_INTRO_MAX_MS}
+            label={t('voice.intro.record')}
+            onDone={(blob, durationMs, filename) => setClip({ blob, durationMs, filename })}
+            onReset={() => setClip(null)}
+            actions={
+              <Button size="sm" icon="check" loading={busy === 'save'} disabled={!!busy && busy !== 'save'} onClick={() => void save()}>
+                {t('common.save')}
+              </Button>
+            }
+          />
+          <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+            {t('voice.intro.record')}
+          </p>
+          {intro ? (
+            <div>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setRecording(false);
+                  setClip(null);
+                }}
+              >
+                {t('common.cancel')}
+              </Button>
+            </div>
+          ) : null}
+        </>
+      )}
+    </section>
   );
 }
 

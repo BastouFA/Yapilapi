@@ -27,6 +27,7 @@ export const FEATURE_FLAGS = {
   REAL: { default: false, description: 'Authenticity-focused dual capture.' },
   REAL_TOGETHER: { default: false, description: 'Shared multi-perspective experiences.' },
   PASS_THE_MIC: { default: true, description: 'Pass the Mic: reels made together, one after another, from a prompt (chains).' },
+  YAPS: { default: true, description: 'Yaps: voice posts of up to a minute, voice replies and voice intros, with transcripts.' },
   SQUADS: { default: true, description: 'Squads: small private groups of friends with a shared feed, story, chat and weekly memory.' },
   FAIR_START: { default: true, description: "Fair start: a new creator's first reels are shown to up to 1,000 people." },
   CITY_MAP: { default: true, description: 'Near you: a live map of lives, events, Market listings, busy places, chains and friends who are out.' },

@@ -201,6 +201,14 @@ export async function exportSections(db: Q, userId: string) {
               ${openUrl('m')} AS url, ${openUrl('m', 'poster_url')} AS poster_url, ${openUrl('m', 'hls_url')} AS hls_url
        FROM media m WHERE m.owner_id = $1 ORDER BY m.created_at DESC LIMIT ${EXPORT_LIMITS.media}`,
     ),
+    // Your Yaps, voice replies and voice intro: where each went, the recording's address while you can open it, and its transcript.
+    voice: await q(
+      `SELECT vc.media_id, vc.purpose, vc.duration_ms, ${openUrl('m')} AS url, vc.transcript_status, vc.transcript, vc.segments, vc.lang, vc.created_at,
+              (SELECT pm.post_id FROM post_media pm WHERE pm.media_id = vc.media_id LIMIT 1) AS post_id,
+              (SELECT cm.id FROM comments cm WHERE cm.voice_media_id = vc.media_id LIMIT 1) AS comment_id,
+              EXISTS (SELECT 1 FROM profiles pr WHERE pr.voice_intro_media_id = vc.media_id) AS is_intro
+       FROM voice_clips vc JOIN media m ON m.id = vc.media_id WHERE vc.owner_id = $1 ORDER BY vc.created_at DESC`,
+    ),
     captions: await q(
       `SELECT t.media_id, t.lang, t.label, t.source, t.status, t.cue_count, CASE WHEN t.status = 'ready' THEN t.url END AS url, t.created_at
        FROM caption_tracks t JOIN media m ON m.id = t.media_id WHERE m.owner_id = $1 OR t.created_by = $1`,
@@ -588,7 +596,7 @@ export const EXPORT_README = {
     passTheMic: 'Pass the Mic chains you started, your reels in chains, the people you passed the mic to (by username), and your reels’ fair starts.',
     squads: 'Squads you’re in or were invited to: their names, your role, and when you were invited and joined. What you shared with them is under content.',
     content:
-      'Stories, chapters, boards, saves, memories, recaps, lives, rooms, products, drops, places, businesses, photos and videos, and more you made; your event tickets, tickets given or received, events you co-host and how many people you checked in.',
+      'Stories, chapters, boards, saves, memories, recaps, lives, rooms, products, drops, places, businesses, photos and videos, your Yaps, voice replies and voice intro (recordings and transcripts), and more you made; your event tickets, tickets given or received, events you co-host and how many people you checked in.',
     chats:
       'Chats you are in, the transcripts of your own voice messages, and the polls, lists, plans, games, calls and watch together sessions you took part in (your side only), and when you shared where you were, with whom (never the place).',
     activity:

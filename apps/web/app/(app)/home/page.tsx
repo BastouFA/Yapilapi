@@ -29,6 +29,16 @@ export default function Home() {
   const [mode, setMode] = useState<FeedMode>('for_you');
   const [moments, setMoments] = useState<StoryGroup[]>([]);
   const [viewing, setViewing] = useState<number | null>(null);
+  // Yaps (voice posts) have their own feed while the feature is on.
+  const yapsOn = flags.YAPS !== false;
+  const modes: FeedMode[] = ['for_you', 'following', 'friends', 'communities', 'local', ...(yapsOn ? (['yaps'] as const) : [])];
+  // ?mode=yaps (after posting a Yap) opens that feed.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('mode') === 'yaps') setMode('yaps');
+  }, []);
+  useEffect(() => {
+    if (!yapsOn) setMode((m) => (m === 'yaps' ? 'for_you' : m));
+  }, [yapsOn]);
 
   useEffect(() => {
     api.moments
@@ -87,12 +97,7 @@ export default function Home() {
       {/* Launches from people you follow: when they open, and a Notify me on each drop's page. */}
       <FollowingDrops />
 
-      <Segments
-        label={t('m.feed.label')}
-        value={mode}
-        onChange={setMode}
-        options={(['for_you', 'following', 'friends', 'communities', 'local'] as FeedMode[]).map((m) => ({ id: m, label: t(`feed.${m}`) }))}
-      />
+      <Segments label={t('m.feed.label')} value={mode} onChange={setMode} options={modes.map((m) => ({ id: m, label: t(`feed.${m}`) }))} />
 
       {/* Someone who follows fewer than three people still gets a full Home: reels to start with and trending tags. */}
       <StarterRow />
@@ -104,12 +109,14 @@ export default function Home() {
         reloadKey={mode}
         sponsored={mode === 'for_you'}
         surface={mode === 'local' ? 'other' : mode}
-        // Communities and Local fill up in their own ways: say how.
+        // Communities, Local and Yaps fill up in their own ways: say how.
         {...(mode === 'communities'
           ? { emptyTitle: t('feed.empty.communities.title'), empty: t('feed.empty.communities.body') }
           : mode === 'local'
             ? { emptyTitle: t('feed.empty.local.title'), empty: t('feed.empty.local.body') }
-            : {})}
+            : mode === 'yaps'
+              ? { emptyTitle: t('feed.empty.yaps.title'), empty: t('feed.empty.yaps.body') }
+              : {})}
       />
 
       {viewing !== null && moments[viewing] ? <StoryViewer groups={moments} start={viewing} onClose={() => setViewing(null)} onChange={setMoments} /> : null}

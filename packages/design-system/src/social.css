@@ -824,6 +824,185 @@ a.yp-post__name {
   line-height: 1.5;
   white-space: pre-line;
 }
+/* A Yap: play, the waveform to scrub along, the time and the speed, with the transcript under it. */
+.yp-post__media--yap {
+  overflow: visible;
+}
+.yp-voice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  color: var(--ink);
+}
+.yp-voice audio {
+  display: none;
+}
+.yp-voice__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.yp-voice__play {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--yapi);
+  color: var(--on-yapi);
+  cursor: pointer;
+}
+.yp-voice__play:hover {
+  background: var(--yapi-strong);
+}
+.yp-voice__wave {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  /* Dragging along it scrubs instead of scrolling the page sideways. */
+  touch-action: pan-y;
+}
+.yp-voice__wave svg {
+  display: block;
+  width: 100%;
+  height: 36px;
+}
+.yp-voice__wave rect {
+  fill: var(--line-strong);
+}
+.yp-voice__wave rect.is-played {
+  fill: var(--yapi);
+}
+.yp-voice__clock {
+  flex: none;
+  min-width: 4ch;
+  color: var(--ink-muted);
+  font: 500 13px/1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+.yp-voice__rate {
+  flex: none;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--ink);
+  font: 600 13px/1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.yp-voice__play:focus-visible,
+.yp-voice__wave:focus-visible,
+.yp-voice__rate:focus-visible,
+.yp-voice__toggle:focus-visible,
+.yp-voice__seg:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.yp-voice__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  /* Ink, not the accent: a profile's accent colour can be too light for text on this panel. */
+  color: var(--ink);
+  font: 600 14px/1.2 var(--font-sans);
+  cursor: pointer;
+}
+.yp-voice__toggle svg {
+  color: var(--yapi);
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+.yp-voice__toggle[aria-expanded='true'] svg {
+  transform: rotate(180deg);
+}
+.yp-voice__words[hidden] {
+  display: none;
+}
+.yp-voice__text,
+.yp-voice__note {
+  margin: 0;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.yp-voice__note {
+  color: var(--ink-muted);
+}
+/* "Listen in English" under a translated transcript. */
+.yp-voice__listen {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+}
+.yp-voice__seg {
+  display: inline;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.yp-voice__seg:hover {
+  text-decoration: underline;
+}
+.yp-voice__seg[aria-current='true'] {
+  background: var(--yapi-soft);
+  box-shadow: 0 0 0 2px var(--yapi-soft);
+}
+/* Small: a voice reply or a voice intro. */
+.yp-voice--sm {
+  padding: var(--space-2);
+}
+.yp-voice--sm .yp-voice__play {
+  width: 44px;
+  height: 44px;
+}
+.yp-voice--sm .yp-voice__wave svg {
+  height: 28px;
+}
+/* Large: a Yap on its own page. */
+.yp-voice--lg {
+  padding: var(--space-4);
+  gap: var(--space-2);
+}
+.yp-voice--lg .yp-voice__play {
+  width: 56px;
+  height: 56px;
+}
+.yp-voice--lg .yp-voice__wave {
+  height: 64px;
+}
+.yp-voice--lg .yp-voice__wave svg {
+  height: 56px;
+}
+.yp-voice--lg .yp-voice__text {
+  font-size: 17px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .yp-voice__toggle svg {
+    transition: none;
+  }
+}
 /* A reel in a feed: its poster, a play sign and "Watch reel"; the whole card opens the viewer. */
 .yp-post__reel-card {
   position: relative;

@@ -599,7 +599,7 @@ function SquadFeed({ id }: { id: string }) {
   const { t } = useSession();
   return (
     <section aria-label={t('squads.share')}>
-      <PostList load={(cursor) => api.squads.posts(id, cursor)} empty={t('squads.feedEmpty')} reloadKey={id} showEnd={false} />
+      <PostList load={(cursor) => api.squads.posts(id, cursor)} empty={t('squads.feedEmpty')} reloadKey={id} showEnd={false} surface="squad" />
     </section>
   );
 }

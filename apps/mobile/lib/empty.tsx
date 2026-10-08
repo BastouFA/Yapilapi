@@ -109,16 +109,30 @@ export function PulseEmpty({ mode, onFollowed, onShowForYou }: { mode: FeedMode;
           ? t('feed.empty.communities.title')
           : mode === 'local'
             ? t('feed.empty.local.title')
-            : t('m.feed.empty.title');
-  // Communities and Local fill up in their own ways: say how.
-  const body = mode === 'communities' ? t('feed.empty.communities.body') : mode === 'local' ? t('feed.empty.local.body') : t('starter.body');
+            : mode === 'yaps'
+              ? t('feed.empty.yaps.title')
+              : t('m.feed.empty.title');
+  // Communities, Local and Yaps fill up in their own ways: say how.
+  const body =
+    mode === 'communities'
+      ? t('feed.empty.communities.body')
+      : mode === 'local'
+        ? t('feed.empty.local.body')
+        : mode === 'yaps'
+          ? t('feed.empty.yaps.body')
+          : t('starter.body');
   return (
     <View style={{ gap: space[3] }}>
       <EmptyState
         icon="sparkles-outline"
         title={title}
         body={body}
-        action={{ label: t('friends.title'), icon: 'people-outline', onPress: () => router.push('/find-friends') }}
+        action={
+          // No Yaps yet: record one.
+          mode === 'yaps'
+            ? { label: t('m.create.mode.yap'), icon: 'mic-outline', onPress: () => router.navigate({ pathname: '/create', params: { mode: 'yap' } }) }
+            : { label: t('friends.title'), icon: 'people-outline', onPress: () => router.push('/find-friends') }
+        }
         secondary={
           onShowForYou
             ? { label: t('m.empty.pulse.forYou'), onPress: onShowForYou }

@@ -17,12 +17,14 @@ import { FeaturedEditor, LinksEditor, StyleEditor, TabsEditor, editorTabs, songA
 import { useSession } from '../lib/session';
 import { space } from '../lib/theme';
 import { Avatar, Button, Card, Field, KeyboardAvoid, Loading, Notice, SwitchRow, Title, useColors } from '../lib/ui';
+import { uploadVoice, VoicePlayer, VoiceRecorder } from '../lib/voice';
+import { VOICE_INTRO_MAX_MS } from '../../../packages/shared/src/voice';
 
 /**
  * Edit profile: photo, name, bio, profile type, the app's language and a private account, the
  * same fields as the web settings, and how the profile looks: accent and header (with a live
- * preview in light and dark), pronouns and city, links, a song, tabs and featured posts. The cover
- * photo is changed on the profile itself.
+ * preview in light and dark), pronouns and city, links, a song, a voice intro, tabs and featured
+ * posts. The cover photo is changed on the profile itself.
  */
 export default function ProfileEdit() {
   const c = useColors();
@@ -50,6 +52,11 @@ export default function ProfileEdit() {
   const [featured, setFeatured] = useState<Post[]>([]);
   const [song, setSong] = useState<DraftMusic | null>(null);
   const [songChanged, setSongChanged] = useState(false);
+  // The voice intro: recorded here, then saved (or removed) straight away, like the photo.
+  const [introUri, setIntroUri] = useState<string | null>(null);
+  const [introKey, setIntroKey] = useState(0);
+  const [introBusy, setIntroBusy] = useState(false);
+  const [introError, setIntroError] = useState<string | null>(null);
   const tint = useTint(accent);
 
   useEffect(() => {
@@ -100,6 +107,36 @@ export default function ProfileEdit() {
       setError(errorMessage(e));
     } finally {
       setPhoto(null);
+    }
+  }
+
+  async function saveIntro() {
+    if (!introUri) return;
+    setIntroBusy(true);
+    setIntroError(null);
+    try {
+      const voice = await uploadVoice(introUri, 'intro');
+      const r = await (await client()).me.updateProfile({ voiceIntroId: voice.id });
+      setProfile({ ...r.profile, voiceIntro: r.profile.voiceIntro ?? voice });
+      setIntroUri(null);
+      setIntroKey((k) => k + 1);
+    } catch (e) {
+      setIntroError(errorMessage(e));
+    } finally {
+      setIntroBusy(false);
+    }
+  }
+
+  async function removeIntro() {
+    setIntroBusy(true);
+    setIntroError(null);
+    try {
+      const r = await (await client()).me.updateProfile({ voiceIntroId: null });
+      setProfile({ ...r.profile, voiceIntro: null });
+    } catch (e) {
+      setIntroError(errorMessage(e));
+    } finally {
+      setIntroBusy(false);
     }
   }
 
@@ -246,6 +283,41 @@ export default function ProfileEdit() {
             }}
           />
           {fields['song.durationMs'] ? <Text style={{ color: c.danger, fontSize: 13 }}>{fields['song.durationMs']}</Text> : null}
+        </Card>
+
+        <Card style={{ gap: space[3] }}>
+          <Title sub={t('voice.intro.record')}>{t('voice.intro')}</Title>
+          {profile.voiceIntro ? (
+            <>
+              <VoicePlayer compact clip={profile.voiceIntro} label={t('voice.intro.play')} own />
+              <Button
+                label={t('voice.intro.remove')}
+                icon="trash-outline"
+                variant="secondary"
+                size="sm"
+                disabled={introBusy}
+                onPress={() => removeIntro()}
+                style={{ alignSelf: 'flex-start' }}
+              />
+            </>
+          ) : (
+            <>
+              <VoiceRecorder
+                key={introKey}
+                maxMs={VOICE_INTRO_MAX_MS}
+                purpose="intro"
+                busy={introBusy}
+                onDone={(uri) => setIntroUri(uri)}
+                onCancel={() => setIntroUri(null)}
+              />
+              {introUri ? <Button label={introBusy ? t('m.common.saving') : t('common.save')} disabled={introBusy} onPress={() => saveIntro()} /> : null}
+            </>
+          )}
+          {introError ? (
+            <Text accessibilityLiveRegion="polite" style={{ color: c.danger, fontSize: 13 }}>
+              {introError}
+            </Text>
+          ) : null}
         </Card>
 
         <Card style={{ gap: space[3] }}>

@@ -41,6 +41,8 @@ import {
   type PostMusic,
   type PostVersion,
   type PublicUser,
+  type VoiceClip,
+  voiceClock,
   squadColor,
   SQUAD_INK,
 } from '@yapilapi/shared';
@@ -48,6 +50,7 @@ import { Icon, type IconName } from './icons.tsx';
 import { Avatar, Badge, Button, cx, PlusBadge, useModalFocus } from './primitives.tsx';
 import { useDataSaver } from './data-saver.tsx';
 import { TranslatableText, TRANSLATED_TRACK_ID, useTranslatedCaptions } from './translation.tsx';
+import { VoicePlayer, type VoiceListenEvent } from './voice.tsx';
 
 // ── Translation helpers ─────────────────────────────────────────────────
 type Vars = Record<string, string | number>;
@@ -920,6 +923,14 @@ export interface PostCardProps {
   onToggleCounts?: (post: Post) => void;
   /** Send the post into one of your chats ("Send in a chat"). */
   onSend?: (post: Post) => void;
+  /** A Yap was listened to: started, how much was heard, finished (for the feed). */
+  onListen?: (post: Post, e: VoiceListenEvent) => void;
+  /** Ask for a Yap's clip again while its transcript is being made. */
+  onVoiceRefresh?: (id: string) => Promise<VoiceClip>;
+  /** "Listen in English" under a Yap's translated transcript (when listening is on). */
+  onVoiceSpeak?: (id: string, target: string) => Promise<string>;
+  /** The post's own page: a Yap gets the big player with its transcript open. */
+  detail?: boolean;
 }
 
 type Person = Pick<PublicUser, 'id' | 'username' | 'displayName'>;
@@ -1244,6 +1255,10 @@ export function PostCard({
   onEditTranscript,
   onToggleCounts,
   onSend,
+  onListen,
+  onVoiceRefresh,
+  onVoiceSpeak,
+  detail,
 }: PostCardProps) {
   const tt = (k: MessageKey) => t(k, locale);
   // Why it's in your feed, in your language.
@@ -1273,7 +1288,8 @@ export function PostCard({
   }
   if (onReport && !isOwn && !coauthor) menu.push({ label: tt('post.report'), icon: 'flag', danger: true, onSelect: () => onReport(post) });
   if (onEdit && isOwn && !post.status) menu.push({ label: tt('m.post.edit'), icon: 'edit', onSelect: () => onEdit(post) });
-  if (onEditTranscript && isOwn && post.media.length === 1 && post.media[0]!.kind === 'audio')
+  // A Yap's transcript is made from the clip itself (it isn't a caption track).
+  if (onEditTranscript && isOwn && post.format !== 'yap' && post.media.length === 1 && post.media[0]!.kind === 'audio')
     menu.push({ label: tt('transcript.edit'), icon: 'mic', onSelect: () => onEditTranscript(post) });
   if (onToggleCounts && isOwn)
     menu.push({
@@ -1297,9 +1313,15 @@ export function PostCard({
   const chipTopics = post.topics.filter((tp) => !inText.includes(tp));
   // Signed in, a reel is its poster frame: a tap opens it full screen in Reels, at this reel.
   const showReelCard = post.format === 'reel' && !!viewerId && !post.locked && post.media.length > 0;
+  // A Yap: the line said with it (the body, above), then the player.
+  const yap = post.format === 'yap' && !post.locked && post.voice ? post.voice : null;
 
   return (
-    <article className={cx('yp-post', post.status && 'yp-post--unpublished')} aria-labelledby={`post-${post.id}-author`}>
+    <article
+      className={cx('yp-post', post.status && 'yp-post--unpublished', yap && 'yp-post--yap')}
+      aria-labelledby={`post-${post.id}-author`}
+      data-testid={yap ? 'yap-card' : undefined}
+    >
       {post.pinned ? (
         <p className="yp-post__pinned">
           <Icon name="bookmark" size={12} filled />
@@ -1465,7 +1487,21 @@ export function PostCard({
         </div>
       ) : null}
 
-      {showReelCard ? (
+      {yap ? (
+        <div className="yp-post__media yp-post__media--yap">
+          <VoicePlayer
+            clip={yap}
+            label={tr('voice.playA11y', locale, { name: post.author.displayName, duration: voiceClock(yap.durationMs) })}
+            locale={locale}
+            size={detail ? 'lg' : 'md'}
+            transcriptOpen={detail}
+            own={isOwn}
+            onListen={onListen ? (e) => onListen(post, e) : undefined}
+            refresh={onVoiceRefresh}
+            speak={onVoiceSpeak}
+          />
+        </div>
+      ) : showReelCard ? (
         <ReelCard post={post} locale={locale} linkAs={L} />
       ) : post.media[0]?.kind === 'audio' && post.media.length === 1 && !post.media[0].sensitive ? (
         <div className="yp-post__media yp-post__media--audio">

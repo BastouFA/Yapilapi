@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { Avatar, Badge, Button, EmptyState, Menu, PlusBadge, Segments, Skeleton } from '@yapilapi/design-system';
+import { Avatar, Badge, Button, EmptyState, Menu, PlusBadge, Segments, Skeleton, VoicePlayer } from '@yapilapi/design-system';
 import { FollowList } from '@/components/FollowList';
 import type { Profile, ProfileTab } from '@yapilapi/shared';
 import { api, errorMessage, isGone, onFollowChange } from '@/lib/api';
@@ -309,6 +309,12 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
         </div>
         {profile.bio ? <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{profile.bio}</p> : null}
         {profile.song ? <ProfileSongChip song={profile.song} /> : null}
+        {profile.voiceIntro && flags.YAPS !== false ? (
+          <div className="profile-intro">
+            <span className="profile-intro__label">{t('voice.intro')}</span>
+            <VoicePlayer clip={profile.voiceIntro} label={t('voice.intro.play')} locale={locale} size="sm" own={rel.isSelf} />
+          </div>
+        ) : null}
         <ProfileLinks links={profile.links} />
         <ProfileAbout profile={profile} />
         {/* Someone you blocked shows nothing of theirs, not even counts. */}

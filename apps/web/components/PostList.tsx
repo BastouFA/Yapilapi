@@ -69,6 +69,7 @@ export function PostList({
   boost,
   openComments,
   surface = 'other',
+  detail,
 }: {
   load: (cursor?: string) => Promise<Page<Post>>;
   empty?: string;
@@ -84,8 +85,10 @@ export function PostList({
   openComments?: string;
   /** Where the list is, told to the recommender with what's seen, shared and opened in it. */
   surface?: FeedEventSurface;
+  /** A post's own page: a Yap shows its big player with the transcript open. */
+  detail?: boolean;
 }) {
-  const { me, toast, t, tp, locale, flags } = useSession();
+  const { me, toast, t, tp, locale, flags, voice } = useSession();
   const [memoryFor, setMemoryFor] = useState<Post | null>(null);
   const [posts, setPosts] = useState<Post[] | null>(null);
   // Why the first page couldn't load, when that isn't because it's gone or private (which shows as empty).
@@ -484,6 +487,10 @@ export function PostList({
               onHistory={setHistoryFor}
               onEditTranscript={me ? setTranscriptFor : undefined}
               onToggleCounts={me ? toggleCounts : undefined}
+              onListen={me ? (post, e) => recordFeedEvent({ postId: post.id, surface, kind: e.kind, valueMs: e.valueMs }) : undefined}
+              onVoiceRefresh={refreshVoice}
+              onVoiceSpeak={me && voice.listen ? speakVoice : undefined}
+              detail={detail}
             />
           </SeenPost>
           {ad && i === Math.min(2, posts.length - 1) ? renderAd(ad) : null}
@@ -631,6 +638,10 @@ export function PostList({
     </div>
   );
 }
+
+/** A Yap's clip again, for its transcript once it's made. */
+const refreshVoice = (id: string) => api.voice.get(id).then((r) => r.voice);
+const speakVoice = (id: string, target: string) => api.voice.speech(id, target).then((r) => r.url);
 
 /**
  * A post in a list, watched for the recommender: seen (half of it for a second), for how long,

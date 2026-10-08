@@ -22,7 +22,7 @@ export const FEED_EVENT_RULES = {
   watchCapPlays: 3,
 } as const;
 
-const ONCE: FeedEventKind[] = ['impression', 'complete', 'skip', 'share', 'profile_open'];
+const ONCE: FeedEventKind[] = ['impression', 'complete', 'skip', 'share', 'profile_open', 'listen_start', 'listen_complete'];
 
 /**
  * A share that didn't come through the apps' feed events (a post sent into chats): written as a
@@ -57,7 +57,7 @@ export default async function recommendationsModule(app: FastifyInstance, ctx: A
     const ids = [...new Set(events.map((e) => e.postId))];
     const { rows } = await db.query<{ id: string; author_id: string; topics: string[]; duration_ms: number | null }>(
       `SELECT p.id, p.author_id, p.topics,
-              (SELECT m.duration_ms FROM post_media pm JOIN media m ON m.id = pm.media_id WHERE pm.post_id = p.id AND m.kind = 'video' ORDER BY pm.position LIMIT 1) AS duration_ms
+              (SELECT m.duration_ms FROM post_media pm JOIN media m ON m.id = pm.media_id WHERE pm.post_id = p.id AND m.kind IN ('video', 'audio') ORDER BY pm.position LIMIT 1) AS duration_ms
        FROM posts p JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id
        WHERE p.id = ANY($2::uuid[]) AND p.author_id <> $1 AND ${postVisibleSql('$1')}`,
       [u.id, ids],
@@ -92,7 +92,7 @@ export default async function recommendationsModule(app: FastifyInstance, ctx: A
         if (counted.has(key)) continue;
         counted.add(key);
       } else {
-        // Dwell and watch need a time; they add up.
+        // Dwell, watch and listen need a time; they add up.
         if (e.valueMs === undefined) continue;
         const cap =
           e.kind === 'dwell'
@@ -133,6 +133,20 @@ export default async function recommendationsModule(app: FastifyInstance, ctx: A
           break;
         case 'profile_open':
           learned.push({ signal: 'profile_open', ...about });
+          break;
+        // Yaps (lib/voice.ts): started, how long it played, and heard to the end (which counts like a finished reel).
+        case 'listen_start':
+          stats.push({ postId: p.id, listens: 1 });
+          break;
+        case 'listen': {
+          stats.push({ postId: p.id, listenMs: valueMs! });
+          const enough = p.duration_ms ? valueMs! >= p.duration_ms * AFFINITY.watchShare : valueMs! >= AFFINITY.dwellMs;
+          if (enough) learned.push({ signal: 'watch', ...about });
+          break;
+        }
+        case 'listen_complete':
+          stats.push({ postId: p.id, listenCompletes: 1, trend: TREND.weights.complete });
+          learned.push({ signal: 'complete', ...about });
           break;
       }
     }

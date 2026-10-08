@@ -26,6 +26,10 @@ export interface StatDelta {
   /** Shares people see: sent to a chat, through the share sheet or as a copied link (not reposts). */
   sends?: number;
   saves?: number;
+  /** Yaps: listens started, time listened and listens to the end. */
+  listens?: number;
+  listenMs?: number;
+  listenCompletes?: number;
   /** Momentum to add (TREND.weights). */
   trend?: number;
 }
@@ -33,7 +37,20 @@ export interface StatDelta {
 /** A post's momentum as of `at` (SQL), from post_stats aliased `ps`; 0 without a row. */
 export const trendSql = (at: string) => `coalesce(ps.trend * exp(-greatest(0, extract(epoch FROM (${at} - ps.trend_at))) / 3600.0 / ${TREND.fadeHours}), 0)`;
 
-const COLS = ['impressions', 'viewers', 'dwell_ms', 'watch_ms', 'completes', 'skips', 'shares', 'sends', 'saves'] as const;
+const COLS = [
+  'impressions',
+  'viewers',
+  'dwell_ms',
+  'watch_ms',
+  'completes',
+  'skips',
+  'shares',
+  'sends',
+  'saves',
+  'listens',
+  'listen_ms',
+  'listen_completes',
+] as const;
 const FIELD: Record<(typeof COLS)[number], keyof StatDelta> = {
   impressions: 'impressions',
   viewers: 'viewers',
@@ -44,6 +61,9 @@ const FIELD: Record<(typeof COLS)[number], keyof StatDelta> = {
   shares: 'shares',
   sends: 'sends',
   saves: 'saves',
+  listens: 'listens',
+  listen_ms: 'listenMs',
+  listen_completes: 'listenCompletes',
 };
 
 /** Add to the counts of one or more posts (negative numbers take away, never below 0). Posts that are gone are skipped. */

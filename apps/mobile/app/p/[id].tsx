@@ -13,6 +13,9 @@ import { PostCard } from '../../lib/post';
 import { useReport } from '../../lib/report';
 import { TranslatableText } from '../../lib/translation';
 import { useSession } from '../../lib/session';
+import { useFlag } from '../../lib/flags';
+import { uploadVoice, VoicePlayer, VoiceRecorder } from '../../lib/voice';
+import { VOICE_MAX_MS, voiceClock } from '../../../../packages/shared/src/voice';
 import { elevation, radius, space } from '../../lib/theme';
 import { Avatar, Button, EmptyState, ErrorState, Icon, KeyboardAvoid, Loading, Notice, ScreenError, Segmented, useColors, userText } from '../../lib/ui';
 
@@ -84,6 +87,11 @@ export default function PostScreen() {
   const [hidden, setHidden] = useState<Comment[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Talk back: a voice reply recorded under the box (with the words in it, if any), and a new recorder after sending.
+  const yapsOn = useFlag('YAPS') !== false;
+  const [talking, setTalking] = useState(false);
+  const [voice, setVoice] = useState<{ uri: string } | null>(null);
+  const [voiceKey, setVoiceKey] = useState(0);
   const ac = useAutocomplete(body, setBody);
   // The Reply buttons, so focus can go back to the one used once the reply is sent.
   const replyButtons = useRef<Record<string, View | null>>({});
@@ -226,7 +234,16 @@ export default function PostScreen() {
       setBusy(true);
       try {
         const atMs = pointAt && !replyTo && momentMs !== null && post.format === 'reel' ? momentMs : undefined;
-        const { comment } = await (await client()).posts.comment(post.id, body.trim(), replyTo?.id, atMs);
+        const api = await client();
+        // A voice reply goes up first; its words (if any) go with it.
+        const { comment } = voice
+          ? await api.posts.voiceComment(post.id, (await uploadVoice(voice.uri, 'comment')).id, { body: body.trim(), parentId: replyTo?.id })
+          : await api.posts.comment(post.id, body.trim(), replyTo?.id, atMs);
+        if (voice) {
+          setVoice(null);
+          setTalking(false);
+          setVoiceKey((k) => k + 1);
+        }
         setPointAt(false);
         if (comment.parentId) {
           const parentId = comment.parentId;
@@ -375,7 +392,13 @@ export default function PostScreen() {
 
   const header = (
     <View style={{ gap: space[3], marginBottom: space[2] }}>
-      <PostCard post={post} open={false} commentCount={commentCount} onDeleted={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
+      <PostCard
+        post={post}
+        open={false}
+        commentCount={commentCount}
+        yapTranscriptOpen
+        onDeleted={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+      />
       <Text accessibilityRole="header" style={{ color: c.ink, fontWeight: '800', fontSize: 17 }}>
         {t('post.comments')}
       </Text>
@@ -438,6 +461,7 @@ export default function PostScreen() {
                   ? hidden.map((x) => (
                       <View key={x.id} style={{ gap: 4 }}>
                         <Text style={[{ color: c.ink, fontWeight: '700', fontSize: 13 }, userText]}>{x.author.displayName}</Text>
+                        {x.voice ? <VoicePlayer compact clip={x.voice} label={t('voice.replyA11y', { duration: voiceClock(x.voice.durationMs) })} /> : null}
                         <TranslatableText
                           kind="comment"
                           id={x.id}
@@ -593,8 +617,43 @@ export default function PostScreen() {
                     userText,
                   ]}
                 />
-                <Button label={busy ? t('m.comment.posting') : t('m.comment.post')} disabled={!body.trim() || busy} onPress={() => send()} />
+                {yapsOn ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t('voice.reply')}
+                    accessibilityState={{ expanded: talking, disabled: busy }}
+                    disabled={busy}
+                    onPress={() => {
+                      // Closing it drops what was recorded.
+                      if (talking) setVoice(null);
+                      setTalking((v) => !v);
+                    }}
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 22,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: talking ? c.yapiSoft : c.surface,
+                      borderWidth: 1,
+                      borderColor: talking ? c.yapi : c.line,
+                    }}
+                  >
+                    <Icon name={talking ? 'mic' : 'mic-outline'} size={20} color={c.yapi} />
+                  </Pressable>
+                ) : null}
+                <Button label={busy ? t('m.comment.posting') : t('m.comment.post')} disabled={(!body.trim() && !voice) || busy} onPress={() => send()} />
               </View>
+              {talking && yapsOn ? (
+                <VoiceRecorder
+                  key={voiceKey}
+                  maxMs={VOICE_MAX_MS}
+                  purpose="comment"
+                  busy={busy}
+                  onDone={(uri) => setVoice({ uri })}
+                  onCancel={() => setVoice(null)}
+                />
+              ) : null}
             </>
           )}
         </View>
@@ -731,6 +790,14 @@ const CommentRow = memo(function CommentRow({
                   />
                   <Button label={t('common.cancel')} size="sm" variant="secondary" onPress={() => h.current?.cancelEdit()} />
                 </View>
+              </View>
+            ) : x.voice ? (
+              // A voice reply: the recording (with its transcript), and its words if it has any.
+              <View style={{ gap: space[2], marginTop: 2 }}>
+                <VoicePlayer compact clip={x.voice} label={t('voice.replyA11y', { duration: voiceClock(x.voice.durationMs) })} own={own} />
+                {x.body ? (
+                  <TranslatableText kind="comment" id={x.id} text={x.body} lang={x.lang} own={own} style={{ color: c.ink, fontSize: 15, lineHeight: 21 }} />
+                ) : null}
               </View>
             ) : (
               <TranslatableText kind="comment" id={x.id} text={x.body} lang={x.lang} own={own} style={{ color: c.ink, fontSize: 15, lineHeight: 21 }} />

@@ -21,9 +21,10 @@ import {
   type PostVersion,
   type PostWhy,
   type WhyReason,
+  YAP_TEXT_MAX,
 } from '@yapilapi/shared';
 import { z } from 'zod';
-import { AppError, badRequest, forbidden, notFound, parse } from '../lib/errors.ts';
+import { AppError, badRequest, featureDisabled, forbidden, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { decodeCursor, keyCursorOf, type KeyCursor } from '../lib/cursor.ts';
 import { analyzeText, statusForRisk } from '../lib/moderation.ts';
@@ -35,7 +36,7 @@ import { attachSaveNotes, savedFilterSql } from '../lib/saves.ts';
 import { notifyMentions } from '../lib/mentions.ts';
 import { coAuthoredIdsSql } from '../lib/collabs.ts';
 import { topicsFor } from './tags.ts';
-import { notify, personalizationAllowed, track } from '../lib/services.ts';
+import { isEnabled, notify, personalizationAllowed, track } from '../lib/services.ts';
 import { plusCol, publicUserFrom } from '../lib/users.ts';
 import { seesSensitiveMedia } from '../lib/interactions.ts';
 import { notBlockedSql, postUnlockedSql, postVisibleSql } from '../lib/visibility.ts';
@@ -60,6 +61,7 @@ import { checkMilestones } from '../lib/milestones.ts';
 import { messageFailureCode, messageFailureEnglish } from '../lib/failures.ts';
 import { asSameUser } from './moments.ts';
 import { recordShare } from './recommendations.ts';
+import { assertYapPace, forgetVoice } from '../lib/voice.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
 
@@ -163,6 +165,8 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
       const [post] = await hydratePosts(db, [id], u.id);
       return { post };
     }
+    // Yaps go out at a sensible pace (lib/voice.ts).
+    if (input.format === 'yap') await assertYapPace(db, u.id);
     const screening = await screenPost(db, ctx.config, u.id, {
       body: input.body,
       // A chain's prompt is shown to everyone who sees the chain: checked like the post's own words.
@@ -211,8 +215,17 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
   app.delete('/v1/posts/:id', { preHandler: requireAuth }, async (req) => {
     const u = me(req);
     const { id } = parse(idParam, req.params);
-    const r = await db.query(`UPDATE posts SET deleted_at = now() WHERE id = $1 AND author_id = $2 AND deleted_at IS NULL`, [id, u.id]);
+    const r = await db.query(`UPDATE posts SET deleted_at = now() WHERE id = $1 AND author_id = $2 AND deleted_at IS NULL RETURNING format`, [id, u.id]);
     if (!r.rowCount) throw notFound('That post');
+    // A Yap's recording is deleted with it (lib/voice.ts): other posts' files go with the retention sweep.
+    if (r.rows[0].format === 'yap') {
+      const media = await db.query<{ media_id: string }>(`SELECT media_id FROM post_media WHERE post_id = $1`, [id]);
+      await forgetVoice(
+        ctx,
+        media.rows.map((m) => m.media_id),
+        { type: 'post', id },
+      );
+    }
     return { ok: true };
   });
 
@@ -229,7 +242,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     const input = parse(editPostSchema, req.body);
     const post = (
       await db.query(
-        `SELECT p.author_id, p.visibility, p.community_id, p.link_url, p.moderation_status, p.is_echo,
+        `SELECT p.author_id, p.visibility, p.community_id, p.link_url, p.moderation_status, p.is_echo, p.format,
                 EXISTS (SELECT 1 FROM post_media pm WHERE pm.post_id = p.id) AS has_media,
                 EXISTS (SELECT 1 FROM poll_options o WHERE o.post_id = p.id) AS has_poll,
                 EXISTS (SELECT 1 FROM post_collaborators pc WHERE pc.post_id = p.id AND pc.status IN ('pending', 'accepted')) AS has_collabs,
@@ -259,6 +272,8 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
 
     // A new text is checked like a new post: harmful text is refused, anything flagged waits for a moderator.
     let screening: Screening | null = null;
+    if (input.body !== undefined && post.format === 'yap' && input.body.length > YAP_TEXT_MAX)
+      throw new AppError(400, 'validation_failed', 'Check the highlighted fields.', { fields: { body: 'The words with a Yap can be up to 280 characters.' } });
     if (input.body !== undefined) {
       if (!input.body && !post.has_media && !post.link_url && !post.has_poll)
         throw new AppError(400, 'validation_failed', 'A post needs text, media, a link or a poll.', { fields: { body: 'Add some text.' } });
@@ -613,6 +628,11 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     const personal = PERSONAL_FILTERS;
 
     if (mode === 'for_you') return rankedFeed(u.id, q.cursor, q.limit, personal, !!prefs.reduced_recommendations, await personalizationAllowed(db, u.id));
+    // Yaps only, ranked like For you (with what was listened to the end and answered by voice: lib/ranking.ts).
+    if (mode === 'yaps') {
+      if (!(await isEnabled(db, 'YAPS'))) throw featureDisabled('Yaps');
+      return rankedFeed(u.id, q.cursor, q.limit, personal, !!prefs.reduced_recommendations, await personalizationAllowed(db, u.id), 'yaps');
+    }
 
     const scope: Record<string, string> = {
       following: `(p.author_id = $1 OR EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = p.author_id)) AND p.community_id IS NULL`,
@@ -687,11 +707,19 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
    * it's the same for everyone (quality, momentum, freshness); your own filters still apply, and
    * so does who may see what. "Fewer suggestions" keeps it to your connections and communities.
    */
-  async function rankedFeed(userId: string, cursor: string | undefined, limit: number, personal: string, reduced: boolean, personalized: boolean) {
+  async function rankedFeed(
+    userId: string,
+    cursor: string | undefined,
+    limit: number,
+    personal: string,
+    reduced: boolean,
+    personalized: boolean,
+    surface: 'for_you' | 'yaps' = 'for_you',
+  ) {
     const reader = await readerLanguages(db, userId, ctx.ai.machineTranslation);
-    const ranked = await rankedPage(db, { userId, surface: 'for_you', personalized, personal, reduced, reader }, cursor, limit);
+    const ranked = await rankedPage(db, { userId, surface, personalized, personal, reduced, reader }, cursor, limit);
     return {
-      mode: 'for_you',
+      mode: surface,
       items: await hydratePosts(
         db,
         ranked.items.map((r) => r.id),

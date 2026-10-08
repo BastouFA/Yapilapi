@@ -45,7 +45,7 @@ export default function PostPageClient({ isPublic }: { isPublic: boolean }) {
       </div>
       {ownReel ? <FairStartCard postId={id} /> : null}
       {/* One post: no "You're all caught up" under it. */}
-      <PostList load={load} reloadKey={id} boost={boost} openComments={comments} showEnd={false} empty={t('postPage.unavailable')} />
+      <PostList load={load} reloadKey={id} boost={boost} openComments={comments} showEnd={false} detail empty={t('postPage.unavailable')} />
       {!me ? <JoinNote text={t('postPage.join')} /> : null}
     </div>
   );

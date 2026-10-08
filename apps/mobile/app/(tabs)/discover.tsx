@@ -11,6 +11,7 @@ import { ChainShelf } from '../../lib/chains';
 import { Chip, ChipRow, SectionHeader } from '../../lib/chips';
 import { useT } from '../../lib/i18n';
 import { PostCard } from '../../lib/post';
+import { FeedSurfaceContext } from '../../lib/feed-events';
 import { clearRecent, forgetSearch, readRecent, rememberSearch } from '../../lib/recent-searches';
 import { radius, space } from '../../lib/theme';
 import { Avatar, EmptyState, ErrorState, Icon, type IconName, Row, SkeletonList, useColors, useRefresh, userText, useTabBarSpace } from '../../lib/ui';
@@ -510,9 +511,11 @@ export default function Wander() {
             {show('posts') && found.posts.length ? (
               <View style={{ gap: space[3] }}>
                 <SectionHeader title={t('discover.posts')} action={seeAll('posts', found.posts.length)} />
-                {cut(found.posts).map((p) => (
-                  <PostCard key={p.id} post={p} />
-                ))}
+                <FeedSurfaceContext.Provider value="search">
+                  {cut(found.posts).map((p) => (
+                    <PostCard key={p.id} post={p} />
+                  ))}
+                </FeedSurfaceContext.Provider>
               </View>
             ) : null}
           </>

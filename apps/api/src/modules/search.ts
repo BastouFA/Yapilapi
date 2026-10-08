@@ -61,7 +61,11 @@ export async function searchAll(db: Pool, viewer: string | null, q: SearchInput)
       db
         .query(
           `SELECT p.id FROM posts p JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id
-             WHERE (p.search @@ ${tsqEn} OR p.topics @> ARRAY[$2]::text[]) AND ${postVisibleSql('$1')}
+             WHERE (p.search @@ ${tsqEn} OR p.topics @> ARRAY[$2]::text[]
+                    -- What a Yap says, from its transcript (lib/voice.ts).
+                    OR (p.format = 'yap' AND EXISTS (SELECT 1 FROM post_media pm JOIN voice_clips vc ON vc.media_id = pm.media_id
+                                                     WHERE pm.post_id = p.id AND vc.transcript_status = 'ready' AND vc.search @@ ${tsq})))
+               AND ${postVisibleSql('$1')}
                -- Matching a subscriber-only post's text would reveal it, so only posts you can open are searched.
                AND ${postUnlockedSql('$1')}
              ORDER BY ts_rank(p.search, ${tsqEn}) DESC, p.created_at DESC LIMIT $3`,

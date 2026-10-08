@@ -18,7 +18,9 @@ three steps, each useful on its own.
    ("Show text") or hear it read in their language ("Listen in French", `apps/api/src/lib/speech.ts`)
    by a plain synthetic voice that is clearly not the sender's. Videos without captions get
    automatic captions the same way, and then step 1 translates them (not automatic yet: the owner
-   asks for them in the video editor).
+   asks for them in the video editor). Yaps, voice replies and voice intros (`docs/product/yaps.md`)
+   work the same way: their transcript is translated automatically (kind `voice`, by the clip's id)
+   and can be heard ("Listen in …", `POST /v1/voice/:id/speech`).
 3. **Dubbing in the creator's own voice (opt-in).** A creator can choose to have their reels
    dubbed into other languages in a voice made from their own. Off unless the creator turns it
    on, for their own videos only.

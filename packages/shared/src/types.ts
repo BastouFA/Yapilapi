@@ -1,3 +1,4 @@
+import type { VoiceClip } from './voice.ts';
 import type { StoryCard } from './stories.ts';
 import type { PostMusic } from './music.ts';
 import type { DataSaverMode } from './data-saver.ts';
@@ -147,6 +148,8 @@ export interface Profile extends PublicUser {
   song: PostMusic | null;
   /** Their question box ("Ask me"), for this viewer. Null when it's off and there are no answers to show. */
   ask: ProfileAskBox | null;
+  /** A voice intro of up to 15 seconds, played from the profile header. */
+  voiceIntro?: VoiceClip | null;
   relationship: {
     isSelf: boolean;
     following: boolean;
@@ -371,8 +374,10 @@ export interface PeopleSuggestion {
 export interface Post {
   id: string;
   kind: PostKind;
-  /** 'reel' posts are short vertical videos shown in the Reels feed. */
-  format: 'post' | 'reel';
+  /** 'reel' posts are short vertical videos shown in the Reels feed; 'yap' posts are voice clips of up to a minute (`voice`). */
+  format: 'post' | 'reel' | 'yap';
+  /** Yaps: the recording, its waveform and transcript (left out on locked posts). */
+  voice?: VoiceClip | null;
   body: string;
   visibility: Visibility;
   author: PublicUser;
@@ -580,6 +585,8 @@ export interface Comment {
   hidden?: boolean;
   /** Reels: a moment comment, anchored to this time in the video. */
   atMs?: number | null;
+  /** A voice reply: the recording, with its waveform and transcript. `body` may then be empty. */
+  voice?: VoiceClip | null;
   viewer: {
     liked: boolean;
     /** The writer, until COMMENT_EDIT_MINUTES after posting. */

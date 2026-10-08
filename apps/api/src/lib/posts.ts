@@ -19,6 +19,7 @@ import { trendSql } from './post-stats.ts';
 import { isRising, risingCutoff, RISING } from './rising.ts';
 import { chainRefs } from './chains.ts';
 import { isEnabled } from './services.ts';
+import { voiceClipSql } from './voice.ts';
 
 type Q = Pool | PoolClient;
 
@@ -73,6 +74,8 @@ export async function hydratePosts(db: Q, ids: string[], viewer: string | null, 
             (SELECT array_agg(DISTINCT w.country ORDER BY w.country) FROM post_withholdings w WHERE w.post_id = p.id AND p.author_id = $2) AS withheld_in,
             p.allow_remix, p.remix_mode, p.remix_of_post_id, p.highlights, p.question_id, p.mix_id,
             CASE WHEN p.format = 'reel' THEN (SELECT rr.position_ms FROM reel_resume rr WHERE rr.user_id = $2 AND rr.post_id = p.id) END AS resume_ms,
+            -- A Yap's recording, waveform and transcript (lib/voice.ts).
+            CASE WHEN p.format = 'yap' THEN ${voiceClipSql('(SELECT pm.media_id FROM post_media pm WHERE pm.post_id = p.id ORDER BY pm.position LIMIT 1)')} END AS voice,
             -- Which circle a post went to is for its author only; members never see a circle's name.
             (p.visibility = 'circle' AND p.author_id IS NOT DISTINCT FROM $2) AS own_circle_post,
             CASE WHEN p.visibility = 'circle' AND p.author_id IS NOT DISTINCT FROM $2
@@ -289,6 +292,7 @@ function toPost(r: Record<string, any>, originals: Map<string, NonNullable<Remix
     ...(r.boost ? { boost: r.boost } : {}),
     ...(r.own_circle_post ? { circle: r.own_circle ?? null } : {}),
     ...(r.visibility === 'squad' ? { squad: r.squad ?? null } : {}),
+    ...(r.format === 'yap' ? { voice: r.voice ?? null } : {}),
   } satisfies Post;
 }
 

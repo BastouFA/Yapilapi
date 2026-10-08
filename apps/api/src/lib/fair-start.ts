@@ -3,6 +3,7 @@ import { FAIR_START, type FairStart, type FairStartReport } from '@yapilapi/shar
 import { SPAM_RULES } from './spam.ts';
 import { isEnabled, notify } from './services.ts';
 import type { RealtimeHub } from './realtime.ts';
+import { yapDistributableSql } from './voice.ts';
 
 type Q = Pool | PoolClient;
 
@@ -59,7 +60,7 @@ export async function fairStartOffered(db: Q, userId: string, spam: boolean): Pr
 }
 
 /**
- * Give a reel that was just published a fair start when it and its author may have one. Returns
+ * Give a reel (or a Yap) that was just published a fair start when it and its author may have one. Returns
  * whether it did. `postedWithinDays`: only when it was posted that recently (a reel cleared from review).
  */
 export async function enrollFairStart(db: Q, postId: string, spam: boolean, postedWithinDays?: number): Promise<boolean> {
@@ -69,9 +70,11 @@ export async function enrollFairStart(db: Q, postId: string, spam: boolean, post
     `INSERT INTO fair_start_reels (post_id, author_id, target, ends_at)
      SELECT p.id, p.author_id, $2, now() + make_interval(days => $3)
      FROM posts p JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id
-     WHERE p.id = $1 AND p.format = 'reel' AND NOT p.is_echo AND p.visibility = 'public' AND p.community_id IS NULL
+     WHERE p.id = $1 AND p.format IN ('reel', 'yap') AND NOT p.is_echo AND p.visibility = 'public' AND p.community_id IS NULL
        AND p.status = 'published' AND p.deleted_at IS NULL AND p.moderation_status = 'normal' ${recent}
        AND NOT EXISTS (SELECT 1 FROM post_media pm JOIN media m ON m.id = pm.media_id WHERE pm.post_id = p.id AND m.moderation IN ('sensitive', 'blocked'))
+       -- A Yap only once its words passed the checks (or there will be none to check: lib/voice.ts).
+       AND (p.format <> 'yap' OR ${yapDistributableSql('p')})
        AND ${accountEligibleSql(spam)}
      ON CONFLICT DO NOTHING`,
     [postId, FAIR_START.target, FAIR_START.days],
@@ -87,7 +90,9 @@ export async function enrollFairStart(db: Q, postId: string, spam: boolean, post
  */
 export async function enrollClearedFairStarts(db: Q, postIds: string[], spam: boolean): Promise<void> {
   if (!postIds.length) return;
-  const { rows } = await db.query<{ id: string }>(`SELECT id FROM posts WHERE id = ANY($1::uuid[]) AND format = 'reel' ORDER BY created_at`, [postIds]);
+  const { rows } = await db.query<{ id: string }>(`SELECT id FROM posts WHERE id = ANY($1::uuid[]) AND format IN ('reel', 'yap') ORDER BY created_at`, [
+    postIds,
+  ]);
   for (const r of rows) if (await enrollFairStart(db, r.id, spam, FAIR_START.clearedWithinDays)) return;
 }
 
@@ -119,7 +124,7 @@ async function reportOf(db: Q, postId: string): Promise<FairStartReport> {
   const { rows } = await db.query(
     `SELECT f.reached,
             (SELECT count(DISTINCT e.user_id) FROM feed_events e JOIN fair_start_views v ON v.post_id = e.post_id AND v.viewer_id = e.user_id
-             WHERE e.post_id = f.post_id AND e.kind = 'complete')::int AS finished,
+             WHERE e.post_id = f.post_id AND e.kind IN ('complete', 'listen_complete'))::int AS finished,
             (SELECT count(DISTINCT e.user_id) FROM feed_events e JOIN fair_start_views v ON v.post_id = e.post_id AND v.viewer_id = e.user_id
              WHERE e.post_id = f.post_id AND e.kind = 'share')::int AS shared,
             (SELECT count(*) FROM fair_start_views v JOIN follows fo ON fo.follower_id = v.viewer_id AND fo.followee_id = f.author_id AND fo.created_at >= v.created_at

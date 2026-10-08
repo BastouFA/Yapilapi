@@ -7,6 +7,7 @@ import type { Post } from '../../../../packages/shared/src/types';
 import { client, errorMessage, isGone } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import { PostCard } from '../../lib/post';
+import { FeedSurfaceContext } from '../../lib/feed-events';
 import { useSession } from '../../lib/session';
 import { ColorChoice, MAX_SQUAD_MEMBERS, MemoryCard, PeoplePick, PhotoChoice, SquadCoverView } from '../../lib/squads';
 import { space } from '../../lib/theme';
@@ -244,9 +245,12 @@ export default function SquadScreen() {
 
         {posts.length ? (
           <View style={{ gap: space[3] }}>
-            {posts.map((p) => (
-              <PostCard key={p.id} post={p} />
-            ))}
+            {/* Listens and shares here count as the squad's. */}
+            <FeedSurfaceContext.Provider value="squad">
+              {posts.map((p) => (
+                <PostCard key={p.id} post={p} />
+              ))}
+            </FeedSurfaceContext.Provider>
             {cursor ? <Button label={t('m.common.loadingMore')} variant="ghost" disabled={busy === 'more'} onPress={more} /> : null}
           </View>
         ) : (

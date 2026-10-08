@@ -1,7 +1,10 @@
 import type { Picked } from './media';
 
-export type CreateMode = 'post' | 'reel' | 'story';
-type Pending = { asset: Picked; mode: CreateMode };
+/** 'yap': a voice post, recorded in Create itself (the camera only switches over to it). */
+export type CreateMode = 'yap' | 'post' | 'reel' | 'story';
+/** What the camera takes photos and videos for. */
+export type CameraMode = Exclude<CreateMode, 'yap'>;
+type Pending = { asset: Picked; mode: CameraMode };
 
 let pending: Pending | null = null;
 const listeners = new Set<() => void>();
@@ -23,12 +26,12 @@ export function onPendingAsset(fn: () => void): () => void {
  * Hand a photo or video from the camera screen to Create, which switches to `mode`, checks it
  * and opens the editor. Navigate to Create right after.
  */
-export function deliverPendingAsset(asset: Picked, mode: CreateMode) {
+export function deliverPendingAsset(asset: Picked, mode: CameraMode) {
   pending = { asset, mode };
   listeners.forEach((l) => l());
 }
 
-export const createModeFrom = (mode: unknown): CreateMode | null => (mode === 'post' || mode === 'reel' || mode === 'story' ? mode : null);
+export const createModeFrom = (mode: unknown): CreateMode | null => (mode === 'yap' || mode === 'post' || mode === 'reel' || mode === 'story' ? mode : null);
 
 /**
  * A video recorded in the camera for an echo (the camera opened with `echo=<reel id>`), handed back

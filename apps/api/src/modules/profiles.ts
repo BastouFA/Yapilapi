@@ -27,10 +27,11 @@ import {
   type PeopleSuggestion,
 } from '@yapilapi/shared';
 import { z } from 'zod';
-import { AppError, badRequest, conflict, forbidden, notFound, parse } from '../lib/errors.ts';
+import { AppError, badRequest, conflict, featureDisabled, forbidden, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { decodeCursor, encodeCursor } from '../lib/cursor.ts';
-import { notify, personalizationAllowed, track } from '../lib/services.ts';
+import { isEnabled, notify, personalizationAllowed, track } from '../lib/services.ts';
+import { claimVoice, forgetVoice, startTranscript, voiceClipSql } from '../lib/voice.ts';
 import { learn, learnQuietly } from '../lib/affinity.ts';
 import { emitWebhook } from '../lib/webhooks.ts';
 import { ageOf, areFriends, blockUser, isBlockedEitherWay, PUBLIC_USER_COLS, toPublicUser, usernameMatchSql, type PublicUserRow } from '../lib/users.ts';
@@ -250,6 +251,7 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
     const { rows } = await db.query(
       `SELECT ${PUBLIC_USER_COLS}, pr.bio, pr.cover_url, pr.cover_alt, pr.cover_media_id, pr.cover_edit, pr.links, pr.is_private,
         pr.accent, pr.header_style, pr.pronouns, pr.city, pr.tabs, pr.featured_post_ids, pr.song_sound_id, pr.song_track_id, pr.song_part,
+        CASE WHEN pr.voice_intro_media_id IS NOT NULL THEN ${voiceClipSql('pr.voice_intro_media_id')} END AS voice_intro,
         coalesce(u.created_at, pr.created_at) AS joined_at,
         coalesce(u.birth_date > current_date - interval '18 years', false) AS is_minor,
         (SELECT count(*) FROM follows WHERE followee_id = pr.user_id) AS followers,
@@ -294,6 +296,7 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
       featured: await featuredOut(userId, r.featured_post_ids ?? [], viewer),
       song: await songOut(r, viewer),
       ask: await profileAskBox(db, userId, viewer),
+      voiceIntro: r.voice_intro ?? null,
       relationship: {
         isSelf: viewer === userId,
         following: r.following_them,
@@ -334,6 +337,7 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
           featured: [],
           song: null,
           ask: null,
+          voiceIntro: null,
           tabs: [],
           counts: { followers: 0, following: 0, friends: 0, posts: 0 },
         },
@@ -353,6 +357,7 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
           featured: [],
           song: null,
           ask: null,
+          voiceIntro: null,
         },
       };
     return { profile };
@@ -437,6 +442,19 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
     // A cover photo is set from your own uploads (PUT /v1/me/cover); here it can only be removed.
     if (input.coverUrl) throw badRequest('Choose a cover photo from your own uploads.', { fields: { coverUrl: 'Upload a photo first.' } });
     if (sets.length) await db.query(`UPDATE profiles SET ${sets.join(', ')} WHERE user_id = $1`, vals);
+    // A voice intro (lib/voice.ts): one of your clips recorded for it; the one it replaces is deleted.
+    if (input.voiceIntroId !== undefined) {
+      if (input.voiceIntroId && !(await isEnabled(db, 'YAPS'))) throw featureDisabled('Yaps');
+      const before = (await db.query<{ id: string | null }>(`SELECT voice_intro_media_id AS id FROM profiles WHERE user_id = $1`, [u.id])).rows[0]?.id ?? null;
+      if (input.voiceIntroId !== before) {
+        await tx(db, async (c) => {
+          if (input.voiceIntroId) await claimVoice(c, u.id, input.voiceIntroId, 'intro');
+          await c.query(`UPDATE profiles SET voice_intro_media_id = $2 WHERE user_id = $1`, [u.id, input.voiceIntroId]);
+        });
+        if (input.voiceIntroId) await startTranscript(ctx, input.voiceIntroId);
+        if (before) await forgetVoice(ctx, [before]);
+      }
+    }
     // A public account has nothing to approve: everyone still waiting follows it now (quietly, as they asked).
     if (input.isPrivate === false)
       await db.query(

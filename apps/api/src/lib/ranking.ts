@@ -6,6 +6,7 @@ import { postVisibleSql } from './visibility.ts';
 import type { FeedReason } from './posts.ts';
 import { FAIR_START } from '@yapilapi/shared';
 import { getFlags } from './services.ts';
+import { yapDistributableSql } from './voice.ts';
 
 type Q = Pool | PoolClient;
 
@@ -52,6 +53,8 @@ export const RANKING = {
     /** Reels: × (smoothed share of views watched to the end − its prior), and the same for skips (subtracted). */
     completion: 2.0,
     skip: 2.0,
+    /** Yaps: × ln(1 + voice replies), the conversation a Yap started (its listen-through counts like a reel's completion). */
+    voiceReplies: 0.6,
     /** × exp(−age in hours / freshnessHours). */
     freshness: 4.0,
     /** A later reel of a Pass the Mic chain you watched an earlier reel of: the chain's audience carries on. */
@@ -73,6 +76,8 @@ export const RANKING = {
   quality: { smoothing: 20, likes: 1, comments: 2, shares: 3, saves: 3, completes: 2 },
   /** Reels: rates pulled towards these priors until a reel has been seen enough times. */
   reels: { smoothing: 10, completionPrior: 0.3, skipPrior: 0.2 },
+  /** Yaps: the share of listens that reached the end, pulled towards this prior until a Yap has been heard enough. */
+  yaps: { smoothing: 10, completionPrior: 0.4 },
   /** Momentum at which a post is "trending now" in its reason. */
   trendingReason: 3,
   /** Learned scores at which a creator or topic is named as the reason. */
@@ -140,7 +145,8 @@ export const RANKING = {
   sessionSize: 1500,
 } as const;
 
-export type RankSurface = 'for_you' | 'reels';
+/** 'yaps': For you with Yaps only (the Yaps filter on Pulse). */
+export type RankSurface = 'for_you' | 'reels' | 'yaps';
 
 export interface RankOptions {
   userId: string;
@@ -184,6 +190,10 @@ export interface Features {
   impressions: number;
   completes: number;
   skips: number;
+  /** Yaps: listens started and finished, and voice replies under it. */
+  listens?: number;
+  listenCompletes?: number;
+  voiceReplies?: number;
   shares: number;
   saves: number;
   trend: number;
@@ -218,6 +228,11 @@ function commonScore(f: Features): number {
     const completion = (f.completes + r.completionPrior * r.smoothing) / (f.impressions + r.smoothing);
     const skips = (f.skips + r.skipPrior * r.smoothing) / (f.impressions + r.smoothing);
     s += W.completion * (Math.min(1, completion) - r.completionPrior) - W.skip * (Math.min(1, skips) - r.skipPrior);
+  }
+  if (f.format === 'yap') {
+    const y = RANKING.yaps;
+    const finished = ((f.listenCompletes ?? 0) + y.completionPrior * y.smoothing) / ((f.listens ?? 0) + y.smoothing);
+    s += W.completion * (Math.min(1, finished) - y.completionPrior) + W.voiceReplies * ln1p(f.voiceReplies ?? 0);
   }
   return s + W.freshness * Math.exp(-Math.max(0, f.ageHours) / RANKING.freshnessHours);
 }
@@ -274,7 +289,7 @@ export function reasonOf(f: Features, surface: RankSurface, personalized: boolea
 }
 
 const formatOf = (f: Pick<Features, 'kind' | 'format'>) =>
-  f.format === 'reel' || f.kind === 'video' ? 'video' : f.kind === 'photo' || f.kind === 'carousel' ? 'photo' : 'text';
+  f.format === 'yap' ? 'voice' : f.format === 'reel' || f.kind === 'video' ? 'video' : f.kind === 'photo' || f.kind === 'carousel' ? 'photo' : 'text';
 
 export interface Arranged {
   id: string;
@@ -364,7 +379,7 @@ function rankingSql(o: RankOptions, chains = false): { sql: string; params: unkn
   const C = RANKING.candidates;
   const reels = o.surface === 'reels';
   const at = '$2::timestamptz';
-  const fmt = reels ? `AND p.format = 'reel'` : '';
+  const fmt = reels ? `AND p.format = 'reel'` : o.surface === 'yaps' ? `AND p.format = 'yap'` : '';
   const live = `p.deleted_at IS NULL AND p.status = 'published' AND p.created_at <= ${at} ${fmt}`;
   const since = (n: number, unit = 'days') => `AND p.created_at > ${at} - interval '${n} ${unit}'`;
   const faded = (t: string) => fadedScoreSql(t, at);
@@ -387,7 +402,7 @@ function rankingSql(o: RankOptions, chains = false): { sql: string; params: unkn
        mine AS (
          (SELECT r.post_id FROM reactions r WHERE r.user_id = $1 AND r.created_at > ${at} - interval '${C.mineDays} days' AND r.created_at <= ${at} ORDER BY r.created_at DESC LIMIT 100)
          UNION (SELECT s.post_id FROM saves s WHERE s.user_id = $1 AND s.created_at > ${at} - interval '${C.mineDays} days' AND s.created_at <= ${at} ORDER BY s.created_at DESC LIMIT 100)
-         UNION (SELECT e.post_id FROM feed_events e WHERE e.user_id = $1 AND e.kind = 'complete' AND e.created_at > ${at} - interval '${C.mineDays} days' AND e.created_at <= ${at}
+         UNION (SELECT e.post_id FROM feed_events e WHERE e.user_id = $1 AND e.kind IN ('complete', 'listen_complete') AND e.created_at > ${at} - interval '${C.mineDays} days' AND e.created_at <= ${at}
                 ORDER BY e.created_at DESC LIMIT 100)
        ),
        -- People who engaged with what you engaged with (and haven't turned Personalization off), the most overlap first.
@@ -395,7 +410,7 @@ function rankingSql(o: RankOptions, chains = false): { sql: string; params: unkn
          SELECT x.user_id, count(*)::real AS n FROM (
            SELECT r.user_id, r.post_id FROM mine m JOIN reactions r ON r.post_id = m.post_id
            UNION SELECT s.user_id, s.post_id FROM mine m JOIN saves s ON s.post_id = m.post_id
-           UNION SELECT e.user_id, e.post_id FROM mine m JOIN feed_events e ON e.post_id = m.post_id AND e.kind = 'complete' AND e.created_at > ${at} - interval '${C.mineDays} days'
+           UNION SELECT e.user_id, e.post_id FROM mine m JOIN feed_events e ON e.post_id = m.post_id AND e.kind IN ('complete', 'listen_complete') AND e.created_at > ${at} - interval '${C.mineDays} days'
          ) x
          WHERE x.user_id <> $1 AND NOT EXISTS (SELECT 1 FROM consents cs WHERE cs.user_id = x.user_id AND cs.purpose = 'personalization' AND NOT cs.granted)
          GROUP BY x.user_id ORDER BY n DESC LIMIT ${C.peers}
@@ -405,7 +420,7 @@ function rankingSql(o: RankOptions, chains = false): { sql: string; params: unkn
            SELECT pe.n, z.post_id FROM peers pe CROSS JOIN LATERAL (
              (SELECT r.post_id FROM reactions r WHERE r.user_id = pe.user_id AND r.created_at > ${at} - interval '${C.peersDays} days' AND r.created_at <= ${at} ORDER BY r.created_at DESC LIMIT 50)
              UNION (SELECT s.post_id FROM saves s WHERE s.user_id = pe.user_id AND s.created_at > ${at} - interval '${C.peersDays} days' AND s.created_at <= ${at} ORDER BY s.created_at DESC LIMIT 50)
-             UNION (SELECT e.post_id FROM feed_events e WHERE e.user_id = pe.user_id AND e.kind = 'complete' AND e.created_at > ${at} - interval '${C.peersDays} days' AND e.created_at <= ${at}
+             UNION (SELECT e.post_id FROM feed_events e WHERE e.user_id = pe.user_id AND e.kind IN ('complete', 'listen_complete') AND e.created_at > ${at} - interval '${C.peersDays} days' AND e.created_at <= ${at}
                     ORDER BY e.created_at DESC LIMIT 50)
            ) z
          ) y
@@ -480,7 +495,7 @@ function rankingSql(o: RankOptions, chains = false): { sql: string; params: unkn
                          AND fe.created_at > ${at} - interval '${S.days} days' AND fe.created_at <= ${at})
          OR (p.created_at > ${at} - interval '${S.closeFriendHours} hours'
              AND (p.author_id IN (SELECT id FROM friends) OR EXISTS (SELECT 1 FROM close_friends cf WHERE cf.owner_id = $1 AND cf.friend_id = p.author_id))))
-       AND (p.format <> 'reel' OR NOT EXISTS (SELECT 1 FROM feed_events fe WHERE fe.user_id = $1 AND fe.post_id = p.id AND fe.kind = 'complete'
+       AND (p.format <> 'reel' OR NOT EXISTS (SELECT 1 FROM feed_events fe WHERE fe.user_id = $1 AND fe.post_id = p.id AND fe.kind IN ('complete', 'listen_complete')
                                                AND fe.created_at > ${at} - interval '${S.completedDays} days'))`
     : '';
   const reelRules = reels
@@ -488,6 +503,8 @@ function rankingSql(o: RankOptions, chains = false): { sql: string; params: unkn
        AND ($3 OR NOT EXISTS (SELECT 1 FROM post_media pm JOIN media m ON m.id = pm.media_id WHERE pm.post_id = p.id AND m.moderation = 'sensitive'))`
     : '';
   const X = RANKING.exploration;
+  // A Yap is suggested beyond its author's followers once its words passed the checks (lib/voice.ts).
+  const voiceRules = reels ? '' : `AND (p.format <> 'yap' OR p.author_id = $1 OR p.author_id IN (SELECT id FROM followed) OR ${yapDistributableSql('p')})`;
 
   const sql = `WITH me AS (${me}),
     followed AS (SELECT followee_id AS id FROM follows WHERE follower_id = $1),
@@ -513,6 +530,9 @@ function rankingSql(o: RankOptions, chains = false): { sql: string; params: unkn
            p.like_count, p.comment_count,
            coalesce(ps.impressions, 0) AS impressions, coalesce(ps.completes, 0) AS completes, coalesce(ps.skips, 0) AS skips,
            coalesce(ps.shares, 0) AS shares, coalesce(ps.saves, 0) AS saves,
+           coalesce(ps.listens, 0) AS listens, coalesce(ps.listen_completes, 0) AS listen_completes,
+           CASE WHEN p.format = 'yap' THEN (SELECT count(*) FROM comments vr WHERE vr.post_id = p.id AND vr.voice_media_id IS NOT NULL AND vr.deleted_at IS NULL
+                                              AND vr.moderation_status IN ('normal', 'review'))::int ELSE 0 END AS voice_replies,
            ${trendSql(at)}::real AS trend,
            (extract(epoch FROM (${at} - p.created_at)) / 3600.0)::real AS age_hours,
            (au.created_at > ${at} - interval '${X.newCreatorDays} days'
@@ -534,7 +554,7 @@ function rankingSql(o: RankOptions, chains = false): { sql: string; params: unkn
     LEFT JOIN post_stats ps ON ps.post_id = p.id
     LEFT JOIN caff ca ON ca.author_id = p.author_id
     LEFT JOIN alike sm ON sm.post_id = p.id
-    WHERE ${postVisibleSql('$1')} ${o.personal} ${connectionOnly} ${reelRules} ${unseen}
+    WHERE ${postVisibleSql('$1')} ${o.personal} ${connectionOnly} ${reelRules} ${voiceRules} ${unseen}
       AND (p.community_id IS NULL OR cm_self.user_id IS NOT NULL OR cm_c.visibility = 'public')`;
   return { sql, params: reels ? [o.userId, o.asOf, !!o.sensitiveOk] : [o.userId, o.asOf] };
 }
@@ -575,6 +595,9 @@ export async function rankFeed(db: Q, o: RankOptions): Promise<Arranged[]> {
     impressions: Number(r.impressions),
     completes: Number(r.completes),
     skips: Number(r.skips),
+    listens: Number(r.listens),
+    listenCompletes: Number(r.listen_completes),
+    voiceReplies: Number(r.voice_replies),
     shares: Number(r.shares),
     saves: Number(r.saves),
     trend: Number(r.trend),
@@ -661,6 +684,8 @@ export async function fairStartPicks(db: Q, o: RankOptions): Promise<FairPick[]>
        AND NOT EXISTS (SELECT 1 FROM feed_events fe WHERE fe.user_id = $1 AND fe.post_id = p.id AND fe.kind = 'impression')
        AND coalesce((SELECT a.score FROM user_creator_affinity a WHERE a.user_id = $1 AND a.author_id = p.author_id), 0) > -2
        AND p.moderation_status = 'normal' AND ${postVisibleSql('$1')} ${o.personal}
+       -- Reels get fair-start reels, the Yaps filter fair-start Yaps, For you either.
+       ${reels ? `AND p.format = 'reel'` : o.surface === 'yaps' ? `AND p.format = 'yap'` : ''}
        AND ($3 OR NOT EXISTS (SELECT 1 FROM post_media pm JOIN media m ON m.id = pm.media_id WHERE pm.post_id = p.id AND m.moderation = 'sensitive'))
        ${o.reduced && !reels ? 'AND false' : ''}
      ORDER BY f.started_at LIMIT 100`,

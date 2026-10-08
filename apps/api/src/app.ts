@@ -75,6 +75,7 @@ import collagesModule from './modules/collages.ts';
 import echoesModule from './modules/echoes.ts';
 import passTheMicModule from './modules/pass-the-mic.ts';
 import squadsModule from './modules/squads.ts';
+import voiceModule from './modules/voice.ts';
 import cityMapModule from './modules/city-map.ts';
 import tagsModule from './modules/tags.ts';
 import collabsModule from './modules/collabs.ts';
@@ -499,6 +500,7 @@ export async function buildApp(
     echoesModule,
     passTheMicModule,
     squadsModule,
+    voiceModule,
     cityMapModule,
     plusModule,
     invitesModule,

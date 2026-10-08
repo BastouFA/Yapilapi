@@ -2,11 +2,13 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Avatar, BottomSheet, Button, Checkbox, Icon, Segments, Select, Skeleton, TaggedText, TranslatableText } from '@yapilapi/design-system';
+import { Avatar, BottomSheet, Button, Checkbox, Icon, Segments, Select, Skeleton, TaggedText, TranslatableText, VoicePlayer } from '@yapilapi/design-system';
 import {
   COMMENT_POLICIES,
   formatRelativeTime,
   formatReelTime,
+  voiceClock,
+  VOICE_MAX_MS,
   type Comment,
   type CommentPage,
   type CommentPolicy,
@@ -21,6 +23,7 @@ import { AutocompleteText } from '@/components/Autocomplete';
 import { useSession } from '@/app/providers';
 import { signInHref, useSignIn } from './SignedOut';
 import { ReportSheet } from './ReportSheet';
+import { uploadVoice, voiceError, YapRecorder, type Recording } from './YapRecorder';
 
 const POLICY_LABEL: Record<CommentPolicy, MessageKey> = {
   everyone: 'comments.policy.everyone',
@@ -46,6 +49,10 @@ export interface CommentMoment {
   seek: (ms: number) => void;
   onMoment?: (c: Comment) => void;
 }
+
+/** A voice reply's clip again, for its transcript once it's made. */
+const refreshVoice = (id: string) => api.voice.get(id).then((r) => r.voice);
+const speakVoice = (id: string, target: string) => api.voice.speech(id, target).then((r) => r.url);
 
 /** The comments of a post in a bottom sheet. `onCountChange` gets +1 or minus the comments removed. */
 export function CommentsSheet({
@@ -73,8 +80,13 @@ export function CommentsSheet({
  * hidden comments). Replying to a reply stays in the thread and starts with an @mention.
  */
 export function Comments({ post, onCountChange, moment }: { post: Post; onCountChange: (delta: number) => void; moment?: CommentMoment }) {
-  const { toast, t, tp, locale, me } = useSession();
+  const { toast, t, tp, locale, me, flags, voice } = useSession();
   const signIn = useSignIn();
+  // Talk back: a voice reply, recorded here (with the words typed so far, if any).
+  const voiceOn = flags.YAPS !== false;
+  const [voiceOpen, setVoiceOpen] = useState(false);
+  const [voiceRec, setVoiceRec] = useState<Recording | null>(null);
+  const [voiceBusy, setVoiceBusy] = useState(false);
   const [sort, setSort] = useState<CommentSort>('top');
   const [page, setPage] = useState<Omit<CommentPage, 'items' | 'nextCursor'> | null>(null);
   const [items, setItems] = useState<Comment[] | null>(null);
@@ -179,6 +191,34 @@ export function Comments({ post, onCountChange, moment }: { post: Post; onCountC
     returnTo.current = null;
   };
 
+  /** A comment was posted (written or spoken): it shows in its place, and the composer is cleared. */
+  const added = (comment: Comment) => {
+    if (comment.atMs !== null && comment.atMs !== undefined) moment?.onMoment?.(comment);
+    setPointAt(false);
+    if (comment.parentId) {
+      const parentId = comment.parentId;
+      setThreads((cur) => {
+        const th = cur[parentId] ?? { open: true, items: [], cursor: null, loading: false };
+        return { ...cur, [parentId]: { ...th, open: true, items: [...th.items, comment] } };
+      });
+      update(parentId, (c) => ({ ...c, replies: c.replies + 1 }));
+    } else {
+      // Your new comment shows first, after a pinned one.
+      setItems((cur) => {
+        const list = cur ?? [];
+        const pinned = list.filter((c) => c.pinned);
+        return [...pinned, comment, ...list.filter((c) => !c.pinned)];
+      });
+    }
+    setBody('');
+    onCountChange(1);
+    if (replyTo) {
+      setReplyTo(null);
+      focusLater(returnTo.current);
+      returnTo.current = null;
+    }
+  };
+
   const submit = async () => {
     const text = body.trim();
     if (!text) return;
@@ -186,36 +226,53 @@ export function Comments({ post, onCountChange, moment }: { post: Post; onCountC
     try {
       const atMs = pointAt && !replyTo && momentMs !== null ? momentMs : undefined;
       const { comment } = await api.posts.comment(post.id, text, replyTo?.id, atMs);
-      if (comment.atMs !== null && comment.atMs !== undefined) moment?.onMoment?.(comment);
-      setPointAt(false);
-      if (comment.parentId) {
-        const parentId = comment.parentId;
-        setThreads((cur) => {
-          const th = cur[parentId] ?? { open: true, items: [], cursor: null, loading: false };
-          return { ...cur, [parentId]: { ...th, open: true, items: [...th.items, comment] } };
-        });
-        update(parentId, (c) => ({ ...c, replies: c.replies + 1 }));
-      } else {
-        // Your new comment shows first, after a pinned one.
-        setItems((cur) => {
-          const list = cur ?? [];
-          const pinned = list.filter((c) => c.pinned);
-          return [...pinned, comment, ...list.filter((c) => !c.pinned)];
-        });
-      }
-      setBody('');
-      onCountChange(1);
-      if (replyTo) {
-        setReplyTo(null);
-        focusLater(returnTo.current);
-        returnTo.current = null;
-      }
+      added(comment);
     } catch (err) {
       toast(errorMessage(err));
     } finally {
       setBusy(false);
     }
   };
+
+  /** Send the voice reply: the recording first, then the reply with it (and any words typed). */
+  const sendVoice = async () => {
+    if (!voiceRec) return;
+    setVoiceBusy(true);
+    try {
+      let voiceId: string;
+      try {
+        voiceId = (await uploadVoice(voiceRec, 'comment')).id;
+      } catch (err) {
+        toast(voiceError(err, t));
+        return;
+      }
+      const { comment } = await api.posts.voiceComment(post.id, voiceId, { body: body.trim() || undefined, parentId: replyTo?.id });
+      added(comment);
+      setVoiceRec(null);
+      setVoiceOpen(false);
+      focusLater('voice-reply-open');
+    } catch (err) {
+      toast(errorMessage(err));
+    } finally {
+      setVoiceBusy(false);
+    }
+  };
+
+  /** A voice reply's player and its transcript (a reply may be only the recording). */
+  const voiceOf = (c: Comment) =>
+    c.voice ? (
+      <VoicePlayer
+        clip={c.voice}
+        label={t('voice.replyA11y', { duration: voiceClock(c.voice.durationMs) })}
+        locale={locale}
+        size="sm"
+        own={c.author.id === me?.id}
+        refresh={refreshVoice}
+        speak={me && voice.listen ? speakVoice : undefined}
+        className="comment__voice"
+        testId="comment-voice"
+      />
+    ) : null;
 
   const like = async (c: Comment) => {
     const liked = !c.viewer.liked;
@@ -425,15 +482,20 @@ export function Comments({ post, onCountChange, moment }: { post: Post; onCountC
                 </div>
               </form>
             ) : (
-              <TranslatableText
-                kind="comment"
-                id={c.id}
-                text={c.body}
-                lang={c.lang}
-                own={c.author.id === me?.id}
-                locale={locale}
-                render={(text) => <TaggedText text={text} linkAs={NextLink} />}
-              />
+              <>
+                {voiceOf(c)}
+                {c.body.trim() || !c.voice ? (
+                  <TranslatableText
+                    kind="comment"
+                    id={c.id}
+                    text={c.body}
+                    lang={c.lang}
+                    own={c.author.id === me?.id}
+                    locale={locale}
+                    render={(text) => <TaggedText text={text} linkAs={NextLink} />}
+                  />
+                ) : null}
+              </>
             )}
           </div>
           <div className="comment__actions">
@@ -569,15 +631,18 @@ export function Comments({ post, onCountChange, moment }: { post: Post; onCountC
                       <strong>
                         {c.author.displayName} <span className="muted">· {formatRelativeTime(c.createdAt, locale)}</span>
                       </strong>
-                      <TranslatableText
-                        kind="comment"
-                        id={c.id}
-                        text={c.body}
-                        lang={c.lang}
-                        own={c.author.id === me?.id}
-                        locale={locale}
-                        render={(text) => <TaggedText text={text} linkAs={NextLink} />}
-                      />
+                      {voiceOf(c)}
+                      {c.body.trim() || !c.voice ? (
+                        <TranslatableText
+                          kind="comment"
+                          id={c.id}
+                          text={c.body}
+                          lang={c.lang}
+                          own={c.author.id === me?.id}
+                          locale={locale}
+                          render={(text) => <TaggedText text={text} linkAs={NextLink} />}
+                        />
+                      ) : null}
                     </div>
                     <div className="comment__actions">
                       <button type="button" className="comment__action" onClick={() => void unhide(c)}>
@@ -712,9 +777,46 @@ export function Comments({ post, onCountChange, moment }: { post: Post; onCountC
               onChange={(e) => setPointAt(e.currentTarget.checked)}
             />
           ) : null}
-          <Button type="submit" loading={busy} disabled={!body.trim()}>
-            {replyTo ? t('comments.postReply') : t('comment.submit')}
-          </Button>
+          <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+            <Button type="submit" loading={busy} disabled={!body.trim()}>
+              {replyTo ? t('comments.postReply') : t('comment.submit')}
+            </Button>
+            {voiceOn && !voiceOpen ? (
+              <Button id="voice-reply-open" variant="secondary" icon="mic" onClick={() => setVoiceOpen(true)} data-testid="voice-reply">
+                {t('voice.reply')}
+              </Button>
+            ) : null}
+          </div>
+          {voiceOn && voiceOpen ? (
+            <div className="stack-sm" role="group" aria-label={t('voice.reply')}>
+              <YapRecorder
+                compact
+                maxMs={VOICE_MAX_MS}
+                label={t('voice.reply')}
+                onDone={(blob, durationMs, filename) => setVoiceRec({ blob, durationMs, filename })}
+                onReset={() => setVoiceRec(null)}
+                actions={
+                  <Button size="sm" icon="send" loading={voiceBusy} onClick={() => void sendVoice()}>
+                    {replyTo ? t('comments.postReply') : t('comment.submit')}
+                  </Button>
+                }
+              />
+              <div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={voiceBusy}
+                  onClick={() => {
+                    setVoiceOpen(false);
+                    setVoiceRec(null);
+                    focusLater('voice-reply-open');
+                  }}
+                >
+                  {t('common.cancel')}
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </form>
       )}
     </div>

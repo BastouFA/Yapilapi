@@ -8,6 +8,7 @@ import { messageVisibleSql } from './chat.ts';
 import { storyVisibleSql } from './stories.ts';
 import { commentVisibleSql } from './comments.ts';
 import { postUnlockedSql, postVisibleSql } from './visibility.ts';
+import { voiceVisibleSql } from './voice.ts';
 
 type Q = Pool | PoolClient;
 
@@ -33,7 +34,14 @@ export interface TranslatableItem {
   lang: string | null;
 }
 
-const WHAT: Record<TranslatableKind, string> = { post: 'That post', comment: 'That comment', story: 'That story', message: 'Message', transcript: 'Message' };
+const WHAT: Record<TranslatableKind, string> = {
+  post: 'That post',
+  comment: 'That comment',
+  story: 'That story',
+  message: 'Message',
+  transcript: 'Message',
+  voice: 'That recording',
+};
 
 /**
  * Which of `ids` `viewer` can see right now, with their text: posts they can see and open
@@ -63,6 +71,9 @@ export async function loadTranslatables(
               JOIN conversation_members cm ON cm.conversation_id = m.conversation_id AND cm.user_id = $1 AND cm.left_at IS NULL
               WHERE m.id = ANY($2::uuid[]) AND m.kind <> 'system' AND m.deleted_at IS NULL AND m.unsent_at IS NULL AND ${messageVisibleSql('$1')}
                 ${opts.auto ? 'AND NOT m.view_once' : ''}`,
+    // A voice clip's transcript (a Yap, a voice reply or an intro: lib/voice.ts), once its words are there.
+    voice: `SELECT vc.media_id AS id, vc.transcript AS body, vc.lang FROM voice_clips vc
+            WHERE vc.media_id = ANY($2::uuid[]) AND vc.transcript_status = 'ready' AND ${voiceVisibleSql('$1')}`,
     transcript: `SELECT m.id, t.body, t.lang FROM message_transcripts t JOIN messages m ON m.id = t.message_id
               JOIN conversation_members cm ON cm.conversation_id = m.conversation_id AND cm.user_id = $1 AND cm.left_at IS NULL
               LEFT JOIN media md ON md.id = (m.attachments->0->>'mediaId')::uuid

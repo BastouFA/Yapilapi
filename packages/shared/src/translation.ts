@@ -7,8 +7,12 @@
  * @names and links out of the model's reach, are in language-detect.ts.
  */
 
-/** What can be translated: a post, a comment, the text on a story, a chat message, or what was said in a voice message (by the message's id). */
-export const TRANSLATABLE_KINDS = ['post', 'comment', 'story', 'message', 'transcript'] as const;
+/**
+ * What can be translated: a post, a comment, the text on a story, a chat message, what was said in a
+ * voice message (by the message's id), or what was said in a Yap, a voice reply or a voice intro
+ * ('voice', by the clip's id: packages/shared/src/voice.ts).
+ */
+export const TRANSLATABLE_KINDS = ['post', 'comment', 'story', 'message', 'transcript', 'voice'] as const;
 export type TranslatableKind = (typeof TRANSLATABLE_KINDS)[number];
 
 export interface LanguageInfo {

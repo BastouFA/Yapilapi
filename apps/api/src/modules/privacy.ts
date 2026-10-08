@@ -73,7 +73,8 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
       profile: (
         await q(
           `SELECT username, display_name, bio, avatar_url, cover_url, cover_alt, cover_media_id, cover_edit, links, mode, locale, is_private, pronouns, city, accent, header_style, tabs, featured_post_ids,
-                  song_sound_id, song_track_id, song_part, country, country_source, cdn_country, plus_until, allow_download, hide_counts, tag_permission, pinned_post_id, created_at
+                  song_sound_id, song_track_id, song_part, country, country_source, cdn_country, plus_until, allow_download, hide_counts, tag_permission, pinned_post_id,
+                  voice_intro_media_id, created_at
            FROM profiles WHERE user_id = $1`,
         )
       )[0],
@@ -221,10 +222,13 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
       await c.query(
         `UPDATE profiles SET username = 'deleted_' || substr(replace(user_id::text, '-', ''), 1, 12), display_name = 'Deleted account', bio = '', avatar_url = NULL, cover_url = NULL, cover_media_id = NULL, cover_alt = NULL, cover_edit = NULL, cover_render_media_id = NULL, links = '[]', is_private = true,
            country = NULL, country_source = NULL, cdn_country = NULL, pinned_post_id = NULL, accent = NULL, header_style = 'cover', pronouns = NULL, city = NULL,
-           tabs = NULL, featured_post_ids = '{}', song_sound_id = NULL, song_track_id = NULL, song_part = NULL, mode = 'personal', locale = 'en'
+           tabs = NULL, featured_post_ids = '{}', song_sound_id = NULL, song_track_id = NULL, song_part = NULL, mode = 'personal', locale = 'en',
+           voice_intro_media_id = NULL
          WHERE user_id = $1`,
         [u.id],
       );
+      // What their recordings said (transcripts); the recordings themselves go with their other files.
+      await c.query(`UPDATE voice_clips SET transcript = NULL, segments = NULL WHERE owner_id = $1`, [u.id]);
       await c.query(`DELETE FROM profile_statuses WHERE user_id = $1`, [u.id]);
       await c.query(`UPDATE posts SET deleted_at = now(), body = '' WHERE author_id = $1 AND deleted_at IS NULL`, [u.id]);
       // Problems they reported stay (they may describe a bug), without their words or who sent them.

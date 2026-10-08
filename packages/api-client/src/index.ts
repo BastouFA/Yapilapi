@@ -174,6 +174,9 @@ import type {
   PublicListingPreview,
   AdminContentKind,
   AdminPeriod,
+  TranscriptStatus,
+  VoiceClip,
+  VoicePurpose,
 } from '@yapilapi/shared';
 
 export class ApiError extends Error {
@@ -576,6 +579,9 @@ export function createClient(opts: ClientOptions) {
       /** Comment, or reply with `parentId` (a reply to a reply joins the top-level thread). */
       comment: (id: string, body: string, parentId?: string, atMs?: number) =>
         post<{ comment: Comment }>(`/v1/posts/${id}/comments`, { body, parentId, ...(atMs === undefined ? {} : { atMs }) }),
+      /** Talk back: a voice reply (a clip from voice.upload with purpose 'comment'), with optional words, or a reply in a thread with `parentId`. */
+      voiceComment: (id: string, voiceId: string, o: { body?: string; parentId?: string } = {}) =>
+        post<{ comment: Comment }>(`/v1/posts/${id}/comments`, { voiceId, body: o.body ?? '', parentId: o.parentId }),
       /** Reels: comments anchored to a time in the video, in time order, for the bubbles on the scrubber. */
       momentComments: (id: string) => get<{ items: ReelMoment[] }>(`/v1/posts/${id}/moment-comments`),
       /** Reels, creator only: replace the named highlights in the video (an empty list removes them). */
@@ -750,6 +756,23 @@ export function createClient(opts: ClientOptions) {
       salt: () => get<ContactHashing>('/v1/contacts/salt'),
       /** Send only hashes, at most `maxHashes` per call. */
       match: (hashes: string[], source?: 'web' | 'mobile') => post<{ items: ContactMatch[] }>('/v1/contacts/match', { hashes, source }),
+    },
+    /**
+     * Yaps, voice replies and voice intros (docs/product/yaps.md). Upload the recording first: the
+     * server measures it (a Yap or reply up to 60 s, an intro up to 15 s), stores it small and draws
+     * its waveform. Then post it (posts.create({ format: 'yap', media: [{ id, url, kind: 'audio' }] })),
+     * answer with it (posts.voiceComment) or set it as your intro (me.updateProfile({ voiceIntroId })).
+     */
+    voice: {
+      upload: (file: Blob, purpose: VoicePurpose = 'yap', filename = 'voice.m4a') => {
+        const fd = new FormData();
+        fd.append('file', file, filename);
+        return req<{ voice: VoiceClip }>('POST', `/v1/voice${qs({ purpose })}`, fd);
+      },
+      /** One clip you can hear (its transcript may have arrived since). */
+      get: (id: string) => get<{ voice: VoiceClip }>(`/v1/voice/${id}`),
+      /** "Listen in English": the translation of a clip's transcript, read out (flags voice.listen). */
+      speech: (id: string, target: string) => post<{ url: string; language: string }>(`/v1/voice/${id}/speech`, { target }),
     },
     media: {
       /** `viewOnce`: stored privately for a view-once chat message (no public address; url is empty). */
@@ -2069,6 +2092,15 @@ export function createClient(opts: ClientOptions) {
         post<{ minutesToday: number; dailyLimitMinutes: number | null; overLimit: boolean; quietNow: boolean; supervised: boolean }>('/v1/me/usage/heartbeat'),
     },
     admin: {
+      /** Yaps: how many there are, this week's, voice replies, voice intros, and transcripts by state. */
+      yaps: () =>
+        get<{
+          yaps: number;
+          thisWeek: number;
+          voiceReplies: number;
+          intros: number;
+          transcripts: Record<TranscriptStatus, number>;
+        }>('/v1/admin/yaps'),
       /** How many squads, people in them, open invites, and posts shared to squads this week. */
       squads: () => get<{ squads: number; members: number; invites: number; postsThisWeek: number }>('/v1/admin/squads'),
       /** Chains this week and the fair-start pool. */

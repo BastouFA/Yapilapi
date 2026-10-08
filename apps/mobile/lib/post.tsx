@@ -47,6 +47,8 @@ import { recordFeedEvent, useFeedSurface } from './feed-events';
 import { compactCount } from '../../../packages/shared/src/post-stats';
 import { PostStats } from './post-stats';
 import { useSendPost } from './post-send';
+import { VoicePlayer } from './voice';
+import { voiceClock } from '../../../packages/shared/src/voice';
 
 export { RichText };
 
@@ -187,9 +189,12 @@ function PostCardView({
   open = true,
   commentCount,
   onDeleted,
+  yapTranscriptOpen,
 }: {
   post: Post;
   open?: boolean;
+  /** A Yap's own page: its transcript shows from the start. */
+  yapTranscriptOpen?: boolean;
   /** The post's page keeps the comment count itself, as comments are added and deleted there. */
   commentCount?: number;
   /** After you deleted your post (the post's page goes back). */
@@ -645,6 +650,16 @@ function PostCardView({
           style={{ color: c.ink, fontSize: 15, lineHeight: 22 }}
         />
       ) : null}
+      {post.format === 'yap' && post.voice ? (
+        // A Yap: the recording under its line, with its transcript.
+        <VoicePlayer
+          clip={post.voice}
+          label={t('voice.playA11y', { name: post.author.displayName, duration: voiceClock(post.voice.durationMs) })}
+          own={isAuthor}
+          transcriptOpen={yapTranscriptOpen}
+          onListen={(e) => recordFeedEvent({ postId: post.id, surface, kind: e.kind, valueMs: e.valueMs })}
+        />
+      ) : null}
 
       {post.locked ? <LockedPanel post={post} /> : null}
       {post.remixOf?.post ? (
@@ -680,7 +695,8 @@ function PostCardView({
       {post.format === 'reel' && !post.locked && post.media.some((m) => m.kind === 'video') ? <ReelPreview post={post} saver={saver} /> : null}
       {post.format !== 'reel' && gallery.length ? <MediaGallery media={gallery} tags={tags} meId={me?.id} onRemoveTag={(tag) => void removeTag(tag)} /> : null}
 
-      {post.format !== 'reel' ? audio.map((m) => <PostAudio key={m.id} media={m} />) : null}
+      {/* A Yap's recording plays in its own player above. */}
+      {post.format !== 'reel' && !(post.format === 'yap' && post.voice) ? audio.map((m) => <PostAudio key={m.id} media={m} />) : null}
 
       {poll ? <PostPoll poll={poll} canVote={canVote} onVote={(id) => void vote(id)} /> : null}
 

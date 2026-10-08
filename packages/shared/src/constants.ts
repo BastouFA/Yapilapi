@@ -25,7 +25,8 @@ export type PostKind = (typeof POST_KINDS)[number];
 export const PROFILE_MODES = ['personal', 'creator', 'professional', 'business'] as const;
 export type ProfileMode = (typeof PROFILE_MODES)[number];
 
-export const FEED_MODES = ['for_you', 'following', 'friends', 'communities', 'local'] as const;
+/** 'yaps': only Yaps (voice posts), ranked like For you. */
+export const FEED_MODES = ['for_you', 'following', 'friends', 'communities', 'local', 'yaps'] as const;
 export type FeedMode = (typeof FEED_MODES)[number];
 
 export const CIRCLE_KINDS = ['family', 'close_friends', 'work', 'business', 'travel', 'custom'] as const;
@@ -156,9 +157,37 @@ export const FEEDBACK_SIGNALS = ['more_like_this', 'less_like_this', 'not_intere
  * `complete` it played to the end (or looped), `skip` it was left within two seconds, `share`
  * it was shared or its link copied, `profile_open` its author's profile was opened from it.
  */
-export const FEED_EVENT_SURFACES = ['for_you', 'reels', 'following', 'friends', 'communities', 'profile', 'tag', 'search', 'other'] as const;
+export const FEED_EVENT_SURFACES = [
+  'for_you',
+  'reels',
+  'following',
+  'friends',
+  'communities',
+  'profile',
+  'tag',
+  'search',
+  'other',
+  'yaps',
+  'squad',
+  'place',
+] as const;
 export type FeedEventSurface = (typeof FEED_EVENT_SURFACES)[number];
-export const FEED_EVENT_KINDS = ['impression', 'dwell', 'watch', 'complete', 'skip', 'share', 'profile_open'] as const;
+/**
+ * Yaps: `listen_start` a Yap started playing, `listen` how long it played (valueMs), `listen_complete`
+ * it played (nearly) to the end (VOICE_COMPLETE_AT).
+ */
+export const FEED_EVENT_KINDS = [
+  'impression',
+  'dwell',
+  'watch',
+  'complete',
+  'skip',
+  'share',
+  'profile_open',
+  'listen_start',
+  'listen',
+  'listen_complete',
+] as const;
 export type FeedEventKind = (typeof FEED_EVENT_KINDS)[number];
 /** The most events in one POST /v1/feed/events. */
 export const FEED_EVENTS_MAX_BATCH = 50;

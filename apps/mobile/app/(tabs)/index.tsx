@@ -19,6 +19,7 @@ import { CatchUpCard } from '../../lib/ai-helpers';
 import { PulseCards } from '../../lib/wrap';
 import { FollowingDrops } from '../../lib/drops';
 import { space } from '../../lib/theme';
+import { useFlag } from '../../lib/flags';
 import { ErrorState, feedListProps, Icon, Loading, Segmented, SkeletonList, slop, useColors, useTabBarSpace } from '../../lib/ui';
 
 const MODES = [
@@ -27,6 +28,8 @@ const MODES = [
   { id: 'friends', label: 'feed.friends' },
   { id: 'communities', label: 'feed.communities' },
   { id: 'local', label: 'feed.local' },
+  // Yaps only (voice posts); not shown while the YAPS flag is off.
+  { id: 'yaps', label: 'feed.yaps' },
 ] as const satisfies readonly { id: FeedMode; label: MessageKey }[];
 
 /** Home: the welcome screen if signed out, then stories and the feed with cursor pagination. */
@@ -47,6 +50,12 @@ function Feed() {
   const { t } = useT();
   const bottom = useTabBarSpace();
   const [mode, setMode] = useState<(typeof MODES)[number]['id']>('for_you');
+  const yapsOn = useFlag('YAPS') !== false;
+  const modes = yapsOn ? MODES : MODES.filter((m) => m.id !== 'yaps');
+  // Yaps turned off while showing them: back to For you.
+  useEffect(() => {
+    if (!yapsOn && mode === 'yaps') setMode('for_you');
+  }, [yapsOn, mode]);
   const [posts, setPosts] = useState<Post[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -177,7 +186,7 @@ function Feed() {
             <FollowingDrops />
             {/* With nothing in the feed, the empty state below does the starter row's job. */}
             {posts?.length ? <StarterRow /> : null}
-            <Segmented label={t('m.feed.label')} options={MODES.map((m) => ({ id: m.id, label: t(m.label) }))} value={mode} onChange={setMode} />
+            <Segmented label={t('m.feed.label')} options={modes.map((m) => ({ id: m.id, label: t(m.label) }))} value={mode} onChange={setMode} />
             {error ? <ErrorState message={error} onRetry={() => Promise.all([load(), loadStories()])} /> : null}
           </View>
         }

@@ -59,6 +59,7 @@ import {
 } from './constants.ts';
 import { storyMusicInputSchema, storyStickersSchema } from './stories.ts';
 import { postMusicInputSchema } from './music.ts';
+import { YAP_TEXT_MAX } from './voice.ts';
 import {
   CITY_MAX,
   MAX_FEATURED_POSTS,
@@ -237,6 +238,8 @@ export const updateProfileSchema = z
     mode: z.enum(PROFILE_MODES),
     locale: z.string().min(2).max(10),
     isPrivate: z.boolean(),
+    /** A voice intro on your profile: a clip recorded for it (POST /v1/voice?purpose=intro); null removes it. */
+    voiceIntroId: uuid.nullable(),
     /** ISO 3166-1 alpha-2; null clears it. Used for regional rules. */
     country: z
       .string()
@@ -291,8 +294,11 @@ export const createPostSchema = z
     poll: z.object({ options: z.array(trimmed(80)).min(2).max(6) }).optional(),
     topics: z.array(z.string().min(1).max(40)).max(5).default([]),
     aiAssisted: z.boolean().default(false),
-    /** 'reel': one short vertical video, shown in the full-screen Reels feed as well as on the profile. */
-    format: z.enum(['post', 'reel']).default('post'),
+    /**
+     * 'reel': one short vertical video, shown in the full-screen Reels feed as well as on the profile.
+     * 'yap': one voice clip of up to a minute (POST /v1/voice), with an optional short line of text.
+     */
+    format: z.enum(['post', 'reel', 'yap']).default('post'),
     /** Reels: whether other people may duet or remix this reel. On by default. */
     allowRemix: z.boolean().default(true),
     /** Reels: post as a duet or remix of another public reel. */
@@ -358,6 +364,12 @@ export const createPostSchema = z
     if (v.format === 'reel' && (v.media.length !== 1 || v.media[0]!.kind !== 'video'))
       ctx.addIssue({ code: 'custom', message: 'A reel is one video.', path: ['media'] });
     if (v.format === 'reel' && v.poll) ctx.addIssue({ code: 'custom', message: "Reels can't have polls.", path: ['poll'] });
+    if (v.format === 'yap') {
+      // A Yap is its recording, with at most a short line of text: no photos, poll, link or music.
+      if (v.media.length !== 1 || v.media[0]!.kind !== 'audio' || !v.media[0]!.id || v.poll || v.linkUrl || v.music)
+        ctx.addIssue({ code: 'custom', message: 'A Yap is one voice recording.', path: ['media'] });
+      if (v.body.length > YAP_TEXT_MAX) ctx.addIssue({ code: 'custom', message: 'The words with a Yap can be up to 280 characters.', path: ['body'] });
+    }
     if (v.format !== 'reel' && (v.remixOf || v.soundId || v.soundTitle))
       ctx.addIssue({ code: 'custom', message: 'Only reels can use sounds or remix other reels.', path: ['format'] });
     if (v.music && v.format === 'reel' && (v.soundId || v.remixOf || v.music.soundId))
@@ -482,7 +494,15 @@ export const pageQuerySchema = z.object({
 
 /** A comment, or a reply: `parentId` is the comment answered. A reply to a reply joins its top-level thread. */
 /** `atMs`: reels only, a moment comment anchored to that time in the video (top-level comments). */
-export const commentSchema = z.object({ body: trimmed(2000), parentId: uuid.optional(), atMs: z.number().int().min(0).max(REEL_LONGEST_MS).optional() });
+/** `voiceId`: a voice reply, a clip recorded for it (POST /v1/voice?purpose=comment); the words are then optional. */
+export const commentSchema = z
+  .object({
+    body: z.string().trim().max(2000).default(''),
+    parentId: uuid.optional(),
+    atMs: z.number().int().min(0).max(REEL_LONGEST_MS).optional(),
+    voiceId: uuid.optional(),
+  })
+  .refine((v) => v.body.length > 0 || !!v.voiceId, { message: 'Write a comment or record one.', path: ['body'] });
 /** Change your comment's text, within COMMENT_EDIT_MINUTES of posting it. */
 export const editCommentSchema = z.object({ body: trimmed(2000) });
 export const commentsQuerySchema = z.object({

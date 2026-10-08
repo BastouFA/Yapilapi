@@ -7,10 +7,10 @@ import { client, getToken } from './api';
 
 /**
  * What happened to posts on screen, for the recommender (POST /v1/feed/events): seen, for how
- * long, watched, finished, skipped, shared, the author's profile opened. Events wait in memory
- * and go in batches: every few seconds, as soon as a full batch is ready, and when the app goes
- * to the background. A batch that can't be sent is dropped: these are hints, never worth an
- * error on screen or a retry loop.
+ * long, watched, finished, skipped, shared, the author's profile opened, a Yap listened to.
+ * Events wait in memory and go in batches: every few seconds, as soon as a full batch is ready,
+ * and when the app goes to the background. A batch that can't be sent is dropped: these are
+ * hints, never worth an error on screen or a retry loop.
  */
 
 const FLUSH_MS = 5000;
@@ -89,7 +89,7 @@ export function onAppAway(listener: (away: boolean) => void) {
 
 /** Pulse's feed modes as the recommender names them; Local has no surface of its own. */
 export const feedSurface = (mode: FeedMode): FeedEventSurface =>
-  mode === 'for_you' || mode === 'following' || mode === 'friends' || mode === 'communities' ? mode : 'other';
+  mode === 'for_you' || mode === 'following' || mode === 'friends' || mode === 'communities' || mode === 'yaps' ? mode : 'other';
 
 /** The list a post card is in, so its share and profile taps say where they happened. */
 export const FeedSurfaceContext = createContext<FeedEventSurface>('other');

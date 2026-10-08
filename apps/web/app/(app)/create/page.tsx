@@ -13,6 +13,8 @@ import {
   isVideoFile,
   MEDIA_ACCEPT,
   VIDEO_ACCEPT,
+  VOICE_MAX_MS,
+  YAP_TEXT_MAX,
   type CaptionIdeas,
   type CollageShape,
   type CommentPolicy,
@@ -63,6 +65,7 @@ import { StoryStickerEditor, type DraftSticker } from '@/components/StorySticker
 import { clipMax, draftMusic, MusicField, musicInput, soundAsTrack, type DraftMusic } from '@/components/MusicPicker';
 import { localInput, nextHour, scheduleBounds } from '@/lib/schedule';
 import { VoiceRecorder } from '@/components/ChatAttachments';
+import { uploadVoice, voiceError, YapRecorder, type Recording } from '@/components/YapRecorder';
 import { ChainJoinSelect, chainableAudience, guessChainJoin, takeMicHref } from '@/components/PassTheMic';
 import { useSession } from '../../providers';
 
@@ -77,8 +80,9 @@ type Uploaded = { id: string; kind: 'image' | 'video' | 'audio'; url: string; al
 const REEL_MAX_SECONDS = 180;
 const PLUS_REEL_MAX_SECONDS = 600;
 
-/** What Create makes, in the order of the buttons at the top. */
-const KINDS = ['post', 'reel', 'story'] as const;
+/** What Create makes, in the order of the buttons at the top (Yap only while Yaps are on). */
+const KINDS = ['yap', 'post', 'reel', 'story'] as const;
+type Kind = (typeof KINDS)[number];
 
 /** Photos and videos that open in the editor before uploading (GIFs keep their animation, so they skip it). */
 const EDITABLE = new Set(['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/webm']);
@@ -112,15 +116,23 @@ function Create() {
   // Duet, remix or "Use this sound" links open Create as a reel, prefilled; "Add to your story" on a sound opens a story with it.
   const remixOf = params.get('remixOf');
   const remixMode = params.get('remixMode') === 'remix' ? 'remix' : 'duet';
-  const initialMode =
-    params.get('mode') === 'story' && !remixOf
-      ? 'story'
-      : params.get('mode') === 'reel' || remixOf || (params.get('sound') && params.get('mode') !== 'post')
-        ? 'reel'
-        : params.get('moment')
-          ? 'story'
-          : 'post';
-  const [kind, setKind] = useState<'post' | 'reel' | 'story'>(initialMode);
+  const yapsOn = flags.YAPS !== false;
+  const kinds = KINDS.filter((k) => k !== 'yap' || yapsOn);
+  const initialMode: Kind =
+    params.get('mode') === 'yap' && yapsOn && !remixOf && !params.get('draft')
+      ? 'yap'
+      : params.get('mode') === 'story' && !remixOf
+        ? 'story'
+        : params.get('mode') === 'reel' || remixOf || (params.get('sound') && params.get('mode') !== 'post')
+          ? 'reel'
+          : params.get('moment')
+            ? 'story'
+            : 'post';
+  const [kind, setKind] = useState<Kind>(initialMode);
+  // A Yap: the recording, sent when it's posted.
+  const [recording, setRecording] = useState<Recording | null>(null);
+  // Sent already (posting failed after it, e.g. a rule about the line): a second try doesn't send it again.
+  const sentVoice = useRef<{ recording: Recording; voice: { id: string; url: string } } | null>(null);
   const [body, setBody] = useState(() => (params.get('text') ?? '').slice(0, 5000));
   // From a squad's page (?squad=): shared with that squad.
   const [visibility, setVisibility] = useState<Audience>(params.get('squad') ? 'squad' : initialMode === 'story' ? 'friends' : 'public');
@@ -134,7 +146,7 @@ function Create() {
   // Hide the like and view counts: starts at the account's choice (Settings, Privacy), sent only when changed from it.
   const [hideCountsDefault, setHideCountsDefault] = useState(false);
   const [hideCounts, setHideCounts] = useState<boolean | null>(null);
-  const [communityId, setCommunityId] = useState(params.get('community') ?? '');
+  const [communityId, setCommunityId] = useState(initialMode === 'yap' ? '' : (params.get('community') ?? ''));
   const [communities, setCommunities] = useState<Community[]>([]);
   const [circles, setCircles] = useState<{ id: string; name: string }[]>([]);
   const [circleId, setCircleId] = useState('');
@@ -217,6 +229,9 @@ function Create() {
   // Fair start: whether this reel would be shown to new people (a new creator's first reels).
   const [fairOffered, setFairOffered] = useState(false);
   useEffect(() => {
+    if (!yapsOn && kind === 'yap') setKind('post');
+  }, [yapsOn, kind]);
+  useEffect(() => {
     if (!chainId) return;
     let live = true;
     api.chains.get(chainId).then(
@@ -284,7 +299,7 @@ function Create() {
         setHideCounts(!!post.countsHidden);
         if (post.sound?.original) setSoundTitle(post.sound.title);
         // Music on the draft: the song or sound as the picker has it, with the part it plays.
-        const use = post.format === 'reel' ? 'reel' : 'post';
+        const use = post.format === 'reel' ? ('reel' as const) : ('post' as const);
         const part = post.music ? { startMs: post.music.startMs, durationMs: post.music.durationMs } : undefined;
         if (post.music?.source === 'library')
           api.sounds.get(post.music.id).then(
@@ -323,13 +338,13 @@ function Create() {
     const soundId = params.get('sound');
     if (soundId && !remixOf)
       api.sounds.get(soundId).then(
-        (r) => setMusic(draftMusic(soundAsTrack(r.sound), initialMode)),
+        (r) => setMusic(draftMusic(soundAsTrack(r.sound), initialMode === 'yap' ? 'post' : initialMode)),
         () => toast(t('m.sound.missing')),
       );
     const trackId = params.get('track');
     if (trackId && !remixOf)
       api.music.track(trackId).then(
-        (r) => setMusic(draftMusic(r.track, initialMode)),
+        (r) => setMusic(draftMusic(r.track, initialMode === 'yap' ? 'post' : initialMode)),
         () => toast(t('music.track.missing')),
       );
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -573,6 +588,22 @@ function Create() {
     };
   }
 
+  /** A Yap: the line said with it, who it's for, where, and the recording (already sent). */
+  function yapContent(voice: { id: string; url: string }): Record<string, unknown> {
+    return {
+      format: 'yap',
+      body: body.trim(),
+      visibility,
+      circleId: visibility === 'circle' ? circleId || undefined : undefined,
+      squadId: visibility === 'squad' ? squadId || undefined : undefined,
+      audience: visibility === 'selected' && audience.length ? audience : undefined,
+      placeId: place?.id,
+      commentPolicy,
+      ...hideCountsField,
+      media: [{ id: voice.id, url: new URL(voice.url, location.origin).toString(), kind: 'audio' }],
+    };
+  }
+
   /** Pass the Mic, for a reel published now: the chain it joins, or the chain it starts. */
   function chainFields(): Record<string, unknown> {
     if (joining && chainId && chainAudience) return { chainId };
@@ -613,6 +644,22 @@ function Create() {
     setNeedsVerify(false);
     setFields({});
     try {
+      if (kind === 'yap') {
+        if (!recording) return;
+        let voice = sentVoice.current?.recording === recording ? sentVoice.current.voice : null;
+        if (!voice)
+          try {
+            voice = await uploadVoice(recording, 'yap');
+            sentVoice.current = { recording, voice };
+          } catch (err) {
+            setError(voiceError(err, t));
+            return;
+          }
+        const r = await api.posts.create(yapContent(voice));
+        toast(noticeText(r.moderation, t) ?? t('create.published'));
+        router.push('/home?mode=yaps');
+        return;
+      }
       if (kind === 'story') {
         await api.moments.create({
           body,
@@ -651,9 +698,11 @@ function Create() {
   }
 
   const empty =
-    kind === 'reel'
-      ? media.length !== 1 || media[0]!.kind !== 'video' || (!!remixOf && !original)
-      : !body.trim() && !media.length && !poll && !(kind === 'post' && link?.trim()) && !(kind === 'story' && (stickers.length || music));
+    kind === 'yap'
+      ? !recording
+      : kind === 'reel'
+        ? media.length !== 1 || media[0]!.kind !== 'video' || (!!remixOf && !original)
+        : !body.trim() && !media.length && !poll && !(kind === 'post' && link?.trim()) && !(kind === 'story' && (stickers.length || music));
   // Taking the mic waits for the chain; starting one needs its prompt.
   const chainIncomplete = (joining && !chain) || (kind === 'reel' && micOn && !chainId && startChain && chainAudience && !chainPrompt.trim());
   const blocked = uploading || !draftLoaded || empty || chainIncomplete;
@@ -675,8 +724,9 @@ function Create() {
           onDoubleClick={(e) => {
             // The buttons are in the same order as the kinds; their labels are translated.
             const button = (e.target as HTMLElement).closest('button');
-            const picked = button ? KINDS[Array.from(e.currentTarget.querySelectorAll('button')).indexOf(button)] : undefined;
-            if (picked) router.push(picked === 'post' ? '/camera' : `/camera?mode=${picked}`);
+            const picked = button ? kinds[Array.from(e.currentTarget.querySelectorAll('button')).indexOf(button)] : undefined;
+            // A Yap needs no camera.
+            if (picked && picked !== 'yap') router.push(picked === 'post' ? '/camera' : `/camera?mode=${picked}`);
           }}
         >
           <Segments
@@ -690,11 +740,13 @@ function Create() {
                 setMedia((m) => m.filter((x) => k !== 'reel' || x.kind === 'video').slice(0, 1));
               }
               if (k === 'story' && (visibility === 'selected' || visibility === 'subscribers' || visibility === 'circle')) setVisibility('friends');
-              // The part keeps within what the new kind plays (15 seconds on stories).
-              setMusic((m) => (m ? { ...m, durationMs: Math.min(m.durationMs, clipMax(m.track, k)) } : m));
+              // The part keeps within what the new kind plays (15 seconds on stories). A Yap has no music.
+              if (k !== 'yap') setMusic((m) => (m ? { ...m, durationMs: Math.min(m.durationMs, clipMax(m.track, k)) } : m));
+              // A Yap goes on your profile, not in a community.
+              if (k === 'yap') setCommunityId('');
               if (k !== 'story' && visibility === 'close_friends') setVisibility('friends');
             }}
-            options={KINDS.map((id) => ({ id, label: t(`m.create.mode.${id}`) }))}
+            options={kinds.map((id) => ({ id, label: t(`m.create.mode.${id}`) }))}
           />
         </div>
         {kind === 'reel' && remixOf ? (
@@ -752,13 +804,41 @@ function Create() {
             </span>
           </p>
         ) : null}
-        <p className="muted" style={{ margin: 0, fontSize: 14 }}>
-          {kind === 'post' ? t('compose.hint.post') : kind === 'reel' ? t('compose.hint.reel', { minutes: reelMax / 60 }) : t('compose.hint.story')}
-        </p>
+        {kind === 'yap' ? null : (
+          <p className="muted" style={{ margin: 0, fontSize: 14 }}>
+            {kind === 'post' ? t('compose.hint.post') : kind === 'reel' ? t('compose.hint.reel', { minutes: reelMax / 60 }) : t('compose.hint.story')}
+          </p>
+        )}
         {error ? <Alert tone="danger">{error}</Alert> : null}
         {needsVerify || (me?.needsVerification && kind !== 'story' && (visibility === 'public' || !!communityId)) ? <VerifyPrompt action="post" /> : null}
 
-        <div className="composer-box">
+        {kind === 'yap' ? (
+          <div className="yap-compose">
+            <YapRecorder
+              maxMs={VOICE_MAX_MS}
+              onDone={(blob, durationMs, filename) => setRecording({ blob, durationMs, filename })}
+              onReset={() => setRecording(null)}
+            />
+            <div className="yp-field">
+              <label htmlFor="yap-line" className="yp-field__label">
+                {t('voice.lineLabel')}
+              </label>
+              <AutocompleteText
+                as="input"
+                id="yap-line"
+                className="yp-input"
+                value={body}
+                onValueChange={setBody}
+                maxLength={YAP_TEXT_MAX}
+                autoComplete="off"
+                aria-invalid={!!fields.body}
+              />
+              {fields.body ? <span className="yp-field__error">{fields.body}</span> : null}
+            </div>
+            <PlacePicker value={place} onChange={setPlace} />
+          </div>
+        ) : null}
+        <div className="composer-box" hidden={kind === 'yap'}>
           <label htmlFor="body" className="yp-visually-hidden">
             {t('create.placeholder')}
           </label>
@@ -905,7 +985,7 @@ function Create() {
             </div>
           ) : null}
 
-          {communityId ? null : <PlacePicker value={place} onChange={setPlace} />}
+          {communityId || kind === 'yap' ? null : <PlacePicker value={place} onChange={setPlace} />}
 
           {videoCost ? (
             <Alert tone="warning" title={t('dataSaver.title')} onDismiss={() => setVideoCost(null)} locale={locale}>
@@ -1004,7 +1084,7 @@ function Create() {
           />
         ) : null}
 
-        {kind !== 'story' ? (
+        {kind !== 'story' && kind !== 'yap' ? (
           <PeoplePicker
             label={t('compose.coAuthors')}
             hint={t('compose.coAuthorsHint')}
@@ -1059,7 +1139,7 @@ function Create() {
         {kind === 'post' && postCanHaveMusic ? <MusicField use="post" value={music} onChange={setMusic} /> : null}
 
         <div className="stack">
-          {kind === 'reel' ? null : kind === 'post' ? (
+          {kind === 'reel' || kind === 'yap' ? null : kind === 'post' ? (
             <Select label={t('compose.postIn')} value={communityId} onChange={(e) => setCommunityId(e.currentTarget.value)}>
               <option value="">{t('compose.myProfile')}</option>
               {communities.map((c) => (
@@ -1244,28 +1324,30 @@ function Create() {
               <Link href="/circles">{t(circles.length ? 'compose.manageCircles' : 'compose.makeCircle')}</Link>
             </p>
           ) : null}
-          {kind !== 'story' ? (
+          {kind !== 'story' && kind !== 'yap' ? (
             <TextField label={t('compose.topics')} hint={t('compose.topicsHint')} value={topics} onChange={(e) => setTopics(e.currentTarget.value)} />
           ) : null}
           {aiUsed ? <Checkbox label={t('compose.aiLabel')} checked readOnly disabled /> : null}
         </div>
 
-        <Button type="submit" size="lg" block loading={busy === 'publish'} disabled={blocked || !!busy}>
+        <Button type="submit" size="lg" block loading={busy === 'publish'} disabled={blocked || !!busy} data-testid={kind === 'yap' ? 'yap-post' : undefined}>
           {t(
-            kind === 'story'
-              ? visibility === 'close_friends'
-                ? 'compose.shareCloseFriends'
-                : 'm.create.shareStory'
-              : kind === 'reel'
-                ? remixOf
-                  ? remixMode === 'duet'
-                    ? 'compose.publishDuet'
-                    : 'compose.publishRemix'
-                  : 'm.create.publishReel'
-                : 'create.publish',
+            kind === 'yap'
+              ? 'voice.post'
+              : kind === 'story'
+                ? visibility === 'close_friends'
+                  ? 'compose.shareCloseFriends'
+                  : 'm.create.shareStory'
+                : kind === 'reel'
+                  ? remixOf
+                    ? remixMode === 'duet'
+                      ? 'compose.publishDuet'
+                      : 'compose.publishRemix'
+                    : 'm.create.publishReel'
+                  : 'create.publish',
           )}
         </Button>
-        {kind !== 'story' && !chainNow ? (
+        {kind !== 'story' && kind !== 'yap' && !chainNow ? (
           <div className="stack-sm">
             <div className="row">
               <Button variant="secondary" loading={busy === 'draft'} disabled={blocked || !!busy} onClick={() => keep('draft')}>
