@@ -7,6 +7,7 @@ import type { Post } from '../../../../packages/shared/src/types';
 import { client, errorMessage, isGone } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import { PostCard } from '../../lib/post';
+import { RadioButton } from '../../lib/radio';
 import { FeedSurfaceContext } from '../../lib/feed-events';
 import { useSession } from '../../lib/session';
 import { ColorChoice, MAX_SQUAD_MEMBERS, MemoryCard, PeoplePick, PhotoChoice, SquadCoverView } from '../../lib/squads';
@@ -239,6 +240,8 @@ export default function SquadScreen() {
               onPress={() => router.push({ pathname: '/chat/[id]', params: { id: s.conversationId! } })}
             />
           ) : null}
+          {/* The squad's Yaps, one after another. */}
+          <RadioButton station={{ kind: 'squad', key: s.id }} />
         </View>
 
         {s.memory ? <MemoryCard memory={s.memory} /> : null}

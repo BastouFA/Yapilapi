@@ -1225,6 +1225,7 @@ export const nl: Record<string, string> = {
   'You’ve added a lot of reels to chains today. Try again tomorrow.': 'Je hebt vandaag veel reels aan ketens toegevoegd. Probeer het morgen opnieuw.',
   // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
   'Near you is not enabled.': 'In je buurt staat niet aan.',
+  'Yap Radio is not enabled.': 'Yap Radio staat niet aan.',
   'Zoom in to see what’s here.': 'Zoom in om te zien wat hier is.',
   // Squads (lib/squads.ts, and where posts, stories, chats and chains meet them)
   "Squad doesn't exist or isn't visible to you.": 'Deze squad bestaat niet of je kunt hem niet zien.',

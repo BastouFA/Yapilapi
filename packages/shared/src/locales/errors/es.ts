@@ -1318,6 +1318,7 @@ export const es: Record<string, string> = {
   'You’ve added a lot of reels to chains today. Try again tomorrow.': 'Hoy añadiste muchos reels a cadenas. Inténtalo de nuevo mañana.',
   // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
   'Near you is not enabled.': 'Cerca de ti no está activado.',
+  'Yap Radio is not enabled.': 'Yap Radio no está activado.',
   'Zoom in to see what’s here.': 'Acerca el mapa para ver lo que hay aquí.',
   // Squads (lib/squads.ts, and where posts, stories, chats and chains meet them)
   "Squad doesn't exist or isn't visible to you.": 'Este squad no existe o no puedes verlo.',

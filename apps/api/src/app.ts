@@ -78,6 +78,7 @@ import squadsModule from './modules/squads.ts';
 import voiceModule from './modules/voice.ts';
 import cityMapModule from './modules/city-map.ts';
 import todayModule from './modules/today.ts';
+import radioModule from './modules/radio.ts';
 import tagsModule from './modules/tags.ts';
 import collabsModule from './modules/collabs.ts';
 import postCoversModule from './modules/post-covers.ts';
@@ -511,6 +512,7 @@ export async function buildApp(
     voiceModule,
     cityMapModule,
     todayModule,
+    radioModule,
     plusModule,
     invitesModule,
     growthModule,

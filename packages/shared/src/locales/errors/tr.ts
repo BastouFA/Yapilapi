@@ -1218,6 +1218,7 @@ export const tr: Record<string, string> = {
   'You’ve added a lot of reels to chains today. Try again tomorrow.': 'Bugün zincirlere çok sayıda reel ekledin. Yarın tekrar dene.',
   // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
   'Near you is not enabled.': 'Yakınında özelliği etkin değil.',
+  'Yap Radio is not enabled.': 'Yap Radyo etkin değil.',
   'Zoom in to see what’s here.': 'Burada ne olduğunu görmek için yakınlaştır.',
   // Squads (lib/squads.ts, and where posts, stories, chats and chains meet them)
   "Squad doesn't exist or isn't visible to you.": 'Bu ekip yok ya da onu göremiyorsun.',

@@ -170,6 +170,7 @@ export const FEED_EVENT_SURFACES = [
   'yaps',
   'squad',
   'place',
+  'radio',
 ] as const;
 export type FeedEventSurface = (typeof FEED_EVENT_SURFACES)[number];
 /**

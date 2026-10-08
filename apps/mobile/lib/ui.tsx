@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { HeaderHeightContext, NavigationContext } from 'expo-router/react-navigation';
-import { useCallback, useContext, useEffect, useId, useRef, useState, type ComponentProps, type ReactNode, type Ref } from 'react';
+import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ComponentProps, type ReactNode, type Ref } from 'react';
 import {
   AccessibilityInfo,
   ActivityIndicator,
@@ -69,9 +69,12 @@ export function useColors() {
   return palette(useColorScheme() === 'dark' ? 'dark' : 'light');
 }
 
+/** More height covered above the floating tab bar, by a bar shown over it (Yap Radio's player). */
+export const TabBarExtraSpace = createContext(0);
+
 /** Height the floating tab bar covers at the bottom of tab screens. */
 export function useTabBarSpace() {
-  return useSafeAreaInsets().bottom + 104;
+  return useSafeAreaInsets().bottom + 104 + useContext(TabBarExtraSpace);
 }
 
 export function Screen({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {

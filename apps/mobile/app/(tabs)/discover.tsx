@@ -11,6 +11,7 @@ import { ChainShelf } from '../../lib/chains';
 import { Chip, ChipRow, SectionHeader } from '../../lib/chips';
 import { useT } from '../../lib/i18n';
 import { PostCard } from '../../lib/post';
+import { useRadioOn } from '../../lib/radio';
 import { FeedSurfaceContext } from '../../lib/feed-events';
 import { clearRecent, forgetSearch, readRecent, rememberSearch } from '../../lib/recent-searches';
 import { radius, space } from '../../lib/theme';
@@ -74,6 +75,7 @@ export default function Wander() {
   const c = useColors();
   const { t, tp, number, dateTime, locale } = useT();
   const bottom = useTabBarSpace();
+  const radioOn = useRadioOn();
   const params = useLocalSearchParams<{ q?: string }>();
   const input = useRef<TextInput>(null);
   const [q, setQ] = useState(params.q ?? '');
@@ -206,6 +208,8 @@ export default function Wander() {
     { label: t('m.market.title'), icon: 'storefront-outline', href: '/market' },
     { label: t('map.title'), icon: 'map-outline', href: '/map' },
     { label: t('m.title.assistant'), icon: 'sparkles-outline', href: '/assistant' },
+    // Yap Radio: its stations, and Yaps one after another.
+    ...(radioOn ? [{ label: t('radio.title'), icon: 'radio-outline' as const, href: '/radio' }] : []),
   ];
 
   return (

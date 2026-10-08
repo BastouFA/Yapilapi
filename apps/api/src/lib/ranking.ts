@@ -145,8 +145,8 @@ export const RANKING = {
   sessionSize: 1500,
 } as const;
 
-/** 'yaps': For you with Yaps only (the Yaps filter on Pulse). */
-export type RankSurface = 'for_you' | 'reels' | 'yaps';
+/** 'yaps': For you with Yaps only (the Yaps filter on Pulse); 'radio': the same for Yap Radio's For you (modules/radio.ts). */
+export type RankSurface = 'for_you' | 'reels' | 'yaps' | 'radio';
 
 export interface RankOptions {
   userId: string;
@@ -379,7 +379,7 @@ function rankingSql(o: RankOptions, chains = false): { sql: string; params: unkn
   const C = RANKING.candidates;
   const reels = o.surface === 'reels';
   const at = '$2::timestamptz';
-  const fmt = reels ? `AND p.format = 'reel'` : o.surface === 'yaps' ? `AND p.format = 'yap'` : '';
+  const fmt = reels ? `AND p.format = 'reel'` : o.surface === 'yaps' || o.surface === 'radio' ? `AND p.format = 'yap'` : '';
   const live = `p.deleted_at IS NULL AND p.status = 'published' AND p.created_at <= ${at} ${fmt}`;
   const since = (n: number, unit = 'days') => `AND p.created_at > ${at} - interval '${n} ${unit}'`;
   const faded = (t: string) => fadedScoreSql(t, at);
@@ -685,7 +685,7 @@ export async function fairStartPicks(db: Q, o: RankOptions): Promise<FairPick[]>
        AND coalesce((SELECT a.score FROM user_creator_affinity a WHERE a.user_id = $1 AND a.author_id = p.author_id), 0) > -2
        AND p.moderation_status = 'normal' AND ${postVisibleSql('$1')} ${o.personal}
        -- Reels get fair-start reels, the Yaps filter fair-start Yaps, For you either.
-       ${reels ? `AND p.format = 'reel'` : o.surface === 'yaps' ? `AND p.format = 'yap'` : ''}
+       ${reels ? `AND p.format = 'reel'` : o.surface === 'yaps' || o.surface === 'radio' ? `AND p.format = 'yap'` : ''}
        AND ($3 OR NOT EXISTS (SELECT 1 FROM post_media pm JOIN media m ON m.id = pm.media_id WHERE pm.post_id = p.id AND m.moderation = 'sensitive'))
        ${o.reduced && !reels ? 'AND false' : ''}
      ORDER BY f.started_at LIMIT 100`,

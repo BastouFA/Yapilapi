@@ -63,5 +63,6 @@ export * from './squad-schemas.ts';
 export * from './city-map.ts';
 export * from './city-map-schemas.ts';
 export * from './voice.ts';
+export * from './radio.ts';
 export * from './voice-schemas.ts';
 export * from './today.ts';

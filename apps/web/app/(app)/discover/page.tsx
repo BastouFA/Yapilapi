@@ -130,6 +130,11 @@ function Discover() {
           <Link href="/assistant" className="yp-btn yp-btn--ghost yp-btn--sm">
             {t('m.title.assistant')}
           </Link>
+          {flags.YAPS !== false && flags.YAP_RADIO !== false ? (
+            <Link href="/radio" className="yp-btn yp-btn--ghost yp-btn--sm" data-testid="wander-radio">
+              <Icon name="volume" size={16} /> {t('radio.title')}
+            </Link>
+          ) : null}
           {flags.CITY_MAP !== false ? (
             <Link href="/map" className="yp-btn yp-btn--ghost yp-btn--sm" title={t('map.hint')}>
               <Icon name="map-pin" size={16} /> {t('map.title')}

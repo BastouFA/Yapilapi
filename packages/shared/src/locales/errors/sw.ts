@@ -1320,6 +1320,7 @@ export const sw: Record<string, string> = {
   'You’ve added a lot of reels to chains today. Try again tomorrow.': 'Umeongeza reel nyingi kwenye minyororo leo. Jaribu tena kesho.',
   // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
   'Near you is not enabled.': 'Karibu nawe haijawashwa.',
+  'Yap Radio is not enabled.': 'Yap Radio haijawashwa.',
   'Zoom in to see what’s here.': 'Kuza ili uone kilichopo hapa.',
   // Squads (lib/squads.ts, and where posts, stories, chats and chains meet them)
   "Squad doesn't exist or isn't visible to you.": 'Kikosi hiki hakipo au huwezi kukiona.',

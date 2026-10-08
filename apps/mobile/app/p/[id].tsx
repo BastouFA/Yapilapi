@@ -64,7 +64,8 @@ function forRow<T extends { id: string }>(value: T | null, x: Comment, th: Threa
  */
 export default function PostScreen() {
   // From Reels, `atMs` is where the viewer was: a new comment on the reel can point to that moment.
-  const { id, atMs: atParam } = useLocalSearchParams<{ id: string; atMs?: string }>();
+  // `reply=voice` (Yap Radio's "Reply by voice") opens the voice recorder under the box.
+  const { id, atMs: atParam, reply: replyParam } = useLocalSearchParams<{ id: string; atMs?: string; reply?: string }>();
   const momentMs = atParam !== undefined && /^\d+$/.test(atParam) ? Number(atParam) : null;
   const [pointAt, setPointAt] = useState(false);
   const c = useColors();
@@ -89,7 +90,7 @@ export default function PostScreen() {
   const [busy, setBusy] = useState(false);
   // Talk back: a voice reply recorded under the box (with the words in it, if any), and a new recorder after sending.
   const yapsOn = useFlag('YAPS') !== false;
-  const [talking, setTalking] = useState(false);
+  const [talking, setTalking] = useState(replyParam === 'voice');
   const [voice, setVoice] = useState<{ uri: string } | null>(null);
   const [voiceKey, setVoiceKey] = useState(0);
   const ac = useAutocomplete(body, setBody);

@@ -1305,6 +1305,7 @@ export const yo: Record<string, string> = {
   'You’ve added a lot of reels to chains today. Try again tomorrow.': 'O ti fi ọ̀pọ̀ reel kún àwọn ẹ̀wọ̀n lónìí. Gbìyànjú lẹ́ẹ̀kan sí i lọ́la.',
   // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
   'Near you is not enabled.': 'Nítòsí rẹ kò ṣiṣẹ́.',
+  'Yap Radio is not enabled.': 'A kò tíì tan Rédíò Yap.',
   'Zoom in to see what’s here.': 'Sún mọ́ láti rí ohun tó wà níbí.',
   // Squads (lib/squads.ts, and where posts, stories, chats and chains meet them)
   "Squad doesn't exist or isn't visible to you.": 'Squad yìí kò sí tàbí o kò lè rí i.',

@@ -10,6 +10,7 @@ import { normalizeTag } from '@yapilapi/shared';
 import { api, ApiError, errorMessage, isGone } from '@/lib/api';
 import { PostList } from '@/components/PostList';
 import { ScreenLoading } from '@/components/Loading';
+import { PlayAsRadio } from '@/components/Radio';
 import { useSession } from '../../../providers';
 
 // The story viewer opens full screen when a story is tapped, so it downloads then.
@@ -109,6 +110,7 @@ export default function TagPage() {
               {info.following ? t('m.tag.following') : t('m.tag.follow')}
             </Button>
           ) : null}
+          <PlayAsRadio station={{ kind: 'topics', key: tag }} />
           <Button variant="secondary" size="sm" icon="plus" onClick={() => router.push(`/create?text=${encodeURIComponent(`#${tag} `)}`)}>
             {t('tag.postWith', { tag })}
           </Button>

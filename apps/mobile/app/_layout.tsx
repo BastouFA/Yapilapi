@@ -15,6 +15,7 @@ import { YapPlayer } from '../lib/yaps';
 import { useNotificationLinks } from '../lib/links';
 import { OfflineBanner } from '../lib/offline';
 import { AccountMenuProvider } from '../lib/account-menu';
+import { RadioProvider } from '../lib/radio';
 import { loadAppearance } from '../lib/appearance';
 
 // A chosen Light or Dark appearance applies before the first screen draws.
@@ -151,6 +152,7 @@ function Screens() {
         <Stack.Screen name="mixes/index" options={{ title: t('mixes.title') }} />
         <Stack.Screen name="mixes/[id]" options={{ title: t('mixes.card.kind') }} />
         <Stack.Screen name="map" options={{ title: t('map.title') }} />
+        <Stack.Screen name="radio" options={{ title: t('radio.title') }} />
         <Stack.Screen name="market/index" options={{ title: t('m.market.title') }} />
         <Stack.Screen name="market/[id]" options={{ title: t('m.market.listing') }} />
         <Stack.Screen name="market/mine" options={{ title: t('m.market.yours') }} />
@@ -187,11 +189,14 @@ export default function Root() {
             <CallsProvider>
               <BoardsProvider>
                 <AccountMenuProvider>
-                  <Heartbeat />
-                  <Screens />
-                  <BirthDateGate />
-                  <YapPlayer />
-                  <OfflineBanner />
+                  {/* Yap Radio: one player that keeps going from screen to screen. */}
+                  <RadioProvider>
+                    <Heartbeat />
+                    <Screens />
+                    <BirthDateGate />
+                    <YapPlayer />
+                    <OfflineBanner />
+                  </RadioProvider>
                 </AccountMenuProvider>
               </BoardsProvider>
             </CallsProvider>

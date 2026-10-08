@@ -7,6 +7,7 @@ import type { Post } from '../../../../packages/shared/src/types';
 import { client, errorMessage, isGone } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import { PostCard } from '../../lib/post';
+import { RadioButton } from '../../lib/radio';
 import { FeedSurfaceContext, useFeedViewability } from '../../lib/feed-events';
 import { StoriesStrip, StoryViewer } from '../../lib/stories';
 import { useSession } from '../../lib/session';
@@ -139,6 +140,10 @@ export default function TagScreen() {
             }}
           />
         ) : null}
+        {/* The tag's Yaps, one after another. */}
+        <View style={{ alignSelf: 'flex-start' }}>
+          <RadioButton station={{ kind: 'topics', key: tag }} />
+        </View>
       </View>
       {info.related.length ? (
         // Wrapped rows sit space[4] apart so each 30pt chip's slop (8 up and down) reaches 44 without overlapping the next row.
