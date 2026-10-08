@@ -1,17 +1,16 @@
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { CHAIN_RULES, FAIR_START, type ChainJoin } from '../../../packages/shared/src/constants';
 import { fairStartLines, type Chain, type ChainRef, type FairStart } from '../../../packages/shared/src/pass-the-mic';
-import type { Post } from '../../../packages/shared/src/types';
+import type { Post, PublicUser } from '../../../packages/shared/src/types';
 import { client, errorMessage, mediaUrl } from './api';
 import { SectionHeader } from './chips';
 import { Chips } from './circles';
 import { useFlag } from './flags';
-import { FriendPicker, useFriends } from './friend-picker';
 import { useT } from './i18n';
 import { radius, space } from './theme';
-import { BottomSheet, Button, Card, Field, Icon, Notice, useColors, userText } from './ui';
+import { Avatar, BottomSheet, Button, Card, Field, Icon, Notice, useColors, userText } from './ui';
 
 /**
  * Pass the Mic on the phone (docs/product/pass-the-mic.md): what Reels, Create, the chain's page,
@@ -117,24 +116,59 @@ export function StartChainSheet({ post, onClose, onStarted }: { post: Post | nul
   );
 }
 
-/** Pass the mic: invite up to CHAIN_RULES.passesAtOnce friends to add the next reel. */
+type Suggestion = { user: PublicUser; relation: 'friend' | 'following' | null };
+
+/**
+ * Pass the mic: invite up to CHAIN_RULES.passesAtOnce people you follow or are friends with to add
+ * the next reel, like apps/web/components/PassTheMic.tsx. Before typing it offers your friends,
+ * people you follow and recent chats; each letter narrows it down. Anyone else is shown, with the
+ * reason, but can't be ticked. The server also skips anyone who can't take the mic, without saying
+ * who: the count tells how many it reached.
+ */
 export function PassMicSheet({ chainId, onClose, onPassed }: { chainId: string | null; onClose: () => void; onPassed: (passed: number) => void }) {
+  const c = useColors();
   const { t } = useT();
-  const friends = useFriends();
-  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [q, setQ] = useState('');
+  const [items, setItems] = useState<Suggestion[] | null>(null);
+  const [picked, setPicked] = useState<Suggestion[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const req = useRef(0);
+  const full = picked.length >= CHAIN_RULES.passesAtOnce;
   useEffect(() => {
     if (!chainId) return;
-    setPicked(new Set());
+    setQ('');
+    setPicked([]);
     setError(null);
   }, [chainId]);
+  useEffect(() => {
+    if (!chainId) return;
+    const n = ++req.current;
+    const timer = setTimeout(
+      () =>
+        void client()
+          .then((api) => api.people.suggest(q.trim().replace(/^@/, ''), 12))
+          .then(
+            (r) => n === req.current && setItems(r.items),
+            () => n === req.current && setItems((cur) => cur ?? []),
+          ),
+      q ? 150 : 0,
+    );
+    return () => clearTimeout(timer);
+  }, [chainId, q]);
+  // The people ticked stay at the top while the search changes.
+  const rows: Suggestion[] = [...picked, ...(items ?? []).filter((s) => !picked.some((p) => p.user.id === s.user.id))];
   const send = async () => {
-    if (!chainId || !picked.size) return;
+    if (!chainId || !picked.length) return;
     setBusy(true);
     setError(null);
     try {
-      const r = await (await client()).chains.pass(chainId, [...picked]);
+      const r = await (
+        await client()
+      ).chains.pass(
+        chainId,
+        picked.map((p) => p.user.id),
+      );
       onPassed(r.passed);
       onClose();
     } catch (e) {
@@ -145,17 +179,70 @@ export function PassMicSheet({ chainId, onClose, onPassed }: { chainId: string |
   };
   return (
     <BottomSheet visible={!!chainId} title={t('mic.pass')} subtitle={t('mic.pass.hint')} onClose={onClose}>
-      <FriendPicker
-        friends={friends}
-        picked={picked}
-        // Up to five at once: a sixth tick is left out.
-        onChange={(next) => next.size <= CHAIN_RULES.passesAtOnce && setPicked(next)}
-        empty={t('mic.pass.none')}
+      <Field
+        label={t('m.group.addPeople')}
+        placeholder={t('m.group.placeholder')}
+        value={q}
+        onChangeText={setQ}
+        autoCapitalize="none"
+        autoCorrect={false}
+        returnKeyType="search"
+        hint={full ? t('people.max', { count: CHAIN_RULES.passesAtOnce }) : undefined}
       />
+      {items === null ? (
+        <ActivityIndicator color={c.yapi} accessibilityLabel={t('common.loading')} style={{ paddingVertical: space[3] }} />
+      ) : !rows.length ? (
+        <Text accessibilityLiveRegion="polite" style={{ color: c.inkMuted, lineHeight: 20 }}>
+          {q.trim() ? t('m.group.noMatch', { query: q.trim() }) : t('mic.pass.followingOnly')}
+        </Text>
+      ) : (
+        <View style={{ gap: space[1] }}>
+          {rows.map((s) => {
+            const on = picked.some((p) => p.user.id === s.user.id);
+            const allowed = s.relation !== null;
+            const disabled = !on && (!allowed || full);
+            const meta = [
+              `@${s.user.username}`,
+              s.relation === 'friend' ? t('m.group.friend') : s.relation === 'following' ? t('m.group.following') : t('mic.pass.followingOnly'),
+            ].join(' · ');
+            return (
+              <Pressable
+                key={s.user.id}
+                accessibilityRole="checkbox"
+                accessibilityLabel={`${s.user.displayName}, ${meta}`}
+                accessibilityState={{ checked: on, disabled }}
+                disabled={disabled}
+                onPress={() => setPicked((cur) => (on ? cur.filter((p) => p.user.id !== s.user.id) : [...cur, s]))}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: space[3],
+                  minHeight: 52,
+                  paddingHorizontal: space[2],
+                  borderRadius: radius.md,
+                  opacity: disabled ? 0.5 : 1,
+                  backgroundColor: pressed ? c.surfaceSunken : 'transparent',
+                })}
+              >
+                <Avatar name={s.user.displayName} url={s.user.avatarUrl} size={36} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[{ color: c.ink, fontWeight: '600', fontSize: 15 }, userText]} numberOfLines={1}>
+                    {s.user.displayName}
+                  </Text>
+                  <Text style={[{ color: c.inkMuted, fontSize: 13 }, userText]} numberOfLines={2}>
+                    {meta}
+                  </Text>
+                </View>
+                {allowed ? <Icon name={on ? 'checkmark-circle' : 'ellipse-outline'} size={24} color={on ? c.yapi : c.inkMuted} /> : null}
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
       {error ? <Notice tone="danger">{error}</Notice> : null}
       <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: space[2] }}>
         <Button label={t('common.cancel')} variant="ghost" onPress={onClose} />
-        <Button label={t('mic.pass')} icon="mic-outline" disabled={busy || !picked.size} onPress={send} />
+        <Button label={t('mic.pass')} icon="mic-outline" disabled={busy || !picked.length} onPress={send} />
       </View>
     </BottomSheet>
   );

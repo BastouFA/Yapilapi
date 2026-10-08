@@ -115,7 +115,7 @@ export default function ChainScreen() {
           onPress={() => router.push({ pathname: '/reels', params: { start: chain.firstPostId! } })}
         />
       ) : null}
-      {me ? <Button label={t('mic.pass')} icon="paper-plane-outline" variant="secondary" onPress={() => setPassing(true)} /> : null}
+      {me && !chain.closed ? <Button label={t('mic.pass')} icon="paper-plane-outline" variant="secondary" onPress={() => setPassing(true)} /> : null}
       {chain.viewer.isStarter ? (
         <View style={{ gap: space[2] }}>
           <Button

@@ -173,7 +173,7 @@ export default function Create() {
   const [originalMissing, setOriginalMissing] = useState(false);
   // Pass the Mic: the chain this reel joins ("Take the mic"), or a new chain it starts (a prompt, and who can take the mic).
   const micOn = useFlag('PASS_THE_MIC') === true;
-  const [joining, setJoining] = useState<{ id: string; prompt: string } | null>(null);
+  const [joining, setJoining] = useState<{ id: string; prompt: string; closed: boolean } | null>(null);
   const [starting, setStarting] = useState(false);
   const [chainPrompt, setChainPrompt] = useState('');
   const [chainJoin, setChainJoin] = useState<ChainJoin | null>(null);
@@ -310,7 +310,7 @@ export default function Create() {
     client()
       .then(async (api) => {
         const { chain } = await api.chains.get(id);
-        setJoining({ id: chain.id, prompt: chain.prompt });
+        setJoining({ id: chain.id, prompt: chain.prompt, closed: chain.closed });
         // Joining a chain is sharing it with people: a reel for everyone, followers or friends.
         setVisibility((v) => (v === 'public' || v === 'followers' || v === 'friends' ? v : 'public'));
         setKeptAudience(null);
@@ -871,6 +871,7 @@ export default function Create() {
         {kind === 'reel' && joining && chainable ? (
           <Notice title={t('mic.title')}>
             <Text style={[{ color: c.ink, lineHeight: 20 }, userText]}>{t('mic.joining', { prompt: joining.prompt })}</Text>
+            <Text style={{ color: c.inkMuted, fontSize: 14, lineHeight: 20 }}>{t(joining.closed ? 'mic.closed' : 'mic.mention')}</Text>
             <Button
               label={t('m.common.remove')}
               variant="secondary"
@@ -1270,6 +1271,7 @@ export default function Create() {
                     value={chainPrompt}
                     onChangeText={setChainPrompt}
                     maxLength={CHAIN_RULES.promptMax}
+                    hint={t('mic.mention')}
                   />
                   <JoinChoice value={chainJoin} onChange={setChainJoin} />
                 </>

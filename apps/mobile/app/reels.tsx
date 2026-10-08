@@ -2212,7 +2212,7 @@ function OptionsSheet({
           {post.downloadable ? <SheetItem icon="download-outline" label={t('share.video.download')} onPress={done(() => onDownload(post))} /> : null}
           {mic && post.chain ? (
             <>
-              <SheetItem icon="paper-plane-outline" label={t('mic.pass')} onPress={() => onPassMic(post)} />
+              {!post.chain.closed ? <SheetItem icon="paper-plane-outline" label={t('mic.pass')} onPress={() => onPassMic(post)} /> : null}
               {post.chain.isStarter ? (
                 <>
                   <SheetItem
