@@ -32,3 +32,5 @@ apps/yap/android/
 # Store credentials for `eas submit` (never commit them)
 apps/mobile/secrets/
 apps/yap/secrets/
+# Vercel CLI link (the website is hosted on Vercel)
+.vercel
