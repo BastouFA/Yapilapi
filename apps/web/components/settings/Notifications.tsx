@@ -275,7 +275,7 @@ export function TodaySettingsCard() {
   return (
     <Anchor id="today">
       <Card title={t('today.title')} subtitle={t('today.settings.desc')}>
-        <div className="stack-sm">
+        <div className="stack">
           <Switch label={t('today.settings.enabled')} checked={settings.enabled} onChange={(v) => void save({ enabled: v })} />
           <Select
             label={t('today.settings.hour')}

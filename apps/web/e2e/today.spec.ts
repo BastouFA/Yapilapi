@@ -47,7 +47,7 @@ async function account(ctx: APIRequestContext, name: string) {
 
 test('the Today card plays its segments, offers the original Yap and can put one away', async ({ page, baseURL }, info) => {
   const flags = await (await page.request.get('/api/v1/flags')).json();
-  test.skip(!flags.today, 'needs a model (e2e/today-stub.mjs)');
+  test.skip(!flags.today || !flags.voiceListen, 'needs a model and a voice (e2e/today-stub.mjs)');
 
   const tag = `${info.project.name.startsWith('mobile') ? 'm' : 'd'}${info.project.name.endsWith('dark') ? 'k' : 'l'}`;
   const ada = await account(page.request, `ada${tag}`);

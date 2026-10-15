@@ -45,6 +45,19 @@ const feedIds = async (u: TestUser, url = '/v1/feed?mode=for_you&limit=50') => {
   expect(r.status).toBe(200);
   return (r.body.items as { id: string }[]).map((p) => p.id);
 };
+/** Every page of a viewer's For you (up to `pages`): other test files leave plenty of fresh posts in the shared database. */
+const allFeedIds = async (u: TestUser, pages = 6) => {
+  const ids: string[] = [];
+  let cursor: string | null = null;
+  for (let i = 0; i < pages; i++) {
+    const r = await as(t.app, u).get(`/v1/feed?mode=for_you&limit=50${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
+    expect(r.status).toBe(200);
+    ids.push(...(r.body.items as { id: string }[]).map((p) => p.id));
+    cursor = r.body.nextCursor;
+    if (!cursor) break;
+  }
+  return ids;
+};
 
 describe('feed events', () => {
   it('are checked, count impressions once per half hour, cap times and ignore posts you cannot see', async () => {
@@ -200,14 +213,14 @@ describe('what you already saw', () => {
     await as(t.app, viewer).post(`/v1/users/${author.id}/follow`);
     const p = await publish(author, 'Seen it');
     await db().query(`UPDATE posts SET created_at = now() - interval '2 days' WHERE id = $1`, [p]);
-    expect(await feedIds(viewer)).toContain(p);
+    expect(await allFeedIds(viewer)).toContain(p);
     await events(viewer, [{ postId: p, kind: 'impression' }]);
-    expect(await feedIds(viewer)).not.toContain(p);
+    expect(await allFeedIds(viewer)).not.toContain(p);
     // Seen in Following is not seen in For you.
     const q = await publish(author, 'Seen elsewhere');
     await db().query(`UPDATE posts SET created_at = now() - interval '2 days' WHERE id = $1`, [q]);
     await events(viewer, [{ postId: q, surface: 'following', kind: 'impression' }]);
-    expect(await feedIds(viewer)).toContain(q);
+    expect(await allFeedIds(viewer)).toContain(q);
   });
 
   it("doesn't show a reel you finished for a week", async () => {
