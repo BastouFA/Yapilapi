@@ -37,7 +37,14 @@ export const metadata: Metadata = {
   // "Add to Home Screen" installs YAPILAPI with its own icon (Yap mode has its own: app/(app)/yap/layout.tsx).
   manifest: '/manifest.webmanifest',
   appleWebApp: { capable: true, title: 'YAPILAPI', statusBarStyle: 'default' },
-  icons: { apple: '/yapilapi-icon-180.png' },
+  // Declared in full: setting only `apple` here would stop Next from adding the tab icon from app/icon.svg.
+  icons: {
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/yapilapi-icon-192.png', sizes: '192x192', type: 'image/png' },
+    ],
+    apple: '/yapilapi-icon-180.png',
+  },
   openGraph: { siteName: 'YAPILAPI', type: 'website', title: 'YAPILAPI: the social network you speak', description: SITE_DESCRIPTION },
   twitter: { card: 'summary_large_image', title: 'YAPILAPI: the social network you speak', description: SITE_DESCRIPTION },
 };
