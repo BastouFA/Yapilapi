@@ -68,6 +68,7 @@ const yapBleed = tile(yapMark(), false);
 writeFileSync(web('app/icon.svg'), yapilapiRounded);
 writeFileSync(web('public/mark.svg'), yapilapiRounded);
 writeFileSync(web('public/yap-icon.svg'), yapRounded);
+await favicon(yapilapiRounded, web('app/favicon.ico'));
 for (const size of [180, 192, 512]) {
   await png(yapilapiBleed, size, web(`public/yapilapi-icon-${size}.png`));
   await png(yapBleed, size, web(`public/yap-icon-${size}.png`));
@@ -84,6 +85,27 @@ for (const [file, mark, bleed, rounded] of [
   await png(foreground(mark), 1024, file('adaptive-icon.png'));
   await png(background, 1024, file('adaptive-background.png'));
   await png(rounded, 1024, file('splash-icon.png'));
+}
+
+/** favicon.ico for browsers that ask for it before reading the page: 16, 32 and 48 px PNGs in one ICO file. */
+async function favicon(svg: string, file: string) {
+  const sizes = [16, 32, 48];
+  const images = await Promise.all(sizes.map((s) => sharp(Buffer.from(svg), { density: 384 }).resize(s, s).png().toBuffer()));
+  const header = Buffer.alloc(6 + 16 * sizes.length);
+  header.writeUInt16LE(1, 2);
+  header.writeUInt16LE(sizes.length, 4);
+  let offset = header.length;
+  sizes.forEach((s, i) => {
+    const at = 6 + 16 * i;
+    header.writeUInt8(s, at);
+    header.writeUInt8(s, at + 1);
+    header.writeUInt16LE(1, at + 4);
+    header.writeUInt16LE(32, at + 6);
+    header.writeUInt32LE(images[i]!.length, at + 8);
+    header.writeUInt32LE(offset, at + 12);
+    offset += images[i]!.length;
+  });
+  writeFileSync(file, Buffer.concat([header, ...images]));
 }
 
 console.log('icons written');

@@ -7,7 +7,13 @@ export const metadata: Metadata = {
   title: { default: 'Yap', template: '%s · Yap' },
   manifest: '/yap.webmanifest',
   appleWebApp: { capable: true, title: 'Yap', statusBarStyle: 'default' },
-  icons: { apple: '/yap-icon-180.png' },
+  icons: {
+    icon: [
+      { url: '/yap-icon.svg', type: 'image/svg+xml' },
+      { url: '/yap-icon-192.png', sizes: '192x192', type: 'image/png' },
+    ],
+    apple: '/yap-icon-180.png',
+  },
 };
 
 export const viewport: Viewport = {
