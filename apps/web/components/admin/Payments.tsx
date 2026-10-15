@@ -9,7 +9,10 @@ import { useSession } from '@/app/providers';
 import { api } from '@/lib/api';
 import { formatCount, LoadFailed, Loading, PeriodChoice, useLoad } from './shared';
 
-/** Money in over 7, 30 or 90 days: orders by status, payments by provider, refunds, and the newest orders. */
+/**
+ * Money in over 7, 30 or 90 days: what YAPILAPI kept, what creators are owed now, orders by status, payments by
+ * provider, refunds, and the newest orders.
+ */
 export function Payments() {
   const { t, locale } = useSession();
   const [days, setDays] = useState<AdminPeriod>(30);
@@ -23,6 +26,23 @@ export function Payments() {
         <Loading />
       ) : (
         <>
+          <Card title={t('admin.payments.kept')} subtitle={t('admin.payments.keptHint')}>
+            <Figures
+              label={t('admin.payments.kept')}
+              columns={[t('admin.payments.fees'), t('admin.payments.plus'), t('admin.payments.ads'), t('admin.payments.processing'), t('admin.payments.net')]}
+              rows={data.income.map((r) => ({
+                currency: r.currency,
+                cells: [r.feesCents, r.plusCents, r.adsCents, r.processingCents ? -r.processingCents : 0, r.netCents],
+              }))}
+            />
+          </Card>
+          <Card title={t('admin.payments.owed')} subtitle={t('admin.payments.owedHint')}>
+            <Figures
+              label={t('admin.payments.owed')}
+              columns={[t('admin.payments.held'), t('admin.payments.available'), t('admin.payments.inFlight'), t('admin.payments.paidOut')]}
+              rows={data.owed.map((r) => ({ currency: r.currency, cells: [r.heldCents, r.availableCents, r.inFlightCents, r.paidOutCents] }))}
+            />
+          </Card>
           <Card title={t('admin.payments.byStatus')}>
             <MoneyTable
               rows={data.byStatus.map((r) => ({ key: `${r.status}-${r.currency}`, label: r.status.replace(/_/g, ' '), ...r }))}
@@ -106,6 +126,38 @@ function MoneyTable({ rows, label }: { rows: (AdminMoney & { key: string; label:
               <td>{r.currency}</td>
               <td style={{ fontVariantNumeric: 'tabular-nums' }}>{formatCount(r.count, locale)}</td>
               <td style={{ fontVariantNumeric: 'tabular-nums' }}>{formatMoney(r.cents, r.currency, locale)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** Amounts per currency, one column each; the last column is the one that matters, so it's bold. */
+function Figures({ label, columns, rows }: { label: string; columns: string[]; rows: { currency: string; cells: number[] }[] }) {
+  const { t, locale } = useSession();
+  if (!rows.length) return <EmptyState title={t('admin.payments.none')} />;
+  return (
+    <div className="table-wrap" tabIndex={0} role="region" aria-label={label}>
+      <table className="table">
+        <thead>
+          <tr>
+            <th>{t('admin.payments.currency')}</th>
+            {columns.map((c) => (
+              <th key={c}>{c}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.currency}>
+              <td>{r.currency}</td>
+              {r.cells.map((cents, i) => (
+                <td key={columns[i]} style={{ fontVariantNumeric: 'tabular-nums', fontWeight: i === r.cells.length - 1 ? 700 : undefined }}>
+                  {formatMoney(cents, r.currency, locale)}
+                </td>
+              ))}
             </tr>
           ))}
         </tbody>

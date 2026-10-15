@@ -1,10 +1,19 @@
 import type { FastifyInstance } from 'fastify';
-import { ADMIN_CONTENT_KINDS, ADMIN_PERIODS, ANNOUNCEMENT_BODY_MAX, ANNOUNCEMENT_TITLE_MAX, type AdminContentKind } from '@yapilapi/shared';
+import {
+  ADMIN_CONTENT_KINDS,
+  ADMIN_PERIODS,
+  ANNOUNCEMENT_BODY_MAX,
+  ANNOUNCEMENT_TITLE_MAX,
+  EARNINGS_HOLD_DAYS,
+  processingFeeCents,
+  type AdminContentKind,
+} from '@yapilapi/shared';
 import { z } from 'zod';
 import { badRequest, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { decodeCursor, encodeCursor } from '../lib/cursor.ts';
 import { audit, securityEvent } from '../lib/services.ts';
+import { sellerFeesSql } from '../lib/checkout.ts';
 import { me, requireAuth, requireRole } from '../plugins/auth.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
@@ -580,7 +589,7 @@ export default async function adminModule(app: FastifyInstance, ctx: AppContext)
   app.get('/v1/admin/payments', admin, async (req) => {
     const { days } = parse(periodQuery, req.query);
     const since = `now() - make_interval(days => $1::int)`;
-    const [byStatus, byProvider, refunds, recent] = await Promise.all([
+    const [byStatus, byProvider, refunds, recent, kept, ads, ownOrders, earned, payouts] = await Promise.all([
       db.query(`SELECT status, currency, count(*) AS n, sum(total_cents) AS cents FROM orders WHERE created_at >= ${since} GROUP BY 1, 2 ORDER BY 1, 2`, [
         days,
       ]),
@@ -603,12 +612,71 @@ export default async function adminModule(app: FastifyInstance, ctx: AppContext)
          WHERE o.created_at >= ${since} ORDER BY o.created_at DESC LIMIT 50`,
         [days],
       ),
+      // What the platform keeps from payments made in the period: its 5% of creators' sales, tips and
+      // subscriptions (their processing is theirs), and all of Plus.
+      db.query(
+        `SELECT currency,
+                coalesce(sum(platform_fee_cents) FILTER (WHERE purpose IN ('products', 'booking', 'subscription', 'tip')), 0) AS fees,
+                coalesce(sum(total_cents) FILTER (WHERE purpose = 'plus'), 0) AS plus
+         FROM orders WHERE status = 'paid' AND paid_at >= ${since} GROUP BY 1`,
+        [days],
+      ),
+      // Ad budgets earn as they're spent: each impression costs its campaign's price per thousand.
+      db.query(
+        `SELECT c.currency, round(sum(c.cpm_cents) / 1000.0) AS cents FROM ad_events e JOIN ad_campaigns c ON c.id = e.campaign_id
+         WHERE e.kind = 'impression' AND e.created_at >= ${since} GROUP BY 1`,
+        [days],
+      ),
+      // Payments the platform keeps whole pay their own processing.
+      db.query(`SELECT currency, total_cents FROM orders WHERE status = 'paid' AND purpose IN ('plus', 'ad_budget') AND paid_at >= ${since}`, [days]),
+      // What creators have earned, now: everything paid less fees, and the part still held after each sale.
+      db.query(
+        `SELECT currency, sum(net) AS net, coalesce(sum(net) FILTER (WHERE held), 0) AS held FROM (
+           SELECT o.currency, oi.quantity * oi.unit_cents - ${sellerFeesSql} AS net, o.paid_at > now() - make_interval(days => $1::int) AS held
+           FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE o.status = 'paid'
+           UNION ALL
+           SELECT currency, total_cents - platform_fee_cents - processing_fee_cents, paid_at > now() - make_interval(days => $1::int)
+           FROM orders WHERE status = 'paid' AND purpose IN ('subscription', 'tip') AND payee_id IS NOT NULL
+         ) x GROUP BY 1`,
+        [EARNINGS_HOLD_DAYS],
+      ),
+      db.query(
+        `SELECT currency, coalesce(sum(amount_cents) FILTER (WHERE status = 'paid'), 0) AS paid,
+                coalesce(sum(amount_cents) FILTER (WHERE status IN ('pending', 'verified', 'processing')), 0) AS in_flight
+         FROM payouts GROUP BY 1`,
+      ),
     ]);
+    const cur = (c: unknown) => String(c).trim();
+    const income = new Map<string, { currency: string; feesCents: number; plusCents: number; adsCents: number; processingCents: number; netCents: number }>();
+    const line = (currency: string) => {
+      if (!income.has(currency)) income.set(currency, { currency, feesCents: 0, plusCents: 0, adsCents: 0, processingCents: 0, netCents: 0 });
+      return income.get(currency)!;
+    };
+    for (const r of kept.rows) Object.assign(line(cur(r.currency)), { feesCents: Number(r.fees), plusCents: Number(r.plus) });
+    for (const r of ads.rows) line(cur(r.currency)).adsCents = Number(r.cents);
+    for (const r of ownOrders.rows) line(cur(r.currency)).processingCents += processingFeeCents(r.total_cents, cur(r.currency));
+    for (const l of income.values()) l.netCents = l.feesCents + l.plusCents + l.adsCents - l.processingCents;
+    const owed = new Map<string, { currency: string; heldCents: number; availableCents: number; inFlightCents: number; paidOutCents: number }>();
+    const owe = (currency: string) => {
+      if (!owed.has(currency)) owed.set(currency, { currency, heldCents: 0, availableCents: 0, inFlightCents: 0, paidOutCents: 0 });
+      return owed.get(currency)!;
+    };
+    for (const r of earned.rows) Object.assign(owe(cur(r.currency)), { heldCents: Number(r.held), availableCents: Number(r.net) - Number(r.held) });
+    for (const r of payouts.rows) {
+      const o = owe(cur(r.currency));
+      o.inFlightCents = Number(r.in_flight);
+      o.paidOutCents = Number(r.paid);
+      o.availableCents -= Number(r.in_flight) + Number(r.paid);
+    }
     return {
       days,
       byStatus: byStatus.rows.map((r) => ({ status: r.status, ...money(r) })),
       byProvider: byProvider.rows.map((r) => ({ provider: r.provider, status: r.status, ...money(r) })),
       refunds: refunds.rows.map((r) => ({ status: r.status, ...money(r) })),
+      /** What the platform kept in the period, per currency, after the processing it pays itself. */
+      income: [...income.values()].sort((a, b) => a.currency.localeCompare(b.currency)),
+      /** What creators are owed now: held after recent sales, theirs to ask for, being paid, and paid out so far. */
+      owed: [...owed.values()].sort((a, b) => a.currency.localeCompare(b.currency)),
       recent: recent.rows.map((r) => ({
         id: r.id,
         status: r.status,

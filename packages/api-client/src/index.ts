@@ -2575,6 +2575,10 @@ export interface AdminPayments {
   byStatus: (AdminMoney & { status: string })[];
   byProvider: (AdminMoney & { provider: string; status: string })[];
   refunds: (AdminMoney & { status: string })[];
+  /** What the platform kept in the period, per currency: its fees, Plus, ad spend, less the processing it pays itself. */
+  income: { currency: string; feesCents: number; plusCents: number; adsCents: number; processingCents: number; netCents: number }[];
+  /** What creators are owed now, per currency. */
+  owed: { currency: string; heldCents: number; availableCents: number; inFlightCents: number; paidOutCents: number }[];
   recent: {
     id: string;
     status: string;

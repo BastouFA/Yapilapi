@@ -323,6 +323,35 @@ describe('payments and the audit log', () => {
     expect((await as(t.app, admin).get('/v1/admin/payments?days=5')).status).toBe(400);
   });
 
+  it('says what the platform kept and what creators are owed', async () => {
+    const zar = async () => {
+      const r = (await as(t.app, admin).get('/v1/admin/payments?days=30')).body;
+      const income = r.income.find((x: any) => x.currency === 'ZAR') ?? { feesCents: 0, plusCents: 0, processingCents: 0, netCents: 0 };
+      const owed = r.owed.find((x: any) => x.currency === 'ZAR') ?? { heldCents: 0, availableCents: 0, inFlightCents: 0 };
+      return { income, owed };
+    };
+    const before = await zar();
+    const buyer = await signUp(t.app);
+    const key = () => `admin-money-${Math.random().toString(36).slice(2)}`;
+    // A R200 tip just paid (its R10 fee kept, its R6.80 processing paid by the creator), and R100 of Plus.
+    await db().query(
+      `INSERT INTO orders (buyer_id, status, total_cents, platform_fee_cents, processing_fee_cents, currency, idempotency_key, purpose, payee_id, paid_at)
+       VALUES ($1, 'paid', 20000, 1000, 680, 'ZAR', $3, 'tip', $2, now()), ($1, 'paid', 10000, 10000, 0, 'ZAR', $4, 'plus', NULL, now())`,
+      [buyer.id, person.id, key(), key()],
+    );
+    await db().query(`INSERT INTO payouts (user_id, amount_cents, currency) VALUES ($1, 5000, 'ZAR')`, [person.id]);
+    const after = await zar();
+    // Plus pays its own processing: 2.9% + R1.
+    expect(after.income.feesCents - before.income.feesCents).toBe(1000);
+    expect(after.income.plusCents - before.income.plusCents).toBe(10000);
+    expect(after.income.processingCents - before.income.processingCents).toBe(390);
+    expect(after.income.netCents - before.income.netCents).toBe(1000 + 10000 - 390);
+    // The creator's R183.20 is held for a week; the payout being asked for comes out of what's free.
+    expect(after.owed.heldCents - before.owed.heldCents).toBe(18320);
+    expect(after.owed.inFlightCents - before.owed.inFlightCents).toBe(5000);
+    expect(after.owed.availableCents - before.owed.availableCents).toBe(-5000);
+  });
+
   it('filters by action, actor, entity and date, a page at a time', async () => {
     const u = await signUp(t.app);
     await as(t.app, admin).put(`/v1/admin/users/${u.id}/role`, { role: 'moderator' });
