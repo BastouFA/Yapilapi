@@ -239,9 +239,9 @@ services:
 
   - type: web
     name: yapilapi-web
-    domains:
-      - yapilapi.com
-      - www.yapilapi.com
+    # yapilapi.com and www are served by Vercel now (project yapilapi-web, team afriqora; free and it
+    # never sleeps). This service stays as a fallback at yapilapi-web.onrender.com; with no traffic it
+    # sleeps and uses none of the 750 free hours the always-awake API needs.
     runtime: docker
     dockerfilePath: infrastructure/docker/web.Dockerfile
     dockerContext: .
