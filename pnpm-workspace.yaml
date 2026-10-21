@@ -17,5 +17,7 @@ minimumReleaseAgeExclude:
 overrides:
   tinypool: 2.1.2
   source-map-js: 1.2.2
+  # Vitest's dev server (tests only): launch-editor advisory, fixed in vite 7.3.7.
+  vite: 7.3.7
   # Image processing (the API's and Next's): GHSA-wq5f-xc86-pv6w.
   sharp: 0.35.5
