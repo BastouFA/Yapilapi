@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { badRequest, forbidden, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { earnings } from '../lib/earnings.ts';
+import { payoutRisks } from '../lib/payout-risk.ts';
 import { failPayout, PAYOUT_SEND_JOB, payoutAccountFor, sendPayout } from '../lib/payouts.ts';
 import { audit } from '../lib/services.ts';
 import { assertAdultForMoney } from '../lib/users.ts';
@@ -208,6 +209,8 @@ export default async function payoutsModule(app: FastifyInstance, ctx: AppContex
         available_cents: balances.get(r.user_id)!.find((b) => b.currency === currency)?.availableCents ?? 0,
         account_ready: !!account?.ready,
         account_label: account?.label ?? null,
+        // Signs it deserves a closer look (lib/payout-risk.ts); only worth working out for ones still to decide.
+        risks: r.status === 'pending' ? await payoutRisks(db, r.user_id, account?.id ?? null) : [],
       });
     }
     return { items };

@@ -6265,6 +6265,12 @@ export const zu: Catalog = {
   'admin.payouts.approve': 'Gunyaza futhi uthumele',
   'admin.payouts.reject': 'Nqaba',
   'admin.payouts.reason': 'Isizathu (umdali uyasibona)',
+  'admin.payouts.risk.new_account': 'I-akhawunti entsha (ngaphansi kwezinsuku ezingu-14)',
+  'admin.payouts.risk.new_payout_account': 'I-akhawunti yezinkokhelo isanda kushintshwa',
+  'admin.payouts.risk.one_buyer': 'Iningi lemali eyenziwe livela kumthengi oyedwa',
+  'admin.payouts.risk.new_buyers': 'Iningi lemali eyenziwe livela kubathengi abasha',
+  'admin.payouts.risk.refunds': 'Ukubuyiselwa kwemali noma izingxabano eziningi',
+  'admin.payouts.risk.first_payout': 'Inkokhelo yokuqala',
   'admin.purchases.title': 'Ukuthenga ku-app yefoni',
   'admin.purchases.subtitle':
     'Izinto zedijithali kuma-app e-iPhone ne-Android. Imikhiqizo ephathekayo, amasevisi namathikithi emicimbi kuhlala kunokukhokha kwakho, futhi ukukhokha kwewebhu kuhlala kusebenza.',

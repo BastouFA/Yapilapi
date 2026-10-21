@@ -6264,6 +6264,12 @@ export const fr: Catalog = {
   'admin.payouts.approve': 'Approuver et envoyer',
   'admin.payouts.reject': 'Refuser',
   'admin.payouts.reason': 'Motif (la personne le verra)',
+  'admin.payouts.risk.new_account': 'Compte récent (moins de 14 jours)',
+  'admin.payouts.risk.new_payout_account': 'Compte de versement tout juste modifié',
+  'admin.payouts.risk.one_buyer': 'Revenus surtout d’un seul acheteur',
+  'admin.payouts.risk.new_buyers': 'Revenus surtout de tout nouveaux acheteurs',
+  'admin.payouts.risk.refunds': 'Beaucoup de remboursements ou de litiges',
+  'admin.payouts.risk.first_payout': 'Premier versement',
   'admin.purchases.title': 'Achats dans les applis mobiles',
   'admin.purchases.subtitle':
     'Biens numériques dans les applis iPhone et Android. Les produits physiques, services et billets d’événements gardent toujours leur paiement, et le paiement sur le web fonctionne toujours.',

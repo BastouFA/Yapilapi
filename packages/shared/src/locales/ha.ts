@@ -6244,6 +6244,12 @@ export const ha: Catalog = {
   'admin.payouts.approve': 'Amince ka tura',
   'admin.payouts.reject': 'Ƙi',
   'admin.payouts.reason': 'Dalili (mai ƙirƙira zai gani)',
+  'admin.payouts.risk.new_account': 'Sabon asusu (ƙasa da kwana 14)',
+  'admin.payouts.risk.new_payout_account': 'An canza asusun biyan kuɗi yanzu',
+  'admin.payouts.risk.one_buyer': 'Yawancin kuɗin shiga daga mai saya ɗaya',
+  'admin.payouts.risk.new_buyers': 'Yawancin kuɗin shiga daga sababbin masu saya',
+  'admin.payouts.risk.refunds': 'Mayar da kuɗi ko jayayya da yawa',
+  'admin.payouts.risk.first_payout': 'Biyan kuɗi na farko',
   'admin.purchases.title': 'Sayayya a manhajojin waya',
   'admin.purchases.subtitle':
     'Kayayyakin dijital a manhajojin iPhone da Android. Kayayyakin zahiri, ayyuka da tikitin taruka suna riƙe da hanyar biyansu koyaushe, kuma biyan kuɗi a yanar gizo yana aiki koyaushe.',

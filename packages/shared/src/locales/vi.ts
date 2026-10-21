@@ -6230,6 +6230,12 @@ export const vi: Catalog = {
   'admin.payouts.approve': 'Duyệt và gửi',
   'admin.payouts.reject': 'Từ chối',
   'admin.payouts.reason': 'Lý do (nhà sáng tạo sẽ thấy)',
+  'admin.payouts.risk.new_account': 'Tài khoản mới (dưới 14 ngày)',
+  'admin.payouts.risk.new_payout_account': 'Vừa đổi tài khoản nhận chi trả',
+  'admin.payouts.risk.one_buyer': 'Phần lớn thu nhập từ một người mua',
+  'admin.payouts.risk.new_buyers': 'Phần lớn thu nhập từ người mua hoàn toàn mới',
+  'admin.payouts.risk.refunds': 'Nhiều lần hoàn tiền hoặc tranh chấp',
+  'admin.payouts.risk.first_payout': 'Lần chi trả đầu tiên',
   'admin.purchases.title': 'Mua hàng trong ứng dụng điện thoại',
   'admin.purchases.subtitle':
     'Hàng hóa kỹ thuật số trong ứng dụng iPhone và Android. Sản phẩm vật lý, dịch vụ và vé sự kiện luôn giữ trang thanh toán của chúng, và trang thanh toán trên web luôn hoạt động.',

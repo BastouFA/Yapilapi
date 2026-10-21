@@ -6249,6 +6249,12 @@ export const nl: Catalog = {
   'admin.payouts.approve': 'Goedkeuren en versturen',
   'admin.payouts.reject': 'Afwijzen',
   'admin.payouts.reason': 'Reden (de maker ziet dit)',
+  'admin.payouts.risk.new_account': 'Nieuw account (korter dan 14 dagen)',
+  'admin.payouts.risk.new_payout_account': 'Uitbetalingsaccount net gewijzigd',
+  'admin.payouts.risk.one_buyer': 'Inkomsten vooral van één koper',
+  'admin.payouts.risk.new_buyers': 'Inkomsten vooral van gloednieuwe kopers',
+  'admin.payouts.risk.refunds': 'Veel terugbetalingen of geschillen',
+  'admin.payouts.risk.first_payout': 'Eerste uitbetaling',
   'admin.purchases.title': 'Aankopen in de telefoonapp',
   'admin.purchases.subtitle':
     'Digitale producten in de iPhone- en Android-apps. Fysieke producten, diensten en evenementtickets houden altijd hun eigen afrekenen, en afrekenen op het web werkt altijd.',

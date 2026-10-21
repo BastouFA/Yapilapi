@@ -6227,6 +6227,12 @@ export const ur: Catalog = {
   'admin.payouts.approve': 'منظور کریں اور بھیجیں',
   'admin.payouts.reject': 'انکار کریں',
   'admin.payouts.reason': 'وجہ (تخلیق کار اسے دیکھتا ہے)',
+  'admin.payouts.risk.new_account': 'نیا اکاؤنٹ (14 دن سے کم)',
+  'admin.payouts.risk.new_payout_account': 'ادائیگی کا اکاؤنٹ ابھی بدلا گیا',
+  'admin.payouts.risk.one_buyer': 'زیادہ تر آمدنی ایک ہی خریدار سے',
+  'admin.payouts.risk.new_buyers': 'زیادہ تر آمدنی بالکل نئے خریداروں سے',
+  'admin.payouts.risk.refunds': 'بہت سی رقم کی واپسیاں یا تنازعات',
+  'admin.payouts.risk.first_payout': 'پہلی ادائیگی',
   'admin.purchases.title': 'فون ایپ کی خریداریاں',
   'admin.purchases.subtitle':
     'iPhone اور Android ایپس میں ڈیجیٹل اشیاء۔ مادی مصنوعات، خدمات اور ایونٹ ٹکٹس کا چیک آؤٹ ہمیشہ برقرار رہتا ہے، اور ویب چیک آؤٹ ہمیشہ کام کرتا ہے۔',

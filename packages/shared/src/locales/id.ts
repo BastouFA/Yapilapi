@@ -6261,6 +6261,12 @@ export const id: Catalog = {
   'admin.payouts.approve': 'Setujui dan kirim',
   'admin.payouts.reject': 'Tolak',
   'admin.payouts.reason': 'Alasan (dilihat oleh kreator)',
+  'admin.payouts.risk.new_account': 'Akun baru (kurang dari 14 hari)',
+  'admin.payouts.risk.new_payout_account': 'Rekening pencairan dana baru saja diubah',
+  'admin.payouts.risk.one_buyer': 'Sebagian besar penghasilan dari satu pembeli',
+  'admin.payouts.risk.new_buyers': 'Sebagian besar penghasilan dari pembeli baru',
+  'admin.payouts.risk.refunds': 'Banyak pengembalian dana atau sengketa',
+  'admin.payouts.risk.first_payout': 'Pencairan dana pertama',
   'admin.purchases.title': 'Pembelian di aplikasi ponsel',
   'admin.purchases.subtitle':
     'Barang digital di aplikasi iPhone dan Android. Produk fisik, layanan, dan tiket acara selalu tetap punya pembayarannya, dan pembayaran di web selalu berfungsi.',

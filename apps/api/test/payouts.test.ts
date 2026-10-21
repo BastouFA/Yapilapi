@@ -123,6 +123,36 @@ describe('payouts', () => {
     expect(await available(u, 'USD')).toBe(3000);
   });
 
+  it('warns the team about payouts that deserve a closer look', async () => {
+    // A brand-new account, paid by one brand-new buyer, that just set up its bank and was never paid out.
+    const u = await creator(5000, 'USD');
+    await as(t.app, u).post('/v1/me/payout-accounts/bank', { currency: 'USD', bankCode: 'DEV', accountNumber: '0123456789', accountName: 'Ada Obi' });
+    const id = (await as(t.app, u).post('/v1/me/payouts', { amountCents: 2000, currency: 'USD' })).body.payout.id;
+    const risks = async (payoutId: string) => (await as(t.app, admin).get('/v1/admin/payouts')).body.items.find((p: any) => p.id === payoutId)?.risks;
+    expect(await risks(id)).toEqual(['new_account', 'new_payout_account', 'one_buyer', 'new_buyers', 'first_payout']);
+
+    // An older account, paid by several older buyers, with its bank set up long ago and paid out before.
+    await db().query(`UPDATE users SET created_at = now() - interval '60 days' WHERE id = $1`, [u.id]);
+    await db().query(`UPDATE payout_accounts SET created_at = now() - interval '30 days', updated_at = now() - interval '30 days' WHERE user_id = $1`, [u.id]);
+    await db().query(`UPDATE users SET created_at = now() - interval '60 days' WHERE id IN (SELECT buyer_id FROM orders WHERE payee_id = $1)`, [u.id]);
+    for (let i = 0; i < 2; i++) {
+      const fan = await signUp(t.app, { birthDate: '1990-04-02' });
+      await db().query(`UPDATE users SET created_at = now() - interval '60 days' WHERE id = $1`, [fan.id]);
+      await db().query(
+        `INSERT INTO orders (buyer_id, total_cents, platform_fee_cents, currency, idempotency_key, purpose, payee_id, status, paid_at)
+         VALUES ($1, 5000, 0, 'USD', $2, 'tip', $3, 'paid', now() - interval '8 days')`,
+        [fan.id, key(), u.id],
+      );
+    }
+    await as(t.app, admin).post(`/v1/admin/payouts/${id}/verify`);
+    await drain();
+    const next = (await as(t.app, u).post('/v1/me/payouts', { amountCents: 2000, currency: 'USD' })).body.payout.id;
+    expect(await risks(next)).toEqual([]);
+    // Refunds on more than 1 in 10 of their orders.
+    await db().query(`UPDATE orders SET status = 'refunded' WHERE id = (SELECT id FROM orders WHERE payee_id = $1 ORDER BY created_at DESC LIMIT 1)`, [u.id]);
+    expect(await risks(next)).toEqual(['refunds']);
+  });
+
   it('turned down: the money stays in the balance and the creator hears why', async () => {
     const u = await creator(5000, 'USD');
     await as(t.app, u).post('/v1/me/payout-accounts/bank', { currency: 'USD', bankCode: 'DEV', accountNumber: '0123456789', accountName: 'Ada Obi' });

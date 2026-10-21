@@ -6229,6 +6229,12 @@ export const tr: Catalog = {
   'admin.payouts.approve': 'Onayla ve gönder',
   'admin.payouts.reject': 'Reddet',
   'admin.payouts.reason': 'Neden (içerik üreticisi görür)',
+  'admin.payouts.risk.new_account': 'Yeni hesap (14 günden az)',
+  'admin.payouts.risk.new_payout_account': 'Ödeme hesabı az önce değişti',
+  'admin.payouts.risk.one_buyer': 'Kazancın çoğu tek alıcıdan',
+  'admin.payouts.risk.new_buyers': 'Kazancın çoğu yepyeni alıcılardan',
+  'admin.payouts.risk.refunds': 'Çok sayıda iade veya itiraz',
+  'admin.payouts.risk.first_payout': 'İlk ödeme',
   'admin.purchases.title': 'Telefon uygulaması satın alımları',
   'admin.purchases.subtitle':
     'iPhone ve Android uygulamalarındaki dijital ürünler. Fiziksel ürünler, hizmetler ve etkinlik biletleri her zaman kendi ödeme akışlarını korur ve web ödemesi her zaman çalışır.',

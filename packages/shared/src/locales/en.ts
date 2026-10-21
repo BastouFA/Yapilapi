@@ -6219,6 +6219,12 @@ export const en = {
   'admin.payouts.approve': 'Approve and send',
   'admin.payouts.reject': 'Turn down',
   'admin.payouts.reason': 'Reason (the creator sees it)',
+  'admin.payouts.risk.new_account': 'New account (under 14 days)',
+  'admin.payouts.risk.new_payout_account': 'Payout account just changed',
+  'admin.payouts.risk.one_buyer': 'Most earnings from one buyer',
+  'admin.payouts.risk.new_buyers': 'Most earnings from brand-new buyers',
+  'admin.payouts.risk.refunds': 'Many refunds or disputes',
+  'admin.payouts.risk.first_payout': 'First payout',
   'admin.purchases.title': 'Phone app purchases',
   'admin.purchases.subtitle':
     'Digital goods in the iPhone and Android apps. Physical products, services and event tickets always keep their checkout, and the web checkout always works.',

@@ -6223,6 +6223,12 @@ export const yo: Catalog = {
   'admin.payouts.approve': 'Fọwọ́ sí i kí o sì fi ránṣẹ́',
   'admin.payouts.reject': 'Kọ̀ ọ́',
   'admin.payouts.reason': 'Ìdí (olùdásílẹ̀ máa rí i)',
+  'admin.payouts.risk.new_account': 'Àkáǹtì tuntun (kò tíì pé ọjọ́ 14)',
+  'admin.payouts.risk.new_payout_account': 'Wọ́n ṣẹ̀ṣẹ̀ yí àkáǹtì owó sísan padà',
+  'admin.payouts.risk.one_buyer': 'Ọ̀pọ̀ owó tí wọ́n jèrè wá láti ọ̀dọ̀ olùrà kan',
+  'admin.payouts.risk.new_buyers': 'Ọ̀pọ̀ owó tí wọ́n jèrè wá láti ọ̀dọ̀ àwọn olùrà tuntun',
+  'admin.payouts.risk.refunds': 'Ọ̀pọ̀ owó tí a dá padà tàbí àríyànjiyàn',
+  'admin.payouts.risk.first_payout': 'Owó sísan àkọ́kọ́',
   'admin.purchases.title': 'Rírà nínú àwọn ohun èlò fóònù',
   'admin.purchases.subtitle':
     'Àwọn ọjà oní-nọ́ńbà nínú ohun èlò iPhone àti Android. Àwọn ọjà tí a lè fọwọ́ kàn, iṣẹ́ àti tíkẹ́ẹ̀tì ìṣẹ̀lẹ̀ máa ń ní ọ̀nà ìsanwó wọn nígbà gbogbo, ìsanwó lórí wẹ́ẹ̀bù sì máa ń ṣiṣẹ́ nígbà gbogbo.',

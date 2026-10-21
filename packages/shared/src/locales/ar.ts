@@ -6484,6 +6484,12 @@ export const ar: Catalog = {
   'admin.payouts.approve': 'وافق وأرسل',
   'admin.payouts.reject': 'ارفض',
   'admin.payouts.reason': 'السبب (يراه صانع المحتوى)',
+  'admin.payouts.risk.new_account': 'حساب جديد (أقل من 14 يومًا)',
+  'admin.payouts.risk.new_payout_account': 'تغيّر حساب الدفعات للتو',
+  'admin.payouts.risk.one_buyer': 'معظم الأرباح من مشترٍ واحد',
+  'admin.payouts.risk.new_buyers': 'معظم الأرباح من مشترين جدد تمامًا',
+  'admin.payouts.risk.refunds': 'مبالغ مستردة أو نزاعات كثيرة',
+  'admin.payouts.risk.first_payout': 'أول دفعة',
   'admin.purchases.title': 'المشتريات في تطبيقات الهاتف',
   'admin.purchases.subtitle':
     'السلع الرقمية في تطبيقي iPhone وAndroid. تحتفظ المنتجات المادية والخدمات وتذاكر الفعاليات دائمًا بطريقة الدفع الخاصة بها، ويعمل الدفع على الويب دائمًا.',

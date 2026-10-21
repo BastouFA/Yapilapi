@@ -6225,6 +6225,12 @@ export const hi: Catalog = {
   'admin.payouts.approve': 'मंज़ूर करें और भेजें',
   'admin.payouts.reject': 'अस्वीकार करें',
   'admin.payouts.reason': 'वजह (क्रिएटर इसे देखते हैं)',
+  'admin.payouts.risk.new_account': 'नया अकाउंट (14 दिन से कम)',
+  'admin.payouts.risk.new_payout_account': 'पेआउट अकाउंट अभी बदला गया',
+  'admin.payouts.risk.one_buyer': 'ज़्यादातर कमाई एक ही खरीदार से',
+  'admin.payouts.risk.new_buyers': 'ज़्यादातर कमाई बिल्कुल नए खरीदारों से',
+  'admin.payouts.risk.refunds': 'कई रिफ़ंड या विवाद',
+  'admin.payouts.risk.first_payout': 'पहला पेआउट',
   'admin.purchases.title': 'फ़ोन ऐप में खरीदारी',
   'admin.purchases.subtitle':
     'iPhone और Android ऐप में डिजिटल चीज़ें। फ़िज़िकल प्रोडक्ट, सेवाएँ और इवेंट टिकट का चेकआउट हमेशा रहता है, और वेब चेकआउट हमेशा काम करता है।',

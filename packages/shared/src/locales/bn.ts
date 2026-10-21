@@ -6219,6 +6219,12 @@ export const bn: Catalog = {
   'admin.payouts.approve': 'অনুমোদন করে পাঠান',
   'admin.payouts.reject': 'প্রত্যাখ্যান করুন',
   'admin.payouts.reason': 'কারণ (ক্রিয়েটর এটি দেখবেন)',
+  'admin.payouts.risk.new_account': 'নতুন অ্যাকাউন্ট (১৪ দিনের কম)',
+  'admin.payouts.risk.new_payout_account': 'পেআউট অ্যাকাউন্ট সবেমাত্র বদলেছে',
+  'admin.payouts.risk.one_buyer': 'বেশিরভাগ আয় একজন ক্রেতার কাছ থেকে',
+  'admin.payouts.risk.new_buyers': 'বেশিরভাগ আয় একদম নতুন ক্রেতাদের কাছ থেকে',
+  'admin.payouts.risk.refunds': 'অনেক টাকা ফেরত বা বিরোধ',
+  'admin.payouts.risk.first_payout': 'প্রথম পেআউট',
   'admin.purchases.title': 'ফোন অ্যাপের কেনাকাটা',
   'admin.purchases.subtitle':
     'iPhone ও Android অ্যাপে ডিজিটাল পণ্য। ভৌত পণ্য, সেবা আর ইভেন্টের টিকিটে সবসময় নিজস্ব চেকআউট থাকে, আর ওয়েব চেকআউট সবসময় কাজ করে।',

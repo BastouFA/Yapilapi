@@ -1117,6 +1117,11 @@ function Payouts() {
                 {t('admin.payouts.available', { amount: formatMoney(p.available_cents, p.currency, locale) })}
               </Badge>
               <Badge tone={p.account_ready ? 'neutral' : 'danger'}>{p.account_ready ? (p.account_label ?? p.currency) : t('admin.payouts.noAccount')}</Badge>
+              {(p.risks ?? []).map((r) => (
+                <Badge key={r} tone="warning">
+                  {t(`admin.payouts.risk.${r}`)}
+                </Badge>
+              ))}
               {p.status !== 'pending' ? (
                 <Badge tone={p.status === 'failed' ? 'danger' : p.status === 'paid' ? 'success' : 'neutral'}>{t(PAYOUT_STATUS[p.status])}</Badge>
               ) : null}

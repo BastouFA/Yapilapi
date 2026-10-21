@@ -6264,6 +6264,12 @@ export const de: Catalog = {
   'admin.payouts.approve': 'Genehmigen und senden',
   'admin.payouts.reject': 'Ablehnen',
   'admin.payouts.reason': 'Grund (der Creator sieht ihn)',
+  'admin.payouts.risk.new_account': 'Neues Konto (unter 14 Tagen)',
+  'admin.payouts.risk.new_payout_account': 'Auszahlungskonto gerade geändert',
+  'admin.payouts.risk.one_buyer': 'Einnahmen meist von einem Käufer',
+  'admin.payouts.risk.new_buyers': 'Einnahmen meist von ganz neuen Käufern',
+  'admin.payouts.risk.refunds': 'Viele Erstattungen oder Streitfälle',
+  'admin.payouts.risk.first_payout': 'Erste Auszahlung',
   'admin.purchases.title': 'Käufe in der Handy-App',
   'admin.purchases.subtitle':
     'Digitale Güter in den iPhone- und Android-Apps. Physische Produkte, Dienstleistungen und Eventtickets behalten immer ihre Kasse, und die Web-Kasse funktioniert immer.',

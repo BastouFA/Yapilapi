@@ -2652,6 +2652,8 @@ export interface AdminPayout {
   available_cents: number;
   account_ready: boolean;
   account_label: string | null;
+  /** Signs a waiting payout deserves a closer look (warnings; the team decides). */
+  risks: ('new_account' | 'new_payout_account' | 'one_buyer' | 'new_buyers' | 'refunds' | 'first_payout')[];
 }
 
 export interface TipRecord {

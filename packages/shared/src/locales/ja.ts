@@ -6208,6 +6208,12 @@ export const ja: Catalog = {
   'admin.payouts.approve': '承認して送金',
   'admin.payouts.reject': '却下',
   'admin.payouts.reason': '理由（クリエイターに表示されます）',
+  'admin.payouts.risk.new_account': '新しいアカウント（14日未満）',
+  'admin.payouts.risk.new_payout_account': '支払い口座が変更されたばかり',
+  'admin.payouts.risk.one_buyer': '収益の大半が1人の購入者から',
+  'admin.payouts.risk.new_buyers': '収益の大半が新規購入者から',
+  'admin.payouts.risk.refunds': '返金や異議申し立てが多い',
+  'admin.payouts.risk.first_payout': '初めての支払い',
   'admin.purchases.title': 'スマートフォンアプリでの購入',
   'admin.purchases.subtitle':
     'iPhoneとAndroidアプリでのデジタル商品。実物の商品、サービス、イベントのチケットは常に通常の購入手続きを使い、ウェブの購入手続きは常に利用できます。',

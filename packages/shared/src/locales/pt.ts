@@ -6233,6 +6233,12 @@ export const pt: Catalog = {
   'admin.payouts.approve': 'Aprovar e enviar',
   'admin.payouts.reject': 'Recusar',
   'admin.payouts.reason': 'Motivo (a pessoa vai ver)',
+  'admin.payouts.risk.new_account': 'Conta nova (menos de 14 dias)',
+  'admin.payouts.risk.new_payout_account': 'Conta de repasse acabou de mudar',
+  'admin.payouts.risk.one_buyer': 'Maioria dos ganhos de um só comprador',
+  'admin.payouts.risk.new_buyers': 'Maioria dos ganhos de compradores novos',
+  'admin.payouts.risk.refunds': 'Muitos reembolsos ou disputas',
+  'admin.payouts.risk.first_payout': 'Primeiro repasse',
   'admin.purchases.title': 'Compras nos apps de celular',
   'admin.purchases.subtitle':
     'Produtos digitais nos apps de iPhone e Android. Produtos físicos, serviços e ingressos de eventos sempre mantêm o pagamento, e o pagamento na web sempre funciona.',

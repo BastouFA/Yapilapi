@@ -6250,6 +6250,12 @@ export const it: Catalog = {
   'admin.payouts.approve': 'Approva e invia',
   'admin.payouts.reject': 'Rifiuta',
   'admin.payouts.reason': 'Motivo (il creator lo vede)',
+  'admin.payouts.risk.new_account': 'Account nuovo (meno di 14 giorni)',
+  'admin.payouts.risk.new_payout_account': 'Conto per i pagamenti appena cambiato',
+  'admin.payouts.risk.one_buyer': 'Guadagni quasi tutti da un acquirente',
+  'admin.payouts.risk.new_buyers': 'Guadagni quasi tutti da acquirenti nuovi',
+  'admin.payouts.risk.refunds': 'Molti rimborsi o contestazioni',
+  'admin.payouts.risk.first_payout': 'Primo pagamento',
   'admin.purchases.title': 'Acquisti nell’app per telefono',
   'admin.purchases.subtitle':
     'Beni digitali nelle app per iPhone e Android. Prodotti fisici, servizi e biglietti per eventi mantengono sempre il loro pagamento, e il pagamento sul web funziona sempre.',

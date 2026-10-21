@@ -6236,6 +6236,12 @@ export const sw: Catalog = {
   'admin.payouts.approve': 'Idhinisha na utume',
   'admin.payouts.reject': 'Kataa',
   'admin.payouts.reason': 'Sababu (mtayarishaji ataiona)',
+  'admin.payouts.risk.new_account': 'Akaunti mpya (chini ya siku 14)',
+  'admin.payouts.risk.new_payout_account': 'Akaunti ya malipo imebadilishwa sasa hivi',
+  'admin.payouts.risk.one_buyer': 'Mapato mengi kutoka kwa mnunuzi mmoja',
+  'admin.payouts.risk.new_buyers': 'Mapato mengi kutoka kwa wanunuzi wapya kabisa',
+  'admin.payouts.risk.refunds': 'Pesa nyingi zilizorejeshwa au mizozo',
+  'admin.payouts.risk.first_payout': 'Malipo ya kwanza',
   'admin.purchases.title': 'Ununuzi kwenye programu za simu',
   'admin.purchases.subtitle':
     'Bidhaa za kidijitali kwenye programu za iPhone na Android. Bidhaa halisi, huduma na tiketi za matukio huendelea kuwa na malipo yao, na malipo ya wavuti hufanya kazi kila wakati.',

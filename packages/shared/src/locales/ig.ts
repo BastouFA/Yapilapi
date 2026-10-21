@@ -6228,6 +6228,12 @@ export const ig: Catalog = {
   'admin.payouts.approve': 'Kwado ma zipu',
   'admin.payouts.reject': 'Jụ',
   'admin.payouts.reason': 'Ihe kpatara ya (onye okike na-ahụ ya)',
+  'admin.payouts.risk.new_account': 'Akaụntụ ọhụrụ (erughị ụbọchị 14)',
+  'admin.payouts.risk.new_payout_account': 'Akaụntụ nkwụnye ego gbanwere ugbu a',
+  'admin.payouts.risk.one_buyer': 'Ọtụtụ ego e nwetara sitere n’aka otu onye zụrụ',
+  'admin.payouts.risk.new_buyers': 'Ọtụtụ ego e nwetara sitere n’aka ndị zụrụ ọhụrụ',
+  'admin.payouts.risk.refunds': 'Ọtụtụ nweghachi ego ma ọ bụ esemokwu',
+  'admin.payouts.risk.first_payout': 'Nkwụnye ego mbụ',
   'admin.purchases.title': 'Ihe a zụrụ n’app ekwentị',
   'admin.purchases.subtitle':
     'Ngwaahịa dijitalụ n’app iPhone na Android. Ngwaahịa a na-emetụ aka, ọrụ na tiketi mmemme na-ejide ịkwụ ụgwọ ha mgbe niile, ịkwụ ụgwọ na web na-arụkwa ọrụ mgbe niile.',

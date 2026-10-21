@@ -6535,6 +6535,12 @@ export const ru: Catalog = {
   'admin.payouts.approve': 'Одобрить и отправить',
   'admin.payouts.reject': 'Отказать',
   'admin.payouts.reason': 'Причина (автор её увидит)',
+  'admin.payouts.risk.new_account': 'Новый аккаунт (меньше 14 дней)',
+  'admin.payouts.risk.new_payout_account': 'Счёт для выплат только что изменён',
+  'admin.payouts.risk.one_buyer': 'Основной доход от одного покупателя',
+  'admin.payouts.risk.new_buyers': 'Основной доход от совсем новых покупателей',
+  'admin.payouts.risk.refunds': 'Много возвратов или споров',
+  'admin.payouts.risk.first_payout': 'Первая выплата',
   'admin.purchases.title': 'Покупки в приложении для телефона',
   'admin.purchases.subtitle':
     'Цифровые товары в приложениях для iPhone и Android. Физические товары, услуги и билеты на события всегда сохраняют своё оформление заказа, а оформление в веб-версии работает всегда.',
