@@ -1223,4 +1223,27 @@ export const ko: Record<string, string> = {
   'A Yap is one voice recording.': 'Yap은 음성 녹음 하나예요.',
   'Write a comment or record one.': '댓글을 쓰거나 녹음하세요.',
   'Listening isn’t available right now. Try again later.': '지금은 들을 수 없어요. 나중에 다시 시도해 주세요.',
+  // apps/api/src/lib/stash.ts
+  'Your location isn’t accurate enough yet. Move outside or wait for a better GPS signal.':
+    '아직 위치가 충분히 정확하지 않아요. 밖으로 나가거나 GPS 신호가 좋아질 때까지 기다려 주세요.',
+  'Your location moved too far, too fast. Try again in a little while from where you are.':
+    '위치가 너무 짧은 시간에 너무 멀리 이동했어요. 잠시 후 지금 있는 곳에서 다시 시도해 주세요.',
+  'You’ve hidden a lot of stashes today. Try again tomorrow.': '오늘 스태시를 많이 숨겼어요. 내일 다시 시도해 주세요.',
+  'To keep younger people safe, you can only hide a stash for them once you are friends.':
+    '어린 사용자를 보호하기 위해 친구가 된 후에만 스태시를 숨겨 줄 수 있어요.',
+  'Your photo or video is still being prepared. Try again in a moment.': '사진이나 동영상을 아직 준비하는 중이에요. 잠시 후 다시 시도해 주세요.',
+  'This stash has ended.': '이 스태시는 끝났어요.',
+  'This message can’t be sent.': '이 메시지는 보낼 수 없어요.',
+  'Choose someone else.': '다른 사람을 선택하세요.',
+  'You can hide a stash for friends and people who follow you back.': '친구, 그리고 내가 팔로우하고 나를 맞팔로우하는 사람에게 스태시를 숨겨 줄 수 있어요.',
+  'A video in a stash can be up to a minute long.': '스태시에 넣는 동영상은 최대 1분까지 가능해요.',
+  "That stash doesn't exist or isn't visible to you.": '그 스태시가 존재하지 않거나 볼 수 없어요.',
+  'Someone found this one first.': '다른 사람이 먼저 찾았어요.',
+  // apps/api/src/modules/stash.ts
+  'Stash is not enabled.': '스태시가 활성화되어 있지 않아요.',
+  'Choose a photo.': '사진을 선택하세요.',
+  // packages/shared/src/stash-schemas.ts
+  'Choose who it’s for.': '누구를 위한 것인지 선택하세요.',
+  'Add what goes in the stash.': '스태시에 넣을 것을 추가하세요.',
+  'Choose a thank-you or write one.': '감사 인사를 고르거나 직접 쓰세요.',
 };

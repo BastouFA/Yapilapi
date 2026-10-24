@@ -1257,4 +1257,28 @@ export const ur: Record<string, string> = {
   'A Yap is one voice recording.': 'Yap ایک صوتی ریکارڈنگ ہوتا ہے۔',
   'Write a comment or record one.': 'تبصرہ لکھیں یا ریکارڈ کریں۔',
   'Listening isn’t available right now. Try again later.': 'سننا ابھی دستیاب نہیں ہے۔ بعد میں دوبارہ کوشش کریں۔',
+  // apps/api/src/lib/stash.ts
+  'Your location isn’t accurate enough yet. Move outside or wait for a better GPS signal.':
+    'آپ کا مقام ابھی کافی درست نہیں ہے۔ باہر جائیں یا بہتر GPS سگنل کا انتظار کریں۔',
+  'Your location moved too far, too fast. Try again in a little while from where you are.':
+    'آپ کا مقام بہت تیزی سے بہت دور چلا گیا۔ تھوڑی دیر بعد جہاں آپ ہیں وہیں سے دوبارہ کوشش کریں۔',
+  'You’ve hidden a lot of stashes today. Try again tomorrow.': 'آپ نے آج بہت سے خزانے چھپائے ہیں۔ کل دوبارہ کوشش کریں۔',
+  'To keep younger people safe, you can only hide a stash for them once you are friends.':
+    'کم عمر لوگوں کو محفوظ رکھنے کے لیے، آپ ان کے لیے خزانہ تبھی چھپا سکتے ہیں جب آپ دوست بن جائیں۔',
+  'Your photo or video is still being prepared. Try again in a moment.': 'آپ کی تصویر یا ویڈیو ابھی تیار ہو رہی ہے۔ تھوڑی دیر میں دوبارہ کوشش کریں۔',
+  'This stash has ended.': 'یہ خزانہ ختم ہو چکا ہے۔',
+  'This message can’t be sent.': 'یہ پیغام نہیں بھیجا جا سکتا۔',
+  'Choose someone else.': 'کسی اور کو منتخب کریں۔',
+  'You can hide a stash for friends and people who follow you back.':
+    'آپ دوستوں کے لیے اور ان لوگوں کے لیے خزانہ چھپا سکتے ہیں جنہیں آپ فالو کرتے ہیں اور جو آپ کو واپس فالو کرتے ہیں۔',
+  'A video in a stash can be up to a minute long.': 'خزانے میں ویڈیو زیادہ سے زیادہ ایک منٹ کی ہو سکتی ہے۔',
+  "That stash doesn't exist or isn't visible to you.": 'یہ خزانہ موجود نہیں یا آپ اسے نہیں دیکھ سکتے۔',
+  'Someone found this one first.': 'یہ والا کسی اور نے پہلے ڈھونڈ لیا۔',
+  // apps/api/src/modules/stash.ts
+  'Stash is not enabled.': 'خزانہ فعال نہیں ہے۔',
+  'Choose a photo.': 'تصویر منتخب کریں۔',
+  // packages/shared/src/stash-schemas.ts
+  'Choose who it’s for.': 'منتخب کریں کہ یہ کس کے لیے ہے۔',
+  'Add what goes in the stash.': 'خزانے میں ڈالنے کے لیے کچھ شامل کریں۔',
+  'Choose a thank-you or write one.': 'شکریے کا کوئی پیغام منتخب کریں یا خود لکھیں۔',
 };

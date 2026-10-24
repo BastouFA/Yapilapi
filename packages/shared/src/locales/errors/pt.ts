@@ -1355,4 +1355,28 @@ export const pt: Record<string, string> = {
   'A Yap is one voice recording.': 'Um Yap é uma única gravação de voz.',
   'Write a comment or record one.': 'Escreva um comentário ou grave um.',
   'Listening isn’t available right now. Try again later.': 'Ouvir não está disponível agora. Tente de novo mais tarde.',
+  // apps/api/src/lib/stash.ts
+  'Your location isn’t accurate enough yet. Move outside or wait for a better GPS signal.':
+    'Sua localização ainda não está precisa o bastante. Vá para um lugar aberto ou espere um sinal de GPS melhor.',
+  'Your location moved too far, too fast. Try again in a little while from where you are.':
+    'Sua localização se deslocou longe demais e rápido demais. Tente de novo daqui a pouco de onde você está.',
+  'You’ve hidden a lot of stashes today. Try again tomorrow.': 'Você criou muitos esconderijos hoje. Tente de novo amanhã.',
+  'To keep younger people safe, you can only hide a stash for them once you are friends.':
+    'Para proteger os mais jovens, você só pode criar um esconderijo para eles depois que vocês forem amigos.',
+  'Your photo or video is still being prepared. Try again in a moment.': 'Sua foto ou vídeo ainda está sendo preparado. Tente de novo daqui a pouco.',
+  'This stash has ended.': 'Este esconderijo terminou.',
+  'This message can’t be sent.': 'Esta mensagem não pode ser enviada.',
+  'Choose someone else.': 'Escolha outra pessoa.',
+  'You can hide a stash for friends and people who follow you back.':
+    'Você pode criar um esconderijo para amigos e pessoas que você segue e que seguem você de volta.',
+  'A video in a stash can be up to a minute long.': 'Um vídeo em um esconderijo pode ter até um minuto.',
+  "That stash doesn't exist or isn't visible to you.": 'Esse esconderijo não existe ou não está visível para você.',
+  'Someone found this one first.': 'Alguém encontrou este primeiro.',
+  // apps/api/src/modules/stash.ts
+  'Stash is not enabled.': 'Os esconderijos não estão ativados.',
+  'Choose a photo.': 'Escolha uma foto.',
+  // packages/shared/src/stash-schemas.ts
+  'Choose who it’s for.': 'Escolha para quem é.',
+  'Add what goes in the stash.': 'Adicione o que vai no esconderijo.',
+  'Choose a thank-you or write one.': 'Escolha um agradecimento ou escreva um.',
 };

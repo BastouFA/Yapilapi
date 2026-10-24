@@ -125,6 +125,17 @@ import type {
   MapPresenceInput,
   AskCityInput,
   AskHelperInput,
+  HideStashInput,
+  SeedStashInput,
+  StashCard,
+  StashExplorer,
+  StashExplorerRow,
+  StashFind,
+  StashOpenResult,
+  StashPosition,
+  StashSettings,
+  StashSettingsInput,
+  StashThanksInput,
   AskHelperSettings,
   AskTopic,
   ChainEditInput,
@@ -948,6 +959,41 @@ export function createClient(opts: ClientOptions) {
       /** "Help answer questions near me". */
       settings: () => get<{ settings: AskHelperSettings }>('/v1/me/ask-settings'),
       setSettings: (b: AskHelperInput) => put<{ settings: AskHelperSettings }>('/v1/me/ask-settings', b),
+    },
+    /**
+     * Stash (docs/product/stash.md): hide something at a real place; it opens only for someone who
+     * is there. Others only ever get a stash's area, never its point.
+     */
+    stash: {
+      hide: (b: HideStashInput) => post<{ stash: StashCard }>('/v1/stashes', b),
+      /** Around a point (yours, or the map's middle), nearest first; `metres` is to the area's middle. */
+      near: (at: { lat: number; lng: number }) => get<{ items: { stash: StashCard; metres: number | null }[] }>(`/v1/stashes/near${qs(at)}`),
+      mine: () => get<{ hidden: StashCard[]; found: StashCard[] }>('/v1/stashes/mine'),
+      get: (id: string) => get<{ stash: StashCard; finds: StashFind[] }>(`/v1/stashes/${id}`),
+      /** Try to open it from where the device is now. */
+      open: (id: string, at: StashPosition) => post<StashOpenResult>(`/v1/stashes/${id}/open`, at),
+      thank: (id: string, b: StashThanksInput) => post<{ thanked: true }>(`/v1/stashes/${id}/thanks`, b),
+      takeBack: (id: string) => del<{ deleted: true }>(`/v1/stashes/${id}`),
+      explorers: (city: string) => get<{ city: string; items: StashExplorerRow[] }>(`/v1/stashes/explorers${qs({ city })}`),
+      explorer: (username: string) => get<{ explorer: StashExplorer | null }>(`/v1/users/${encodeURIComponent(username)}/explorer`),
+      settings: () => get<{ settings: StashSettings }>('/v1/me/stash-settings'),
+      setSettings: (b: StashSettingsInput) => put<{ settings: StashSettings }>('/v1/me/stash-settings', b),
+      /** Admins: the team's launch stashes (seed mode), at a chosen point. */
+      seed: (b: SeedStashInput) => post<{ stash: StashCard }>('/v1/admin/stashes', b),
+      seeded: () =>
+        get<{
+          items: {
+            id: string;
+            kind: string;
+            title: string | null;
+            city: string | null;
+            point: { lat: number; lng: number };
+            finds: number;
+            removed: boolean;
+            createdAt: string;
+          }[];
+        }>('/v1/admin/stashes'),
+      remove: (id: string) => del<{ removed: true }>(`/v1/admin/stashes/${id}`),
     },
     /** Fair start: whether your next reel gets one, and how one of yours is doing. */
     fairStart: {

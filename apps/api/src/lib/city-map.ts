@@ -17,6 +17,7 @@ import {
 } from '@yapilapi/shared';
 import { ASK_MAP_CANDIDATES, questionMapItems } from './ask-city.ts';
 import { chainsById } from './chains.ts';
+import { STASH_MAP_CANDIDATES, stashMapItems } from './stash.ts';
 import { listingListedSql, listingPhotos, LISTING_FROM } from './market.ts';
 import { plusCol, publicUserFrom } from './users.ts';
 import { eventVisibleSql, liveVisibleSql, notBlockedSql, postUnlockedSql, postVisibleSql, PUBLIC_POST_SQL } from './visibility.ts';
@@ -25,6 +26,7 @@ type Q = Pool | PoolClient;
 
 /**
  * Near you (docs/product/city-map.md): what's happening in a box on the map, for one viewer.
+ * Stashes (docs/product/stash.md) are shown by their area only, and only to people who may find them.
  *
  * Each layer is read in two steps. First the candidates in the area around the box (the box
  * widened to a grid, so people looking at the same part of a city share it): ids and points,
@@ -126,6 +128,8 @@ export function safeZone(tz: string | undefined): string {
 // ─── Candidates (the same for everyone) ─────────────────────────────────
 
 const CANDIDATE_SQL: Record<Exclude<MapLayer, 'friends'>, string> = {
+  // Stashes by their area (never their point; lib/stash.ts): which of them this viewer may find comes after.
+  stashes: STASH_MAP_CANDIDATES,
   // Lives on now at a place.
   live: `SELECT l.id, pl.lat, pl.lng FROM live_sessions l JOIN places pl ON pl.id = l.place_id AND pl.deleted_at IS NULL
          WHERE l.status = 'live' AND l.place_id IS NOT NULL AND ${inBoxSql('pl.lat', 'pl.lng')}
@@ -415,13 +419,22 @@ export interface MapRequest {
 
 /** What's in the box for this viewer, layer by layer. */
 export async function mapItems(db: Q, cache: MapCache, req: MapRequest): Promise<MapAnswer> {
-  const layers = req.layers.filter((l) => !req.off.has(l) && (l !== 'friends' || req.viewer));
+  // Friends out and stashes are only for someone signed in.
+  const layers = req.layers.filter((l) => !req.off.has(l) && ((l !== 'friends' && l !== 'stashes') || req.viewer));
   const dayEnd = await endOfDay(db, req.tz);
   const built = await Promise.all(
     layers.map(async (layer): Promise<Built> => {
       if (layer === 'friends') return friendItems(db, req.viewer!, req.box);
       const c = (await candidates(db, cache, layer, req.box, dayEnd)).filter((x) => inBox(req.box, x));
       if (!c.length) return { items: [], more: false };
+      if (layer === 'stashes')
+        return cut(
+          await stashMapItems(
+            db,
+            req.viewer!,
+            c.map((x) => x.id),
+          ),
+        );
       if (layer === 'live') return liveItems(db, req.viewer, c);
       if (layer === 'today') return eventItems(db, req.viewer, c, dayEnd);
       if (layer === 'market') return marketItems(db, req.viewer, c);

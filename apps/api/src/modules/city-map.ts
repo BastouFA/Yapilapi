@@ -31,6 +31,7 @@ export default async function cityMapModule(app: FastifyInstance, ctx: AppContex
     if (!(await isEnabled(db, 'LIVE'))) off.add('live');
     if (!(await isEnabled(db, 'PASS_THE_MIC'))) off.add('chains');
     if (!(await isEnabled(db, 'ASK_CITY'))) off.add('questions');
+    if (!(await isEnabled(db, 'STASH'))) off.add('stashes');
     const answer = await mapItems(db, cache, {
       box: { south: q.south, west: q.west, north: q.north, east: q.east },
       layers: q.layers,

@@ -315,6 +315,10 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
         `UPDATE conversation_members SET left_at = now() WHERE user_id = $1`,
         // Where they shared their location: points and records alike.
         `DELETE FROM location_shares WHERE user_id = $1`,
+        // Stash: the stashes they hid go (with who found them), and so do their finds and the positions kept to spot impossible jumps.
+        `DELETE FROM stashes WHERE owner_id = $1`,
+        `DELETE FROM stash_finds WHERE finder_id = $1`,
+        `DELETE FROM stash_location_samples WHERE user_id = $1`,
         // Market: their listings go (with their photos, saves, offers and the cards in chats, which then
         // say "no longer available"), and so do what they saved, their offers and chats about other
         // people's listings, and ratings they gave or got. A listing reserved for or sold to them forgets them.

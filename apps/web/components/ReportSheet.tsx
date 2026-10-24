@@ -17,6 +17,7 @@ const REASON_LABEL: Record<string, MessageKey> = {
   fraud: 'postList.reason.fraud',
   minor_safety: 'postList.reason.minorSafety',
   copyright: 'postList.reason.copyright',
+  private_place: 'postList.reason.privatePlace',
   other: 'postList.reason.other',
 };
 
@@ -49,7 +50,8 @@ export function ReportSheet({ target, onClose }: { target: { type: string; id: s
         }}
       >
         <Select label={t('postList.reportWhat')} value={reason} onChange={(e) => setReason(e.currentTarget.value)}>
-          {REPORT_REASONS.map((r) => (
+          {/* "It's at my home or another private place" is for stashes (it hides one at once, until a moderator looks). */}
+          {REPORT_REASONS.filter((r) => r !== 'private_place' || target?.type === 'stash').map((r) => (
             <option key={r} value={r}>
               {REASON_LABEL[r] ? t(REASON_LABEL[r]) : r}
             </option>

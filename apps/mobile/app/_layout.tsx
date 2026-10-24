@@ -53,8 +53,8 @@ function Screens() {
   // A screen opened straight from a link or a notification has nothing behind it: give it a way home.
   const homeWhenAlone = ({ canGoBack }: { canGoBack?: boolean }) =>
     canGoBack ? null : (
-      <Pressable accessibilityRole="button" accessibilityLabel={t('nav.home')} hitSlop={12} onPress={() => router.replace('/')}>
-        <Text style={{ color: c.yapi, fontSize: 17, fontWeight: '600' }}>{t('nav.home')}</Text>
+      <Pressable accessibilityRole="button" accessibilityLabel={t('nav.near')} hitSlop={12} onPress={() => router.replace('/')}>
+        <Text style={{ color: c.yapi, fontSize: 17, fontWeight: '600' }}>{t('nav.near')}</Text>
       </Pressable>
     );
   // Sheets (modal screens) get a Cancel at the top, so there's always a way out besides swiping down.
@@ -153,6 +153,9 @@ function Screens() {
         <Stack.Screen name="mixes/[id]" options={{ title: t('mixes.card.kind') }} />
         <Stack.Screen name="map" options={{ title: t('map.title') }} />
         <Stack.Screen name="ask" options={{ title: t('askCity.title') }} />
+        <Stack.Screen name="stash/index" options={{ title: t('stash.title') }} />
+        <Stack.Screen name="stash/new" options={{ title: t('stash.hide') }} />
+        <Stack.Screen name="stash/[id]" options={{ title: t('stash.title') }} />
         <Stack.Screen name="radio" options={{ title: t('radio.title') }} />
         <Stack.Screen name="market/index" options={{ title: t('m.market.title') }} />
         <Stack.Screen name="market/[id]" options={{ title: t('m.market.listing') }} />

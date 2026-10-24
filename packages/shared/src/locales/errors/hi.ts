@@ -1257,4 +1257,28 @@ export const hi: Record<string, string> = {
   'A Yap is one voice recording.': 'Yap एक आवाज़ की रिकॉर्डिंग है।',
   'Write a comment or record one.': 'कमेंट लिखें या रिकॉर्ड करें।',
   'Listening isn’t available right now. Try again later.': 'सुनना अभी उपलब्ध नहीं है। बाद में फिर से कोशिश करें।',
+  // apps/api/src/lib/stash.ts
+  'Your location isn’t accurate enough yet. Move outside or wait for a better GPS signal.':
+    'आपकी लोकेशन अभी पूरी तरह सटीक नहीं है। बाहर जाएँ या बेहतर GPS सिग्नल का इंतज़ार करें।',
+  'Your location moved too far, too fast. Try again in a little while from where you are.':
+    'आपकी लोकेशन बहुत तेज़ी से बहुत दूर चली गई। थोड़ी देर बाद, जहाँ आप हैं वहीं से फिर से कोशिश करें।',
+  'You’ve hidden a lot of stashes today. Try again tomorrow.': 'आपने आज बहुत सारे ख़ज़ाने छिपाए हैं। कल फिर से कोशिश करें।',
+  'To keep younger people safe, you can only hide a stash for them once you are friends.':
+    'कम उम्र के लोगों को सुरक्षित रखने के लिए, आप उनके लिए ख़ज़ाना तभी छिपा सकते हैं जब आप दोस्त बन जाएँ।',
+  'Your photo or video is still being prepared. Try again in a moment.': 'आपकी फ़ोटो या वीडियो अभी तैयार हो रहा है। थोड़ी देर में फिर से कोशिश करें।',
+  'This stash has ended.': 'यह ख़ज़ाना ख़त्म हो गया है।',
+  'This message can’t be sent.': 'यह मैसेज भेजा नहीं जा सकता।',
+  'Choose someone else.': 'किसी और को चुनें।',
+  'You can hide a stash for friends and people who follow you back.':
+    'आप दोस्तों के लिए और उन लोगों के लिए ख़ज़ाना छिपा सकते हैं जिन्हें आप फ़ॉलो करते हैं और जो आपको भी फ़ॉलो करते हैं।',
+  'A video in a stash can be up to a minute long.': 'ख़ज़ाने में वीडियो ज़्यादा से ज़्यादा एक मिनट का हो सकता है।',
+  "That stash doesn't exist or isn't visible to you.": 'वह ख़ज़ाना मौजूद नहीं है या आपको नहीं दिखता।',
+  'Someone found this one first.': 'इसे किसी और ने पहले ढूँढ लिया।',
+  // apps/api/src/modules/stash.ts
+  'Stash is not enabled.': 'ख़ज़ाना चालू नहीं है।',
+  'Choose a photo.': 'फ़ोटो चुनें।',
+  // packages/shared/src/stash-schemas.ts
+  'Choose who it’s for.': 'चुनें कि यह किसके लिए है।',
+  'Add what goes in the stash.': 'ख़ज़ाने में रखने के लिए कुछ जोड़ें।',
+  'Choose a thank-you or write one.': 'कोई शुक्रिया चुनें या ख़ुद लिखें।',
 };

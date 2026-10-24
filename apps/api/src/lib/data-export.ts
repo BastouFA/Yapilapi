@@ -331,6 +331,26 @@ export async function exportSections(db: Q, userId: string) {
     ),
   };
 
+  // Stash: the stashes you hid, with their exact points (they're yours), the ones you found (never
+  // their points: those are the hider's), who found yours and what they sent back, and the positions
+  // kept for the last hour to spot impossible jumps.
+  const stash = {
+    hidden: await q(
+      `SELECT id, kind, title, hint, body, gift_code, media_id, sound_id, music_track_id, lat, lng, accuracy, area_lat, area_lng, city, audience,
+              ${un('recipient_id')} AS for_person, squad_id, first_only, expires_at, moderation_status, deleted_at, created_at
+       FROM stashes WHERE owner_id = $1 ORDER BY created_at DESC`,
+    ),
+    found: await q(
+      `SELECT f.stash_id, s.kind, s.title, s.city, CASE WHEN s.seeded THEN 'YAPILAPI' ELSE ${un('s.owner_id')} END AS hidden_by, f.reaction, f.thanks, f.created_at
+       FROM stash_finds f JOIN stashes s ON s.id = f.stash_id WHERE f.finder_id = $1 ORDER BY f.created_at DESC`,
+    ),
+    findsOfYours: await q(
+      `SELECT f.stash_id, ${un('f.finder_id')} AS found_by, f.reaction, f.thanks, f.created_at
+       FROM stash_finds f JOIN stashes s ON s.id = f.stash_id WHERE s.owner_id = $1 ORDER BY f.created_at DESC`,
+    ),
+    recentPositions: await q(`SELECT lat, lng, accuracy, created_at FROM stash_location_samples WHERE user_id = $1 ORDER BY created_at DESC`),
+  };
+
   const activity = {
     reposts: await q(`SELECT post_id, created_at FROM post_reposts WHERE user_id = $1 ORDER BY created_at DESC`),
     pollVotes: await q(`SELECT v.post_id, o.label AS option FROM poll_votes v JOIN poll_options o ON o.id = v.option_id WHERE v.user_id = $1`),
@@ -555,7 +575,7 @@ export async function exportSections(db: Q, userId: string) {
       `SELECT notification_categories, focus_mode, quiet_mode, friends_only, reduced_recommendations, daily_time_budget_minutes, notifications_paused_until, yaps_paused,
               data_saver, languages, auto_translate, messages_from, comments_from, mentions_from, quiet_start, quiet_end, quiet_timezone, sensitive_media,
               sign_in_email_alerts, smart_replies, catch_up, transcribe_voice, weekly_wrap, weekly_wrap_notify, timezone,
-              today, today_hour, today_city, today_notify, updated_at
+              today, today_hour, today_city, today_notify, stash_show_counts, stash_explorer_lists, stash_nearby_notify, updated_at
        FROM user_preferences WHERE user_id = $1`,
     ),
     teenControls: await first(
@@ -598,7 +618,7 @@ export async function exportSections(db: Q, userId: string) {
     ),
   };
 
-  return { content, chats, activity, relationships, money, safety, ai, security, developer, invites, settings, market, passTheMic, squads };
+  return { content, chats, activity, relationships, money, safety, ai, security, developer, invites, settings, market, passTheMic, squads, stash };
 }
 
 /** A short guide at the top of the file: what each part holds, the limits, and what is left out. */
@@ -610,6 +630,8 @@ export const EXPORT_README = {
     profile: 'Your profile as others see it, and its settings.',
     'posts, comments, messagesSent': 'What you shared. Messages include only the ones you sent.',
     passTheMic: 'Pass the Mic chains you started, your reels in chains, the people you passed the mic to (by username), and your reels’ fair starts.',
+    stash:
+      'Stashes you hid, with their exact points, the stashes you found (who hid them, never where exactly), who found yours and what they sent back, and the positions kept from the last hour to spot impossible jumps.',
     squads: 'Squads you’re in or were invited to: their names, your role, and when you were invited and joined. What you shared with them is under content.',
     content:
       'Stories, chapters, boards, saves, memories, recaps, lives, rooms, products, drops, places, businesses, photos and videos, your Yaps, voice replies and voice intro (recordings and transcripts), your Ask the city questions and helpful answers, and more you made; your event tickets, tickets given or received, events you co-host and how many people you checked in.',

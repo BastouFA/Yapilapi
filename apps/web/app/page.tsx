@@ -27,7 +27,7 @@ export default function Landing() {
   const { me, loading, t } = useSession();
   const router = useRouter();
   useEffect(() => {
-    if (!loading && me) router.replace('/home');
+    if (!loading && me) router.replace('/near');
   }, [loading, me, router]);
 
   // "Speak. The world understands." → the second sentence gets the brand gradient (the full stop

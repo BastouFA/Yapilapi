@@ -1,21 +1,24 @@
 # Build status against the master directive
 
-## Strategy: the social network you speak
+## Strategy: Your city, alive
 
-YAPILAPI is the social network you speak. The core unit is the **Yap**, a voice post of up to 60
-seconds: hold one button and talk, with no camera, no face and no typing. Every Yap gets a
-transcript (searchable, checked by moderation, the text alternative) and reaches listeners in their
-own language through automatic translation, with "Listen in …". Voice is about fifty times lighter
-on data than video, which matters for the people we build for first (Africa, South Asia, the Middle
-East). Photos and reels stay, but voice leads: the big Yap button sits in the middle of the
-navigation (Pulse · Wander · Yap · Chats · You; the chats tab is now called Chats, and the
-standalone messenger keeps the name Yap), Yaps come first after For you on Pulse, onboarding starts
-with a voice hello, and the landing page says "Speak. The world understands." (naming and details:
-docs/product/yaps.md). Built so far: Yaps, voice replies and voice intros (docs/product/yaps.md), Yap Radio, hands-free
+YAPILAPI is your city, alive: see what's happening around you, find hidden surprises, and go do it
+with your people (docs/product/your-city-alive.md). Launch cities: Lagos, Lomé and Paris. It comes in
+three steps; step 1 is built: **Stash**, hide something at a real place that only opens for someone
+who is there (docs/product/stash.md), the new **Near** home (the city map and what's on now around
+you), and the new navigation **Near · Pulse · ＋ · Chats · You**, with Create back in the middle
+(hide a stash first, then a post, reel, story, live or Yap). Step 2 ("Go out together") and step 3
+(city-first ranking, the landing page, sponsored hunts) come later.
+
+Voice stays one of the ways to share, no longer the identity: the voice-first Yap button left the
+middle of the navigation (a Yap is one of the ways in Create). Built from that time, and still
+features: Yaps, voice replies and voice intros (docs/product/yaps.md), Yap Radio, hands-free
 listening from stations (docs/product/yap-radio.md), Yapilapi Today, a daily spoken briefing
-(docs/product/yapilapi-today.md), and Ask the city, questions to people nearby (docs/product/ask-the-city.md).
+(docs/product/yapilapi-today.md), and Ask the city, questions to people nearby
+(docs/product/ask-the-city.md). The landing page and onboarding still carry the voice-first words
+until step 3.
 
-Last updated 2026-10-08 (Ask the city, migration 0092; Yap Radio, migration 0091; Yapilapi Today, migration 0093; Yaps, migration 0090; squads, migration 0086; account and chat additions, migration 0041; watch together, weekly wrap, On this day on Pulse, migration 0043; Ask me, chat games and drops, migrations 0045 to 0047; chess in chats, migration 0054, 2026-09-28; several games at once and a 3D view, migration 0060, 2026-09-28). Legend: **Built** = UI + API + database + validation + authorization + tests. **API** = working, tested endpoints without a dedicated UI yet. **Schema** = tables and design exist, no endpoints. **Not started** = nothing yet.
+Last updated 2026-10-24 (Stash and the Near home, migration 0094; Ask the city, migration 0092; Yap Radio, migration 0091; Yapilapi Today, migration 0093; Yaps, migration 0090; squads, migration 0086; account and chat additions, migration 0041; watch together, weekly wrap, On this day on Pulse, migration 0043; Ask me, chat games and drops, migrations 0045 to 0047; chess in chats, migration 0054, 2026-09-28; several games at once and a 3D view, migration 0060, 2026-09-28). Legend: **Built** = UI + API + database + validation + authorization + tests. **API** = working, tested endpoints without a dedicated UI yet. **Schema** = tables and design exist, no endpoints. **Not started** = nothing yet.
 
 ## The first integrated flow (directive §60)
 

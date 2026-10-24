@@ -2,6 +2,7 @@ import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { useEffect } from 'react';
 import { askNoticePost } from '../../../packages/shared/src/ask-city';
+import { stashNoticeTarget } from '../../../packages/shared/src/stash';
 import { micNoticeHref } from '../../../packages/shared/src/pass-the-mic';
 import { squadNoticeHref } from '../../../packages/shared/src/squads';
 import { useSession } from './session';
@@ -28,6 +29,9 @@ export function notificationHref(n: NotificationTarget): string | null {
   // Squads: an invite, someone joining, new posts and the weekly memory open the squad.
   const squad = squadNoticeHref({ type: n.type, entityId: n.entityId });
   if (squad) return `/squad/${encodeURIComponent(squad)}`;
+  // Stash: someone found your stash or thanked you for it (the stash), new stashes near you (the Stash screen).
+  const stash = stashNoticeTarget({ type: n.type, entityId: n.entityId });
+  if (stash !== null) return stash ? `/stash/${encodeURIComponent(stash)}` : '/stash';
   // Ask the city: a new question near you, or your answer marked helpful, opens the question with its answers.
   const question = askNoticePost({ type: n.type, entityId: n.entityId });
   if (question) return `/p/${encodeURIComponent(question)}`;
@@ -58,7 +62,7 @@ export function notificationHref(n: NotificationTarget): string | null {
   if (n.type === 'watch_invite' || n.entityType === 'watch') return id ? `/watch/${id}` : null;
   if (n.type === 'weekly_wrap' || n.entityType === 'wrap') return id ? `/wraps/${id}` : '/wraps';
   // "Your Today is ready": it's at the top of Pulse.
-  if (n.type === 'today_ready') return '/';
+  if (n.type === 'today_ready') return '/home';
   if (n.type === 'account_limited' || n.type === 'account_review') return '/settings';
   // A Mini App's review: the notification says how it went (and why); its page is on the web.
   if (n.entityType === 'mini_app') return null;
@@ -193,9 +197,11 @@ export function appPath(link: string): string {
   // The query goes along as it came (?q=…, ?start=…, ?open=…).
   const q = query ? `?${query}` : '';
   if (!first) return '/';
-  // The development app's own "open this server" link isn't a page: land on Pulse.
+  // The development app's own "open this server" link isn't a page: land on Near.
   if (first === 'expo-development-client') return '/';
-  if (first === 'home') return '/';
+  // Near is the first tab (the phone's "/"); Pulse is /home on both.
+  if (first === 'near') return '/';
+  if (first === 'home') return '/home';
   if (first === 'search') return `/discover${q}`;
   if (first === 'inbox') return second ? `/chat/${second}` : '/inbox';
   if (first === 'recaps' && second === 'new') return '/recap-new';

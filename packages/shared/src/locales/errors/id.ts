@@ -1254,4 +1254,28 @@ export const id: Record<string, string> = {
   'A Yap is one voice recording.': 'Yap adalah satu rekaman suara.',
   'Write a comment or record one.': 'Tulis komentar atau rekam komentar.',
   'Listening isn’t available right now. Try again later.': 'Mendengarkan belum tersedia saat ini. Coba lagi nanti.',
+  // apps/api/src/lib/stash.ts
+  'Your location isn’t accurate enough yet. Move outside or wait for a better GPS signal.':
+    'Lokasi Anda belum cukup akurat. Pindah ke luar ruangan atau tunggu sinyal GPS yang lebih baik.',
+  'Your location moved too far, too fast. Try again in a little while from where you are.':
+    'Lokasi Anda berpindah terlalu jauh, terlalu cepat. Coba lagi sebentar lagi dari tempat Anda berada.',
+  'You’ve hidden a lot of stashes today. Try again tomorrow.': 'Anda sudah menyembunyikan banyak stash hari ini. Coba lagi besok.',
+  'To keep younger people safe, you can only hide a stash for them once you are friends.':
+    'Untuk menjaga keamanan orang yang lebih muda, Anda hanya bisa menyembunyikan stash untuknya setelah berteman.',
+  'Your photo or video is still being prepared. Try again in a moment.': 'Foto atau video Anda masih disiapkan. Coba lagi sebentar lagi.',
+  'This stash has ended.': 'Stash ini sudah berakhir.',
+  'This message can’t be sent.': 'Pesan ini tidak bisa dikirim.',
+  'Choose someone else.': 'Pilih orang lain.',
+  'You can hide a stash for friends and people who follow you back.':
+    'Anda bisa menyembunyikan stash untuk teman dan orang yang Anda ikuti dan mengikuti Anda balik.',
+  'A video in a stash can be up to a minute long.': 'Video dalam stash bisa berdurasi hingga satu menit.',
+  "That stash doesn't exist or isn't visible to you.": 'Stash itu tidak ada atau tidak bisa Anda lihat.',
+  'Someone found this one first.': 'Seseorang sudah menemukannya lebih dulu.',
+  // apps/api/src/modules/stash.ts
+  'Stash is not enabled.': 'Stash tidak diaktifkan.',
+  'Choose a photo.': 'Pilih foto.',
+  // packages/shared/src/stash-schemas.ts
+  'Choose who it’s for.': 'Pilih untuk siapa stash ini.',
+  'Add what goes in the stash.': 'Tambahkan isi stash.',
+  'Choose a thank-you or write one.': 'Pilih ucapan terima kasih atau tulis sendiri.',
 };

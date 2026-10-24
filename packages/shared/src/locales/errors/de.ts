@@ -1280,4 +1280,28 @@ export const de: Record<string, string> = {
   'A Yap is one voice recording.': 'Ein Yap ist eine einzelne Sprachaufnahme.',
   'Write a comment or record one.': 'Schreib einen Kommentar oder nimm einen auf.',
   'Listening isn’t available right now. Try again later.': 'Anhören ist gerade nicht verfügbar. Versuch es später noch einmal.',
+  // apps/api/src/lib/stash.ts
+  'Your location isn’t accurate enough yet. Move outside or wait for a better GPS signal.':
+    'Dein Standort ist noch nicht genau genug. Geh nach draußen oder warte auf ein besseres GPS-Signal.',
+  'Your location moved too far, too fast. Try again in a little while from where you are.':
+    'Dein Standort hat sich zu weit und zu schnell verändert. Versuch es in einer Weile noch einmal von dort, wo du bist.',
+  'You’ve hidden a lot of stashes today. Try again tomorrow.': 'Du hast heute schon viele Verstecke angelegt. Versuch es morgen noch einmal.',
+  'To keep younger people safe, you can only hide a stash for them once you are friends.':
+    'Zum Schutz jüngerer Menschen kannst du erst ein Versteck für sie anlegen, wenn ihr befreundet seid.',
+  'Your photo or video is still being prepared. Try again in a moment.': 'Dein Foto oder Video wird noch vorbereitet. Versuch es gleich noch einmal.',
+  'This stash has ended.': 'Dieses Versteck ist beendet.',
+  'This message can’t be sent.': 'Diese Nachricht kann nicht gesendet werden.',
+  'Choose someone else.': 'Wähle jemand anderen.',
+  'You can hide a stash for friends and people who follow you back.':
+    'Du kannst ein Versteck für Freunde anlegen und für Leute, denen du folgst und die dir zurückfolgen.',
+  'A video in a stash can be up to a minute long.': 'Ein Video in einem Versteck kann bis zu einer Minute lang sein.',
+  "That stash doesn't exist or isn't visible to you.": 'Dieses Versteck existiert nicht oder ist für dich nicht sichtbar.',
+  'Someone found this one first.': 'Jemand anderes hat es zuerst gefunden.',
+  // apps/api/src/modules/stash.ts
+  'Stash is not enabled.': 'Verstecke sind nicht aktiviert.',
+  'Choose a photo.': 'Wähle ein Foto.',
+  // packages/shared/src/stash-schemas.ts
+  'Choose who it’s for.': 'Wähle aus, für wen es ist.',
+  'Add what goes in the stash.': 'Füge hinzu, was ins Versteck kommt.',
+  'Choose a thank-you or write one.': 'Wähle ein Dankeschön oder schreib eins.',
 };

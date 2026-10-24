@@ -220,7 +220,8 @@ export default function MapPage() {
         <legend>{t('map.layers')}</legend>
         {MAP_LAYERS.filter(
           (l) =>
-            (l !== 'friends' || me) &&
+            ((l !== 'friends' && l !== 'stashes') || me) &&
+            (l !== 'stashes' || flags.STASH !== false) &&
             (l !== 'live' || flags.LIVE) &&
             (l !== 'chains' || flags.PASS_THE_MIC !== false) &&
             (l !== 'questions' || flags.ASK_CITY !== false),

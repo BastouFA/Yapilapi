@@ -1247,4 +1247,27 @@ export const vi: Record<string, string> = {
   'A Yap is one voice recording.': 'Mỗi Yap là một bản ghi âm giọng nói.',
   'Write a comment or record one.': 'Hãy viết bình luận hoặc ghi âm một bình luận.',
   'Listening isn’t available right now. Try again later.': 'Hiện chưa nghe được. Hãy thử lại sau.',
+  // apps/api/src/lib/stash.ts
+  'Your location isn’t accurate enough yet. Move outside or wait for a better GPS signal.':
+    'Vị trí của bạn chưa đủ chính xác. Hãy ra ngoài trời hoặc chờ tín hiệu GPS tốt hơn.',
+  'Your location moved too far, too fast. Try again in a little while from where you are.':
+    'Vị trí của bạn đã thay đổi quá xa, quá nhanh. Hãy thử lại sau một lúc từ nơi bạn đang ở.',
+  'You’ve hidden a lot of stashes today. Try again tomorrow.': 'Hôm nay bạn đã giấu nhiều kho báu. Hãy thử lại vào ngày mai.',
+  'To keep younger people safe, you can only hide a stash for them once you are friends.':
+    'Để bảo vệ người trẻ tuổi, bạn chỉ có thể giấu kho báu cho họ khi hai bạn đã là bạn bè.',
+  'Your photo or video is still being prepared. Try again in a moment.': 'Ảnh hoặc video của bạn vẫn đang được chuẩn bị. Hãy thử lại sau giây lát.',
+  'This stash has ended.': 'Kho báu này đã kết thúc.',
+  'This message can’t be sent.': 'Không thể gửi tin nhắn này.',
+  'Choose someone else.': 'Hãy chọn người khác.',
+  'You can hide a stash for friends and people who follow you back.': 'Bạn có thể giấu kho báu cho bạn bè và những người bạn theo dõi cũng theo dõi lại bạn.',
+  'A video in a stash can be up to a minute long.': 'Video trong kho báu có thể dài tối đa một phút.',
+  "That stash doesn't exist or isn't visible to you.": 'Kho báu đó không tồn tại hoặc bạn không xem được.',
+  'Someone found this one first.': 'Đã có người tìm thấy kho báu này trước.',
+  // apps/api/src/modules/stash.ts
+  'Stash is not enabled.': 'Tính năng Kho báu chưa được bật.',
+  'Choose a photo.': 'Hãy chọn một ảnh.',
+  // packages/shared/src/stash-schemas.ts
+  'Choose who it’s for.': 'Hãy chọn kho báu này dành cho ai.',
+  'Add what goes in the stash.': 'Hãy thêm thứ sẽ đặt trong kho báu.',
+  'Choose a thank-you or write one.': 'Hãy chọn một lời cảm ơn hoặc tự viết.',
 };

@@ -1241,4 +1241,27 @@ export const ig: Record<string, string> = {
   'A Yap is one voice recording.': 'Yap bụ otu ndekọ olu.',
   'Write a comment or record one.': 'Dee nkọwa ma ọ bụ dekọọ otu.',
   'Listening isn’t available right now. Try again later.': 'Ige ntị adịghị ugbu a. Nwaa ọzọ ma emechaa.',
+  // apps/api/src/lib/stash.ts
+  'Your location isn’t accurate enough yet. Move outside or wait for a better GPS signal.':
+    'Ebe ị nọ ezibeghị ezi nke ọma. Pụọ n’èzí ma ọ bụ chere ka mgbaàmà GPS ka mma.',
+  'Your location moved too far, too fast. Try again in a little while from where you are.':
+    'Ebe ị nọ agaala ebe dị anya nke ukwuu, ngwa ngwa nke ukwuu. Nwaa ọzọ mgbe obere oge gachara site n’ebe ị nọ.',
+  'You’ve hidden a lot of stashes today. Try again tomorrow.': 'Ị zoola ọtụtụ akụ nzuzo taa. Nwaa ọzọ echi.',
+  'To keep younger people safe, you can only hide a stash for them once you are friends.':
+    'Iji chekwaa ndị na-eto eto, ị nwere ike ịzoro ha akụ nzuzo naanị ozugbo unu bụ ndị enyi.',
+  'Your photo or video is still being prepared. Try again in a moment.': 'A ka na-akwado foto ma ọ bụ vidiyo gị. Nwaa ọzọ n’oge na-adịghị anya.',
+  'This stash has ended.': 'Akụ nzuzo a agwụla.',
+  'This message can’t be sent.': 'Enweghị ike iziga ozi a.',
+  'Choose someone else.': 'Họrọ onye ọzọ.',
+  'You can hide a stash for friends and people who follow you back.': 'Ị nwere ike ịzoro ndị enyi na ndị ị na-eso ndị na-esokwa gị akụ nzuzo.',
+  'A video in a stash can be up to a minute long.': 'Vidiyo dị n’akụ nzuzo nwere ike iru otu nkeji.',
+  "That stash doesn't exist or isn't visible to you.": 'Akụ nzuzo ahụ adịghị ma ọ bụ ị nweghị ike ịhụ ya.',
+  'Someone found this one first.': 'Onye ọzọ buru ụzọ chọta nke a.',
+  // apps/api/src/modules/stash.ts
+  'Stash is not enabled.': 'Agbanyebeghị akụ nzuzo.',
+  'Choose a photo.': 'Họrọ foto.',
+  // packages/shared/src/stash-schemas.ts
+  'Choose who it’s for.': 'Họrọ onye ọ bụ maka ya.',
+  'Add what goes in the stash.': 'Tinye ihe ga-adị n’ime akụ nzuzo ahụ.',
+  'Choose a thank-you or write one.': 'Họrọ ekele ma ọ bụ dee otu.',
 };

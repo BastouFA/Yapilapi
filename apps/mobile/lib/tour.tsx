@@ -12,22 +12,23 @@ import { useColors } from './ui';
 /** The floating dock's measurements, shared with app/(tabs)/_layout.tsx so the tour points at the right place. */
 export const DOCK = { pad: 5, row: 54, maxWidth: 460, side: 12 } as const;
 const DOCK_HEIGHT = DOCK.row + DOCK.pad * 2 + 2;
-/** The middle (Yap) button rises this far above the dock. */
+/** The middle (Create) button rises this far above the dock. */
 const SPARK_RISE = 30;
 
-const DONE_KEY = 'ypl_nav_tour_v1';
+// v2: the dock became Near · Pulse · Create · Chats · You (docs/product/your-city-alive.md); everyone sees it once more.
+const DONE_KEY = 'ypl_nav_tour_v2';
 
 /** The four marks: which tab (or tabs) each points at, and what it says. */
 const MARKS: { slots: number[]; title: MessageKey; body: MessageKey }[] = [
-  { slots: [0], title: 'nav.home', body: 'm.tour.pulse' },
-  { slots: [1], title: 'nav.discover', body: 'm.tour.wander' },
-  { slots: [2], title: 'nav.yap', body: 'm.tour.spark' },
+  { slots: [0], title: 'nav.near', body: 'm.tour.near' },
+  { slots: [1], title: 'nav.home', body: 'm.tour.pulse' },
+  { slots: [2], title: 'nav.create', body: 'm.tour.create' },
   { slots: [3, 4], title: 'm.tour.yapYou.title', body: 'm.tour.yapYou.body' },
 ];
 
 /**
- * A short tour of the dock on first launch: four small marks, one at a time, pointing at Pulse,
- * Wander, the Yap button, then Chats and You. It never blocks the screen (nothing dims, every tab still
+ * A short tour of the dock on first launch: four small marks, one at a time, pointing at Near,
+ * Pulse, the Create button, then Chats and You. It never blocks the screen (nothing dims, every tab still
  * works), Skip ends it at once, and it is shown once per phone. Screen readers hear each mark
  * as it appears and can reach its buttons, but focus is never held inside it. With Reduce Motion
  * the marks appear without fading.

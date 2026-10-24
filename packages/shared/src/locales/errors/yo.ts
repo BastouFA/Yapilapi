@@ -1342,4 +1342,27 @@ export const yo: Record<string, string> = {
   'A Yap is one voice recording.': 'Yap jẹ́ ohùn kan tí a gbà sílẹ̀.',
   'Write a comment or record one.': 'Kọ èrò rẹ tàbí gba ọ̀kan sílẹ̀.',
   'Listening isn’t available right now. Try again later.': 'Gbígbọ́ kò sí báyìí. Gbìyànjú lẹ́ẹ̀kan sí i nígbà míì.',
+  // apps/api/src/lib/stash.ts
+  'Your location isn’t accurate enough yet. Move outside or wait for a better GPS signal.':
+    'Ibi tí o wà kò tíì péye tó. Jáde sí ìta tàbí dúró de àmì GPS tó dára jù.',
+  'Your location moved too far, too fast. Try again in a little while from where you are.':
+    'Ibi tí o wà ti yí padà jìnnà jù, kíákíá jù. Gbìyànjú lẹ́ẹ̀kan sí i láìpẹ́ láti ibi tí o wà.',
+  'You’ve hidden a lot of stashes today. Try again tomorrow.': 'O ti fi ìṣúra púpọ̀ pamọ́ lónìí. Gbìyànjú lẹ́ẹ̀kan sí i lọ́la.',
+  'To keep younger people safe, you can only hide a stash for them once you are friends.':
+    'Láti dáàbò bo àwọn ọ̀dọ́, o lè fi ìṣúra pamọ́ fún wọn nígbà tí ẹ bá ti di ọ̀rẹ́ nìkan.',
+  'Your photo or video is still being prepared. Try again in a moment.': 'À ń ṣètò fọ́tò tàbí fídíò rẹ lọ́wọ́. Gbìyànjú lẹ́ẹ̀kan sí i láìpẹ́.',
+  'This stash has ended.': 'Ìṣúra yìí ti parí.',
+  'This message can’t be sent.': 'A kò lè fi ìfiránṣẹ́ yìí ránṣẹ́.',
+  'Choose someone else.': 'Yan ẹlòmíràn.',
+  'You can hide a stash for friends and people who follow you back.': 'O lè fi ìṣúra pamọ́ fún àwọn ọ̀rẹ́ àti àwọn tí o ń tẹ̀lé tí wọ́n sì ń tẹ̀lé ọ padà.',
+  'A video in a stash can be up to a minute long.': 'Fídíò inú ìṣúra kò gbọ́dọ̀ ju ìṣẹ́jú kan lọ.',
+  "That stash doesn't exist or isn't visible to you.": 'Ìṣúra yẹn kò sí, tàbí o kò lè rí i.',
+  'Someone found this one first.': 'Ẹlòmíràn ti kọ́kọ́ rí èyí.',
+  // apps/api/src/modules/stash.ts
+  'Stash is not enabled.': 'A kò tíì tan Ìṣúra.',
+  'Choose a photo.': 'Yan fọ́tò kan.',
+  // packages/shared/src/stash-schemas.ts
+  'Choose who it’s for.': 'Yan ẹni tí o fi í pamọ́ fún.',
+  'Add what goes in the stash.': 'Fi ohun tó máa wà nínú ìṣúra náà kún un.',
+  'Choose a thank-you or write one.': 'Yan ọ̀rọ̀ ọpẹ́ kan tàbí kọ ọ̀kan.',
 };

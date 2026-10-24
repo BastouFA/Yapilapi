@@ -58,6 +58,7 @@ import { VoicePlayer } from './voice';
 import { ProfileMixes } from './mixes';
 import { ProfileMarket } from './market';
 import { useFlag } from './flags';
+import { ExplorerLine } from './stash';
 
 /**
  * A profile: name, bio, counts, Follow and Message for other people, and
@@ -82,6 +83,7 @@ export function ProfileView({
   const c = useColors();
   const { t, tp, number } = useT();
   const askOn = useFlag('ASK_CITY') !== false;
+  const stashOn = useFlag('STASH') !== false;
   const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
   // Why it couldn't load, when that isn't because it's gone; a profile already showing stays.
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -394,6 +396,8 @@ export function ProfileView({
             </Text>
           </View>
         ) : null}
+        {/* Stash: "Stashes found: 12 · Hidden: 5" and badges, unless they keep it to themselves. */}
+        {rel.blocked || !stashOn ? null : <ExplorerLine username={profile.username} />}
         <ProfileLinks links={profile.links} tint={tint} />
         <ProfileAbout profile={profile} />
         {/* Someone you blocked shows nothing of theirs, not even counts. */}

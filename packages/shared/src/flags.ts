@@ -42,6 +42,10 @@ export const FEATURE_FLAGS = {
     default: true,
     description: 'Yapilapi Today: a short daily briefing of what your people and your city are talking about, read aloud (needs a real AI model).',
   },
+  STASH: {
+    default: true,
+    description: 'Stash: hide a note, photo, video, song, voice note or gift at a real place; it opens only for someone who is there.',
+  },
   CITY_MAP: { default: true, description: 'Near you: a live map of lives, events, Market listings, busy places, chains and friends who are out.' },
   ADS: { default: false, description: 'Sponsored posts: paid campaigns shown only to adults who opted in to advertising.' },
 } as const;

@@ -19,9 +19,12 @@ import { PageBack } from '@/components/BackButton';
 import { RadioBar, RadioProvider } from '@/components/Radio';
 import { useSession } from '../providers';
 
-function currentTab(path: string, username?: string, yaps = true): NavEntry['id'] | undefined {
+function currentTab(path: string, username?: string): NavEntry['id'] | undefined {
   if (path.startsWith('/home')) return 'home';
+  // Near is the city around you: the map, stashes, and Explore (Wander) and search from there.
   if (
+    path.startsWith('/near') ||
+    path.startsWith('/stash') ||
     path.startsWith('/discover') ||
     path.startsWith('/search') ||
     path.startsWith('/t/') ||
@@ -33,9 +36,9 @@ function currentTab(path: string, username?: string, yaps = true): NavEntry['id'
     path.startsWith('/map') ||
     path.startsWith('/ask')
   )
-    return 'discover';
-  // The middle button: Yap (it opens the recorder, and holds the other ways to create), or Spark while Yaps are off.
-  if (path.startsWith('/create') || path.startsWith('/camera')) return yaps ? 'yap' : 'create';
+    return 'near';
+  // The middle button: Create (a stash, a post, reel, story, live or Yap).
+  if (path.startsWith('/create') || path.startsWith('/camera')) return 'create';
   if (path.startsWith('/inbox') || path.startsWith('/yap') || path.startsWith('/notifications')) return 'inbox';
   if (username && path.startsWith(`/u/${username}`)) return 'profile';
   if (path.startsWith('/settings') || path.startsWith('/studio') || path.startsWith('/saved')) return 'profile';
@@ -43,7 +46,7 @@ function currentTab(path: string, username?: string, yaps = true): NavEntry['id'
 }
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { me, loading, unread, locale, sessionError, refresh, t, flags } = useSession();
+  const { me, loading, unread, locale, sessionError, refresh, t } = useSession();
   const [creating, setCreating] = useState(false);
   const router = useRouter();
   const path = usePathname();
@@ -86,14 +89,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </div>
     );
 
-  // Pulse · Wander · Yap · Chats · You (docs/product/yaps.md, "Naming"). The Yap button opens the
-  // recorder; held down (or with the + beside it on a computer) it offers a post, reel, story or live.
-  // While Yaps are off, Spark takes the middle and opens the camera, as before.
-  const yaps = flags.YAPS !== false;
+  // Near · Pulse · ＋ · Chats · You (docs/product/your-city-alive.md). The + in the middle opens the
+  // ways to create: hide a stash first, then a post, reel, story, live or Yap.
   const items: NavEntry[] = [
+    { id: 'near', href: '/near' },
     { id: 'home', href: '/home' },
-    { id: 'discover', href: '/discover' },
-    yaps ? { id: 'yap', href: '/create?mode=yap', menu: { label: t('nav.createMore'), open: () => setCreating(true) } } : { id: 'create', href: '/camera' },
+    { id: 'create', href: '/create', opens: () => setCreating(true) },
     { id: 'inbox', href: '/inbox', badge: unread.messages + unread.notifications },
     { id: 'profile', href: `/u/${me.username}`, avatar: { name: me.displayName, src: me.avatarUrl } },
   ];
@@ -125,9 +126,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <div className="yp-shell">
               <NavBar
                 items={items}
-                current={currentTab(path, me.username, yaps)}
+                current={currentTab(path, me.username)}
                 linkAs={NextLink}
                 locale={locale}
+                brandHref="/near"
                 logoSrc="/mark.svg"
                 searchHref="/search"
                 footer={<RailAccountButton />}

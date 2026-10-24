@@ -69,7 +69,9 @@ export default function MapScreen() {
 
   // Questions (Ask the city) are left out while that feature is off.
   const askOn = useFlag('ASK_CITY') !== false;
-  const offered = MAP_LAYERS.filter((l) => (l !== 'friends' || !!me) && (l !== 'questions' || askOn));
+  // Stashes and friends are for someone signed in (stashes while Stash is on).
+  const stashOn = useFlag('STASH') !== false;
+  const offered = MAP_LAYERS.filter((l) => ((l !== 'friends' && l !== 'stashes') || !!me) && (l !== 'questions' || askOn) && (l !== 'stashes' || stashOn));
   const layers = offered.filter((l) => !hidden.includes(l));
   const layersKey = layers.join(',');
 

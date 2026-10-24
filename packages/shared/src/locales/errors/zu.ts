@@ -1271,4 +1271,27 @@ export const zu: Record<string, string> = {
   'A Yap is one voice recording.': 'I-Yap iwukuqopha kwezwi okukodwa.',
   'Write a comment or record one.': 'Bhala amazwana noma uqophe.',
   'Listening isn’t available right now. Try again later.': 'Ukulalela akutholakali manje. Zama futhi emuva kwesikhathi.',
+  // apps/api/src/lib/stash.ts
+  'Your location isn’t accurate enough yet. Move outside or wait for a better GPS signal.':
+    'Indawo yakho ayikanembi ngokwanele. Phumela ngaphandle noma ulinde isignali ye-GPS engcono.',
+  'Your location moved too far, too fast. Try again in a little while from where you are.':
+    'Indawo yakho isuke ibanga elide kakhulu ngokushesha okukhulu. Zama futhi emva kwesikhashana ulapho ukhona.',
+  'You’ve hidden a lot of stashes today. Try again tomorrow.': 'Ufihle imicebo eminingi namuhla. Zama futhi kusasa.',
+  'To keep younger people safe, you can only hide a stash for them once you are friends.':
+    'Ukuze sigcine abantu abasebasha bephephile, ungabafihlela umcebo kuphela uma senibangani.',
+  'Your photo or video is still being prepared. Try again in a moment.': 'Isithombe noma ividiyo yakho isalungiswa. Zama futhi emzuzwini.',
+  'This stash has ended.': 'Lo mcebo usuphelile.',
+  'This message can’t be sent.': 'Lo mlayezo awukwazi ukuthunyelwa.',
+  'Choose someone else.': 'Khetha omunye.',
+  'You can hide a stash for friends and people who follow you back.': 'Ungafihlela abangani umcebo, kanye nabantu obalandelayo abakulandela nabo.',
+  'A video in a stash can be up to a minute long.': 'Ividiyo esemcebweni ingaba yinde kuze kube umzuzu owodwa.',
+  "That stash doesn't exist or isn't visible to you.": 'Lowo mcebo awukho noma awukwazi ukuwubona.',
+  'Someone found this one first.': 'Omunye umuntu uwuthole kuqala lo.',
+  // apps/api/src/modules/stash.ts
+  'Stash is not enabled.': 'Umcebo awuvuliwe.',
+  'Choose a photo.': 'Khetha isithombe.',
+  // packages/shared/src/stash-schemas.ts
+  'Choose who it’s for.': 'Khetha ukuthi uwenzela bani.',
+  'Add what goes in the stash.': 'Engeza okuzofakwa emcebweni.',
+  'Choose a thank-you or write one.': 'Khetha ukubonga noma ubhale okwakho.',
 };

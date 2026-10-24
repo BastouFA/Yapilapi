@@ -158,6 +158,7 @@ export const MODERATION_TARGET_KEYS: Record<(typeof REPORT_TARGETS)[number], Mes
   mix: 'moderation.target.mix',
   together_item: 'moderation.target.togetherItem',
   listing: 'moderation.target.listing',
+  stash: 'moderation.target.stash',
 };
 
 export const MODERATION_DECISION_KEYS: Record<ModerationDecision, MessageKey> = {

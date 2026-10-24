@@ -1251,4 +1251,27 @@ export const ru: Record<string, string> = {
   'A Yap is one voice recording.': 'Yap — это одна голосовая запись.',
   'Write a comment or record one.': 'Напишите комментарий или запишите его голосом.',
   'Listening isn’t available right now. Try again later.': 'Прослушивание сейчас недоступно. Попробуйте позже.',
+  // apps/api/src/lib/stash.ts
+  'Your location isn’t accurate enough yet. Move outside or wait for a better GPS signal.':
+    'Местоположение пока недостаточно точное. Выйдите на улицу или дождитесь сигнала GPS получше.',
+  'Your location moved too far, too fast. Try again in a little while from where you are.':
+    'Ваше местоположение изменилось слишком сильно и слишком быстро. Попробуйте ещё раз чуть позже с того места, где вы находитесь.',
+  'You’ve hidden a lot of stashes today. Try again tomorrow.': 'Сегодня вы спрятали много тайников. Попробуйте завтра.',
+  'To keep younger people safe, you can only hide a stash for them once you are friends.':
+    'Чтобы защитить младших, спрятать для них тайник можно только после того, как вы станете друзьями.',
+  'Your photo or video is still being prepared. Try again in a moment.': 'Ваше фото или видео ещё готовится. Попробуйте чуть позже.',
+  'This stash has ended.': 'Срок этого тайника закончился.',
+  'This message can’t be sent.': 'Это сообщение нельзя отправить.',
+  'Choose someone else.': 'Выберите кого-нибудь другого.',
+  'You can hide a stash for friends and people who follow you back.': 'Прятать тайники можно для друзей и тех, на кого вы подписаны и кто подписан на вас.',
+  'A video in a stash can be up to a minute long.': 'Видео в тайнике может длиться не больше минуты.',
+  "That stash doesn't exist or isn't visible to you.": 'Этот тайник не существует или вам не виден.',
+  'Someone found this one first.': 'Этот тайник уже нашёл кто-то другой.',
+  // apps/api/src/modules/stash.ts
+  'Stash is not enabled.': 'Тайники не включены.',
+  'Choose a photo.': 'Выберите фото.',
+  // packages/shared/src/stash-schemas.ts
+  'Choose who it’s for.': 'Выберите, для кого он.',
+  'Add what goes in the stash.': 'Добавьте то, что будет в тайнике.',
+  'Choose a thank-you or write one.': 'Выберите благодарность или напишите свою.',
 };

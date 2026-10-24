@@ -102,7 +102,7 @@ export function AboutCard() {
           <div>
             <strong>{t('st.about.web')}</strong>
             <p className="muted" style={{ margin: 0 }}>
-              {t('st.about.version', { version: APP_VERSION })} · {t('app.tagline')}
+              {t('st.about.version', { version: APP_VERSION })}
             </p>
           </div>
         </div>

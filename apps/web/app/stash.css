@@ -1,0 +1,180 @@
+/* ── Stash and the Near home (app/(app)/stash, app/(app)/near, components/Stash.tsx) ── */
+
+/* A stash on the map is an area: a soft disc with a pin, never a point. */
+.citymap__pin--stashes {
+  border-color: var(--yapi);
+  border-style: dotted;
+  background: var(--yapi-soft);
+  color: var(--yapi-strong);
+}
+
+.stash-page .citymap__view {
+  height: min(40vh, 300px);
+  min-height: 220px;
+}
+.stash-page__hint {
+  margin: 0;
+  font-size: 17px;
+  line-height: 24px;
+}
+.stash-page__note,
+.stash-page__held {
+  margin: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  color: var(--ink);
+}
+.stash-inside {
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.stash-inside__media {
+  display: block;
+  width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+.stash-inside__body {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: 16px;
+  line-height: 24px;
+}
+.stash-inside__gift {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 2px dashed var(--yapi);
+  border-radius: var(--radius-md);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  word-break: break-all;
+}
+.stash-inside__song {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+.stash-inside__song img {
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+}
+.stash-inside__credit {
+  font-size: 12px;
+}
+.stash-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.stash-reactions legend {
+  margin-bottom: var(--space-2);
+  font-weight: 700;
+}
+.stash-finds {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.stash-explorer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink-muted);
+}
+.stash-kinds {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.stash-kinds legend {
+  margin-bottom: var(--space-2);
+  font-weight: 700;
+}
+.stash-kind {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 64px;
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.stash-kind[aria-pressed='true'] {
+  border-color: var(--yapi);
+  background: var(--yapi-soft);
+  font-weight: 700;
+}
+.stash-kind:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* The Near home: a search, the map, and what's on now. */
+.near-page__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.near-page__search {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-end;
+  min-width: 0;
+}
+.near-page__search .yp-field {
+  flex: 1;
+  min-width: 0;
+}
+.near-page__picks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.near-page .citymap__view {
+  height: min(52vh, 420px);
+}
+.near-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.near-section h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: 15px;
+}
+.near-section ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}

@@ -2,10 +2,10 @@ import { randomBytes } from 'node:crypto';
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 
 /**
- * "The social network you speak" (docs/product/yaps.md, "Naming" and "The Yap button"): the
- * signed-out landing page in English and French, the Yap button in the middle of the navigation
- * (it opens the recorder; a right click or a long press offers the other ways to create), the
- * navigation at phone width and on a computer, and onboarding's first step, a voice hello that can
+ * The signed-out landing page in English and French (still "The social network you speak" until
+ * step 3 of docs/product/your-city-alive.md), the navigation, Near · Pulse · Create · Chats · You,
+ * with Create in the middle (a tap offers a stash, post, reel, story, live or Yap), at phone width
+ * and on a computer, and onboarding's first step, a voice hello that can
  * be recorded or skipped. Chrome's fake media flags stand in for a real microphone. Each project
  * (light and dark, desktop and phone) runs the page checks; recording runs in the light ones.
  */
@@ -75,52 +75,53 @@ test.describe('landing page', () => {
 });
 
 test.describe('navigation', () => {
-  test('Pulse · Wander · Yap · Chats · You, with the Yap button in the middle', async ({ page, isMobile }) => {
+  // docs/product/your-city-alive.md: Near · Pulse · + · Chats · You, Create in the middle.
+  test('Near · Pulse · Create · Chats · You, with Create in the middle', async ({ page, isMobile }) => {
     await account(page.request, 'nav');
     await page.goto('/home');
     const nav = page.getByRole('navigation', { name: 'Primary' });
-    const yap = nav.getByRole('link', { name: 'Yap', exact: true });
-    await expect(yap).toBeInViewport();
-    await expect(yap).toHaveAttribute('href', '/create?mode=yap');
+    const links = nav.getByRole('link');
+    await expect(nav.getByRole('link', { name: /^Near/ })).toHaveAttribute('href', '/near');
+    await expect(nav.getByRole('link', { name: /^Pulse/ })).toHaveAttribute('href', '/home');
     await expect(nav.getByRole('link', { name: /^Chats/ })).toHaveAttribute('href', '/inbox');
-    // The Yap button is the biggest thing in the bar.
-    const box = (await yap.locator('.yp-nav__icon').boundingBox())!;
-    expect(box.width).toBeGreaterThanOrEqual(isMobile ? 56 : 22);
-    // Wide screens have the menu's own button beside it; phones hold the button down instead.
-    await expect(nav.getByRole('button', { name: 'More ways to create' })).toBeVisible({ visible: !isMobile });
-    // Pulse: Yaps right after For you.
-    const filters = page.getByRole('group', { name: 'Feed' }).getByRole('button');
-    await expect(filters.nth(0)).toHaveText('For you');
-    await expect(filters.nth(1)).toHaveText('Yaps');
+    await expect(nav.getByRole('link', { name: 'Wander', exact: true })).toHaveCount(0);
+    expect(await links.count()).toBeGreaterThanOrEqual(5);
+    const create = nav.getByRole('link', { name: 'Create', exact: true });
+    await expect(create).toBeInViewport();
+    // The raised button in the middle is the biggest thing in the bar.
+    const box = (await create.locator('.yp-nav__icon').boundingBox())!;
+    expect(box.width).toBeGreaterThanOrEqual(isMobile ? 54 : 22);
     await noSidewaysScroll(page);
-    // A right click (a long press on a phone) opens the other ways to create, and doesn't follow the link.
-    await yap.click({ button: 'right' });
-    const menu = page.getByRole('dialog', { name: 'More ways to create' });
+    // A tap opens the ways to create (a stash first), and doesn't follow the link.
+    await create.click();
+    const menu = page.getByRole('dialog', { name: 'Create' });
     await expect(menu).toBeVisible();
-    for (const name of ['Post', 'Reel', 'Story']) await expect(menu.getByRole('link', { name })).toBeVisible();
+    await expect(menu.getByRole('link').first()).toHaveText('Hide a stash');
+    for (const name of ['Post', 'Reel', 'Story', 'Yap']) await expect(menu.getByRole('link', { name })).toBeVisible();
     // Live is there while the LIVE feature is on.
     const flags = (await (await page.request.get('/api/v1/flags')).json()).flags as Record<string, boolean>;
-    await expect(menu.getByRole('link', { name: 'Live' })).toHaveCount(flags.LIVE === false ? 0 : 1);
+    await expect(menu.getByRole('link', { name: 'Live' })).toHaveCount(flags.LIVE ? 1 : 0);
     await expect(page).toHaveURL(/\/home/);
     await menu.getByRole('link', { name: 'Reel' }).click();
     await expect(page).toHaveURL(/\/camera\?mode=reel/);
   });
 
-  test('at 375px wide, nothing overflows and the Yap button fits', async ({ page }) => {
+  test('at 375px wide, nothing overflows and Create fits', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await account(page.request, 'narrow');
     await page.goto('/home');
-    const yap = page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Yap', exact: true });
-    await expect(yap).toBeInViewport({ ratio: 1 });
+    const create = page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Create', exact: true });
+    await expect(create).toBeInViewport({ ratio: 1 });
     await noSidewaysScroll(page);
   });
 
-  test('the Yap button opens the recorder', async ({ page }, info) => {
+  test('Yap in Create opens the recorder', async ({ page }, info) => {
     lightOnly(info.project.name);
     test.setTimeout(90_000);
     await account(page.request, 'button');
     await page.goto('/home');
-    await page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Yap', exact: true }).click();
+    await page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Create', exact: true }).click();
+    await page.getByRole('dialog', { name: 'Create' }).getByRole('link', { name: 'Yap' }).click();
     await expect(page).toHaveURL(/\/create\?mode=yap/);
     await expect(page.getByTestId('yap-record')).toBeVisible();
     await record(page, 2500);

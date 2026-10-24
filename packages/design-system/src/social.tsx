@@ -115,10 +115,11 @@ const A: LinkLike = ({ href, children, ...rest }) => (
 // ── Navigation ──────────────────────────────────────────────────────────
 export interface NavEntry {
   /**
-   * Pulse, Wander, the Yap button (Spark while Yaps are off), Chats and You. The ids (and URLs)
-   * keep their original names: `inbox` is Chats, `create` is Spark, `yap` records a Yap.
+   * Near, Pulse, Create (the raised + in the middle), Chats and You (docs/product/your-city-alive.md).
+   * The ids keep their original names: `home` is Pulse, `inbox` is Chats. `discover` (Wander) and
+   * `yap` (the voice-first Yap button) are from before and no longer in the bar.
    */
-  id: 'home' | 'discover' | 'create' | 'yap' | 'inbox' | 'profile';
+  id: 'near' | 'home' | 'discover' | 'create' | 'yap' | 'inbox' | 'profile';
   href: string;
   badge?: number;
   /** "You" shows the signed-in person's own avatar (their initials when there is no photo). */
@@ -128,9 +129,18 @@ export interface NavEntry {
    * down or a right click on it (the context-menu key too), and by a small button beside it on wide screens.
    */
   menu?: { label: string; open: () => void };
+  /** A tap opens this (a dialog, such as the ways to create) instead of following the link. */
+  opens?: () => void;
 }
-const NAV_GLYPH: Record<Exclude<NavEntry['id'], 'profile'>, IconName> = { home: 'pulse', discover: 'wander', create: 'spark', yap: 'voice', inbox: 'yap' };
-/** The raised button in the middle: the Yap button, or Spark while Yaps are off. */
+const NAV_GLYPH: Record<Exclude<NavEntry['id'], 'profile'>, IconName> = {
+  near: 'near',
+  home: 'pulse',
+  discover: 'wander',
+  create: 'add',
+  yap: 'voice',
+  inbox: 'yap',
+};
+/** The raised button in the middle: Create. */
 const isCentre = (id: NavEntry['id']) => id === 'create' || id === 'yap';
 /** How long a press is held before it counts as a long press. */
 const LONG_PRESS_MS = 450;
@@ -158,8 +168,18 @@ function NavItem({ it, on, hint, L, locale }: { it: NavEntry; on: boolean; hint:
       className={cx('yp-nav__item', `yp-nav__item--${it.id}`, isCentre(it.id) && 'yp-nav__item--create')}
       aria-current={on ? 'page' : undefined}
       aria-describedby={hint}
+      aria-haspopup={it.opens ? 'dialog' : undefined}
       {...hold.handlers}
-      onClick={it.menu ? (e) => hold.wasHeld() && e.preventDefault() : undefined}
+      onClick={
+        it.opens
+          ? (e) => {
+              e.preventDefault();
+              it.opens!();
+            }
+          : it.menu
+            ? (e) => hold.wasHeld() && e.preventDefault()
+            : undefined
+      }
     >
       <span className="yp-nav__icon">
         {it.id === 'profile' ? (
@@ -185,13 +205,12 @@ function NavItem({ it, on, hint, L, locale }: { it: NavEntry; on: boolean; hint:
 }
 
 /**
- * Primary navigation: Pulse | Wander | Yap | Chats | You (ids home, discover, yap, inbox, profile;
- * while Yaps are off, Spark, id create, takes the middle).
+ * Primary navigation: Near | Pulse | Create | Chats | You (ids near, home, create, inbox, profile).
  * Phones: a floating dock. Icons only, except the current page, whose label sits with its icon
  * in a squircle highlight that slides between tabs; other labels show on hover and keyboard focus
  * and are always in the links' accessible names. The middle button is a raised, slightly tilted
- * brand-gradient squircle that straightens when pressed; held down, it opens its menu. Wide
- * screens: a side rail with every label visible, and the menu's own small button beside the middle one.
+ * brand-gradient squircle with a plus that straightens when pressed; a tap opens the ways to
+ * create (`opens`). Wide screens: a side rail with every label visible.
  */
 export function NavBar({
   items,

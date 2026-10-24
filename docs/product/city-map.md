@@ -31,6 +31,7 @@ post or live shows it, and it can't be changed after posting, like media). Nothi
 
 | Layer | What shows | Point on the map | Card |
 | --- | --- | --- | --- |
+| Stashes | stashes the viewer may find (signed in only; docs/product/stash.md), behind `STASH` | the stash's area, never its point | title, hint, who hid it, finds |
 | Live now | lives on now with a place | the place | title, place, host, started |
 | Today | events at a place that are on now, or start before the end of the viewer's day (their time zone; events without an end count 3 hours) | the place | title, place, time |
 | Market | listed things with a pickup point (not sold, not ended, not held) | the 2 km grid (`marketPoint`) | title, area, photo |

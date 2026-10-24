@@ -29,6 +29,7 @@ import { answerCards } from '../lib/ask.ts';
 import { MIX_FROM, mixVisibleSql } from '../lib/mixes.ts';
 import { LISTING_FROM, listingVisibleSql } from '../lib/market.ts';
 import { postVisibleSql } from '../lib/visibility.ts';
+import { stashVisibleSql } from '../lib/stash.ts';
 import { emailSuspension, redeemAppealToken } from '../lib/suspension.ts';
 import { me, requireAuth, requireRole } from '../plugins/auth.ts';
 
@@ -47,6 +48,7 @@ const CONTENT_TABLES: Record<string, string> = {
   listing: 'market_listings',
   market_rating: 'market_ratings',
   story: 'moments',
+  stash: 'stashes',
 };
 /** What a removal deletes that has no moderation state. */
 const DELETED_TABLES: Record<string, string> = {
@@ -57,7 +59,7 @@ const DELETED_TABLES: Record<string, string> = {
 };
 
 // Reports in these categories skip the queue and are escalated immediately.
-const URGENT = new Set(['minor_safety', 'self_harm', 'violence']);
+const URGENT = new Set(['minor_safety', 'self_harm', 'violence', 'private_place']);
 
 /**
  * Trust & safety: reports → moderation cases → decisions → enforcement → appeals.
@@ -87,6 +89,8 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
       together_item: `SELECT user_id AS uid FROM together_contributions WHERE id = $1 AND deleted_at IS NULL`,
       // A Market listing is its seller's.
       listing: `SELECT seller_id AS uid FROM market_listings WHERE id = $1 AND deleted_at IS NULL`,
+      // A stash is whoever hid it (the team's launch stashes: the admin who placed it).
+      stash: `SELECT owner_id AS uid FROM stashes WHERE id = $1 AND deleted_at IS NULL`,
     };
     const r = await db.query(q[type]!, [id]);
     return r.rows[0]?.uid ?? null;
@@ -136,6 +140,11 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
       const ok = await db.query(`SELECT 1 ${LISTING_FROM} WHERE l.id = $2 AND ${listingVisibleSql('$1')}`, [u.id, input.targetId]);
       if (!ok.rowCount) throw notFound('The item you reported');
     }
+    // A stash, only by someone who may find it.
+    if (input.targetType === 'stash') {
+      const ok = await db.query(`SELECT 1 FROM stashes s WHERE s.id = $2 AND ${stashVisibleSql('$1')}`, [u.id, input.targetId]);
+      if (!ok.rowCount) throw notFound('The item you reported');
+    }
     // Albums are for their members: only someone in it (who can see the item) can report what's in it.
     if (input.targetType === 'together_item') {
       const ok = await db.query(
@@ -161,6 +170,8 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
       );
       // Content reported for minor safety is hidden from everyone but its author at once, until a moderator decides.
       if (input.reason === 'minor_safety') await holdForMinorSafety(c, input.targetType, input.targetId);
+      // A stash at someone's home or another private place: hidden from everyone at once, until a moderator decides.
+      if (input.reason === 'private_place' && input.targetType === 'stash') await holdForMinorSafety(c, 'stash', input.targetId);
       return r.rows[0];
     });
     reply.code(201);
@@ -232,6 +243,8 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
                              WHEN 'mix' THEN (SELECT concat_ws(E'\n', title, nullif(description, '')) FROM mixes WHERE id = mc.target_id)
                              WHEN 'together_item' THEN (SELECT caption FROM together_contributions WHERE id = mc.target_id)
                              WHEN 'listing' THEN (SELECT concat_ws(E'\n', title, nullif(description, ''), area) FROM market_listings WHERE id = mc.target_id)
+                             -- A stash: its words, and its exact point (moderators only), to judge "It's at my home".
+                             WHEN 'stash' THEN (SELECT concat_ws(E'\n', nullif(title, ''), nullif(hint, ''), nullif(body, ''), nullif(gift_code, ''), lat || ', ' || lng) FROM stashes WHERE id = mc.target_id)
                              WHEN 'market_rating' THEN (SELECT stars || '/5: ' || coalesce(body, '') FROM market_ratings WHERE id = mc.target_id)
                              -- What the moderator needs to judge an account, a story, a community, an event and the rest.
                              WHEN 'user' THEN (SELECT concat_ws(E'\n', display_name || ' (@' || username || ')', nullif(bio, '')) FROM profiles WHERE user_id = mc.target_id)
@@ -251,7 +264,9 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
                                                     FROM together_contributions tc JOIN media m ON m.id = tc.media_id WHERE tc.id = mc.target_id)
               WHEN mc.target_type = 'listing' THEN (SELECT json_build_object('kind', m.kind, 'url', coalesce(m.variants->>'medium', m.url), 'moderation', m.moderation)
                                                     FROM market_listing_photos ph JOIN media m ON m.id = ph.media_id WHERE ph.listing_id = mc.target_id
-                                                    ORDER BY (m.moderation = 'sensitive') DESC, ph.position LIMIT 1) END AS media
+                                                    ORDER BY (m.moderation = 'sensitive') DESC, ph.position LIMIT 1)
+              WHEN mc.target_type = 'stash' THEN (SELECT json_build_object('kind', m.kind, 'url', coalesce(m.variants->>'medium', m.poster_url, m.url), 'moderation', m.moderation)
+                                                    FROM stashes st JOIN media m ON m.id = st.media_id WHERE st.id = mc.target_id) END AS media
        FROM moderation_cases mc LEFT JOIN profiles pr ON pr.user_id = mc.subject_user_id LEFT JOIN appeals ap ON ap.case_id = mc.id
        WHERE mc.status = $1 ORDER BY CASE mc.risk WHEN 'escalate' THEN 0 WHEN 'restrict' THEN 1 ELSE 2 END, mc.created_at LIMIT 100`,
       [q.status, me(req).id],

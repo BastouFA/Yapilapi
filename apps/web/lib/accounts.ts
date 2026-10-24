@@ -11,7 +11,7 @@ import { currentSubscription } from './push';
 
 /** Where to land after switching: Yap mode stays in Yap mode. */
 export function homeFor(path: string): string {
-  return path.startsWith('/yap') ? '/yap' : '/home';
+  return path.startsWith('/yap') ? '/yap' : '/near';
 }
 
 /** Browser storage that belongs to the account in use, not to the browser. */

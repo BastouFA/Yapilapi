@@ -1328,4 +1328,27 @@ export const ar: Record<string, string> = {
   'A Yap is one voice recording.': 'الـ Yap تسجيل صوتي واحد.',
   'Write a comment or record one.': 'اكتب تعليقًا أو سجّل واحدًا.',
   'Listening isn’t available right now. Try again later.': 'الاستماع غير متاح الآن. حاول مرة أخرى لاحقًا.',
+  // apps/api/src/lib/stash.ts
+  'Your location isn’t accurate enough yet. Move outside or wait for a better GPS signal.':
+    'موقعك ليس دقيقًا بما يكفي بعد. اخرج إلى مكان مفتوح أو انتظر إشارة GPS أفضل.',
+  'Your location moved too far, too fast. Try again in a little while from where you are.':
+    'تحرّك موقعك مسافة كبيرة بسرعة كبيرة. حاول مرة أخرى بعد قليل من مكانك الحالي.',
+  'You’ve hidden a lot of stashes today. Try again tomorrow.': 'خبّأت الكثير من الخبايا اليوم. حاول مرة أخرى غدًا.',
+  'To keep younger people safe, you can only hide a stash for them once you are friends.':
+    'حفاظًا على سلامة الأصغر سنًا، لا يمكنك أن تخبّئ خبيئة لهم إلا بعد أن تصبحا صديقين.',
+  'Your photo or video is still being prepared. Try again in a moment.': 'لا تزال صورتك أو الفيديو الخاص بك قيد التجهيز. حاول مرة أخرى بعد لحظات.',
+  'This stash has ended.': 'انتهت هذه الخبيئة.',
+  'This message can’t be sent.': 'لا يمكن إرسال هذه الرسالة.',
+  'Choose someone else.': 'اختر شخصًا آخر.',
+  'You can hide a stash for friends and people who follow you back.': 'يمكنك أن تخبّئ خبيئة للأصدقاء وللأشخاص الذين تتابعهم ويتابعونك.',
+  'A video in a stash can be up to a minute long.': 'يمكن أن يصل طول الفيديو في الخبيئة إلى دقيقة واحدة.',
+  "That stash doesn't exist or isn't visible to you.": 'هذه الخبيئة غير موجودة أو لا يمكنك رؤيتها.',
+  'Someone found this one first.': 'وجدها شخص آخر قبلك.',
+  // apps/api/src/modules/stash.ts
+  'Stash is not enabled.': 'ميزة «الخبيئة» غير مفعّلة.',
+  'Choose a photo.': 'اختر صورة.',
+  // packages/shared/src/stash-schemas.ts
+  'Choose who it’s for.': 'اختر لمن هي.',
+  'Add what goes in the stash.': 'أضف ما سيكون داخل الخبيئة.',
+  'Choose a thank-you or write one.': 'اختر كلمة شكر أو اكتب واحدة.',
 };

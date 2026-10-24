@@ -1242,4 +1242,28 @@ export const bn: Record<string, string> = {
   'A Yap is one voice recording.': 'Yap মানে একটি ভয়েস রেকর্ডিং।',
   'Write a comment or record one.': 'একটি মন্তব্য লিখুন বা রেকর্ড করুন।',
   'Listening isn’t available right now. Try again later.': 'শোনা এখন উপলব্ধ নয়। পরে আবার চেষ্টা করুন।',
+  // apps/api/src/lib/stash.ts
+  'Your location isn’t accurate enough yet. Move outside or wait for a better GPS signal.':
+    'আপনার লোকেশন এখনো যথেষ্ট নির্ভুল নয়। বাইরে যান বা ভালো GPS সিগন্যালের জন্য অপেক্ষা করুন।',
+  'Your location moved too far, too fast. Try again in a little while from where you are.':
+    'আপনার লোকেশন খুব অল্প সময়ে অনেক দূরে সরে গেছে। একটু পরে আপনি যেখানে আছেন সেখান থেকে আবার চেষ্টা করুন।',
+  'You’ve hidden a lot of stashes today. Try again tomorrow.': 'আজ আপনি অনেক গুপ্তধন লুকিয়েছেন। আগামীকাল আবার চেষ্টা করুন।',
+  'To keep younger people safe, you can only hide a stash for them once you are friends.':
+    'কমবয়সীদের নিরাপদ রাখতে, বন্ধু হওয়ার পরেই কেবল আপনি তাঁদের জন্য গুপ্তধন লুকাতে পারবেন।',
+  'Your photo or video is still being prepared. Try again in a moment.': 'আপনার ছবি বা ভিডিও এখনো প্রস্তুত হচ্ছে। একটু পরে আবার চেষ্টা করুন।',
+  'This stash has ended.': 'এই গুপ্তধনের মেয়াদ শেষ হয়েছে।',
+  'This message can’t be sent.': 'এই বার্তাটি পাঠানো যাবে না।',
+  'Choose someone else.': 'অন্য কাউকে বেছে নিন।',
+  'You can hide a stash for friends and people who follow you back.':
+    'আপনি বন্ধুদের জন্য, আর যাঁদের আপনি ফলো করেন এবং যাঁরা আপনাকেও ফলো করেন তাঁদের জন্য গুপ্তধন লুকাতে পারবেন।',
+  'A video in a stash can be up to a minute long.': 'গুপ্তধনে ভিডিও সর্বোচ্চ এক মিনিট লম্বা হতে পারে।',
+  "That stash doesn't exist or isn't visible to you.": 'ওই গুপ্তধনটি নেই বা আপনি এটি দেখতে পারবেন না।',
+  'Someone found this one first.': 'অন্য কেউ এটি আগেই খুঁজে পেয়েছেন।',
+  // apps/api/src/modules/stash.ts
+  'Stash is not enabled.': 'গুপ্তধন চালু করা নেই।',
+  'Choose a photo.': 'একটি ছবি বেছে নিন।',
+  // packages/shared/src/stash-schemas.ts
+  'Choose who it’s for.': 'এটি কার জন্য, তা বেছে নিন।',
+  'Add what goes in the stash.': 'গুপ্তধনে কী থাকবে তা যোগ করুন।',
+  'Choose a thank-you or write one.': 'একটি ধন্যবাদ বেছে নিন বা নিজে লিখুন।',
 };

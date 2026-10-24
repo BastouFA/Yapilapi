@@ -1361,4 +1361,27 @@ export const ha: Record<string, string> = {
   'A Yap is one voice recording.': 'Yap rikodin murya ɗaya ne.',
   'Write a comment or record one.': 'Rubuta sharhi ko ku naɗa ɗaya.',
   'Listening isn’t available right now. Try again later.': 'Ba a iya sauraro yanzu. Sake gwadawa nan gaba.',
+  // apps/api/src/lib/stash.ts
+  'Your location isn’t accurate enough yet. Move outside or wait for a better GPS signal.':
+    'Wurin da kake bai yi daidai sosai ba tukuna. Fita waje ko ka jira siginar GPS mafi kyau.',
+  'Your location moved too far, too fast. Try again in a little while from where you are.':
+    'Wurin da kake ya matsa nesa sosai, da sauri sosai. Sake gwadawa nan da ɗan lokaci daga inda kake.',
+  'You’ve hidden a lot of stashes today. Try again tomorrow.': 'Kun ɓoye taskoki da yawa yau. Sake gwadawa gobe.',
+  'To keep younger people safe, you can only hide a stash for them once you are friends.':
+    'Don kare matasa, za ku iya ɓoye musu taska ne kawai bayan kun zama abokai.',
+  'Your photo or video is still being prepared. Try again in a moment.': 'Ana shirya hotonku ko bidiyonku har yanzu. Sake gwadawa nan da ɗan lokaci.',
+  'This stash has ended.': 'Wannan taska ta ƙare.',
+  'This message can’t be sent.': 'Ba za a iya aika wannan saƙon ba.',
+  'Choose someone else.': 'Zaɓi wani daban.',
+  'You can hide a stash for friends and people who follow you back.': 'Za ku iya ɓoye taska don abokai da mutanen da kuke bi waɗanda su ma suke bin ku.',
+  'A video in a stash can be up to a minute long.': 'Bidiyo a cikin taska zai iya kai tsawon minti ɗaya.',
+  "That stash doesn't exist or isn't visible to you.": 'Ba a sami wannan taskar ba, ko kuma ba za ku iya ganinta ba.',
+  'Someone found this one first.': 'Wani ya riga ka samo wannan.',
+  // apps/api/src/modules/stash.ts
+  'Stash is not enabled.': 'Ba a kunna taska ba.',
+  'Choose a photo.': 'Zaɓi hoto.',
+  // packages/shared/src/stash-schemas.ts
+  'Choose who it’s for.': 'Zaɓi wanda aka nufa da ita.',
+  'Add what goes in the stash.': 'Ƙara abin da zai kasance a cikin taskar.',
+  'Choose a thank-you or write one.': 'Zaɓi saƙon godiya ko ku rubuta ɗaya.',
 };

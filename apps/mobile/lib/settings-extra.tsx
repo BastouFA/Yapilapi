@@ -1324,9 +1324,7 @@ export function About() {
       </View>
       <View style={{ flex: 1 }}>
         <Text style={{ color: c.ink, fontSize: 15, fontWeight: '700' }}>{Platform.OS === 'ios' ? t('st.about.ios') : t('st.about.android')}</Text>
-        <Text style={{ color: c.inkMuted, fontSize: 13 }}>
-          {t('st.about.version', { version: APP_VERSION })} · {t('app.tagline')}
-        </Text>
+        <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t('st.about.version', { version: APP_VERSION })}</Text>
       </View>
     </Card>
   );

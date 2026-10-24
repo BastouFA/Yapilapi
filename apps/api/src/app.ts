@@ -78,6 +78,7 @@ import squadsModule from './modules/squads.ts';
 import voiceModule from './modules/voice.ts';
 import cityMapModule from './modules/city-map.ts';
 import askCityModule from './modules/ask-city.ts';
+import stashModule from './modules/stash.ts';
 import todayModule from './modules/today.ts';
 import radioModule from './modules/radio.ts';
 import tagsModule from './modules/tags.ts';
@@ -124,6 +125,7 @@ import { maybeRunRetention } from './lib/retention.ts';
 import { sweepMarket } from './lib/market.ts';
 import { sweepFairStarts } from './lib/fair-start.ts';
 import { sweepPresence } from './lib/city-map.ts';
+import { sweepStashNearby, sweepStashSamples } from './lib/stash.ts';
 import { sweepToday } from './lib/today.ts';
 import Stripe from 'stripe';
 import { adminEmails, promoteListedAdmins } from './lib/admin-bootstrap.ts';
@@ -513,6 +515,7 @@ export async function buildApp(
     voiceModule,
     cityMapModule,
     askCityModule,
+    stashModule,
     todayModule,
     radioModule,
     plusModule,
@@ -611,6 +614,9 @@ export async function buildApp(
         await sweepSquadMemories({ db, realtime: ctx.realtime }).catch((e) => app.log.warn({ err: e.message }, 'squad memories'));
         // "Show me on the map to friends" past its time: the point is deleted (lib/city-map.ts).
         await sweepPresence(db).catch((e) => app.log.warn({ err: e.message }, 'map presence sweep'));
+        // Stash: positions kept to spot impossible jumps go after an hour; "new stashes near you", at most once a day each (lib/stash.ts).
+        await sweepStashSamples(db).catch((e) => app.log.warn({ err: e.message }, 'stash samples sweep'));
+        await sweepStashNearby({ db, realtime: ctx.realtime }).catch((e) => app.log.warn({ err: e.message }, 'stash nearby'));
         // Yapilapi Today for people whose morning hour has come (lib/today.ts). Not awaited: each is a model call and a few clips.
         if (!todaySweeping) {
           todaySweeping = true;

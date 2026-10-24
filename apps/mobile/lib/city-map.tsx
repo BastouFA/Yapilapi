@@ -44,7 +44,8 @@ const TILE_TEMPLATE = ((Constants.expoConfig?.extra ?? {}) as { mapTileUrl?: str
 /** Tile servers ask apps to say who they are. */
 const TILE_HEADERS = { 'User-Agent': `YAPILAPI/${Constants.expoConfig?.version ?? '1'} (+${webUrl})` };
 
-const LAYER_ICONS: Record<MapLayer, IconName> = {
+export const LAYER_ICONS: Record<MapLayer, IconName> = {
+  stashes: 'gift-outline',
   live: 'radio-outline',
   today: 'calendar-outline',
   market: 'pricetag-outline',
@@ -84,6 +85,8 @@ export function openMapTarget(target: MapTarget) {
       return router.push(`/chain/${target.id}`);
     case 'post':
       return router.push(`/p/${target.id}`);
+    case 'stash':
+      return router.push(`/stash/${target.id}`);
     case 'chat':
       return router.push(`/chat/${target.id}`);
     case 'user':
@@ -104,6 +107,7 @@ export function useItemMeta() {
     else if (item.layer === 'friends' && item.endsAt) parts.push(t('location.until', { time: clockTime(item.endsAt, locale) }));
     else if (item.layer === 'places' && item.count) parts.push(tp('map.recent', item.count, { count: number(item.count) }));
     else if (item.layer === 'chains' && item.count) parts.push(tp('m.sound.reelCount', item.count, { count: number(item.count) }));
+    else if (item.layer === 'stashes' && item.count) parts.push(tp('stash.finds', item.count, { count: number(item.count) }));
     else if (item.layer === 'questions') parts.push(item.count ? tp('askCity.answers', item.count) : t('askCity.needsAnswer'));
     else if (item.layer === 'live' && item.at) parts.push(timeAgo(item.at));
     return parts.join(' · ');
@@ -113,7 +117,7 @@ export function useItemMeta() {
 /** What an item is called: its title, or its layer's name when it has none (a spoken question without words). */
 export function useItemTitle() {
   const { t } = useT();
-  return (item: MapItem) => item.title || t(MAP_LAYER_KEYS[item.layer]);
+  return (item: MapItem) => item.title || t(item.layer === 'stashes' ? 'stash.untitled' : MAP_LAYER_KEYS[item.layer]);
 }
 
 /** One item, in the list and on a pin's card: picture, title, where, and the meta line. Opens the item. */

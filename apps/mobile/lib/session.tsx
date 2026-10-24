@@ -175,7 +175,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const ended = token ? await accountWithToken(token) : null;
       if (ended) await forgetAccount(ended);
       await restoreToken(undefined);
-      // Screens loaded for the account that ended close; the next one starts at Pulse.
+      // Screens loaded for the account that ended close; the next one starts at Near.
       if ((await takeOverNext(ended)) === 'switched') {
         if (router.canDismiss()) router.dismissAll();
         router.replace('/');

@@ -150,7 +150,8 @@ export async function claimVoice(c: Q, userId: string, mediaId: string, purpose:
     `SELECT vc.purpose,
             (EXISTS (SELECT 1 FROM post_media pm WHERE pm.media_id = vc.media_id AND pm.post_id IS DISTINCT FROM $3::uuid)
              OR EXISTS (SELECT 1 FROM comments cm WHERE cm.voice_media_id = vc.media_id)
-             OR EXISTS (SELECT 1 FROM profiles pr WHERE pr.voice_intro_media_id = vc.media_id)) AS used
+             OR EXISTS (SELECT 1 FROM profiles pr WHERE pr.voice_intro_media_id = vc.media_id)
+             OR EXISTS (SELECT 1 FROM stashes st WHERE st.media_id = vc.media_id)) AS used
      FROM voice_clips vc JOIN media m ON m.id = vc.media_id
      WHERE vc.media_id = $1 AND vc.owner_id = $2 AND m.moderation <> 'blocked'
      FOR UPDATE OF vc`,
@@ -198,11 +199,18 @@ export async function startPostTranscripts(deps: VoiceDeps, postId: string): Pro
 
 /** Where a clip is used: the Yap or comment (with its post), or the profile it introduces. */
 async function attachmentOf(db: Q, mediaId: string) {
-  const { rows } = await db.query<{ post_id: string | null; comment_id: string | null; comment_post_id: string | null; intro_of: string | null }>(
+  const { rows } = await db.query<{
+    post_id: string | null;
+    comment_id: string | null;
+    comment_post_id: string | null;
+    intro_of: string | null;
+    stash_id: string | null;
+  }>(
     `SELECT (SELECT pm.post_id FROM post_media pm JOIN posts p ON p.id = pm.post_id WHERE pm.media_id = $1 AND p.deleted_at IS NULL LIMIT 1) AS post_id,
             (SELECT cm.id FROM comments cm WHERE cm.voice_media_id = $1 AND cm.deleted_at IS NULL LIMIT 1) AS comment_id,
             (SELECT cm.post_id FROM comments cm WHERE cm.voice_media_id = $1 AND cm.deleted_at IS NULL LIMIT 1) AS comment_post_id,
-            (SELECT pr.user_id FROM profiles pr WHERE pr.voice_intro_media_id = $1 LIMIT 1) AS intro_of`,
+            (SELECT pr.user_id FROM profiles pr WHERE pr.voice_intro_media_id = $1 LIMIT 1) AS intro_of,
+            (SELECT st.id FROM stashes st WHERE st.media_id = $1 AND st.kind = 'voice' AND st.deleted_at IS NULL LIMIT 1) AS stash_id`,
     [mediaId],
   );
   return rows[0]!;
@@ -234,7 +242,9 @@ async function screenTranscript(deps: VoiceDeps, mediaId: string, ownerId: strin
       ? { type: 'comment', id: at.comment_id }
       : at.intro_of
         ? { type: 'user', id: at.intro_of }
-        : null;
+        : at.stash_id
+          ? { type: 'stash', id: at.stash_id }
+          : null;
   if (!target) return;
   if (at.post_id) {
     const cur = (await deps.db.query<{ s: string }>(`SELECT moderation_status AS s FROM posts WHERE id = $1`, [at.post_id])).rows[0]?.s ?? 'normal';
@@ -243,6 +253,10 @@ async function screenTranscript(deps: VoiceDeps, mediaId: string, ownerId: strin
     const cur = (await deps.db.query<{ s: string }>(`SELECT moderation_status AS s FROM comments WHERE id = $1`, [at.comment_id])).rows[0]?.s ?? 'normal';
     await deps.db.query(`UPDATE comments SET moderation_status = $2 WHERE id = $1`, [at.comment_id, worse(cur, status)]);
     if (at.comment_post_id) await syncCommentCounts(deps.db, at.comment_post_id);
+  } else if (at.stash_id) {
+    // A stash's voice note: it can't be found while held (lib/stash.ts), and is limited or removed like a post.
+    const cur = (await deps.db.query<{ s: string }>(`SELECT moderation_status AS s FROM stashes WHERE id = $1`, [at.stash_id])).rows[0]?.s ?? 'normal';
+    await deps.db.query(`UPDATE stashes SET moderation_status = $2 WHERE id = $1`, [at.stash_id, worse(cur, status)]);
   } else if (at.intro_of) {
     await deps.db.query(`UPDATE profiles SET voice_intro_media_id = NULL WHERE user_id = $1 AND voice_intro_media_id = $2`, [at.intro_of, mediaId]);
   }

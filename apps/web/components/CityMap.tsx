@@ -38,6 +38,7 @@ const TILES = process.env.NEXT_PUBLIC_MAP_TILE_URL || MAP_TILE_URL;
 const STEP = 96;
 
 export const LAYER_ICONS: Record<MapLayer, IconName> = {
+  stashes: 'map-pin',
   live: 'video',
   today: 'calendar',
   market: 'bag',
@@ -240,11 +241,13 @@ export function MapItemRow({ item, from }: { item: MapItem; from: LatLng }) {
           ? tp('map.recent', item.count)
           : item.layer === 'chains' && item.count
             ? tp('m.sound.reelCount', item.count)
-            : item.layer === 'questions'
-              ? item.count
-                ? tp('askCity.answers', item.count)
-                : t('askCity.needsAnswer')
-              : null;
+            : item.layer === 'stashes' && item.count
+              ? tp('stash.finds', item.count)
+              : item.layer === 'questions'
+                ? item.count
+                  ? tp('askCity.answers', item.count)
+                  : t('askCity.needsAnswer')
+                : null;
   const meta = [t(MAP_LAYER_KEYS[item.layer]), distance, when, item.approximate ? t('location.precision.approximate') : null].filter(Boolean);
   return (
     <Link href={mapTargetPath(item.target)} className="citymap-row">
@@ -252,7 +255,7 @@ export function MapItemRow({ item, from }: { item: MapItem; from: LatLng }) {
         {item.thumbUrl ? <img src={item.thumbUrl} alt="" /> : <Icon name={LAYER_ICONS[item.layer]} size={20} />}
       </span>
       <span className="citymap-row__text">
-        <span className="citymap-row__title">{item.title || t(MAP_LAYER_KEYS[item.layer])}</span>
+        <span className="citymap-row__title">{item.title || t(item.layer === 'stashes' ? 'stash.untitled' : MAP_LAYER_KEYS[item.layer])}</span>
         {item.subtitle ? <span className="citymap-row__sub">{item.subtitle}</span> : null}
         <span className="citymap-row__meta">{meta.join(' · ')}</span>
       </span>

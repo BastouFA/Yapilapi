@@ -24,7 +24,7 @@ export function BackButton({ fallback = '/home' }: { fallback?: string }) {
 }
 
 /** The main tabs: you arrive at them from the navigation, so there's nothing to go back to. */
-const ROOTS = new Set(['/', '/home', '/discover', '/inbox', '/search', '/onboarding']);
+const ROOTS = new Set(['/', '/near', '/home', '/discover', '/inbox', '/search', '/onboarding']);
 /** Full-screen views and pages that draw their own back or close control. */
 const OWN_BACK = [/^\/reels$/, /^\/inbox\/./, /^\/yap(\/|$)/, /^\/s\//, /^\/camera/, /^\/watch\//, /^\/live\/./, /^\/rooms\//, /^\/together\/./, /^\/wraps\/./];
 /** Pages that list things: where "up" goes when there's no history (an item's page goes to its list). */

@@ -28,6 +28,9 @@ const PUBLIC_PAGES: [string, string][] = [
 ];
 
 const APP_PAGES: [string, (d: SeedData) => string][] = [
+  ['near', () => '/near'],
+  ['stash', () => '/stash'],
+  ['hide a stash', () => '/stash/new'],
   ['home', () => '/home'],
   ['discover', () => '/discover'],
   ['create', () => '/create'],
@@ -539,12 +542,12 @@ const STATES: [string, (page: Page, d: SeedData) => Promise<void>][] = [
 /** Newer states (audited at 375px on phones, like NEW_PAGES). */
 const NEW_STATES: [string, (page: Page, d: SeedData) => Promise<void>][] = [
   [
-    'nav: more ways to create',
+    'nav: the ways to create',
     async (page) => {
       await open(page, '/home');
-      // A right click (a long press on a phone) on the Yap button opens the other ways to create.
-      await page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Yap', exact: true }).click({ button: 'right' });
-      await expect(page.getByRole('dialog', { name: 'More ways to create' })).toBeVisible();
+      // The + in the middle opens the ways to create (a stash first).
+      await page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Create', exact: true }).click();
+      await expect(page.getByRole('dialog', { name: 'Create' })).toBeVisible();
     },
   ],
   [

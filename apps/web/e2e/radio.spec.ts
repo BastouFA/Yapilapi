@@ -108,11 +108,8 @@ test('plays a station hands-free, keeps playing across the app, and answers the 
   await expect.poll(() => nowPlaying(page)).toBe(before);
 
   // Stop from the bar: gone.
-  await page
-    .getByRole('link', { name: /Wander/ })
-    .first()
-    .click();
-  await page.waitForURL(/\/discover/);
+  await page.getByRole('link', { name: /^Near/ }).first().click();
+  await page.waitForURL(/\/near/);
   await bar.getByRole('button', { name: 'Stop Radio' }).click();
   await expect(bar).toBeHidden();
 });

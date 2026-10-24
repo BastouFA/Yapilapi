@@ -120,6 +120,8 @@ export const REPORT_REASONS = [
   'fraud',
   'minor_safety',
   'copyright',
+  // A stash hidden at someone's home or another private place (offered for stashes only): hidden at once until a moderator looks.
+  'private_place',
   'other',
 ] as const;
 
@@ -127,7 +129,8 @@ export const REPORT_REASONS = [
  * What can be reported. A story is a moment; a live is a live session; a room is an audio room. A
  * question (by whoever asked it) and an answer (the card, by the person who answered) share an id. A drop is a
  * seller's launch. A mix is a song list (its name and description are its owner's). A together_item is a photo or
- * video in a Together album (only its members can report it). A listing is a Market listing (by its seller).
+ * video in a Together album (only its members can report it). A listing is a Market listing (by its seller). A stash is
+ * something hidden at a place (by whoever hid it; only people who can find it can report it).
  */
 export const REPORT_TARGETS = [
   'user',
@@ -146,6 +149,7 @@ export const REPORT_TARGETS = [
   'mix',
   'together_item',
   'listing',
+  'stash',
 ] as const;
 
 export const FEEDBACK_SIGNALS = ['more_like_this', 'less_like_this', 'not_interested', 'mute_topic', 'mute_creator'] as const;

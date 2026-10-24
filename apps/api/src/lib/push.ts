@@ -263,6 +263,10 @@ const TEXT: Record<string, Text> = {
       topic: ASK_TOPIC_KEYS[d.topic as AskTopic] ? t(ASK_TOPIC_KEYS[d.topic as AskTopic], locale) : '',
     }),
   ask_helpful: say('push.ask_helpful'),
+  // Stash: someone found yours (grouped per stash: the newest finder pushes once), thanked you for it, or new ones near you today.
+  stash_found: say('push.stash_found'),
+  stash_thanks: say('push.stash_thanks'),
+  stash_nearby: (_n, d, locale) => tp('push.stash_nearby', Number(d.count ?? 1), locale),
   drop_opened: say('push.drop_opened'),
   drop_cancelled: say('push.drop_cancelled'),
   drop_sold_out: say('push.drop_sold_out'),

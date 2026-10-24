@@ -1244,4 +1244,28 @@ export const ja: Record<string, string> = {
   'A Yap is one voice recording.': 'Yapは1つの音声の録音です。',
   'Write a comment or record one.': 'コメントを書くか、録音してください。',
   'Listening isn’t available right now. Try again later.': '現在、音声で聞くことはできません。後でもう一度お試しください。',
+  // apps/api/src/lib/stash.ts
+  'Your location isn’t accurate enough yet. Move outside or wait for a better GPS signal.':
+    '位置情報の精度がまだ足りません。屋外に出るか、GPSの電波が良くなるまでお待ちください。',
+  'Your location moved too far, too fast. Try again in a little while from where you are.':
+    '短時間で位置が大きく移動しすぎています。しばらくしてから、今いる場所でもう一度お試しください。',
+  'You’ve hidden a lot of stashes today. Try again tomorrow.': '今日はたくさんのスタッシュを隠しました。明日もう一度お試しください。',
+  'To keep younger people safe, you can only hide a stash for them once you are friends.':
+    '若い人の安全を守るため、その人に向けてスタッシュを隠せるのは友達になってからです。',
+  'Your photo or video is still being prepared. Try again in a moment.': '写真や動画はまだ準備中です。少ししてからもう一度お試しください。',
+  'This stash has ended.': 'このスタッシュは終了しました。',
+  'This message can’t be sent.': 'このメッセージは送信できません。',
+  'Choose someone else.': '別の人を選んでください。',
+  'You can hide a stash for friends and people who follow you back.':
+    '友達や、あなたがフォローしていてフォローし返してくれている人に向けてスタッシュを隠せます。',
+  'A video in a stash can be up to a minute long.': 'スタッシュに入れる動画は最大1分までです。',
+  "That stash doesn't exist or isn't visible to you.": 'そのスタッシュは存在しないか、あなたには表示されません。',
+  'Someone found this one first.': '先に誰かが見つけました。',
+  // apps/api/src/modules/stash.ts
+  'Stash is not enabled.': 'スタッシュは有効になっていません。',
+  'Choose a photo.': '写真を選んでください。',
+  // packages/shared/src/stash-schemas.ts
+  'Choose who it’s for.': '誰に向けたものか選んでください。',
+  'Add what goes in the stash.': 'スタッシュの中身を追加してください。',
+  'Choose a thank-you or write one.': 'お礼を選ぶか、書いてください。',
 };

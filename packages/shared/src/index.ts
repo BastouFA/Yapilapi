@@ -67,4 +67,6 @@ export * from './radio.ts';
 export * from './voice-schemas.ts';
 export * from './ask-city.ts';
 export * from './ask-city-schemas.ts';
+export * from './stash.ts';
+export * from './stash-schemas.ts';
 export * from './today.ts';

@@ -61,11 +61,11 @@ function LoginForm() {
 
   // Already signed in (another tab logged in): carry on to where you were going. Not when adding an account.
   useEffect(() => {
-    if (!loading && me && !busy && !adding) router.replace(!me.onboarded ? '/onboarding' : (next ?? '/home'));
+    if (!loading && me && !busy && !adding) router.replace(!me.onboarded ? '/onboarding' : (next ?? '/near'));
   }, [loading, me, busy, next, router, adding]);
 
   function done(user: Me) {
-    const dest = !user.onboarded ? '/onboarding' : (next ?? '/home');
+    const dest = !user.onboarded ? '/onboarding' : (next ?? '/near');
     // Another account was in use: the page starts again as this one, so nothing of the other stays.
     if (adding && me) return void startAs(dest);
     setMe(user);
@@ -160,7 +160,7 @@ function LoginForm() {
                   setBusy(true);
                   setError(null);
                   try {
-                    await switchAccount(a.id, next ?? '/home');
+                    await switchAccount(a.id, next ?? '/near');
                   } catch (err) {
                     // Its session ended since: it has left the list.
                     setError(problem(err, t));
@@ -230,7 +230,7 @@ function LoginForm() {
       </p>
       {adding ? (
         <p className="auth__foot" style={{ textAlign: 'center' }}>
-          <Link href={next ?? '/home'}>{t('common.cancel')}</Link>
+          <Link href={next ?? '/near'}>{t('common.cancel')}</Link>
         </p>
       ) : null}
     </form>

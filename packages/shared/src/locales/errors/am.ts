@@ -1206,4 +1206,24 @@ export const am: Record<string, string> = {
   'A Yap is one voice recording.': 'Yap አንድ የድምጽ ቅጂ ነው።',
   'Write a comment or record one.': 'አስተያየት ይጻፉ ወይም ይቅዱ።',
   'Listening isn’t available right now. Try again later.': 'ማዳመጥ አሁን አይገኝም። ቆይተው እንደገና ይሞክሩ።',
+  // apps/api/src/lib/stash.ts
+  'Your location isn’t accurate enough yet. Move outside or wait for a better GPS signal.': 'አካባቢዎ ገና በቂ ትክክለኛ አይደለም። ወደ ውጭ ይውጡ ወይም የተሻለ የGPS ምልክት ይጠብቁ።',
+  'Your location moved too far, too fast. Try again in a little while from where you are.': 'አካባቢዎ በጣም በፍጥነት በጣም ርቆ ተንቀሳቅሷል። ካሉበት ቦታ ትንሽ ቆይተው እንደገና ይሞክሩ።',
+  'You’ve hidden a lot of stashes today. Try again tomorrow.': 'ዛሬ ብዙ ድብቅ ሀብቶችን አስቀምጠዋል። ነገ እንደገና ይሞክሩ።',
+  'To keep younger people safe, you can only hide a stash for them once you are friends.': 'ወጣቶችን ደህንነታቸውን ለመጠበቅ፣ ድብቅ ሀብት ሊያስቀምጡላቸው የሚችሉት ጓደኛሞች ሲሆኑ ብቻ ነው።',
+  'Your photo or video is still being prepared. Try again in a moment.': 'ፎቶዎ ወይም ቪዲዮዎ አሁንም በመዘጋጀት ላይ ነው። ትንሽ ቆይተው እንደገና ይሞክሩ።',
+  'This stash has ended.': 'ይህ ድብቅ ሀብት አብቅቷል።',
+  'This message can’t be sent.': 'ይህ መልዕክት ሊላክ አይችልም።',
+  'Choose someone else.': 'ሌላ ሰው ይምረጡ።',
+  'You can hide a stash for friends and people who follow you back.': 'ለጓደኞች እና ለሚከተሏቸው እና መልሰው ለሚከተሉዎት ሰዎች ድብቅ ሀብት ማስቀመጥ ይችላሉ።',
+  'A video in a stash can be up to a minute long.': 'በድብቅ ሀብት ውስጥ ያለ ቪዲዮ እስከ አንድ ደቂቃ ሊረዝም ይችላል።',
+  "That stash doesn't exist or isn't visible to you.": 'ያ ድብቅ ሀብት የለም ወይም ለእርስዎ አይታይም።',
+  'Someone found this one first.': 'ሌላ ሰው ይህን ቀድሞ አግኝቶታል።',
+  // apps/api/src/modules/stash.ts
+  'Stash is not enabled.': 'ድብቅ ሀብት አልበራም።',
+  'Choose a photo.': 'ፎቶ ይምረጡ።',
+  // packages/shared/src/stash-schemas.ts
+  'Choose who it’s for.': 'ለማን እንደሆነ ይምረጡ።',
+  'Add what goes in the stash.': 'በድብቅ ሀብቱ ውስጥ የሚገባውን ያክሉ።',
+  'Choose a thank-you or write one.': 'የምስጋና መልዕክት ይምረጡ ወይም አንድ ይጻፉ።',
 };

@@ -35,6 +35,7 @@ export const REASON_KEYS: Record<ReportReason, MessageKey> = {
   fraud: 'postList.reason.fraud',
   minor_safety: 'postList.reason.minorSafety',
   copyright: 'postList.reason.copyright',
+  private_place: 'postList.reason.privatePlace',
   other: 'postList.reason.other',
 };
 
@@ -55,6 +56,7 @@ const TITLE_KEYS: Record<ReportTargetType, MessageKey> = {
   mix: 'm.report.title.mix',
   together_item: 'm.report.title.togetherItem',
   listing: 'm.report.title.listing',
+  stash: 'm.report.title.stash',
 };
 
 type Done = { already: boolean; blocked: boolean; blockError?: string };
@@ -146,7 +148,8 @@ export function ReportSheet({
         {t('postList.reportWhat')}
       </Text>
       <View accessibilityRole="radiogroup" style={{ gap: 2 }}>
-        {REPORT_REASONS.map((r) => (
+        {/* "It's at my home or another private place" is for stashes (it hides one at once, until a moderator looks). */}
+        {REPORT_REASONS.filter((r) => r !== 'private_place' || target.type === 'stash').map((r) => (
           <SheetItem
             key={r}
             icon={reason === r ? 'radio-button-on' : 'radio-button-off'}

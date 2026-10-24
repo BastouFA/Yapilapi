@@ -1355,4 +1355,28 @@ export const es: Record<string, string> = {
   'A Yap is one voice recording.': 'Un Yap es una sola grabación de voz.',
   'Write a comment or record one.': 'Escribe un comentario o graba uno.',
   'Listening isn’t available right now. Try again later.': 'Escuchar no está disponible ahora mismo. Inténtalo más tarde.',
+  // apps/api/src/lib/stash.ts
+  'Your location isn’t accurate enough yet. Move outside or wait for a better GPS signal.':
+    'Tu ubicación aún no es lo bastante precisa. Sal al exterior o espera a tener mejor señal de GPS.',
+  'Your location moved too far, too fast. Try again in a little while from where you are.':
+    'Tu ubicación se movió demasiado lejos y demasiado rápido. Inténtalo de nuevo dentro de un rato desde donde estás.',
+  'You’ve hidden a lot of stashes today. Try again tomorrow.': 'Hoy creaste muchos escondites. Inténtalo de nuevo mañana.',
+  'To keep younger people safe, you can only hide a stash for them once you are friends.':
+    'Para proteger a las personas más jóvenes, solo puedes crear un escondite para ellas cuando sean amigos.',
+  'Your photo or video is still being prepared. Try again in a moment.': 'Tu foto o vídeo aún se está preparando. Inténtalo de nuevo en un momento.',
+  'This stash has ended.': 'Este escondite ha terminado.',
+  'This message can’t be sent.': 'Este mensaje no se puede enviar.',
+  'Choose someone else.': 'Elige a otra persona.',
+  'You can hide a stash for friends and people who follow you back.':
+    'Puedes crear un escondite para tus amigos y para las personas que sigues y que te siguen.',
+  'A video in a stash can be up to a minute long.': 'Un vídeo en un escondite puede durar hasta un minuto.',
+  "That stash doesn't exist or isn't visible to you.": 'Ese escondite no existe o no puedes verlo.',
+  'Someone found this one first.': 'Alguien lo encontró antes.',
+  // apps/api/src/modules/stash.ts
+  'Stash is not enabled.': 'Los escondites no están activados.',
+  'Choose a photo.': 'Elige una foto.',
+  // packages/shared/src/stash-schemas.ts
+  'Choose who it’s for.': 'Elige para quién es.',
+  'Add what goes in the stash.': 'Añade lo que va dentro del escondite.',
+  'Choose a thank-you or write one.': 'Elige un agradecimiento o escribe uno.',
 };

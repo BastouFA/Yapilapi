@@ -1,5 +1,5 @@
 /**
- * The primary navigation's own symbols (Pulse, Wander, Spark, Chats and the Yap button), drawn once as simple
+ * The primary navigation's own symbols (Near, Pulse, Create, Chats, and Wander, Spark and the Yap button from before), drawn once as simple
  * geometry on a 24px grid so the web (SVG) and the mobile app (plain Views, no SVG library)
  * render exactly the same shapes. "You" is the person's own avatar, so it has no glyph.
  *
@@ -17,9 +17,15 @@ export type GlyphShape =
   | { kind: 'dot'; cx: number; cy: number; d: number }
   | { kind: 'drop'; cx: number; cy: number; r: number; fill: 'outline' | 'solid' };
 
-export type NavGlyphName = 'pulse' | 'wander' | 'spark' | 'yap' | 'voice';
+export type NavGlyphName = 'near' | 'pulse' | 'wander' | 'spark' | 'add' | 'yap' | 'voice';
 
 export const NAV_GLYPHS: Record<NavGlyphName, readonly GlyphShape[]> = {
+  /** Near: a pin standing on the ground, with a dot at its heart (what's happening around you). */
+  near: [
+    { kind: 'drop', cx: 12, cy: 8.5, r: 5, fill: 'outline' },
+    { kind: 'dot', cx: 12, cy: 8.5, d: 3 },
+    { kind: 'box', x: 5, y: 19.75, w: 14, h: 1.75, r: 0.875, fill: 'solid' },
+  ],
   /** Pulse: three rounded bars in a rising and falling beat (what your people are up to now). */
   pulse: [
     { kind: 'box', x: 3, y: 9.5, w: 5, h: 10.5, r: 2.5, fill: 'outline' },
@@ -40,6 +46,11 @@ export const NAV_GLYPHS: Record<NavGlyphName, readonly GlyphShape[]> = {
     { kind: 'box', x: 3.4, y: 3.4, w: 7.2, h: 7.2, r: 2.4, fill: 'outline' },
     { kind: 'box', x: 13.4, y: 3.4, w: 7.2, h: 7.2, r: 2.4, fill: 'outline' },
     { kind: 'box', x: 8.4, y: 12.6, w: 7.2, h: 8.4, r: 2.4, fill: 'outline' },
+  ],
+  /** Create: a plus, in the raised button in the middle (it opens the ways to create, a stash first). */
+  add: [
+    { kind: 'box', x: 11, y: 4.5, w: 2, h: 15, r: 1, fill: 'solid' },
+    { kind: 'box', x: 4.5, y: 11, w: 15, h: 2, r: 1, fill: 'solid' },
   ],
   /** Chats (the tab was called Yap): a soft speech shape (one tighter corner is its tail) with a sound wave inside. */
   yap: [

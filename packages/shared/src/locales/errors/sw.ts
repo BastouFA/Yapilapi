@@ -1357,4 +1357,27 @@ export const sw: Record<string, string> = {
   'A Yap is one voice recording.': 'Yap ni rekodi moja ya sauti.',
   'Write a comment or record one.': 'Andika maoni au urekodi moja.',
   'Listening isn’t available right now. Try again later.': 'Kusikiliza hakupatikani kwa sasa. Jaribu tena baadaye.',
+  // apps/api/src/lib/stash.ts
+  'Your location isn’t accurate enough yet. Move outside or wait for a better GPS signal.':
+    'Mahali ulipo bado si sahihi vya kutosha. Toka nje au subiri ishara bora ya GPS.',
+  'Your location moved too far, too fast. Try again in a little while from where you are.':
+    'Mahali ulipo pamesogea mbali sana, kwa haraka sana. Jaribu tena baada ya muda kidogo ukiwa hapo ulipo.',
+  'You’ve hidden a lot of stashes today. Try again tomorrow.': 'Umeficha hazina nyingi leo. Jaribu tena kesho.',
+  'To keep younger people safe, you can only hide a stash for them once you are friends.':
+    'Ili kuwalinda vijana, unaweza kumfichia hazina tu mkishakuwa marafiki.',
+  'Your photo or video is still being prepared. Try again in a moment.': 'Picha au video yako bado inaandaliwa. Jaribu tena baada ya muda mfupi.',
+  'This stash has ended.': 'Hazina hii imeisha.',
+  'This message can’t be sent.': 'Ujumbe huu hauwezi kutumwa.',
+  'Choose someone else.': 'Chagua mtu mwingine.',
+  'You can hide a stash for friends and people who follow you back.': 'Unaweza kuficha hazina kwa ajili ya marafiki na watu unaowafuata ambao nao wanakufuata.',
+  'A video in a stash can be up to a minute long.': 'Video kwenye hazina inaweza kuwa na urefu wa hadi dakika moja.',
+  "That stash doesn't exist or isn't visible to you.": 'Hazina hiyo haipo au huwezi kuiona.',
+  'Someone found this one first.': 'Mtu mwingine ameipata hii kwanza.',
+  // apps/api/src/modules/stash.ts
+  'Stash is not enabled.': 'Hazina haijawashwa.',
+  'Choose a photo.': 'Chagua picha.',
+  // packages/shared/src/stash-schemas.ts
+  'Choose who it’s for.': 'Chagua ni kwa ajili ya nani.',
+  'Add what goes in the stash.': 'Ongeza kitakachowekwa kwenye hazina.',
+  'Choose a thank-you or write one.': 'Chagua shukrani au uandike moja.',
 };

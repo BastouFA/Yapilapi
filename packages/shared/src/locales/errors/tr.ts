@@ -1255,4 +1255,28 @@ export const tr: Record<string, string> = {
   'A Yap is one voice recording.': 'Yap tek bir ses kaydıdır.',
   'Write a comment or record one.': 'Bir yorum yaz ya da sesli kaydet.',
   'Listening isn’t available right now. Try again later.': 'Dinleme şu anda kullanılamıyor. Daha sonra tekrar dene.',
+  // apps/api/src/lib/stash.ts
+  'Your location isn’t accurate enough yet. Move outside or wait for a better GPS signal.':
+    'Konumun henüz yeterince hassas değil. Dışarı çık ya da daha iyi bir GPS sinyali bekle.',
+  'Your location moved too far, too fast. Try again in a little while from where you are.':
+    'Konumun çok kısa sürede çok uzağa gitti. Biraz sonra bulunduğun yerden tekrar dene.',
+  'You’ve hidden a lot of stashes today. Try again tomorrow.': 'Bugün çok sayıda hazine sakladın. Yarın tekrar dene.',
+  'To keep younger people safe, you can only hide a stash for them once you are friends.':
+    'Daha küçük yaştakileri korumak için onlara ancak arkadaş olduktan sonra hazine saklayabilirsin.',
+  'Your photo or video is still being prepared. Try again in a moment.': 'Fotoğrafın ya da videon hâlâ hazırlanıyor. Birazdan tekrar dene.',
+  'This stash has ended.': 'Bu hazinenin süresi doldu.',
+  'This message can’t be sent.': 'Bu mesaj gönderilemez.',
+  'Choose someone else.': 'Başka birini seç.',
+  'You can hide a stash for friends and people who follow you back.':
+    'Arkadaşların ve takip ettiğin, seni geri takip eden kişiler için hazine saklayabilirsin.',
+  'A video in a stash can be up to a minute long.': 'Hazinedeki bir video en fazla bir dakika olabilir.',
+  "That stash doesn't exist or isn't visible to you.": 'Bu hazine yok ya da sana görünmüyor.',
+  'Someone found this one first.': 'Bunu senden önce başka biri buldu.',
+  // apps/api/src/modules/stash.ts
+  'Stash is not enabled.': 'Hazine etkin değil.',
+  'Choose a photo.': 'Bir fotoğraf seç.',
+  // packages/shared/src/stash-schemas.ts
+  'Choose who it’s for.': 'Kimin için olduğunu seç.',
+  'Add what goes in the stash.': 'Hazinenin içine ne koyacağını ekle.',
+  'Choose a thank-you or write one.': 'Bir teşekkür seç ya da kendin yaz.',
 };

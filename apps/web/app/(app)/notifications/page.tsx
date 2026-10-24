@@ -6,6 +6,8 @@ import { Avatar, Button, EmptyState, Icon, List, ListItem, Skeleton } from '@yap
 import {
   askNoticePost,
   askNoticeText,
+  stashNoticeTarget,
+  stashNoticeText,
   echoNoticeText,
   formatRelativeTime,
   fullCount,
@@ -124,6 +126,9 @@ function hrefFor(n: NotificationItem, meUsername?: string): string | undefined {
   // Squads: the squad's page (its feed, story, chat and weekly memory).
   const squad = squadNoticeHref(n);
   if (squad) return `/squads/${squad}`;
+  // Stash: the stash someone found or thanked you for; "new stashes near you" opens the Stash page.
+  const stash = stashNoticeTarget(n);
+  if (stash !== null) return stash ? `/stash/${stash}` : '/stash';
   // Ask the city: the question, with its answers open.
   const question = askNoticePost(n);
   if (question) return `/p/${question}?comments=1`;
@@ -212,6 +217,9 @@ function batchedText(n: NotificationItem, t: Session['t'], tp: Session['tp']): s
   // "Ada invited you to join Crew", "Ada and 2 others shared in Crew", "Your week in Crew is ready".
   const squad = squadNoticeText(n, t, tp);
   if (squad) return squad;
+  // Stash: "Ada and 2 others found your stash", "3 new stashes near you today".
+  const stashed = stashNoticeText(n, t, tp);
+  if (stashed) return stashed;
   // Ask the city: "New question in Yaba, Lagos: Food", "Ada found your answer helpful".
   const asked = askNoticeText(n, t);
   if (asked) return asked;

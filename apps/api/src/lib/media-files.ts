@@ -87,7 +87,7 @@ export async function purgeMedia(deps: FileDeps, ids: string[]): Promise<number>
 
 /**
  * Media that nothing uses any more: not in a post, story, message (attachment or view once),
- * voice reply, profile cover, avatar or voice intro, sound, recap or live recording, apart from the posts, stories and
+ * voice reply, profile cover, avatar or voice intro, sound, recap, live recording or stash, apart from the posts, stories and
  * messages being deleted.
  */
 export async function unusedMedia(db: Q, ids: string[]): Promise<string[]> {
@@ -107,7 +107,9 @@ export async function unusedMedia(db: Q, ids: string[]): Promise<string[]> {
        AND NOT EXISTS (SELECT 1 FROM sounds s JOIN posts sp ON sp.sound_id = s.id WHERE s.media_id = m.id AND sp.deleted_at IS NULL)
        AND NOT EXISTS (SELECT 1 FROM recaps r WHERE r.media_id = m.id AND r.deleted_at IS NULL)
        AND NOT EXISTS (SELECT 1 FROM live_sessions l WHERE l.recording_media_id = m.id)
-       AND NOT EXISTS (SELECT 1 FROM market_listing_photos mp JOIN market_listings ml ON ml.id = mp.listing_id WHERE mp.media_id = m.id AND ml.deleted_at IS NULL)`,
+       AND NOT EXISTS (SELECT 1 FROM market_listing_photos mp JOIN market_listings ml ON ml.id = mp.listing_id WHERE mp.media_id = m.id AND ml.deleted_at IS NULL)
+       -- A stash's photo, video or voice note (lib/stash.ts).
+       AND NOT EXISTS (SELECT 1 FROM stashes st WHERE st.media_id = m.id AND st.deleted_at IS NULL)`,
     [ids],
   );
   return rows.map((r) => r.id);

@@ -6,7 +6,7 @@ import type { PublicUser } from './types.ts';
  * Near you: a live map of what's happening around you right now (docs/product/city-map.md).
  *
  * The apps ask for a box (south, west, north, east) and the layers they want, and get back the
- * items in it the viewer may see: lives at a place, events today and tonight, Market listings
+ * items in it the viewer may see: stashes (by their area only, never their point; stash.ts), lives at a place, events today and tonight, Market listings
  * (by pickup area, never closer than MAP_MARKET_METRES), places with many recent public posts,
  * Pass the Mic chains with reels made there, open questions people asked about the area (Ask
  * the city, by their area only), and friends who are out (only friends sharing a
@@ -19,7 +19,7 @@ import type { PublicUser } from './types.ts';
  * request schemas are in city-map-schemas.ts).
  */
 
-export const MAP_LAYERS = ['live', 'today', 'market', 'places', 'chains', 'questions', 'friends'] as const;
+export const MAP_LAYERS = ['stashes', 'live', 'today', 'market', 'places', 'chains', 'questions', 'friends'] as const;
 export type MapLayer = (typeof MAP_LAYERS)[number];
 
 /** The largest box the map answers for, in degrees each way (about 100 km): zoom in for more. */
@@ -64,6 +64,8 @@ export type MapTarget =
   | { kind: 'chain'; id: string }
   /** Ask the city: a question (a post). */
   | { kind: 'post'; id: string }
+  /** A stash (docs/product/stash.md): its area only, never its point. */
+  | { kind: 'stash'; id: string }
   | { kind: 'chat'; id: string }
   | { kind: 'user'; username: string };
 
@@ -257,6 +259,8 @@ export function mapTargetPath(t: MapTarget): string {
       return `/chains/${t.id}`;
     case 'post':
       return `/p/${t.id}`;
+    case 'stash':
+      return `/stash/${t.id}`;
     case 'chat':
       return `/inbox/${t.id}`;
     case 'user':
@@ -267,6 +271,7 @@ export function mapTargetPath(t: MapTarget): string {
 // ─── Words ──────────────────────────────────────────────────────────────
 
 export const MAP_LAYER_KEYS: Record<MapLayer, MessageKey> = {
+  stashes: 'stash.layer',
   live: 'sidebar.live',
   today: 'm.picker.today',
   market: 'market.title',

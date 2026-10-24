@@ -17,6 +17,8 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
       disallow: [
         '/api/',
         '/home',
+        '/near',
+        '/stash',
         '/inbox',
         '/notifications',
         '/settings',

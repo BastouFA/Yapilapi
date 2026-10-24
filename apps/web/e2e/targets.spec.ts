@@ -214,11 +214,11 @@ async function open(page: Page, url: string) {
  */
 const STATES: [string, string, (page: Page, d: SeedData) => Promise<void>][] = [
   [
-    'more ways to create',
+    'the ways to create',
     '[role="dialog"]',
     async (page) => {
       await open(page, '/home');
-      await page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Yap', exact: true }).click({ button: 'right' });
+      await page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Create', exact: true }).click();
     },
   ],
   [

@@ -1201,4 +1201,24 @@ export const zh: Record<string, string> = {
   'A Yap is one voice recording.': '一条 Yap 就是一段语音录音。',
   'Write a comment or record one.': '写条评论，或者录一段。',
   'Listening isn’t available right now. Try again later.': '暂时无法收听。请稍后再试。',
+  // apps/api/src/lib/stash.ts
+  'Your location isn’t accurate enough yet. Move outside or wait for a better GPS signal.': '你的位置还不够精确。到户外去，或者等 GPS 信号变好。',
+  'Your location moved too far, too fast. Try again in a little while from where you are.': '你的位置移动得太远、太快了。请过一会儿在你所在的地方再试一次。',
+  'You’ve hidden a lot of stashes today. Try again tomorrow.': '你今天已经藏了很多宝藏。请明天再试。',
+  'To keep younger people safe, you can only hide a stash for them once you are friends.': '为了保护未成年人的安全，你们成为好友后你才能为对方藏宝藏。',
+  'Your photo or video is still being prepared. Try again in a moment.': '你的照片或视频还在准备中。请稍后再试。',
+  'This stash has ended.': '这个宝藏已结束。',
+  'This message can’t be sent.': '这条消息无法发送。',
+  'Choose someone else.': '请选择其他人。',
+  'You can hide a stash for friends and people who follow you back.': '你可以为好友，以及你关注且也关注你的人藏宝藏。',
+  'A video in a stash can be up to a minute long.': '宝藏里的视频最长一分钟。',
+  "That stash doesn't exist or isn't visible to you.": '这个宝藏不存在，或者你无法查看。',
+  'Someone found this one first.': '已经有人先找到了。',
+  // apps/api/src/modules/stash.ts
+  'Stash is not enabled.': '宝藏功能未开启。',
+  'Choose a photo.': '请选择一张照片。',
+  // packages/shared/src/stash-schemas.ts
+  'Choose who it’s for.': '请选择要给谁。',
+  'Add what goes in the stash.': '请添加宝藏里要放的东西。',
+  'Choose a thank-you or write one.': '请选择一句感谢，或者自己写一句。',
 };

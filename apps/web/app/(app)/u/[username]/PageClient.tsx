@@ -23,6 +23,7 @@ import { AccentScope, FeaturedRow, ProfileAbout, ProfileLinks, ProfileSongChip, 
 import { AnswersTab, AskCard } from '@/components/Ask';
 import { ProfileMixes } from '@/components/Mixes';
 import { ProfileMarket } from '@/components/Market';
+import { ExplorerLine } from '@/components/Stash';
 import { useSession } from '../../../providers';
 
 /**
@@ -328,6 +329,8 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
             <Icon name="check-circle" size={16} /> {tp('askCity.helped', profile.localHelper.people, { city: profile.localHelper.city })}
           </p>
         ) : null}
+        {/* Stash: "Stashes found: 12 · Hidden: 5" and badges, unless they keep it to themselves. */}
+        {rel.blocked || signedOut ? null : <ExplorerLine username={profile.username} />}
         <ProfileLinks links={profile.links} />
         <ProfileAbout profile={profile} />
         {/* Someone you blocked shows nothing of theirs, not even counts. */}

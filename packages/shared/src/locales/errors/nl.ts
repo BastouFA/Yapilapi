@@ -1262,4 +1262,28 @@ export const nl: Record<string, string> = {
   'A Yap is one voice recording.': 'Een Yap is één spraakopname.',
   'Write a comment or record one.': 'Schrijf een reactie of neem er een op.',
   'Listening isn’t available right now. Try again later.': 'Luisteren is nu niet beschikbaar. Probeer het later opnieuw.',
+  // apps/api/src/lib/stash.ts
+  'Your location isn’t accurate enough yet. Move outside or wait for a better GPS signal.':
+    'Je locatie is nog niet nauwkeurig genoeg. Ga naar buiten of wacht op een beter gps-signaal.',
+  'Your location moved too far, too fast. Try again in a little while from where you are.':
+    'Je locatie is te ver en te snel verplaatst. Probeer het over een tijdje opnieuw vanaf waar je bent.',
+  'You’ve hidden a lot of stashes today. Try again tomorrow.': 'Je hebt vandaag veel verstopplekken gemaakt. Probeer het morgen opnieuw.',
+  'To keep younger people safe, you can only hide a stash for them once you are friends.':
+    'Om jongere mensen veilig te houden, kun je pas een verstopplek voor ze maken als jullie vrienden zijn.',
+  'Your photo or video is still being prepared. Try again in a moment.': 'Je foto of video wordt nog voorbereid. Probeer het zo opnieuw.',
+  'This stash has ended.': 'Deze verstopplek is afgelopen.',
+  'This message can’t be sent.': 'Dit bericht kan niet worden verstuurd.',
+  'Choose someone else.': 'Kies iemand anders.',
+  'You can hide a stash for friends and people who follow you back.':
+    'Je kunt een verstopplek maken voor vrienden en voor mensen die je volgt en die jou terugvolgen.',
+  'A video in a stash can be up to a minute long.': 'Een video in een verstopplek mag maximaal een minuut duren.',
+  "That stash doesn't exist or isn't visible to you.": 'Die verstopplek bestaat niet of is niet zichtbaar voor je.',
+  'Someone found this one first.': 'Iemand anders was je voor.',
+  // apps/api/src/modules/stash.ts
+  'Stash is not enabled.': 'Verstopplekken staan niet aan.',
+  'Choose a photo.': 'Kies een foto.',
+  // packages/shared/src/stash-schemas.ts
+  'Choose who it’s for.': 'Kies voor wie het is.',
+  'Add what goes in the stash.': 'Voeg toe wat er in de verstopplek zit.',
+  'Choose a thank-you or write one.': 'Kies een bedankje of schrijf er zelf een.',
 };

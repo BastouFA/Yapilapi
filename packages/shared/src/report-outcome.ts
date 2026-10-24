@@ -42,7 +42,7 @@ export const MODERATION_DECISIONS = ['no_action', 'warn', 'restrict', 'remove', 
 export type ModerationDecisionCode = (typeof MODERATION_DECISIONS)[number];
 
 /** Things that have a limited state, seen only by their author (a photo or video is covered instead). */
-const RESTRICTABLE = new Set(['post', 'comment', 'question', 'answer', 'mix', 'listing', 'market_rating', 'story', 'media']);
+const RESTRICTABLE = new Set(['post', 'comment', 'question', 'answer', 'mix', 'listing', 'market_rating', 'story', 'media', 'stash']);
 
 /**
  * What a moderator can decide about this kind of thing. An account is warned or suspended, never
