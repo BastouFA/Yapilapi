@@ -134,32 +134,63 @@
   box-shadow: var(--focus-ring);
 }
 
-/* The Near home: a search, the map, and what's on now. */
-.near-page__head {
+/* Wander's shortcuts under its search: one row that scrolls sideways on a phone, wrapping on wider screens. */
+.wander-shortcuts {
+  display: flex;
+  gap: var(--space-2);
+  margin-block: var(--space-3);
+  overflow-x: auto;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+.wander-shortcuts::-webkit-scrollbar {
+  display: none;
+}
+.wander-shortcuts > * {
+  flex: none;
+}
+/* The row clips at its edges, so each control keeps its own 44px touch target. */
+@media (max-width: 719.98px) {
+  .wander-shortcuts > .yp-btn {
+    min-height: 44px;
+  }
+}
+@media (min-width: 720px) {
+  .wander-shortcuts {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+}
+
+/* The top of Wander: the map and what's on now (components/CityNow.tsx). */
+.city-now__head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
 }
-.near-page__search {
-  display: flex;
-  gap: var(--space-2);
-  align-items: flex-end;
-  min-width: 0;
+.city-now__more {
+  align-self: flex-start;
 }
-.near-page__search .yp-field {
-  flex: 1;
-  min-width: 0;
+.city-now__head .section-title,
+.city-now__intro {
+  margin: 0;
 }
+.city-now__picks,
 .near-page__picks {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
 }
-.near-page .citymap__view {
-  height: min(52vh, 420px);
+.city-now .citymap__view {
+  height: min(46vh, 400px);
+}
+.city-now__sections {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: var(--space-4);
 }
 .near-section {
   display: flex;

@@ -3,9 +3,9 @@ import { expect, test, type APIRequestContext, type Page } from '@playwright/tes
 
 /**
  * The signed-out landing page in English and French (still "The social network you speak" until
- * step 3 of docs/product/your-city-alive.md), the navigation, Near · Pulse · Create · Chats · You,
- * with Create in the middle (a tap offers a stash, post, reel, story, live or Yap), at phone width
- * and on a computer, and onboarding's first step, a voice hello that can
+ * step 3 of docs/product/your-city-alive.md), signing in landing on Pulse, the navigation,
+ * Pulse · Wander · Create · Chats · You, with Create in the middle (a tap offers a stash, post, reel,
+ * story, live or Yap), at phone width and on a computer, and onboarding's first step, a voice hello that can
  * be recorded or skipped. Chrome's fake media flags stand in for a real microphone. Each project
  * (light and dark, desktop and phone) runs the page checks; recording runs in the light ones.
  */
@@ -14,12 +14,12 @@ test.use({
   permissions: ['microphone'],
 });
 
-async function account(request: APIRequestContext, name: string, onboarded = true) {
+async function account(request: APIRequestContext, name: string, onboarded = true, password = randomBytes(18).toString('base64url')) {
   const username = `id_${name}_${Date.now().toString(36)}${randomBytes(2).toString('hex')}`.slice(0, 30);
   const res = await request.post('/api/v1/auth/register', {
     data: {
       email: `${username}@identity.example.test`,
-      password: randomBytes(18).toString('base64url'),
+      password,
       username,
       displayName: `[Dev data] ${name}`,
       birthDate: '1990-05-01',
@@ -74,18 +74,36 @@ test.describe('landing page', () => {
   });
 });
 
+/** The five places in the navigation, in order, by their labels. */
+const MENU = ['Pulse', 'Wander', 'Create', 'Chats', 'You'];
+const menuLabels = (page: Page) => page.getByRole('navigation', { name: 'Primary' }).locator('.yp-nav__list > .yp-nav__item .yp-nav__label');
+
 test.describe('navigation', () => {
-  // docs/product/your-city-alive.md: Near · Pulse · + · Chats · You, Create in the middle.
-  test('Near · Pulse · Create · Chats · You, with Create in the middle', async ({ page, isMobile }) => {
+  // docs/product/your-city-alive.md, "The menu": Pulse · Wander · + · Chats · You, Create in the middle.
+  test('signing in lands on Pulse', async ({ page, request }) => {
+    const password = randomBytes(18).toString('base64url');
+    const username = await account(request, 'signin', true, password);
+    await page.goto('/login');
+    await page.getByLabel('Email address').fill(`${username}@identity.example.test`);
+    await page.getByLabel('Password', { exact: true }).fill(password);
+    await page.getByRole('button', { name: 'Log in', exact: true }).click();
+    await page.waitForURL(/\/home$/);
+    await expect(page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: /^Pulse/ })).toHaveAttribute('aria-current', 'page');
+    // Near was the first tab for a day: its address opens Wander now.
+    await page.goto('/near');
+    await page.waitForURL(/\/discover$/);
+    await expect(page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: /^Wander/ })).toHaveAttribute('aria-current', 'page');
+  });
+
+  test('Pulse · Wander · Create · Chats · You, with Create in the middle', async ({ page, isMobile }) => {
     await account(page.request, 'nav');
     await page.goto('/home');
     const nav = page.getByRole('navigation', { name: 'Primary' });
-    const links = nav.getByRole('link');
-    await expect(nav.getByRole('link', { name: /^Near/ })).toHaveAttribute('href', '/near');
+    await expect(menuLabels(page)).toHaveText(MENU);
     await expect(nav.getByRole('link', { name: /^Pulse/ })).toHaveAttribute('href', '/home');
+    await expect(nav.getByRole('link', { name: /^Wander/ })).toHaveAttribute('href', '/discover');
     await expect(nav.getByRole('link', { name: /^Chats/ })).toHaveAttribute('href', '/inbox');
-    await expect(nav.getByRole('link', { name: 'Wander', exact: true })).toHaveCount(0);
-    expect(await links.count()).toBeGreaterThanOrEqual(5);
+    await expect(nav.getByRole('link', { name: /^Near/ })).toHaveCount(0);
     const create = nav.getByRole('link', { name: 'Create', exact: true });
     await expect(create).toBeInViewport();
     // The raised button in the middle is the biggest thing in the bar.
@@ -112,6 +130,11 @@ test.describe('navigation', () => {
     await page.goto('/home');
     const create = page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Create', exact: true });
     await expect(create).toBeInViewport({ ratio: 1 });
+    await expect(menuLabels(page)).toHaveText(MENU);
+    await noSidewaysScroll(page);
+    // Wander at phone width: the map and what's on now fit too.
+    await page.goto('/discover');
+    await expect(page.getByRole('heading', { level: 2, name: 'What’s on now' })).toBeVisible();
     await noSidewaysScroll(page);
   });
 

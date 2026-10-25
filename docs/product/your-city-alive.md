@@ -16,40 +16,56 @@ city's middle counts as that city.
 
 ## Three steps
 
-1. **Stash, the Near home and the new menu** (built; this document and docs/product/stash.md).
+1. **Stash, the city in Wander and the new menu** (built; this document and docs/product/stash.md).
    - **Stash**: hide a note, photo, short video, song, voice note or gift at a real place; it only
      opens for someone who is there. Others see only an area, never the spot.
-   - **Near**: the first tab and where you land after signing in. The city map (Near you, with a
-     Stashes layer) and "What's on now": stashes near you, lives, events tonight, busy places, open
-     city questions and Market nearby, with search and Explore (Wander) at the top. Location is
-     asked for only on a tap ("Use my location"); otherwise the profile's city, then the launch
-     cities.
-   - **The menu**: Near · Pulse · ＋ · Chats · You. The ＋ in the middle opens the ways to create:
-     Hide a stash (first), Post, Reel, Story, Live (while lives are on) and Yap. The voice-first Yap
-     button is gone from the middle.
-2. **Go out together** (later): plans with your people around what Near shows.
+   - **The city in Wander**: Wander opens on the city around you: the map (Near you, with a
+     Stashes layer and the other layers) and "What's on now": stashes near you, lives, events
+     tonight, busy places, open city questions and Market nearby. Under it, Wander's own sections
+     (trending tags, chains, communities, events) and its search. Location is asked for only on a
+     tap ("Use my location"); otherwise the profile's city, then the launch cities.
+   - **The menu**: see below.
+2. **Go out together** (later): plans with your people around what Wander shows.
 3. **City first** (later): ranking by your city, a new landing page and onboarding, and sponsored
    hunts (businesses hiding stashes).
 
 Steps 2 and 3 aren't built. The landing page and onboarding are unchanged until step 3; nothing on
 the signed-in screens says the app is voice-first any more (the old tagline left Settings, About).
 
+## The menu
+
+**Pulse · Wander · ＋ · Chats · You** on the web and the phone (the owner's pick, 2026-10-25).
+
+- **Pulse** (the feed) is the first tab and where the app opens: after signing in, finishing
+  onboarding or switching accounts the web goes to `/home` unless the sign-in link named another
+  page; on the phone it is the first tab (`index`).
+- **Wander** (`/discover`, the phone's `discover` tab) starts with the map and "What's on now"
+  (`components/CityNow.tsx` on the web, `lib/city-now.tsx` on the phone), then its search and
+  discover sections.
+- **＋ Create** in the middle opens the ways to create: Hide a stash (first), Post, Reel, Story, Live
+  (while lives are on) and Yap. The voice-first Yap button is gone from the middle.
+- **Chats** and **You** as before.
+
+For one day (2026-10-24) the menu was Near · Pulse · ＋ · Chats · You, with a separate Near home at
+`/near` and Wander off the bar. Near's content moved into Wander; `/near` now redirects to
+`/discover` (query included), and a `near` link on the phone opens Wander.
+
 ## Where it lives
 
 | | Web | Phone |
 | --- | --- | --- |
-| Near | `/near` (`app/(app)/near/page.tsx`) | first tab (`app/(tabs)/index.tsx`) |
-| Pulse | `/home` (unchanged) | `home` tab (`app/(tabs)/home.tsx`, was `index`) |
-| Explore (Wander) | `/discover`, from Near's header | `discover`, from Near's header (off the dock) |
+| Pulse | `/home` | first tab (`app/(tabs)/index.tsx`) |
+| Wander, with the map and what's on now | `/discover` (`components/CityNow.tsx` at its top) | `discover` tab (`lib/city-now.tsx` at its top) |
 | Create menu | `components/CreateMenu.tsx`, from the ＋ | the ＋ in `app/(tabs)/_layout.tsx` |
 | Stash | `/stash`, `/stash/new`, `/stash/:id` | `stash`, `stash/new`, `stash/[id]` |
 
-Links keep working: web `/home` is Pulse on both, `/near` opens the phone's first tab, `/discover`,
-`/map` and every other path are unchanged. After signing in (and switching accounts, finishing
-onboarding) the web goes to `/near` unless the sign-in link named another page. The phone's
-first-launch tour of the dock was updated and shows once more.
+Links keep working: `/home` is Pulse, `/near` redirects to `/discover`, `/discover`, `/map`,
+`/stash` and every other path are unchanged. The phone's first-launch tour of the dock points at
+Pulse, Wander (the map and what's on now), Create, then Chats and You, and shows once more
+(`ypl_nav_tour_v3`).
 
-Navigation glyphs (`packages/shared/src/nav-glyphs.ts`, drawn the same on web and phone): `near`
-(a pin on the ground) and `add` (the plus in the raised middle button). Message keys: `nav.near`,
-`nav.hint.near` are new; `nav.create` now says "Create" and `nav.hint.create` lists the ways to
-create, in all 24 languages.
+Navigation glyphs (`packages/shared/src/nav-glyphs.ts`, drawn the same on web and phone): `pulse`,
+`wander`, `add` (the plus in the raised middle button) and `yap` for Chats; `near` (a pin on the
+ground) is from the Near tab and no longer in the bar. Message keys: `nav.create` says "Create" and
+`nav.hint.create` lists the ways to create, in all 24 languages; Wander's map part reuses the
+`near.*` keys ("What's on now", the intro, "Or pick a city", the empty note).

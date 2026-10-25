@@ -6,8 +6,9 @@ video, a song, a voice note or a gift at a real place, and it only opens for som
 The code: `packages/shared/src/stash.ts` (constants, types, the opening and rounding maths, launch
 cities, notification words), `packages/shared/src/stash-schemas.ts`, `apps/api/src/lib/stash.ts`,
 `apps/api/src/modules/stash.ts`, migration `packages/database/migrations/0094_stash.sql`. Web:
-`app/(app)/stash/` (the Stash page, `new`, `[id]`), `components/Stash.tsx`, the Near home
-`app/(app)/near/page.tsx`. Phone: `app/stash/`, `lib/stash.tsx`, Near in `app/(tabs)/index.tsx`.
+`app/(app)/stash/` (the Stash page, `new`, `[id]`), `components/Stash.tsx`, the map and what's on
+now at the top of Wander, `components/CityNow.tsx`. Phone: `app/stash/`, `lib/stash.tsx`, the same
+at the top of Wander, `lib/city-now.tsx`.
 Tests: `apps/api/test/stash.test.ts`, `packages/shared/src/stash.test.ts`, `apps/web/e2e/stash.spec.ts`.
 Behind the `STASH` flag (on by default).
 
@@ -53,7 +54,7 @@ Behind the `STASH` flag (on by default).
 
 ## 3. Finding and opening
 
-- **The map**: a Stashes layer on Near you (and the Near home), using the layer system:
+- **The map**: a Stashes layer on Near you (and the map at the top of Wander), using the layer system:
   candidates by area are cached per part of the city for everyone; which of them this viewer may
   find is worked out every time (`stashVisibleSql`). Signed out: no stashes.
 - **The list**: "Stashes near you" (`GET /v1/stashes/near`), nearest first by area, within 5 km;

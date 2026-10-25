@@ -22,15 +22,13 @@ import { useAccountMenu, YouHeaderActions, YouHeaderTitle } from '../../lib/acco
 type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
 
 /** Route name → the key its label, hint and glyph use (the web app's NavEntry ids). */
-const TABS: Record<string, { id: 'near' | 'home' | 'discover' | 'create' | 'inbox' | 'profile'; glyph?: NavGlyphName }> = {
-  index: { id: 'near', glyph: 'near' },
-  home: { id: 'home', glyph: 'pulse' },
+const TABS: Record<string, { id: 'home' | 'discover' | 'create' | 'inbox' | 'profile'; glyph?: NavGlyphName }> = {
+  index: { id: 'home', glyph: 'pulse' },
+  discover: { id: 'discover', glyph: 'wander' },
   create: { id: 'create', glyph: 'add' },
   inbox: { id: 'inbox', glyph: 'yap' },
   profile: { id: 'profile' },
 };
-/** Routes that stay reachable (from Near's Explore, and links) but have no place in the dock. */
-const OFF_DOCK = new Set(['discover']);
 
 const PAD = DOCK.pad;
 const ROW = DOCK.row;
@@ -85,11 +83,11 @@ function YouAvatar({ c, focused }: { c: Palette; focused: boolean }) {
 }
 
 /**
- * The floating dock: Near · Pulse · [+] · Chats · You (docs/product/your-city-alive.md). Icons only,
+ * The floating dock: Pulse · Wander · [+] · Chats · You (docs/product/your-city-alive.md). Icons only,
  * except the current tab, whose label sits under its icon in a squircle highlight that springs from
  * tab to tab. The + in the middle is a raised, slightly tilted brand-gradient squircle: a tap opens
  * the ways to create, hiding a stash first, then a post, reel, story, live or Yap. Every tab keeps
- * its name, hint and unread count for screen readers. Explore (Wander) is reached from Near.
+ * its name, hint and unread count for screen readers. Wander holds the city map and what's on now.
  */
 function FloatingTabBar({ state, descriptors, navigation }: TabBarProps) {
   const c = useColors();
@@ -127,17 +125,11 @@ function FloatingTabBar({ state, descriptors, navigation }: TabBarProps) {
     return () => (show.remove(), hide.remove());
   }, []);
 
-  const docked = state.routes.filter((r) => !OFF_DOCK.has(r.name));
-  const count = docked.length;
+  const count = state.routes.length;
   const slot = width / count;
   const current = state.routes[state.index]?.name;
-  // Explore (off the dock) belongs to Near: its highlight stays there.
-  const at = Math.max(
-    0,
-    docked.findIndex((r) => r.name === (current && OFF_DOCK.has(current) ? 'index' : current)),
-  );
   // Rows run right to left in Arabic: the highlight then moves the other way from its start edge.
-  const target = (I18nManager.isRTL ? -1 : 1) * at * slot;
+  const target = (I18nManager.isRTL ? -1 : 1) * state.index * slot;
   useEffect(() => {
     if (!width) return;
     if (reduce || !placedOnce.current) slide.setValue(target);
@@ -172,8 +164,8 @@ function FloatingTabBar({ state, descriptors, navigation }: TabBarProps) {
               ]}
             />
           ) : null}
-          {docked.map((route) => {
-            const focused = state.routes[state.index]?.key === route.key || (route.name === 'index' && !!current && OFF_DOCK.has(current));
+          {state.routes.map((route, i) => {
+            const focused = state.index === i;
             const tab = TABS[route.name];
             const label = descriptors[route.key]?.options.title ?? route.name;
             const hint = tab ? t(`nav.hint.${tab.id}` as MessageKey) : undefined;
@@ -263,8 +255,8 @@ function FloatingTabBar({ state, descriptors, navigation }: TabBarProps) {
   );
 }
 
-// Primary navigation: Near | Pulse | + | Chats | You (route files: index is Near, home is Pulse, then create,
-// inbox, profile; discover, Explore, is reached from Near and has no place in the dock).
+// Primary navigation: Pulse | Wander | + | Chats | You (route files keep their names: index is Pulse,
+// discover is Wander, then create, inbox, profile).
 export default function TabsLayout() {
   const c = useColors();
   const { t } = useT();
@@ -283,8 +275,8 @@ export default function TabsLayout() {
         sceneStyle: { backgroundColor: c.ground },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: t('nav.near') }} />
-      <Tabs.Screen name="home" options={{ title: t('nav.home') }} />
+      <Tabs.Screen name="index" options={{ title: t('nav.home') }} />
+      <Tabs.Screen name="discover" options={{ title: t('nav.discover') }} />
       {/* The + opens the ways to create; this screen is the composer they lead to (a post, a Yap). */}
       <Tabs.Screen name="create" options={{ title: t('create.title') }} />
       <Tabs.Screen name="inbox" options={{ title: t('nav.inbox') }} />
@@ -294,8 +286,6 @@ export default function TabsLayout() {
         // Long-press You to switch accounts, as in other apps.
         listeners={{ tabLongPress: () => accountMenu.open() }}
       />
-      {/* Explore (Wander): from Near's header and links, not the dock. */}
-      <Tabs.Screen name="discover" options={{ title: t('near.explore'), href: null }} />
     </Tabs>
   );
 }

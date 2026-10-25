@@ -2,10 +2,11 @@ import { randomBytes } from 'node:crypto';
 import { expect, test, type APIRequestContext, type Browser, type Page } from '@playwright/test';
 
 /**
- * Stash and the Near home (docs/product/stash.md, docs/product/your-city-alive.md): Ada hides a
+ * Stash and the city in Wander (docs/product/stash.md, docs/product/your-city-alive.md): Ada hides a
  * stash at a spot in Lagos; Ben, 400 m away, sees only its area and "Get closer"; at 20 m he opens
- * it, and Ada hears "Ben found your stash". The navigation reads Near · Pulse · Create · Chats ·
- * You, at full width and at 375 px, and Create offers "Hide a stash" first. Positions come from
+ * it, and Ada hears "Ben found your stash". Wander (where /near leads now) shows the map with the
+ * Stashes layer and what's on now. The navigation reads Pulse · Wander · Create · Chats · You, at
+ * full width and at 375 px, and Create offers "Hide a stash" first. Positions come from
  * Playwright's geolocation; map tiles are answered here with a blank picture.
  * SHOTS (a folder) keeps screenshots of each step.
  */
@@ -95,17 +96,26 @@ test('hide a stash in Lagos, see only its area from 400 m, open it at 20 m', asy
   await expect(ada.page.getByText('[Dev data] ben found your stash')).toBeVisible();
   await shot(ada.page, 'notification', info.project.name);
 
-  // The navigation: Near · Pulse · Create · Chats · You, and Create offers a stash first.
+  // Wander (the old /near address leads there): the map with the Stashes layer, and what's on now.
   await ada.page.goto('/near');
-  await expect(ada.page.getByRole('heading', { name: 'Near', level: 1 })).toBeVisible();
+  await ada.page.waitForURL(/\/discover$/);
+  await expect(ada.page.getByRole('heading', { name: 'Wander', level: 1 })).toBeVisible();
+  await expect(ada.page.getByRole('heading', { name: 'What’s on now', level: 2 })).toBeVisible();
+  await ada.page.getByRole('button', { name: 'Use my location' }).click();
+  await expect(ada.page.getByRole('region', { name: 'Near you' })).toBeVisible();
+  await expect(ada.page.getByRole('heading', { name: 'Stashes', level: 3 })).toBeVisible();
+  await expect(ada.page.locator('.citymap__list').getByText('[Dev data] Suya tip').first()).toBeVisible();
+
+  // The navigation: Pulse · Wander · Create · Chats · You, and Create offers a stash first.
   const nav = ada.page.getByRole('navigation', { name: 'Primary' });
-  for (const name of [/^Near/, /^Pulse/, /^Create/, /^Chats/, /You$/]) await expect(nav.getByRole('link', { name })).toBeVisible();
-  await expect(nav.getByRole('link', { name: /^Wander/ })).toHaveCount(0);
+  for (const name of [/^Pulse/, /^Wander/, /^Create/, /^Chats/, /You$/]) await expect(nav.getByRole('link', { name })).toBeVisible();
+  await expect(nav.getByRole('link', { name: /^Near/ })).toHaveCount(0);
+  await expect(nav.getByRole('link', { name: /^Wander/ })).toHaveAttribute('aria-current', 'page');
   const names = await nav.locator('.yp-nav__list > .yp-nav__item .yp-nav__label').allTextContents();
-  expect(names).toEqual(['Near', 'Pulse', 'Create', 'Chats', 'You']);
+  expect(names).toEqual(['Pulse', 'Wander', 'Create', 'Chats', 'You']);
   const width = await ada.page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(width).toBeLessThanOrEqual(0);
-  await shot(ada.page, 'near', info.project.name);
+  await shot(ada.page, 'wander', info.project.name);
   await nav.getByRole('link', { name: 'Create', exact: true }).click();
   const menu = ada.page.getByRole('dialog', { name: 'Create' });
   await expect(menu.getByRole('link').first()).toHaveText('Hide a stash');

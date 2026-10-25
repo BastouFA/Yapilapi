@@ -1,258 +1,243 @@
-import { router } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, Text, TextInput, useWindowDimensions, View } from 'react-native';
-import {
-  byDistance,
-  MAP_DEFAULT_ZOOM,
-  MAP_LAYERS,
-  MAP_LAYER_KEYS,
-  queryBox,
-  viewBox,
-  type MapAnswer,
-  type MapCluster,
-  type MapLayer,
-} from '../../../../packages/shared/src/city-map';
-import type { LatLng } from '../../../../packages/shared/src/location';
-import { LAUNCH_CITIES } from '../../../../packages/shared/src/stash';
+import { Redirect, router, useFocusEffect, useLocalSearchParams, useNavigation } from 'expo-router';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
+import type { StoryGroup } from '../../../../packages/api-client/src/index';
+import type { FeedMode } from '../../../../packages/shared/src/constants';
+import type { Post } from '../../../../packages/shared/src/types';
+import type { MessageKey } from '../../../../packages/shared/src/i18n-core';
 import { client, errorMessage } from '../../lib/api';
-import { CityMapView, LAYER_ICONS, MapItemRow, PinCard, readHere } from '../../lib/city-map';
-import { useFlag } from '../../lib/flags';
+import { AnnouncementCard } from '../../lib/announcement';
+import { feedSurface, FeedSurfaceContext, useFeedViewability } from '../../lib/feed-events';
+import { onBackOnline } from '../../lib/network';
+import { PulseEmpty } from '../../lib/empty';
 import { useT } from '../../lib/i18n';
+import { PostCard } from '../../lib/post';
+import { RadioButton } from '../../lib/radio';
+import { orderStories, StoriesStrip, StoryViewer } from '../../lib/stories';
 import { useSession } from '../../lib/session';
-import { radius, space } from '../../lib/theme';
-import { Button, Icon, Loading, Notice, useColors, userText } from '../../lib/ui';
+import { StarterRow } from '../../lib/starter';
+import { CatchUpCard } from '../../lib/ai-helpers';
+import { PulseCards } from '../../lib/wrap';
+import { TodayCard } from '../../lib/today';
+import { FollowingDrops } from '../../lib/drops';
+import { space } from '../../lib/theme';
+import { useFlag } from '../../lib/flags';
+import { Button, ErrorState, feedListProps, Icon, Loading, Segmented, SkeletonList, slop, useColors, useTabBarSpace } from '../../lib/ui';
 
-/** "What's on now", in this order, a few of each (the nearest first). */
-const SECTIONS: MapLayer[] = ['stashes', 'live', 'today', 'places', 'questions', 'market'];
-const PER_SECTION = 4;
+const MODES = [
+  { id: 'for_you', label: 'feed.for_you' },
+  // Yaps only (voice posts), first after For you; not shown while the YAPS flag is off.
+  { id: 'yaps', label: 'feed.yaps' },
+  { id: 'following', label: 'feed.following' },
+  { id: 'friends', label: 'feed.friends' },
+  { id: 'communities', label: 'feed.communities' },
+  { id: 'local', label: 'feed.local' },
+] as const satisfies readonly { id: FeedMode; label: MessageKey }[];
 
-const timeZone = () => {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone;
-  } catch {
-    return undefined;
-  }
-};
+/** Home: the welcome screen if signed out, then stories and the feed with cursor pagination. */
+export default function Home() {
+  const { me } = useSession();
+  if (me === undefined) return <Loading />;
+  if (!me) return <Redirect href="/welcome" />;
+  // New accounts go through the three onboarding steps first, so Home starts full.
+  if (!me.onboarded) return <Redirect href="/onboarding" />;
+  return <Feed />;
+}
 
-/**
- * Near, the first tab of "Your city, alive" (docs/product/your-city-alive.md): the city map around
- * you and what's on now (stashes near you, lives, events tonight, busy places, open questions and
- * Market nearby), with search and Explore at the top. Where you are is read only when allowed
- * before or after a tap on "Use my location", and stays on the phone; without it, your profile's
- * city, or a launch city. Only the part of the map on screen goes to the server.
- */
-export default function NearScreen() {
+/** Outside the component, so it's the same function on every render and the list leaves its rows alone. */
+const renderPost = ({ item }: { item: Post }) => <PostCard post={item} />;
+
+function Feed() {
   const c = useColors();
   const { t } = useT();
-  const { me } = useSession();
-  const win = useWindowDimensions();
-  const live = useFlag('LIVE') === true;
-  const ask = useFlag('ASK_CITY') !== false;
-  const stash = useFlag('STASH') !== false;
-  const [here, setHere] = useState<LatLng | null>(null);
-  const [center, setCenter] = useState<LatLng | null>(null);
-  const [zoom, setZoom] = useState(MAP_DEFAULT_ZOOM);
-  const [size, setSize] = useState({ width: win.width - space[4] * 2, height: 300 });
-  const [answer, setAnswer] = useState<MapAnswer | null>(null);
-  const [problem, setProblem] = useState<string | null>(null);
-  const [selected, setSelected] = useState<MapCluster | null>(null);
-  const [locating, setLocating] = useState(false);
-  const [q, setQ] = useState('');
-
-  const layers = MAP_LAYERS.filter(
-    (l) => l !== 'friends' && l !== 'chains' && (l !== 'live' || live) && (l !== 'questions' || ask) && (l !== 'stashes' || (stash && !!me)),
-  );
-  const layersKey = layers.join(',');
-
-  // Where to start: here when allowed before (no prompt), else the profile's city, else Lagos.
+  const bottom = useTabBarSpace();
+  const [mode, setMode] = useState<(typeof MODES)[number]['id']>('for_you');
+  const yapsOn = useFlag('YAPS') !== false;
+  const askOn = useFlag('ASK_CITY') !== false;
+  const modes = yapsOn ? MODES : MODES.filter((m) => m.id !== 'yaps');
+  // Yaps turned off while showing them: back to For you.
   useEffect(() => {
+    if (!yapsOn && mode === 'yaps') setMode('for_you');
+  }, [yapsOn, mode]);
+  const [posts, setPosts] = useState<Post[] | null>(null);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [stories, setStories] = useState<StoryGroup[]>([]);
+  const [viewing, setViewing] = useState<number | null>(null);
+  const navigation = useNavigation();
+  // What's seen and for how long, for the recommender, under the mode on screen.
+  const surface = feedSurface(mode);
+  const viewability = useFeedViewability(surface);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        // 16pt apart: the bell's touch area reaches 44 wide mostly away from Reels, so the two don't overlap.
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[4], marginEnd: space[4] }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('notifications.title')}
+            hitSlop={slop({ top: 11, bottom: 11, start: 14, end: 8 })}
+            onPress={() => router.push('/notifications')}
+          >
+            <Icon name="notifications-outline" size={22} color={c.yapi} />
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('m.title.reels')}
+            hitSlop={slop({ top: 11, bottom: 11, start: 8, end: 10 })}
+            onPress={() => router.push('/reels')}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+          >
+            <Icon name="film-outline" size={22} color={c.yapi} />
+            <Text style={{ color: c.yapi, fontWeight: '700', fontSize: 15 }}>{t('m.title.reels')}</Text>
+          </Pressable>
+        </View>
+      ),
+    });
+  }, [navigation, c.yapi, t]);
+
+  const loadStories = useCallback(async () => {
+    try {
+      setStories(orderStories((await (await client()).moments.list()).items));
+    } catch {
+      // Stories are a bonus on Home: the feed still works without them.
+    }
+  }, []);
+  // Refresh when coming back (after adding a story in Create, for example), not while one is open.
+  useFocusEffect(
+    useCallback(() => {
+      if (viewing === null) void loadStories();
+    }, [loadStories, viewing]),
+  );
+
+  // Answers for a mode you've already left (or a first page asked for again) are dropped.
+  const seq = useRef(0);
+  const load = useCallback(
+    async (next?: string) => {
+      const run = next ? seq.current : ++seq.current;
+      try {
+        const page = await (await client()).feed(mode, next);
+        if (run !== seq.current) return;
+        // A post can move down between pages (a repost, a new ranking): it shows once.
+        setPosts((cur) => (next && cur ? [...cur, ...page.items.filter((x) => !cur.some((y) => y.id === x.id))] : page.items));
+        setCursor(page.nextCursor);
+        setError(null);
+      } catch (e) {
+        if (run !== seq.current) return;
+        setError(errorMessage(e));
+        setPosts((cur) => cur ?? []);
+      }
+    },
+    [mode],
+  );
+
+  useEffect(() => {
+    setPosts(null);
+    setCursor(null);
+    void load();
+  }, [load]);
+
+  // The end of the list can be reached more than once before a page arrives: ask for each page once.
+  const fetching = useRef<string | null>(null);
+  const loadMore = useCallback(() => {
+    if (!cursor || fetching.current === cursor) return;
+    fetching.current = cursor;
+    void load(cursor).finally(() => {
+      fetching.current = null;
+    });
+  }, [cursor, load]);
+
+  // Offline, then back: fetch again, so the feed isn't left with an error.
+  useEffect(() => onBackOnline(() => void Promise.all([load(), loadStories()])), [load, loadStories]);
+
+  // Just published from Create: put it at the top, as people expect to see what they posted.
+  const { posted } = useLocalSearchParams<{ posted?: string }>();
+  useEffect(() => {
+    if (!posted) return;
     void (async () => {
       try {
-        const p = await readHere(false);
-        setHere(p);
-        setCenter(p);
-        return;
+        const { post } = await (await client()).posts.get(posted);
+        setPosts((cur) => [post, ...(cur ?? []).filter((p) => p.id !== post.id)]);
       } catch {
-        // Not allowed before.
+        // Not visible (e.g. waiting for review): the feed stays as it is.
       }
-      const r = await client()
-        .then((api) => api.map.center())
-        .catch(() => null);
-      setCenter(r?.center?.center ?? LAUNCH_CITIES[0].center);
     })();
-  }, []);
-
-  const run = useRef(0);
-  useEffect(() => {
-    if (!center) return;
-    const mine = ++run.current;
-    const timer = setTimeout(() => {
-      void (async () => {
-        try {
-          const r = await (await client()).map.items(queryBox(viewBox(center, zoom, size.width, size.height)), layersKey.split(',') as MapLayer[], timeZone());
-          if (mine !== run.current) return;
-          setAnswer(r);
-          setProblem(null);
-        } catch (e) {
-          if (mine === run.current) setProblem(errorMessage(e));
-        }
-      })();
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [center, zoom, size.width, size.height, layersKey]);
-
-  const locate = useCallback(async () => {
-    setLocating(true);
-    try {
-      const p = await readHere(true);
-      setHere(p);
-      setCenter(p);
-      setSelected(null);
-    } catch {
-      setProblem(t('location.unavailable'));
-    } finally {
-      setLocating(false);
-    }
-  }, [t]);
-
-  if (!center) return <Loading />;
-  const items = answer?.items ?? [];
-  const from = here ?? center;
-  const sorted = byDistance(items, from);
-  const sections = SECTIONS.filter((l) => layers.includes(l))
-    .map((l) => ({ layer: l, items: sorted.filter((i) => i.layer === l).slice(0, PER_SECTION) }))
-    .filter((s) => s.items.length);
-  const search = () => {
-    if (q.trim()) router.push({ pathname: '/discover', params: { q: q.trim() } });
-  };
+  }, [posted]);
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: c.ground }}
-      contentContainerStyle={{ padding: space[4], gap: space[3], paddingBottom: 140 }}
-      keyboardShouldPersistTaps="handled"
-    >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
-        <View
-          style={{
-            flex: 1,
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: space[2],
-            minHeight: 44,
-            borderRadius: radius.full,
-            borderWidth: 1,
-            borderColor: c.line,
-            backgroundColor: c.surface,
-            paddingStart: space[4],
-          }}
-        >
-          <Icon name="search" size={18} color={c.inkMuted} />
-          <TextInput
-            accessibilityLabel={t('m.discover.search')}
-            placeholder={t('m.discover.search')}
-            placeholderTextColor={c.inkMuted}
-            value={q}
-            onChangeText={setQ}
-            onSubmitEditing={search}
-            returnKeyType="search"
-            maxLength={100}
-            style={[{ flex: 1, color: c.ink, fontSize: 16, paddingVertical: space[2] }, userText]}
-          />
-        </View>
-        <Button label={t('near.explore')} icon="compass-outline" size="sm" variant="secondary" onPress={() => router.push('/discover')} />
-      </View>
-      <Text style={{ color: c.inkMuted, fontSize: 15, lineHeight: 22 }}>{t('near.intro')}</Text>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space[2] }}>
-        {here ? null : (
-          <Button
-            label={locating ? t('location.locating') : t('map.useLocation')}
-            icon="locate-outline"
-            size="sm"
-            variant="secondary"
-            disabled={locating}
-            onPress={() => locate()}
-          />
-        )}
-        <Text style={{ color: c.inkMuted }}>{t('near.pickCity')}</Text>
-        {LAUNCH_CITIES.map((x) => (
-          <Button
-            key={x.key}
-            label={x.name}
-            size="sm"
-            variant="ghost"
-            onPress={() => {
-              setCenter(x.center);
-              setSelected(null);
+    <FeedSurfaceContext.Provider value={surface}>
+      <FlatList
+        keyboardShouldPersistTaps="handled"
+        {...feedListProps}
+        {...viewability}
+        style={{ backgroundColor: c.ground }}
+        contentContainerStyle={{ padding: space[4], gap: space[3], paddingBottom: bottom }}
+        data={posts ?? []}
+        keyExtractor={(p) => p.id}
+        ListHeaderComponent={
+          <View style={{ gap: space[3] }}>
+            {/* A note from the team to everyone, until it ends or you close it. */}
+            <AnnouncementCard />
+            {/* In the morning: Yapilapi Today, a short briefing of what your people and your city are talking about. */}
+            <TodayCard />
+            <StoriesStrip groups={stories} onOpen={setViewing} onCreate={() => router.push({ pathname: '/camera', params: { mode: 'story' } })} />
+            {/* After 12 hours or more away: a summary of what your people shared, on request. */}
+            <CatchUpCard />
+            {/* Your weekly wrap and "On this day", when there are any: quiet, and easy to put away. */}
+            <PulseCards />
+            {/* Launches from people you follow: when they open, and a Notify me on each drop. */}
+            <FollowingDrops />
+            {/* With nothing in the feed, the empty state below does the starter row's job. */}
+            {posts?.length ? <StarterRow /> : null}
+            <Segmented label={t('m.feed.label')} options={modes.map((m) => ({ id: m.id, label: t(m.label) }))} value={mode} onChange={setMode} />
+            {/* Yaps: listen to them one after another, hands-free, and questions people nearby asked out loud (Ask the city). */}
+            {mode === 'yaps' ? (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
+                <RadioButton station={{ kind: 'for_you' }} />
+                {askOn ? (
+                  <Button
+                    label={t('askCity.title')}
+                    accessibilityLabel={`${t('askCity.title')}. ${t('askCity.hint')}`}
+                    icon="help-circle-outline"
+                    size="sm"
+                    variant="secondary"
+                    onPress={() => router.push('/ask')}
+                  />
+                ) : null}
+              </View>
+            ) : null}
+            {error ? <ErrorState message={error} onRetry={() => Promise.all([load(), loadStories()])} /> : null}
+          </View>
+        }
+        refreshControl={
+          <RefreshControl
+            tintColor={c.yapi}
+            refreshing={refreshing}
+            onRefresh={async () => {
+              setRefreshing(true);
+              await Promise.all([load(), loadStories()]);
+              setRefreshing(false);
             }}
           />
-        ))}
-      </View>
-
-      <View style={{ height: 300, borderRadius: radius.lg, overflow: 'hidden' }}>
-        <CityMapView
-          center={center}
-          zoom={zoom}
-          size={size}
-          items={items}
-          here={here}
-          selected={selected?.key ?? null}
-          onLayout={(e) => {
-            const { width, height } = e.nativeEvent.layout;
-            if (width && height && (Math.round(width) !== size.width || Math.round(height) !== size.height))
-              setSize({ width: Math.round(width), height: Math.round(height) });
-          }}
-          onMove={setCenter}
-          onZoom={(z) => {
-            setSelected(null);
-            setZoom(z);
-          }}
-          onSelect={setSelected}
-          onLocate={() => (here ? setCenter(here) : void locate())}
-          locateHint={here ? undefined : t('map.locationWhy')}
-        />
-        {selected ? <PinCard cluster={selected} from={from} onClose={() => setSelected(null)} /> : null}
-      </View>
-      {problem ? <Notice tone="danger">{problem}</Notice> : null}
-
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[2] }}>
-        <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 20, fontWeight: '800' }}>
-          {t('near.whatsOn')}
-        </Text>
-        {me && stash ? <Button label={t('stash.hide')} icon="gift-outline" size="sm" onPress={() => router.push('/stash/new')} /> : null}
-      </View>
-      {answer && !sections.length ? <Text style={{ color: c.inkMuted }}>{t('near.empty')}</Text> : null}
-      {sections.map((s) => (
-        <View key={s.layer} style={{ gap: space[1] }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
-            <Icon name={LAYER_ICONS[s.layer]} size={18} color={c.yapi} />
-            <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 16, fontWeight: '700' }}>
-              {t(MAP_LAYER_KEYS[s.layer])}
-            </Text>
-          </View>
-          {s.items.map((i) => (
-            <MapItemRow key={i.key} item={i} from={from} />
-          ))}
-        </View>
-      ))}
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
-        {stash && me ? (
-          <Pressable
-            accessibilityRole="link"
-            onPress={() => router.push('/stash')}
-            style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: space[2] }}
-          >
-            <Text style={{ color: c.yapi, fontWeight: '700' }}>{t('stash.near')}</Text>
-          </Pressable>
-        ) : null}
-        <Pressable
-          accessibilityRole="link"
-          onPress={() => router.push('/map')}
-          style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: space[2] }}
-        >
-          <Text style={{ color: c.yapi, fontWeight: '700' }}>{t('map.title')}</Text>
-        </Pressable>
-      </View>
-    </ScrollView>
+        }
+        onEndReached={loadMore}
+        ListEmptyComponent={
+          posts === null ? (
+            <SkeletonList kind="post" />
+          ) : error ? null : (
+            <PulseEmpty mode={mode} onFollowed={() => void load()} onShowForYou={mode === 'for_you' ? undefined : () => setMode('for_you')} />
+          )
+        }
+        ListFooterComponent={
+          posts?.length ? (
+            <Text style={{ color: c.inkMuted, textAlign: 'center', padding: space[4] }}>{cursor ? t('m.common.loadingMore') : t('feed.end')}</Text>
+          ) : null
+        }
+        renderItem={renderPost}
+      />
+      <StoryViewer groups={stories} start={viewing} onClose={() => setViewing(null)} onChange={setStories} />
+    </FeedSurfaceContext.Provider>
   );
 }

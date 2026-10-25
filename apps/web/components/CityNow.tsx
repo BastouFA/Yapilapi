@@ -1,9 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Button, Icon, TextField } from '@yapilapi/design-system';
+import { useEffect, useRef, useState } from 'react';
+import { Button, Icon } from '@yapilapi/design-system';
 import {
   LAUNCH_CITIES,
   MAP_DEFAULT_ZOOM,
@@ -19,7 +18,7 @@ import {
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { useApproxHere } from '@/components/Market';
 import { LAYER_ICONS, MapItemRow, TileMap, type MapView } from '@/components/CityMap';
-import { useSession } from '../../providers';
+import { useSession } from '@/app/providers';
 
 /** "What's on now", in this order, a few of each (the nearest first). */
 const SECTIONS: MapLayer[] = ['stashes', 'live', 'today', 'places', 'questions', 'market'];
@@ -34,22 +33,21 @@ const zone = () => {
 };
 
 /**
- * Near, the home of "Your city, alive" (docs/product/your-city-alive.md): the city map around you
- * and what's on now (stashes near you, lives, events tonight, busy places, open questions and
- * Market nearby), with search and Explore (Wander) at the top. Where you are is asked for only on a
- * tap ("Use my location") and stays on this device; without it, your profile's city, or a launch
- * city. Only the part of the map on screen goes to the server.
+ * The top of Wander (docs/product/your-city-alive.md, "The menu"): the city map around you, with
+ * the Stashes layer and the others, and what's on now (stashes near you, lives, events tonight,
+ * busy places, open questions and Market nearby). Where you are is asked for only on a tap ("Use
+ * my location") and stays on this device; without it, your profile's city, or a launch city. Only
+ * the part of the map on screen goes to the server.
  */
-export default function NearPage() {
+export function CityNow() {
   const { t, me, flags } = useSession();
-  const router = useRouter();
   const place = useApproxHere();
   const [view, setView] = useState<MapView | null>(null);
   const [size, setSize] = useState({ width: 800, height: 420 });
   const [answer, setAnswer] = useState<MapAnswer | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
-  const [q, setQ] = useState('');
   const seq = useRef(0);
+  const stash = flags.STASH !== false;
 
   const layers = MAP_LAYERS.filter(
     (l) =>
@@ -57,16 +55,17 @@ export default function NearPage() {
       (l !== 'live' || flags.LIVE) &&
       (l !== 'chains' || flags.PASS_THE_MIC !== false) &&
       (l !== 'questions' || flags.ASK_CITY !== false) &&
-      (l !== 'stashes' || flags.STASH !== false),
+      (l !== 'stashes' || (stash && !!me)),
   );
 
   // Where to start: your profile's city, else Lagos (the first launch city).
   useEffect(() => {
+    if (flags.CITY_MAP === false) return;
     api.map
       .center()
       .then(({ center }) => setView((v) => v ?? { center: center?.center ?? LAUNCH_CITIES[0].center, zoom: MAP_DEFAULT_ZOOM }))
       .catch(() => setView((v) => v ?? { center: LAUNCH_CITIES[0].center, zoom: MAP_DEFAULT_ZOOM }));
-  }, []);
+  }, [flags.CITY_MAP]);
 
   useEffect(() => {
     if (!view || flags.CITY_MAP === false) return;
@@ -84,42 +83,39 @@ export default function NearPage() {
     return () => clearTimeout(timer);
   }, [view, size]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  if (flags.CITY_MAP === false) return null;
+
   const go = (center: LatLng) => setView({ center, zoom: MAP_DEFAULT_ZOOM });
   async function toHere() {
     const p = await place.locate();
     if (p) go(p);
   }
-  function search(e: FormEvent) {
-    e.preventDefault();
-    if (q.trim()) router.push(`/search?q=${encodeURIComponent(q.trim())}`);
-  }
 
   const items = answer?.items ?? [];
   const from: LatLng | null = place.here ?? view?.center ?? null;
-  const sections = SECTIONS.filter((l) => layers.includes(l)).map((l) => ({
-    layer: l,
-    items: (from ? byDistance(items, from) : items).filter((i) => i.layer === l).slice(0, PER_SECTION),
-  }));
-  const nothing = answer && !items.length;
+  const sections = SECTIONS.filter((l) => layers.includes(l))
+    .map((l) => ({
+      layer: l,
+      items: (from ? byDistance(items, from) : items).filter((i) => i.layer === l).slice(0, PER_SECTION),
+    }))
+    .filter((s) => s.items.length);
 
   return (
-    <div className="yp-shell__inner yp-shell__inner--wide stack near-page">
-      <div className="near-page__head">
-        <h1>{t('nav.near')}</h1>
-        <Link href="/discover" className="yp-btn yp-btn--ghost yp-btn--sm">
-          <Icon name="compass" size={16} /> {t('near.explore')}
-        </Link>
+    <section className="stack city-now" aria-labelledby="city-now">
+      <div className="city-now__head">
+        <h2 id="city-now" className="section-title">
+          {t('near.whatsOn')}
+        </h2>
+        {me && stash ? (
+          <Link href="/stash/new" className="yp-btn yp-btn--primary yp-btn--sm">
+            <Icon name="map-pin" size={16} /> {t('stash.hide')}
+          </Link>
+        ) : null}
       </div>
-      <form className="near-page__search" role="search" onSubmit={search}>
-        <TextField label={t('m.discover.search')} value={q} maxLength={100} onChange={(e) => setQ(e.currentTarget.value)} />
-        <Button type="submit" variant="ghost">
-          {t('m.discover.search')}
-        </Button>
-      </form>
-      <p className="muted citymap-page__intro">{t('near.intro')}</p>
+      <p className="muted city-now__intro">{t('near.intro')}</p>
 
-      <div className="near-page__picks">
-        <Button variant="secondary" size="sm" icon="map-pin" loading={place.busy} onClick={() => void toHere()} aria-describedby="near-why">
+      <div className="city-now__picks">
+        <Button variant="secondary" size="sm" icon="map-pin" loading={place.busy} onClick={() => void toHere()} aria-describedby="city-now-why">
           {t('map.useLocation')}
         </Button>
         <span className="muted">{t('near.pickCity')}</span>
@@ -129,28 +125,17 @@ export default function NearPage() {
           </Button>
         ))}
       </div>
-      <p id="near-why" className="muted citymap-page__note">
+      <p id="city-now-why" className="muted citymap-page__note">
         {t('map.locationWhy')}
       </p>
 
-      {view && flags.CITY_MAP !== false ? (
-        <TileMap view={view} onView={setView} onSize={setSize} items={items} here={place.here} label={t('nav.near')} />
-      ) : null}
+      {view ? <TileMap view={view} onView={setView} onSize={setSize} items={items} here={place.here} label={t('map.title')} /> : null}
       {problem ? <p className="citymap-page__note">{problem}</p> : null}
 
-      <section className="stack" aria-labelledby="near-on">
-        <div className="near-page__head">
-          <h2 id="near-on">{t('near.whatsOn')}</h2>
-          {me && flags.STASH !== false ? (
-            <Link href="/stash/new" className="yp-btn yp-btn--primary yp-btn--sm">
-              <Icon name="map-pin" size={16} /> {t('stash.hide')}
-            </Link>
-          ) : null}
-        </div>
-        {nothing ? <p className="muted">{t('near.empty')}</p> : null}
-        {sections
-          .filter((s) => s.items.length)
-          .map((s) => (
+      {answer && !sections.length ? <p className="muted">{t('near.empty')}</p> : null}
+      {sections.length ? (
+        <div className="city-now__sections">
+          {sections.map((s) => (
             <div key={s.layer} className="near-section">
               <h3>
                 <Icon name={LAYER_ICONS[s.layer]} size={18} /> {t(MAP_LAYER_KEYS[s.layer])}
@@ -164,17 +149,13 @@ export default function NearPage() {
               </ul>
             </div>
           ))}
-        <div className="row" style={{ flexWrap: 'wrap' }}>
-          {flags.STASH !== false ? (
-            <Link href="/stash" className="yp-btn yp-btn--ghost yp-btn--sm">
-              {t('stash.near')}
-            </Link>
-          ) : null}
-          <Link href="/map" className="yp-btn yp-btn--ghost yp-btn--sm">
-            {t('map.title')}
-          </Link>
         </div>
-      </section>
-    </div>
+      ) : null}
+      {me && stash ? (
+        <Link href="/stash" className="yp-btn yp-btn--ghost yp-btn--sm city-now__more">
+          {t('stash.near')}
+        </Link>
+      ) : null}
+    </section>
   );
 }

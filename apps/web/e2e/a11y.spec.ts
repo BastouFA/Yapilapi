@@ -28,7 +28,6 @@ const PUBLIC_PAGES: [string, string][] = [
 ];
 
 const APP_PAGES: [string, (d: SeedData) => string][] = [
-  ['near', () => '/near'],
   ['stash', () => '/stash'],
   ['hide a stash', () => '/stash/new'],
   ['home', () => '/home'],

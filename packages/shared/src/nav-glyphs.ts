@@ -1,5 +1,5 @@
 /**
- * The primary navigation's own symbols (Near, Pulse, Create, Chats, and Wander, Spark and the Yap button from before), drawn once as simple
+ * The primary navigation's own symbols (Pulse, Wander, Create, Chats, and Near, Spark and the Yap button from before), drawn once as simple
  * geometry on a 24px grid so the web (SVG) and the mobile app (plain Views, no SVG library)
  * render exactly the same shapes. "You" is the person's own avatar, so it has no glyph.
  *

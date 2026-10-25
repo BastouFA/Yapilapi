@@ -8,6 +8,7 @@ import type { Community, EventItem, Post, PublicUser } from '../../../../package
 import type { TrendingTag } from '../../../../packages/api-client/src/index';
 import { client, errorMessage } from '../../lib/api';
 import { ChainShelf } from '../../lib/chains';
+import { CityNow } from '../../lib/city-now';
 import { Chip, ChipRow, SectionHeader } from '../../lib/chips';
 import { useFlag } from '../../lib/flags';
 import { useT } from '../../lib/i18n';
@@ -69,8 +70,10 @@ const PREVIEW = 4;
 
 /**
  * Wander: search everything as you type (people, tags, posts, communities, events, places), with
- * filters, recent searches kept on this phone, and, before you type, trending tags, communities
- * to join and what's coming up. `?q=` (from a shared search link) starts a search.
+ * filters, recent searches kept on this phone, and, before you type, the city around you (the map
+ * with stashes and the other layers, and what's on now; docs/product/your-city-alive.md), then
+ * trending tags, communities to join and what's coming up. `?q=` (from a shared search link)
+ * starts a search.
  */
 export default function Wander() {
   const c = useColors();
@@ -319,6 +322,9 @@ export default function Wander() {
                 </ChipRow>
               </View>
             ) : null}
+
+            {/* The city around you: the map (stashes and the other layers) and what's on now. */}
+            <CityNow refreshKey={explored} />
 
             <View style={{ gap: space[2] }}>
               <SectionHeader title={t('m.wander.trending')} />

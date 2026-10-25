@@ -835,7 +835,7 @@ export default function Create() {
       }
       if (r.moderation) setNote(noticeText(r.moderation, t) ?? r.moderation.message);
       // Home shows the new post at the top, whatever the feed's ranking.
-      else router.navigate({ pathname: '/home', params: { posted: r.post.id } });
+      else router.navigate({ pathname: '/', params: { posted: r.post.id } });
     } catch (e) {
       if (isVerificationError(e)) setNeedsVerify(true);
       else setError(errorMessage(e));
@@ -878,7 +878,7 @@ export default function Create() {
       setYapKey((k) => k + 1);
       if (r.moderation) setNote(noticeText(r.moderation, t) ?? r.moderation.message);
       // Home shows the new Yap at the top, whatever the feed's ranking.
-      else router.navigate({ pathname: '/home', params: { posted: r.post.id } });
+      else router.navigate({ pathname: '/', params: { posted: r.post.id } });
     } catch (e) {
       if (isVerificationError(e)) setNeedsVerify(true);
       else setError(errorMessage(e));

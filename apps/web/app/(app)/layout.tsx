@@ -21,7 +21,7 @@ import { useSession } from '../providers';
 
 function currentTab(path: string, username?: string): NavEntry['id'] | undefined {
   if (path.startsWith('/home')) return 'home';
-  // Near is the city around you: the map, stashes, and Explore (Wander) and search from there.
+  // Wander is the city around you (the map, stashes, what's on now) and everything to explore and search.
   if (
     path.startsWith('/near') ||
     path.startsWith('/stash') ||
@@ -36,7 +36,7 @@ function currentTab(path: string, username?: string): NavEntry['id'] | undefined
     path.startsWith('/map') ||
     path.startsWith('/ask')
   )
-    return 'near';
+    return 'discover';
   // The middle button: Create (a stash, a post, reel, story, live or Yap).
   if (path.startsWith('/create') || path.startsWith('/camera')) return 'create';
   if (path.startsWith('/inbox') || path.startsWith('/yap') || path.startsWith('/notifications')) return 'inbox';
@@ -89,11 +89,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </div>
     );
 
-  // Near · Pulse · ＋ · Chats · You (docs/product/your-city-alive.md). The + in the middle opens the
-  // ways to create: hide a stash first, then a post, reel, story, live or Yap.
+  // Pulse · Wander · ＋ · Chats · You (docs/product/your-city-alive.md, "The menu"). The + in the
+  // middle opens the ways to create: hide a stash first, then a post, reel, story, live or Yap.
   const items: NavEntry[] = [
-    { id: 'near', href: '/near' },
     { id: 'home', href: '/home' },
+    { id: 'discover', href: '/discover' },
     { id: 'create', href: '/create', opens: () => setCreating(true) },
     { id: 'inbox', href: '/inbox', badge: unread.messages + unread.notifications },
     { id: 'profile', href: `/u/${me.username}`, avatar: { name: me.displayName, src: me.avatarUrl } },
@@ -129,7 +129,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 current={currentTab(path, me.username)}
                 linkAs={NextLink}
                 locale={locale}
-                brandHref="/near"
                 logoSrc="/mark.svg"
                 searchHref="/search"
                 footer={<RailAccountButton />}

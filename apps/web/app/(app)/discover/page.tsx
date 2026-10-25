@@ -10,6 +10,7 @@ import type { Chain, Community, EventItem, MessageKey, Post, PublicUser } from '
 import { api, errorMessage } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { TrendingTags } from '@/components/TrendingTags';
+import { CityNow } from '@/components/CityNow';
 import { ChainCard } from '@/components/PassTheMic';
 import { PostList } from '@/components/PostList';
 import { normalizeTag } from '@yapilapi/shared';
@@ -43,7 +44,6 @@ function Discover() {
   // Why the search didn't go through (shown with Try again instead of loading forever).
   const [searchError, setSearchError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
-  const [now, setNow] = useState<Awaited<ReturnType<typeof api.now>> | null>(null);
   const [communities, setCommunities] = useState<Community[]>([]);
   const [events, setEvents] = useState<EventItem[]>([]);
   // Pass the Mic: chains with new reels this week.
@@ -65,10 +65,6 @@ function Discover() {
   }, [q, attempt]);
 
   useEffect(() => {
-    api
-      .now()
-      .then(setNow)
-      .catch(() => {});
     api.communities
       .list('discover')
       .then((r) => setCommunities(r.items))
@@ -121,40 +117,6 @@ function Discover() {
     <div className="yp-shell__inner yp-shell__inner--wide">
       <div className="yp-topbar">
         <h1 className="topbar__word">{t('discover.title')}</h1>
-        <div className="row topbar__actions">
-          {flags.LIVE ? (
-            <Link href="/live" className="yp-btn yp-btn--ghost yp-btn--sm">
-              {t('m.live.title')}
-            </Link>
-          ) : null}
-          <Link href="/assistant" className="yp-btn yp-btn--ghost yp-btn--sm">
-            {t('m.title.assistant')}
-          </Link>
-          {flags.YAPS !== false && flags.YAP_RADIO !== false ? (
-            <Link href="/radio" className="yp-btn yp-btn--ghost yp-btn--sm" data-testid="wander-radio">
-              <Icon name="volume" size={16} /> {t('radio.title')}
-            </Link>
-          ) : null}
-          {flags.CITY_MAP !== false ? (
-            <Link href="/map" className="yp-btn yp-btn--ghost yp-btn--sm" title={t('map.hint')}>
-              <Icon name="map-pin" size={16} /> {t('map.title')}
-            </Link>
-          ) : null}
-          {flags.ASK_CITY !== false ? (
-            <Link href="/ask" className="yp-btn yp-btn--ghost yp-btn--sm" title={t('askCity.hint')}>
-              <Icon name="help" size={16} /> {t('askCity.title')}
-            </Link>
-          ) : null}
-          <Link href="/market" className="yp-btn yp-btn--ghost yp-btn--sm">
-            {t('market.title')}
-          </Link>
-          <Link href="/communities/new" className="yp-btn yp-btn--secondary yp-btn--sm">
-            {t('communities.create')}
-          </Link>
-          <Link href="/events/new" className="yp-btn yp-btn--secondary yp-btn--sm">
-            {t('events.create')}
-          </Link>
-        </div>
       </div>
 
       <form
@@ -184,7 +146,41 @@ function Discover() {
           {t('home.search')}
         </Button>
       </form>
-      {!q ? <AgentPanel kind="discover" compact /> : null}
+      {/* Ways around the city and its people: a row that scrolls sideways on a phone, wraps on a computer. */}
+      <div className="wander-shortcuts">
+        {flags.LIVE ? (
+          <Link href="/live" className="yp-btn yp-btn--ghost yp-btn--sm">
+            {t('m.live.title')}
+          </Link>
+        ) : null}
+        <Link href="/assistant" className="yp-btn yp-btn--ghost yp-btn--sm">
+          {t('m.title.assistant')}
+        </Link>
+        {flags.YAPS !== false && flags.YAP_RADIO !== false ? (
+          <Link href="/radio" className="yp-btn yp-btn--ghost yp-btn--sm" data-testid="wander-radio">
+            <Icon name="volume" size={16} /> {t('radio.title')}
+          </Link>
+        ) : null}
+        {flags.CITY_MAP !== false ? (
+          <Link href="/map" className="yp-btn yp-btn--ghost yp-btn--sm" title={t('map.hint')}>
+            <Icon name="map-pin" size={16} /> {t('map.title')}
+          </Link>
+        ) : null}
+        {flags.ASK_CITY !== false ? (
+          <Link href="/ask" className="yp-btn yp-btn--ghost yp-btn--sm" title={t('askCity.hint')}>
+            <Icon name="help" size={16} /> {t('askCity.title')}
+          </Link>
+        ) : null}
+        <Link href="/market" className="yp-btn yp-btn--ghost yp-btn--sm">
+          {t('market.title')}
+        </Link>
+        <Link href="/communities/new" className="yp-btn yp-btn--secondary yp-btn--sm">
+          {t('communities.create')}
+        </Link>
+        <Link href="/events/new" className="yp-btn yp-btn--secondary yp-btn--sm">
+          {t('events.create')}
+        </Link>
+      </div>
 
       {q ? (
         results === null && searchError ? (
@@ -261,6 +257,9 @@ function Discover() {
         )
       ) : (
         <div className="stack">
+          {/* The city around you first: the map (stashes and the other layers) and what's on now. */}
+          <CityNow />
+          <AgentPanel kind="discover" compact />
           <section className="stack-sm">
             <h2 className="section-title">{t('sidebar.trending')}</h2>
             <TrendingTags />
@@ -277,24 +276,6 @@ function Discover() {
               </ul>
             </section>
           ) : null}
-          <section className="stack-sm">
-            <h2 className="section-title">{t('discover.now')}</h2>
-            {now === null ? (
-              <Skeleton height={80} />
-            ) : now.events.length ? (
-              <>
-                {now.events.length ? (
-                  <div className="yp-grid">
-                    {now.events.map((e) => (
-                      <EventCard key={e.id} event={e} linkAs={NextLink} locale={locale} />
-                    ))}
-                  </div>
-                ) : null}
-              </>
-            ) : (
-              <p className="muted">{t('discover.quiet')}</p>
-            )}
-          </section>
           <section className="stack-sm">
             <div className="row" style={{ justifyContent: 'space-between' }}>
               <h2 className="section-title">{t('discover.communities')}</h2>

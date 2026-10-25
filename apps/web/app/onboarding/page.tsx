@@ -42,7 +42,7 @@ export default function Onboarding() {
 
   useEffect(() => {
     if (!loading && !me) router.replace('/login');
-    if (!loading && me?.onboarded) router.replace('/near');
+    if (!loading && me?.onboarded) router.replace('/home');
   }, [loading, me, router]);
   useEffect(() => {
     api.topics().then(
@@ -108,7 +108,7 @@ export default function Onboarding() {
     try {
       await api.me.completeOnboarding({ platform: 'web', steps });
       await refresh();
-      router.replace('/near');
+      router.replace('/home');
     } catch (e) {
       setError(errorMessage(e));
       setBusy(false);

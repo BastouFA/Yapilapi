@@ -115,11 +115,11 @@ const A: LinkLike = ({ href, children, ...rest }) => (
 // ── Navigation ──────────────────────────────────────────────────────────
 export interface NavEntry {
   /**
-   * Near, Pulse, Create (the raised + in the middle), Chats and You (docs/product/your-city-alive.md).
-   * The ids keep their original names: `home` is Pulse, `inbox` is Chats. `discover` (Wander) and
-   * `yap` (the voice-first Yap button) are from before and no longer in the bar.
+   * Pulse, Wander, Create (the raised + in the middle), Chats and You (docs/product/your-city-alive.md,
+   * "The menu"). The ids keep their original names: `home` is Pulse, `discover` is Wander, `inbox` is
+   * Chats. `yap` (the voice-first Yap button) is from before and no longer in the bar.
    */
-  id: 'near' | 'home' | 'discover' | 'create' | 'yap' | 'inbox' | 'profile';
+  id: 'home' | 'discover' | 'create' | 'yap' | 'inbox' | 'profile';
   href: string;
   badge?: number;
   /** "You" shows the signed-in person's own avatar (their initials when there is no photo). */
@@ -133,7 +133,6 @@ export interface NavEntry {
   opens?: () => void;
 }
 const NAV_GLYPH: Record<Exclude<NavEntry['id'], 'profile'>, IconName> = {
-  near: 'near',
   home: 'pulse',
   discover: 'wander',
   create: 'add',
@@ -205,7 +204,7 @@ function NavItem({ it, on, hint, L, locale }: { it: NavEntry; on: boolean; hint:
 }
 
 /**
- * Primary navigation: Near | Pulse | Create | Chats | You (ids near, home, create, inbox, profile).
+ * Primary navigation: Pulse | Wander | Create | Chats | You (ids home, discover, create, inbox, profile).
  * Phones: a floating dock. Icons only, except the current page, whose label sits with its icon
  * in a squircle highlight that slides between tabs; other labels show on hover and keyboard focus
  * and are always in the links' accessible names. The middle button is a raised, slightly tilted

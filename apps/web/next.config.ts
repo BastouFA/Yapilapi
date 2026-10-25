@@ -56,6 +56,9 @@ const config: NextConfig = {
       // Short links to the policies, for app store listings, emails and printed material.
       ...['terms', 'privacy', 'guidelines', 'cookies', 'copyright'].map((slug) => ({ source: `/${slug}`, destination: `/legal/${slug}`, permanent: false })),
       { source: '/dmca', destination: '/legal/copyright', permanent: false },
+      // Near was the first tab for a while; what it held (the map, stashes, what's on now) is in
+      // Wander now (docs/product/your-city-alive.md, "The menu"). Old links keep working, query and all.
+      { source: '/near', destination: '/discover', permanent: false },
     ];
   },
   async headers() {
