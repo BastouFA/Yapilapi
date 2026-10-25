@@ -218,7 +218,7 @@ const STATES: [string, string, (page: Page, d: SeedData) => Promise<void>][] = [
     '[role="dialog"]',
     async (page) => {
       await open(page, '/home');
-      await page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Create', exact: true }).click();
+      await page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Spark', exact: true }).click();
     },
   ],
   [

@@ -5,7 +5,7 @@ export const fr: Catalog = {
   'app.tagline': 'Parle. Le monde comprend.',
   'nav.home': 'Pouls',
   'nav.discover': 'Balade',
-  'nav.create': 'Créer',
+  'nav.create': 'Étincelle',
   'nav.inbox': 'Discussions',
   'nav.profile': 'Toi',
   'nav.hint.home': 'Ce que font tes proches',

@@ -5,7 +5,7 @@ export const id: Catalog = {
   'app.tagline': 'Bicaralah. Dunia mengerti.',
   'nav.home': 'Denyut',
   'nav.discover': 'Jelajah',
-  'nav.create': 'Buat',
+  'nav.create': 'Percik',
   'nav.inbox': 'Obrolan',
   'nav.profile': 'Anda',
   'nav.hint.home': 'Kabar orang-orang Anda',

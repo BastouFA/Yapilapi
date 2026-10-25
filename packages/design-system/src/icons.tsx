@@ -141,12 +141,25 @@ const isGlyph = (name: IconName): name is NavGlyphName => name in NAV_GLYPHS;
 /**
  * The navigation's own symbols (pulse, wander, spark, yap), from geometry shared with the mobile
  * app. 1.75px stroke; `filled` is the duotone active state (a soft fill behind the line). The
- * `yp-glyph__fill` parts can be made solid from CSS (`fill-opacity: 1`), as the Spark button does.
+ * `yp-glyph__fill` parts can be made solid from CSS (`fill-opacity: 1`). A star is `yp-glyph__star`
+ * and a dot `yp-glyph__dot`, which turns around the star's centre (the Spark button's twinkle).
  */
 function Glyph({ name, filled }: { name: NavGlyphName; filled?: boolean }) {
+  const star = NAV_GLYPHS[name].find((s) => s.kind === 'star');
   return NAV_GLYPHS[name].map((s, i) =>
     s.kind === 'dot' ? (
-      <circle key={i} cx={s.cx} cy={s.cy} r={s.d / 2} fill="currentColor" stroke="none" />
+      <circle
+        key={i}
+        className="yp-glyph__dot"
+        cx={s.cx}
+        cy={s.cy}
+        r={s.d / 2}
+        fill="currentColor"
+        stroke="none"
+        style={star ? { transformOrigin: `${star.cx}px ${star.cy}px` } : undefined}
+      />
+    ) : s.kind === 'star' ? (
+      <path key={i} className="yp-glyph__star" d={glyphPath(s)} fill="currentColor" stroke="none" />
     ) : s.fill === 'solid' ? (
       <path key={i} d={glyphPath(s)} fill="currentColor" stroke="none" />
     ) : (

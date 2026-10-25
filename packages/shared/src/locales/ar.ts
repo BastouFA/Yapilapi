@@ -5,7 +5,7 @@ export const ar: Catalog = {
   'app.tagline': 'تكلّم. والعالم يفهم.',
   'nav.home': 'نبض',
   'nav.discover': 'تجوّل',
-  'nav.create': 'إنشاء',
+  'nav.create': 'شرارة',
   'nav.inbox': 'الدردشات',
   'nav.profile': 'أنت',
   'nav.hint.home': 'ما يفعله أصدقاؤك الآن',

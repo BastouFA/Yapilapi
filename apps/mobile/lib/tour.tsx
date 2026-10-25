@@ -12,10 +12,10 @@ import { useColors } from './ui';
 /** The floating dock's measurements, shared with app/(tabs)/_layout.tsx so the tour points at the right place. */
 export const DOCK = { pad: 5, row: 54, maxWidth: 460, side: 12 } as const;
 const DOCK_HEIGHT = DOCK.row + DOCK.pad * 2 + 2;
-/** The middle (Create) button rises this far above the dock. */
+/** The middle (Spark) button rises this far above the dock. */
 const SPARK_RISE = 30;
 
-// v3: the dock is Pulse · Wander · Create · Chats · You, with the city map in Wander (docs/product/your-city-alive.md); everyone sees it once more.
+// v3: the dock is Pulse · Wander · Spark · Chats · You, with the city map in Wander (docs/product/your-city-alive.md); everyone sees it once more.
 const DONE_KEY = 'ypl_nav_tour_v3';
 
 /** The four marks: which tab (or tabs) each points at, and what it says. */
@@ -29,7 +29,7 @@ const MARKS: { slots: number[]; title: MessageKey; body: MessageKey }[] = [
 
 /**
  * A short tour of the dock on first launch: four small marks, one at a time, pointing at Pulse,
- * Wander, the Create button, then Chats and You. It never blocks the screen (nothing dims, every tab still
+ * Wander, the Spark button, then Chats and You. It never blocks the screen (nothing dims, every tab still
  * works), Skip ends it at once, and it is shown once per phone. Screen readers hear each mark
  * as it appears and can reach its buttons, but focus is never held inside it. With Reduce Motion
  * the marks appear without fading.

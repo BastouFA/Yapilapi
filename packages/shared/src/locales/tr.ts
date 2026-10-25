@@ -5,7 +5,7 @@ export const tr: Catalog = {
   'app.tagline': 'Konuş. Dünya anlar.',
   'nav.home': 'Nabız',
   'nav.discover': 'Gezinti',
-  'nav.create': 'Oluştur',
+  'nav.create': 'Kıvılcım',
   'nav.inbox': 'Sohbetler',
   'nav.profile': 'Sen',
   'nav.hint.home': 'Çevrendekiler neler yapıyor',

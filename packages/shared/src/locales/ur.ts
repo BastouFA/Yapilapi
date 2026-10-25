@@ -5,7 +5,7 @@ export const ur: Catalog = {
   'app.tagline': 'بولیں۔ دنیا سمجھتی ہے۔',
   'nav.home': 'نبض',
   'nav.discover': 'سیر',
-  'nav.create': 'بنائیں',
+  'nav.create': 'چنگاری',
   'nav.inbox': 'چیٹس',
   'nav.profile': 'آپ',
   'nav.hint.home': 'آپ کے لوگ کیا کر رہے ہیں',

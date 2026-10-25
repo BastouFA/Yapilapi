@@ -4,7 +4,7 @@ import { expect, test, type APIRequestContext, type Page } from '@playwright/tes
 /**
  * The signed-out landing page in English and French (still "The social network you speak" until
  * step 3 of docs/product/your-city-alive.md), signing in landing on Pulse, the navigation,
- * Pulse · Wander · Create · Chats · You, with Create in the middle (a tap offers a stash, post, reel,
+ * Pulse · Wander · Spark · Chats · You, with Spark in the middle (a tap offers a stash, post, reel,
  * story, live or Yap), at phone width and on a computer, and onboarding's first step, a voice hello that can
  * be recorded or skipped. Chrome's fake media flags stand in for a real microphone. Each project
  * (light and dark, desktop and phone) runs the page checks; recording runs in the light ones.
@@ -75,11 +75,11 @@ test.describe('landing page', () => {
 });
 
 /** The five places in the navigation, in order, by their labels. */
-const MENU = ['Pulse', 'Wander', 'Create', 'Chats', 'You'];
+const MENU = ['Pulse', 'Wander', 'Spark', 'Chats', 'You'];
 const menuLabels = (page: Page) => page.getByRole('navigation', { name: 'Primary' }).locator('.yp-nav__list > .yp-nav__item .yp-nav__label');
 
 test.describe('navigation', () => {
-  // docs/product/your-city-alive.md, "The menu": Pulse · Wander · + · Chats · You, Create in the middle.
+  // docs/product/your-city-alive.md, "The menu": Pulse · Wander · Spark · Chats · You, Spark in the middle.
   test('signing in lands on Pulse', async ({ page, request }) => {
     const password = randomBytes(18).toString('base64url');
     const username = await account(request, 'signin', true, password);
@@ -95,7 +95,7 @@ test.describe('navigation', () => {
     await expect(page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: /^Wander/ })).toHaveAttribute('aria-current', 'page');
   });
 
-  test('Pulse · Wander · Create · Chats · You, with Create in the middle', async ({ page, isMobile }) => {
+  test('Pulse · Wander · Spark · Chats · You, with Spark in the middle', async ({ page, isMobile }) => {
     await account(page.request, 'nav');
     await page.goto('/home');
     const nav = page.getByRole('navigation', { name: 'Primary' });
@@ -104,7 +104,7 @@ test.describe('navigation', () => {
     await expect(nav.getByRole('link', { name: /^Wander/ })).toHaveAttribute('href', '/discover');
     await expect(nav.getByRole('link', { name: /^Chats/ })).toHaveAttribute('href', '/inbox');
     await expect(nav.getByRole('link', { name: /^Near/ })).toHaveCount(0);
-    const create = nav.getByRole('link', { name: 'Create', exact: true });
+    const create = nav.getByRole('link', { name: 'Spark', exact: true });
     await expect(create).toBeInViewport();
     // The raised button in the middle is the biggest thing in the bar.
     const box = (await create.locator('.yp-nav__icon').boundingBox())!;
@@ -124,11 +124,11 @@ test.describe('navigation', () => {
     await expect(page).toHaveURL(/\/camera\?mode=reel/);
   });
 
-  test('at 375px wide, nothing overflows and Create fits', async ({ page }) => {
+  test('at 375px wide, nothing overflows and Spark fits', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await account(page.request, 'narrow');
     await page.goto('/home');
-    const create = page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Create', exact: true });
+    const create = page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Spark', exact: true });
     await expect(create).toBeInViewport({ ratio: 1 });
     await expect(menuLabels(page)).toHaveText(MENU);
     await noSidewaysScroll(page);
@@ -138,12 +138,12 @@ test.describe('navigation', () => {
     await noSidewaysScroll(page);
   });
 
-  test('Yap in Create opens the recorder', async ({ page }, info) => {
+  test('Yap in Spark opens the recorder', async ({ page }, info) => {
     lightOnly(info.project.name);
     test.setTimeout(90_000);
     await account(page.request, 'button');
     await page.goto('/home');
-    await page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Create', exact: true }).click();
+    await page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Spark', exact: true }).click();
     await page.getByRole('dialog', { name: 'Create' }).getByRole('link', { name: 'Yap' }).click();
     await expect(page).toHaveURL(/\/create\?mode=yap/);
     await expect(page.getByTestId('yap-record')).toBeVisible();

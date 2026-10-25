@@ -5,7 +5,7 @@ export const ha: Catalog = {
   'app.tagline': 'Yi magana. Duniya tana fahimta.',
   'nav.home': 'Bugun',
   'nav.discover': 'Yawo',
-  'nav.create': 'Ƙirƙira',
+  'nav.create': 'Tartsatsi',
   'nav.inbox': 'Hirarraki',
   'nav.profile': 'Kai',
   'nav.hint.home': 'Abin da mutanenka ke yi',

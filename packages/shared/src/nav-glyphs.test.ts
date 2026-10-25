@@ -18,4 +18,8 @@ describe('navigation glyphs', () => {
     );
     expect(glyphPath({ kind: 'drop', cx: 12, cy: 10, r: 4, fill: 'solid' })).toMatch(/^M12 15\.657L.*Z$/);
   });
+
+  it('draws a star from its four points with curved-in sides', () => {
+    expect(glyphPath({ kind: 'star', cx: 12, cy: 12, r: 8, c: 8 })).toBe('M12 4A8 8 0 0 0 20 12A8 8 0 0 0 12 20A8 8 0 0 0 4 12A8 8 0 0 0 12 4Z');
+  });
 });

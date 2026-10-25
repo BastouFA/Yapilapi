@@ -34,7 +34,8 @@ the signed-in screens says the app is voice-first any more (the old tagline left
 
 ## The menu
 
-**Pulse · Wander · ＋ · Chats · You** on the web and the phone (the owner's pick, 2026-10-25).
+**Pulse · Wander · Spark · Chats · You** on the web and the phone (the owner's pick, 2026-10-25; the
+middle button was called Create with a ＋ until the owner asked for a better name and icon the same day).
 
 - **Pulse** (the feed) is the first tab and where the app opens: after signing in, finishing
   onboarding or switching accounts the web goes to `/home` unless the sign-in link named another
@@ -42,8 +43,11 @@ the signed-in screens says the app is voice-first any more (the old tagline left
 - **Wander** (`/discover`, the phone's `discover` tab) starts with the map and "What's on now"
   (`components/CityNow.tsx` on the web, `lib/city-now.tsx` on the phone), then its search and
   discover sections.
-- **＋ Create** in the middle opens the ways to create: Hide a stash (first), Post, Reel, Story, Live
-  (while lives are on) and Yap. The voice-first Yap button is gone from the middle.
+- **Spark** in the middle opens the ways to create: Hide a stash (first), Post, Reel, Story, Live
+  (while lives are on) and Yap. Its icon is a bold four-point spark with a small light in its top
+  corner, white on the raised brand-gradient button; the spark twinkles (a quick turn and swell, the
+  light circling it a little) when it is pressed or gets keyboard focus, and not with reduced motion.
+  The menu it opens is titled Create. The voice-first Yap button is gone from the middle.
 - **Chats** and **You** as before.
 
 For one day (2026-10-24) the menu was Near · Pulse · ＋ · Chats · You, with a separate Near home at
@@ -56,16 +60,18 @@ For one day (2026-10-24) the menu was Near · Pulse · ＋ · Chats · You, with
 | --- | --- | --- |
 | Pulse | `/home` | first tab (`app/(tabs)/index.tsx`) |
 | Wander, with the map and what's on now | `/discover` (`components/CityNow.tsx` at its top) | `discover` tab (`lib/city-now.tsx` at its top) |
-| Create menu | `components/CreateMenu.tsx`, from the ＋ | the ＋ in `app/(tabs)/_layout.tsx` |
+| Create menu | `components/CreateMenu.tsx`, from Spark | Spark in `app/(tabs)/_layout.tsx` |
 | Stash | `/stash`, `/stash/new`, `/stash/:id` | `stash`, `stash/new`, `stash/[id]` |
 
 Links keep working: `/home` is Pulse, `/near` redirects to `/discover`, `/discover`, `/map`,
 `/stash` and every other path are unchanged. The phone's first-launch tour of the dock points at
-Pulse, Wander (the map and what's on now), Create, then Chats and You, and shows once more
+Pulse, Wander (the map and what's on now), Spark, then Chats and You, and shows once more
 (`ypl_nav_tour_v3`).
 
 Navigation glyphs (`packages/shared/src/nav-glyphs.ts`, drawn the same on web and phone): `pulse`,
-`wander`, `add` (the plus in the raised middle button) and `yap` for Chats; `near` (a pin on the
-ground) is from the Near tab and no longer in the bar. Message keys: `nav.create` says "Create" and
-`nav.hint.create` lists the ways to create, in all 24 languages; Wander's map part reuses the
+`wander`, `spark` (the raised middle button: a `star` shape, four points with curved-in sides, and a
+dot; on the phone the star is four clipped rings, plain Views) and `yap` for Chats; `near` (a pin on
+the ground) is from the Near tab and no longer in the bar. Message keys: `nav.create` says "Spark"
+("Étincelle", "Funke", ...; it said "Create" for a few hours on 2026-10-25), `nav.hint.create` lists
+the ways to create and `create.title` ("Create") titles the menu, in all 24 languages; Wander's map part reuses the
 `near.*` keys ("What's on now", the intro, "Or pick a city", the empty note).

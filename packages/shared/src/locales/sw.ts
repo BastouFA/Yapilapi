@@ -5,7 +5,7 @@ export const sw: Catalog = {
   'app.tagline': 'Ongea. Dunia inaelewa.',
   'nav.home': 'Mdundo',
   'nav.discover': 'Tembea',
-  'nav.create': 'Unda',
+  'nav.create': 'Cheche',
   'nav.inbox': 'Gumzo',
   'nav.profile': 'Wewe',
   'nav.hint.home': 'Wanachofanya watu wako',

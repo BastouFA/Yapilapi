@@ -5,7 +5,7 @@ export const vi: Catalog = {
   'app.tagline': 'Hãy nói. Thế giới sẽ hiểu.',
   'nav.home': 'Nhịp',
   'nav.discover': 'Dạo',
-  'nav.create': 'Tạo',
+  'nav.create': 'Tia lửa',
   'nav.inbox': 'Trò chuyện',
   'nav.profile': 'Tôi',
   'nav.hint.home': 'Mọi người của bạn đang làm gì',

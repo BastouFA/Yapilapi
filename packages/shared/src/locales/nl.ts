@@ -5,7 +5,7 @@ export const nl: Catalog = {
   'app.tagline': 'Praat. De wereld begrijpt het.',
   'nav.home': 'Hartslag',
   'nav.discover': 'Ontdekken',
-  'nav.create': 'Maken',
+  'nav.create': 'Vonk',
   'nav.inbox': 'Chats',
   'nav.profile': 'Jij',
   'nav.hint.home': 'Waar jouw mensen mee bezig zijn',

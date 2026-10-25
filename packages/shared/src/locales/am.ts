@@ -5,7 +5,7 @@ export const am: Catalog = {
   'app.tagline': 'ይናገሩ። ዓለም ይረዳዎታል።',
   'nav.home': 'ትርታ',
   'nav.discover': 'ቅኝት',
-  'nav.create': 'ይፍጠሩ',
+  'nav.create': 'ብልጭታ',
   'nav.inbox': 'ውይይቶች',
   'nav.profile': 'እርስዎ',
   'nav.hint.home': 'የእርስዎ ሰዎች ምን እየሰሩ እንደሆነ',

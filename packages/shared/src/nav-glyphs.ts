@@ -1,11 +1,12 @@
 /**
- * The primary navigation's own symbols (Pulse, Wander, Create, Chats, and Near, Spark and the Yap button from before), drawn once as simple
+ * The primary navigation's own symbols (Pulse, Wander, Spark, Chats, and Near and the Yap button from before), drawn once as simple
  * geometry on a 24px grid so the web (SVG) and the mobile app (plain Views, no SVG library)
  * render exactly the same shapes. "You" is the person's own avatar, so it has no glyph.
  *
- * Every shape is a rounded box, a dot or a drop (a pin: a circle with a point straight down).
- * `outline` shapes are stroked (NAV_GLYPH_STROKE, rounded joins); the active variant adds a
- * soft fill behind the stroke (duotone). `solid` shapes are always filled.
+ * Every shape is a rounded box, a dot, a drop (a pin: a circle with a point straight down) or a
+ * star (four points with curved-in sides). `outline` shapes are stroked (NAV_GLYPH_STROKE, rounded
+ * joins); the active variant adds a soft fill behind the stroke (duotone). `solid` shapes and stars
+ * are always filled.
  */
 export const NAV_GLYPH_STROKE = 1.75;
 
@@ -15,9 +16,15 @@ export type GlyphRadii = number | readonly [number, number, number, number];
 export type GlyphShape =
   | { kind: 'box'; x: number; y: number; w: number; h: number; r: GlyphRadii; fill: 'outline' | 'solid' }
   | { kind: 'dot'; cx: number; cy: number; d: number }
-  | { kind: 'drop'; cx: number; cy: number; r: number; fill: 'outline' | 'solid' };
+  | { kind: 'drop'; cx: number; cy: number; r: number; fill: 'outline' | 'solid' }
+  /**
+   * Four points `r` from the centre (up, right, down, left). Each side is an arc of a circle whose
+   * centre sits `c` out along both axes (on the diagonal): `c` = `r` is the thinnest spark, a larger
+   * `c` flattens the curve and gives a fuller star.
+   */
+  | { kind: 'star'; cx: number; cy: number; r: number; c: number };
 
-export type NavGlyphName = 'near' | 'pulse' | 'wander' | 'spark' | 'add' | 'yap' | 'voice';
+export type NavGlyphName = 'near' | 'pulse' | 'wander' | 'spark' | 'yap' | 'voice';
 
 export const NAV_GLYPHS: Record<NavGlyphName, readonly GlyphShape[]> = {
   /** Near: a pin standing on the ground, with a dot at its heart (what's happening around you). */
@@ -41,16 +48,14 @@ export const NAV_GLYPHS: Record<NavGlyphName, readonly GlyphShape[]> = {
     { kind: 'dot', cx: 15, cy: 12.6, d: 2.3 },
     { kind: 'drop', cx: 17.75, cy: 6, r: 3.5, fill: 'outline' },
   ],
-  /** Spark: the three rounded blocks of the YAPILAPI mark (apps/web/public/mark.svg). */
+  /**
+   * Spark, in the raised button in the middle (it opens the ways to create, a stash first): a bold
+   * four-point spark with a small light in its top corner, the pair centred on the grid. The light
+   * circles the spark's centre a little when the button is pressed.
+   */
   spark: [
-    { kind: 'box', x: 3.4, y: 3.4, w: 7.2, h: 7.2, r: 2.4, fill: 'outline' },
-    { kind: 'box', x: 13.4, y: 3.4, w: 7.2, h: 7.2, r: 2.4, fill: 'outline' },
-    { kind: 'box', x: 8.4, y: 12.6, w: 7.2, h: 8.4, r: 2.4, fill: 'outline' },
-  ],
-  /** Create: a plus, in the raised button in the middle (it opens the ways to create, a stash first). */
-  add: [
-    { kind: 'box', x: 11, y: 4.5, w: 2, h: 15, r: 1, fill: 'solid' },
-    { kind: 'box', x: 4.5, y: 11, w: 15, h: 2, r: 1, fill: 'solid' },
+    { kind: 'star', cx: 11.25, cy: 12.75, r: 9, c: 13.5 },
+    { kind: 'dot', cx: 19.5, cy: 4.5, d: 4 },
   ],
   /** Chats (the tab was called Yap): a soft speech shape (one tighter corner is its tail) with a sound wave inside. */
   yap: [
@@ -76,8 +81,17 @@ export const radii = (r: GlyphRadii): readonly [number, number, number, number] 
 
 const n = (v: number) => Math.round(v * 1000) / 1000;
 
-/** SVG path data for a shape (a box with its own corner radii, or a drop). Dots are drawn as circles. */
+/** The radius of the four circles that carve a star's sides (each passes through two of its points). */
+export const starSideRadius = (s: { r: number; c: number }) => Math.hypot(s.r - s.c, s.c);
+
+/** SVG path data for a shape (a box with its own corner radii, a drop or a star). Dots are drawn as circles. */
 export function glyphPath(shape: Exclude<GlyphShape, { kind: 'dot' }>): string {
+  if (shape.kind === 'star') {
+    const { cx, cy, r } = shape;
+    const a = n(starSideRadius(shape));
+    const side = (x: number, y: number) => `A${a} ${a} 0 0 0 ${n(x)} ${n(y)}`;
+    return `M${n(cx)} ${n(cy - r)}${side(cx + r, cy)}${side(cx, cy + r)}${side(cx - r, cy)}${side(cx, cy - r)}Z`;
+  }
   if (shape.kind === 'drop') {
     const { cx, cy, r } = shape;
     const a = r / Math.SQRT2;
@@ -97,6 +111,7 @@ export function glyphPath(shape: Exclude<GlyphShape, { kind: 'dot' }>): string {
 export function glyphBounds(shape: GlyphShape): [number, number, number, number] {
   const s = NAV_GLYPH_STROKE / 2;
   if (shape.kind === 'dot') return [shape.cx - shape.d / 2, shape.cy - shape.d / 2, shape.cx + shape.d / 2, shape.cy + shape.d / 2];
+  if (shape.kind === 'star') return [shape.cx - shape.r, shape.cy - shape.r, shape.cx + shape.r, shape.cy + shape.r];
   const pad = shape.fill === 'outline' ? s : 0;
   if (shape.kind === 'drop') return [shape.cx - shape.r - pad, shape.cy - shape.r - pad, shape.cx + shape.r + pad, shape.cy + shape.r * Math.SQRT2 + pad];
   return [shape.x - pad, shape.y - pad, shape.x + shape.w + pad, shape.y + shape.h + pad];

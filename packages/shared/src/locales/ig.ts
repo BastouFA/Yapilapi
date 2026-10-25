@@ -5,7 +5,7 @@ export const ig: Catalog = {
   'app.tagline': 'Kwuo okwu. Ụwa na-aghọta.',
   'nav.home': 'Ịkụ obi',
   'nav.discover': 'Njegharị',
-  'nav.create': 'Mepụta',
+  'nav.create': 'Ọkụ',
   'nav.inbox': 'Nkata',
   'nav.profile': 'Gị',
   'nav.hint.home': 'Ihe ndị gị na-eme',

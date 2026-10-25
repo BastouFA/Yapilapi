@@ -115,7 +115,7 @@ const A: LinkLike = ({ href, children, ...rest }) => (
 // ── Navigation ──────────────────────────────────────────────────────────
 export interface NavEntry {
   /**
-   * Pulse, Wander, Create (the raised + in the middle), Chats and You (docs/product/your-city-alive.md,
+   * Pulse, Wander, Spark (the raised button in the middle), Chats and You (docs/product/your-city-alive.md,
    * "The menu"). The ids keep their original names: `home` is Pulse, `discover` is Wander, `inbox` is
    * Chats. `yap` (the voice-first Yap button) is from before and no longer in the bar.
    */
@@ -135,11 +135,11 @@ export interface NavEntry {
 const NAV_GLYPH: Record<Exclude<NavEntry['id'], 'profile'>, IconName> = {
   home: 'pulse',
   discover: 'wander',
-  create: 'add',
+  create: 'spark',
   yap: 'voice',
   inbox: 'yap',
 };
-/** The raised button in the middle: Create. */
+/** The raised button in the middle: Spark. */
 const isCentre = (id: NavEntry['id']) => id === 'create' || id === 'yap';
 /** How long a press is held before it counts as a long press. */
 const LONG_PRESS_MS = 450;
@@ -161,14 +161,21 @@ function NavItem({ it, on, hint, L, locale }: { it: NavEntry; on: boolean; hint:
   // Held down (or right-clicked, or the context-menu key), the middle button opens its menu
   // instead of following the link; a quick tap still follows it.
   const hold = useLongPress(it.menu?.open, LONG_PRESS_MS);
+  // Spark twinkles once on each press (CSS; none with reduced motion), to the end even after a quick tap.
+  const [twinkle, setTwinkle] = useState(false);
+  const centre = isCentre(it.id);
   return (
     <L
       href={it.href}
-      className={cx('yp-nav__item', `yp-nav__item--${it.id}`, isCentre(it.id) && 'yp-nav__item--create')}
+      className={cx('yp-nav__item', `yp-nav__item--${it.id}`, centre && 'yp-nav__item--create')}
       aria-current={on ? 'page' : undefined}
       aria-describedby={hint}
       aria-haspopup={it.opens ? 'dialog' : undefined}
       {...hold.handlers}
+      onPointerDown={(e) => {
+        if (centre) setTwinkle(true);
+        if ('onPointerDown' in hold.handlers) hold.handlers.onPointerDown(e);
+      }}
       onClick={
         it.opens
           ? (e) => {
@@ -180,11 +187,15 @@ function NavItem({ it, on, hint, L, locale }: { it: NavEntry; on: boolean; hint:
             : undefined
       }
     >
-      <span className="yp-nav__icon">
+      <span
+        className="yp-nav__icon"
+        data-twinkle={twinkle || undefined}
+        onAnimationEnd={twinkle ? (e) => e.animationName === 'yp-spark-twinkle' && setTwinkle(false) : undefined}
+      >
         {it.id === 'profile' ? (
           <NavAvatar name={it.avatar?.name ?? ''} src={it.avatar?.src} />
         ) : (
-          <Icon name={NAV_GLYPH[it.id]} size={24} filled={on || isCentre(it.id)} />
+          <Icon name={NAV_GLYPH[it.id]} size={24} filled={on || centre} />
         )}
       </span>
       <span className="yp-nav__label">{t(`nav.${it.id}` as MessageKey, locale)}</span>
@@ -204,12 +215,13 @@ function NavItem({ it, on, hint, L, locale }: { it: NavEntry; on: boolean; hint:
 }
 
 /**
- * Primary navigation: Pulse | Wander | Create | Chats | You (ids home, discover, create, inbox, profile).
+ * Primary navigation: Pulse | Wander | Spark | Chats | You (ids home, discover, create, inbox, profile).
  * Phones: a floating dock. Icons only, except the current page, whose label sits with its icon
  * in a squircle highlight that slides between tabs; other labels show on hover and keyboard focus
  * and are always in the links' accessible names. The middle button is a raised, slightly tilted
- * brand-gradient squircle with a plus that straightens when pressed; a tap opens the ways to
- * create (`opens`). Wide screens: a side rail with every label visible.
+ * brand-gradient squircle with a four-point spark that straightens when pressed, and the spark
+ * twinkles (its light circling it) on a press or keyboard focus; a tap opens the ways to create
+ * (`opens`). Wide screens: a side rail with every label visible.
  */
 export function NavBar({
   items,

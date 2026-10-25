@@ -5,7 +5,7 @@ export const hi: Catalog = {
   'app.tagline': 'बोलें। दुनिया समझती है।',
   'nav.home': 'धड़कन',
   'nav.discover': 'सैर',
-  'nav.create': 'बनाएँ',
+  'nav.create': 'चिंगारी',
   'nav.inbox': 'चैट',
   'nav.profile': 'आप',
   'nav.hint.home': 'आपके लोग क्या कर रहे हैं',

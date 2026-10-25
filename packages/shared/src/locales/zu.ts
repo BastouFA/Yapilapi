@@ -5,7 +5,7 @@ export const zu: Catalog = {
   'app.tagline': 'Khuluma. Umhlaba uyakuzwa.',
   'nav.home': 'Isigqi',
   'nav.discover': 'Zulazula',
-  'nav.create': 'Dala',
+  'nav.create': 'Inhlansi',
   'nav.inbox': 'Izingxoxo',
   'nav.profile': 'Wena',
   'nav.hint.home': 'Okwenziwa abantu bakho',

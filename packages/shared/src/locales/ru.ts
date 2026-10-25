@@ -5,7 +5,7 @@ export const ru: Catalog = {
   'app.tagline': 'Говорите. Мир понимает.',
   'nav.home': 'Пульс',
   'nav.discover': 'Прогулка',
-  'nav.create': 'Создать',
+  'nav.create': 'Искра',
   'nav.inbox': 'Чаты',
   'nav.profile': 'Профиль',
   'nav.hint.home': 'Чем заняты ваши люди',

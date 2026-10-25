@@ -1,17 +1,44 @@
-import { I18nManager, View, type ViewStyle } from 'react-native';
-import { NAV_GLYPH_DIRECTIONAL, NAV_GLYPH_STROKE, NAV_GLYPHS, radii, type GlyphShape, type NavGlyphName } from '../../../packages/shared/src/nav-glyphs';
+import type { ReactNode } from 'react';
+import { Animated, I18nManager, View, type ViewStyle } from 'react-native';
+import {
+  NAV_GLYPH_DIRECTIONAL,
+  NAV_GLYPH_STROKE,
+  NAV_GLYPHS,
+  radii,
+  starSideRadius,
+  type GlyphShape,
+  type NavGlyphName,
+} from '../../../packages/shared/src/nav-glyphs';
+
+type Star = Extract<GlyphShape, { kind: 'star' }>;
 
 /**
- * The navigation's own symbols (Pulse, Wander, Spark, Yap), from the same geometry as the web
+ * The navigation's own symbols (Pulse, Wander, Spark, Chats), from the same geometry as the web
  * app's icons (packages/shared/src/nav-glyphs.ts), drawn with plain Views: rounded boxes with a
- * border, dots, and a pin (a square with three round corners, turned 45°).
+ * border, dots, a pin (a square with three round corners, turned 45°) and a star (four quarters,
+ * each a ring clipped to its square so that only the curved-in side shows).
  *
  * - `line`: the outline (inactive tabs)
  * - `duo`: the outline over a soft fill of the same colour (the current tab)
  * - `solid`: filled shapes (the Spark button)
+ *
+ * `twinkle` (0 to 1 and back) turns and swells a star and circles the dots around it a little.
  */
-export function NavGlyph({ name, size = 24, color, tone = 'line' }: { name: NavGlyphName; size?: number; color: string; tone?: 'line' | 'duo' | 'solid' }) {
+export function NavGlyph({
+  name,
+  size = 24,
+  color,
+  tone = 'line',
+  twinkle,
+}: {
+  name: NavGlyphName;
+  size?: number;
+  color: string;
+  tone?: 'line' | 'duo' | 'solid';
+  twinkle?: Animated.Value;
+}) {
   const k = size / 24;
+  const star = NAV_GLYPHS[name].find((s): s is Star => s.kind === 'star');
   const mirror = I18nManager.isRTL && NAV_GLYPH_DIRECTIONAL.has(name);
   return (
     <View
@@ -21,10 +48,85 @@ export function NavGlyph({ name, size = 24, color, tone = 'line' }: { name: NavG
       // Shapes are placed with physical left/top: lay them out left to right, then mirror on purpose.
       style={{ width: size, height: size, direction: 'ltr', transform: mirror ? [{ scaleX: -1 }] : undefined }}
     >
-      {NAV_GLYPHS[name].map((s, i) => (
-        <Shape key={i} shape={s} k={k} color={color} tone={tone} />
-      ))}
+      {NAV_GLYPHS[name].map((s, i) =>
+        twinkle && star && (s.kind === 'star' || s.kind === 'dot') ? (
+          <Turn key={i} around={star} size={size} value={twinkle} orbit={s.kind === 'dot'}>
+            <Shape shape={s} k={k} color={color} tone={tone} />
+          </Turn>
+        ) : (
+          <Shape key={i} shape={s} k={k} color={color} tone={tone} />
+        ),
+      )}
     </View>
+  );
+}
+
+/** Turns its shape around the star's centre: the star itself turns and swells, a dot circles it. */
+function Turn({ around, size, value, orbit, children }: { around: Star; size: number; value: Animated.Value; orbit: boolean; children: ReactNode }) {
+  const k = size / 24;
+  // A box twice the glyph's size centred on the star, so it turns around the star's centre.
+  return (
+    <Animated.View
+      style={{
+        position: 'absolute',
+        left: around.cx * k - size,
+        top: around.cy * k - size,
+        width: size * 2,
+        height: size * 2,
+        opacity: orbit ? value.interpolate({ inputRange: [0, 1], outputRange: [1, 0.7] }) : 1,
+        transform: [
+          { rotate: value.interpolate({ inputRange: [0, 1], outputRange: ['0deg', orbit ? '-34deg' : '18deg'] }) },
+          { scale: orbit ? 1 : value.interpolate({ inputRange: [0, 1], outputRange: [1, 1.16] }) },
+        ],
+      }}
+    >
+      <View style={{ position: 'absolute', left: size - around.cx * k, top: size - around.cy * k, width: size, height: size }}>{children}</View>
+    </Animated.View>
+  );
+}
+
+/**
+ * A star, always filled: one square per quarter, from the centre out to two of its points, showing
+ * only what lies outside the circle that carves that side (a thick ring around the circle, clipped
+ * to the square). Two thin bars along the axes, as far out as the arms are wider than them, cover
+ * the lines where the quarters meet.
+ */
+function StarShape({ star, k, color }: { star: Star; k: number; color: string }) {
+  const { cx, cy, r, c } = star;
+  const side = starSideRadius(star);
+  // The ring reaches from the circle to past the star's centre, the farthest point in its square.
+  const ring = c * Math.SQRT2 - side + 1;
+  const outer = side + ring;
+  const bar = 0.4;
+  // Out to where the arm is half as wide again as the bar, so its ends stay inside the star.
+  const reach = c - Math.sqrt(side * side - (c - bar * 1.5) ** 2);
+  return (
+    <>
+      {([1, -1] as const).flatMap((sx) =>
+        ([1, -1] as const).map((sy) => {
+          const left = sx > 0 ? cx : cx - r;
+          const top = sy > 0 ? cy : cy - r;
+          return (
+            <View key={`${sx}${sy}`} style={{ position: 'absolute', left: left * k, top: top * k, width: r * k, height: r * k, overflow: 'hidden' }}>
+              <View
+                style={{
+                  position: 'absolute',
+                  left: (cx + sx * c - outer - left) * k,
+                  top: (cy + sy * c - outer - top) * k,
+                  width: outer * 2 * k,
+                  height: outer * 2 * k,
+                  borderRadius: outer * k,
+                  borderWidth: ring * k,
+                  borderColor: color,
+                }}
+              />
+            </View>
+          );
+        }),
+      )}
+      <View style={{ position: 'absolute', left: (cx - reach) * k, top: (cy - bar) * k, width: reach * 2 * k, height: bar * 2 * k, backgroundColor: color }} />
+      <View style={{ position: 'absolute', left: (cx - bar) * k, top: (cy - reach) * k, width: bar * 2 * k, height: reach * 2 * k, backgroundColor: color }} />
+    </>
   );
 }
 
@@ -46,6 +148,7 @@ function Shape({ shape, k, color, tone }: { shape: GlyphShape; k: number; color:
       />
     );
   }
+  if (shape.kind === 'star') return <StarShape star={shape} k={k} color={color} />;
   const solid = shape.fill === 'solid' || tone === 'solid';
   // A stroke is centred on the outline (as in SVG): the box grows by half the stroke on every side.
   const pad = shape.fill === 'solid' ? 0 : sw / 2;

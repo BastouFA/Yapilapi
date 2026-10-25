@@ -545,7 +545,7 @@ const NEW_STATES: [string, (page: Page, d: SeedData) => Promise<void>][] = [
     async (page) => {
       await open(page, '/home');
       // The + in the middle opens the ways to create (a stash first).
-      await page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Create', exact: true }).click();
+      await page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Spark', exact: true }).click();
       await expect(page.getByRole('dialog', { name: 'Create' })).toBeVisible();
     },
   ],

@@ -8,7 +8,7 @@ export const en = {
   'app.tagline': 'Speak. The world understands.',
   'nav.home': 'Pulse',
   'nav.discover': 'Wander',
-  'nav.create': 'Create',
+  'nav.create': 'Spark',
   'nav.inbox': 'Chats',
   'nav.profile': 'You',
   'nav.hint.home': 'What your people are up to',

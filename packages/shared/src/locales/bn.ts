@@ -5,7 +5,7 @@ export const bn: Catalog = {
   'app.tagline': 'বলুন। পৃথিবী বোঝে।',
   'nav.home': 'স্পন্দন',
   'nav.discover': 'ঘোরাঘুরি',
-  'nav.create': 'তৈরি করুন',
+  'nav.create': 'স্ফুলিঙ্গ',
   'nav.inbox': 'চ্যাট',
   'nav.profile': 'আপনি',
   'nav.hint.home': 'আপনার মানুষেরা কী করছেন',

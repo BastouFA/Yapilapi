@@ -21,15 +21,16 @@ Not to be confused with Yap in chats (hold to talk, plays out loud like a walkie
 ## Naming (decided 2026-10-08, navigation changed 2026-10-24 and 2026-10-25)
 
 **Since 2026-10-25** ("Your city, alive", docs/product/your-city-alive.md, "The menu") the
-navigation reads **Pulse · Wander · ＋ · Chats · You** on the web and the phone. The big Yap button
-left the middle: the ＋ (Create, `NavEntry` id `create`, message key `nav.create`, "Create" in all
-24 languages) opens the ways to create, a stash first, then a post, reel, story, live and **Yap**
+navigation reads **Pulse · Wander · Spark · Chats · You** on the web and the phone. The big Yap button
+left the middle: **Spark** (`NavEntry` id `create`, message key `nav.create`, back to its Spark
+wording in all 24 languages after a few hours as "Create" with a ＋; a four-point spark icon) opens
+the ways to create (a menu titled Create), a stash first, then a post, reel, story, live and **Yap**
 (which still opens the recorder, `/create?mode=yap`). Pulse is the first tab and where you land
 after signing in (web `/home`; the phone's first tab, its `index` route). Wander (`/discover`, the
 phone's `discover` tab) opens on the city map and "What's on now", then its search and sections.
 For one day (2026-10-24) the bar was Near · Pulse · ＋ · Chats · You; `/near` now redirects to
 `/discover`. The names below still hold for what a Yap, Chats and the Yap app are; the rows about the
-button in the middle and Spark are history.
+button in the middle are history; Spark is the middle button again.
 
 
 "Yap" used to name three things inside YAPILAPI: the chats tab, the walkie-talkie clips in chats,

@@ -5,7 +5,7 @@ export const yo: Catalog = {
   'app.tagline': 'Sọ̀rọ̀. Ayé ń gbọ́ ọ yé.',
   'nav.home': 'Ìlù',
   'nav.discover': 'Rìn kiri',
-  'nav.create': 'Ṣẹ̀dá',
+  'nav.create': 'Ẹ̀tanná',
   'nav.inbox': 'Ìjíròrò',
   'nav.profile': 'Ìwọ',
   'nav.hint.home': 'Ohun tí àwọn ènìyàn rẹ ń ṣe',

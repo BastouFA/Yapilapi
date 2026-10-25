@@ -5,7 +5,7 @@ export const zh: Catalog = {
   'app.tagline': '说吧。 世界听得懂。',
   'nav.home': '脉动',
   'nav.discover': '漫游',
-  'nav.create': '创作',
+  'nav.create': '火花',
   'nav.inbox': '聊天',
   'nav.profile': '我',
   'nav.hint.home': '看看你的朋友们在做什么',

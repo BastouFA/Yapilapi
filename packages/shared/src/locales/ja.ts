@@ -5,7 +5,7 @@ export const ja: Catalog = {
   'app.tagline': '話そう。 世界に伝わる。',
   'nav.home': 'パルス',
   'nav.discover': 'ワンダー',
-  'nav.create': '作成',
+  'nav.create': 'スパーク',
   'nav.inbox': 'チャット',
   'nav.profile': 'マイページ',
   'nav.hint.home': 'あなたのつながりの近況',

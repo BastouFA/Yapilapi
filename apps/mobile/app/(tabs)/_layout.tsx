@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, Tabs } from 'expo-router';
 import { useCallback, useEffect, useRef, useState, type ComponentProps } from 'react';
-import { Animated, I18nManager, Image, Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, I18nManager, Image, Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { smallAvatarUrl } from '../../../../packages/shared/src/data-saver';
 import { initialsOf } from '../../../../packages/shared/src/initials';
@@ -25,7 +25,7 @@ type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>
 const TABS: Record<string, { id: 'home' | 'discover' | 'create' | 'inbox' | 'profile'; glyph?: NavGlyphName }> = {
   index: { id: 'home', glyph: 'pulse' },
   discover: { id: 'discover', glyph: 'wander' },
-  create: { id: 'create', glyph: 'add' },
+  create: { id: 'create', glyph: 'spark' },
   inbox: { id: 'inbox', glyph: 'yap' },
   profile: { id: 'profile' },
 };
@@ -100,7 +100,7 @@ function FloatingTabBar({ state, descriptors, navigation }: TabBarProps) {
   const stash = useFlag('STASH') !== false;
   const live = useFlag('LIVE') === true;
   const more = useActionSheet();
-  // The ways to create, behind the + (a stash first).
+  // The ways to create, behind Spark (a stash first).
   const openMore = () =>
     more.show({
       title: t('create.title'),
@@ -117,6 +117,7 @@ function FloatingTabBar({ state, descriptors, navigation }: TabBarProps) {
   const [width, setWidth] = useState(0);
   const slide = useRef(new Animated.Value(0)).current;
   const spark = useRef(new Animated.Value(0)).current;
+  const twinkle = useRef(new Animated.Value(0)).current;
   const placedOnce = useRef(false);
 
   useEffect(() => {
@@ -140,6 +141,16 @@ function FloatingTabBar({ state, descriptors, navigation }: TabBarProps) {
   const press = (to: number) => {
     if (reduce) spark.setValue(to);
     else Animated.spring(spark, { toValue: to, useNativeDriver: true, damping: 12, stiffness: 260 }).start();
+  };
+  // Spark twinkles on a press or focus: its star turns and swells and its light circles it, then settles. None with reduce motion.
+  const sparkle = () => {
+    if (reduce) return;
+    twinkle.stopAnimation();
+    twinkle.setValue(0);
+    Animated.sequence([
+      Animated.timing(twinkle, { toValue: 1, duration: 240, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.spring(twinkle, { toValue: 0, useNativeDriver: true, damping: 9, stiffness: 180 }),
+    ]).start();
   };
 
   if (keyboard) return null;
@@ -175,11 +186,13 @@ function FloatingTabBar({ state, descriptors, navigation }: TabBarProps) {
                 <Pressable
                   key={route.key}
                   accessibilityRole="button"
-                  accessibilityLabel={label}
+                  // Spark (its screen, the composer, is titled Create).
+                  accessibilityLabel={t('nav.create')}
                   accessibilityHint={hint}
                   // The ways to create: hide a stash, a post, reel, story, live or Yap.
                   onPress={openMore}
-                  onPressIn={() => press(1)}
+                  onPressIn={() => (press(1), sparkle())}
+                  onFocus={sparkle}
                   onPressOut={() => press(0)}
                   style={s.sparkHit}
                 >
@@ -197,7 +210,7 @@ function FloatingTabBar({ state, descriptors, navigation }: TabBarProps) {
                     ]}
                   >
                     <LinearGradient {...gradient(c)} style={s.spark}>
-                      <NavGlyph name="add" size={27} color={c.onYapi} tone="solid" />
+                      <NavGlyph name="spark" size={28} color={c.onYapi} tone="solid" twinkle={twinkle} />
                     </LinearGradient>
                   </Animated.View>
                 </Pressable>
@@ -277,7 +290,7 @@ export default function TabsLayout() {
     >
       <Tabs.Screen name="index" options={{ title: t('nav.home') }} />
       <Tabs.Screen name="discover" options={{ title: t('nav.discover') }} />
-      {/* The + opens the ways to create; this screen is the composer they lead to (a post, a Yap). */}
+      {/* Spark opens the ways to create; this screen is the composer they lead to (a post, a Yap). */}
       <Tabs.Screen name="create" options={{ title: t('create.title') }} />
       <Tabs.Screen name="inbox" options={{ title: t('nav.inbox') }} />
       <Tabs.Screen

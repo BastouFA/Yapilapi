@@ -5,7 +5,7 @@ export const ko: Catalog = {
   'app.tagline': '말하세요. 세상이 알아들어요.',
   'nav.home': '펄스',
   'nav.discover': '둘러보기',
-  'nav.create': '만들기',
+  'nav.create': '스파크',
   'nav.inbox': '채팅',
   'nav.profile': '나',
   'nav.hint.home': '내 사람들의 요즘 소식',
