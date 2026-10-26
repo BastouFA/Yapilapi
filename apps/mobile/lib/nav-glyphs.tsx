@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Animated, I18nManager, View, type ViewStyle } from 'react-native';
+import { Animated, Easing, I18nManager, View, type ViewStyle } from 'react-native';
 import {
   NAV_GLYPH_DIRECTIONAL,
   NAV_GLYPH_STROKE,
@@ -9,6 +9,7 @@ import {
   type GlyphShape,
   type NavGlyphName,
 } from '../../../packages/shared/src/nav-glyphs';
+import { curve } from './motion';
 
 type Star = Extract<GlyphShape, { kind: 'star' }>;
 
@@ -22,20 +23,21 @@ type Star = Extract<GlyphShape, { kind: 'star' }>;
  * - `duo`: the outline over a soft fill of the same colour (the current tab)
  * - `solid`: filled shapes (the Spark button)
  *
- * `twinkle` (0 to 1 and back) turns and swells a star and circles the dots around it a little.
+ * `tap` (0 to 1, once per tap) gives a star a quarter turn with a swell (it looks the same after one)
+ * and circles the dots once around it, back to where they started.
  */
 export function NavGlyph({
   name,
   size = 24,
   color,
   tone = 'line',
-  twinkle,
+  tap,
 }: {
   name: NavGlyphName;
   size?: number;
   color: string;
   tone?: 'line' | 'duo' | 'solid';
-  twinkle?: Animated.Value;
+  tap?: Animated.Value;
 }) {
   const k = size / 24;
   const star = NAV_GLYPHS[name].find((s): s is Star => s.kind === 'star');
@@ -49,8 +51,8 @@ export function NavGlyph({
       style={{ width: size, height: size, direction: 'ltr', transform: mirror ? [{ scaleX: -1 }] : undefined }}
     >
       {NAV_GLYPHS[name].map((s, i) =>
-        twinkle && star && (s.kind === 'star' || s.kind === 'dot') ? (
-          <Turn key={i} around={star} size={size} value={twinkle} orbit={s.kind === 'dot'}>
+        tap && star && (s.kind === 'star' || s.kind === 'dot') ? (
+          <Turn key={i} around={star} size={size} value={tap} orbit={s.kind === 'dot'}>
             <Shape shape={s} k={k} color={color} tone={tone} />
           </Turn>
         ) : (
@@ -60,6 +62,8 @@ export function NavGlyph({
     </View>
   );
 }
+
+const settle = Easing.inOut(Easing.quad);
 
 /** Turns its shape around the star's centre: the star itself turns and swells, a dot circles it. */
 function Turn({ around, size, value, orbit, children }: { around: Star; size: number; value: Animated.Value; orbit: boolean; children: ReactNode }) {
@@ -73,11 +77,13 @@ function Turn({ around, size, value, orbit, children }: { around: Star; size: nu
         top: around.cy * k - size,
         width: size * 2,
         height: size * 2,
-        opacity: orbit ? value.interpolate({ inputRange: [0, 1], outputRange: [1, 0.7] }) : 1,
-        transform: [
-          { rotate: value.interpolate({ inputRange: [0, 1], outputRange: ['0deg', orbit ? '-34deg' : '18deg'] }) },
-          { scale: orbit ? 1 : value.interpolate({ inputRange: [0, 1], outputRange: [1, 1.16] }) },
-        ],
+        opacity: orbit ? value.interpolate({ inputRange: [0, 0.4, 0.82, 1], outputRange: [1, 0.75, 1, 1] }) : 1,
+        transform: orbit
+          ? [{ rotate: value.interpolate(curve([0, 0.82, 1], [0, 374, 360], settle, 'deg')) }]
+          : [
+              { rotate: value.interpolate(curve([0, 0.45, 0.75, 1], [0, 80, 95, 90], settle, 'deg')) },
+              { scale: value.interpolate(curve([0, 0.45, 0.75, 1], [1, 1.2, 0.97, 1], settle)) },
+            ],
       }}
     >
       <View style={{ position: 'absolute', left: size - around.cx * k, top: size - around.cy * k, width: size, height: size }}>{children}</View>

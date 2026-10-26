@@ -138,6 +138,34 @@ test.describe('navigation', () => {
     await noSidewaysScroll(page);
   });
 
+  test('Spark plays its tap effect on a tap, Enter or Space, not on focus; a dimming only with reduced motion', async ({ page, isMobile }, info) => {
+    test.skip(info.project.name.endsWith('dark'), 'the effect is the same in dark mode');
+    await account(page.request, 'spark');
+    await page.goto('/home');
+    const create = page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Spark', exact: true });
+    const playing = () =>
+      page.evaluate(() =>
+        [...new Set(document.getAnimations().map((a) => (a as CSSAnimation).animationName ?? ''))].filter((n) => n.startsWith('yp-spark')).sort(),
+      );
+    // Keyboard focus alone plays nothing; Space opens the menu as Enter does, with the effect.
+    await create.focus();
+    expect(await playing()).toEqual([]);
+    await page.keyboard.press('Space');
+    expect(await playing()).toEqual(
+      isMobile
+        ? ['yp-spark-bits', 'yp-spark-flash', 'yp-spark-orbit', 'yp-spark-pop', 'yp-spark-ring', 'yp-spark-spin']
+        : ['yp-spark-flash', 'yp-spark-orbit', 'yp-spark-pop', 'yp-spark-spin'],
+    );
+    await expect(page.getByRole('dialog', { name: 'Create' })).toBeVisible();
+    await expect(page).toHaveURL(/\/home/);
+    // Reduced motion: no squish, pop, turn, orbit or burst; the menu opens at once.
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/home');
+    await create.click();
+    expect(await playing()).toEqual(['yp-spark-dim']);
+    await expect(page.getByRole('dialog', { name: 'Create' })).toBeVisible();
+  });
+
   test('Yap in Spark opens the recorder', async ({ page }, info) => {
     lightOnly(info.project.name);
     test.setTimeout(90_000);

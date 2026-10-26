@@ -9,7 +9,7 @@ import type { MessageKey } from '../../../../packages/shared/src/i18n-core';
 import type { NavGlyphName } from '../../../../packages/shared/src/nav-glyphs';
 import { client, mediaUrl } from '../../lib/api';
 import { useT } from '../../lib/i18n';
-import { useReducedMotion } from '../../lib/motion';
+import { curve, useReducedMotion } from '../../lib/motion';
 import { NavGlyph } from '../../lib/nav-glyphs';
 import { RadioMiniBar } from '../../lib/radio';
 import { useRealtime, useSession } from '../../lib/session';
@@ -32,6 +32,14 @@ const TABS: Record<string, { id: 'home' | 'discover' | 'create' | 'inbox' | 'pro
 
 const PAD = DOCK.pad;
 const ROW = DOCK.row;
+/** How long Spark's menu waits after a tap, so its sheet doesn't cover the tap effect as it starts. */
+const SPARK_MENU_DELAY_MS = 180;
+/** The six specks of Spark's burst: 60° apart, every other one a little nearer. */
+const BITS = [-60, 0, 60, 120, 180, 240].map((deg, i) => {
+  const reach = i % 2 ? 0.82 : 1;
+  return { x: Math.cos((deg * Math.PI) / 180) * reach, y: Math.sin((deg * Math.PI) / 180) * reach };
+});
+const burstEase = Easing.out(Easing.cubic);
 
 /** Unread messages across your chats, for the dot-number on Chats. Refreshed when tabs change and on new messages. */
 function useUnreadChats(signedIn: boolean, tab: number) {
@@ -117,8 +125,17 @@ function FloatingTabBar({ state, descriptors, navigation }: TabBarProps) {
   const [width, setWidth] = useState(0);
   const slide = useRef(new Animated.Value(0)).current;
   const spark = useRef(new Animated.Value(0)).current;
-  const twinkle = useRef(new Animated.Value(0)).current;
+  const squish = useRef(new Animated.Value(1)).current;
+  const tap = useRef(new Animated.Value(0)).current;
+  const popping = useRef(false);
+  const later = useRef<ReturnType<typeof setTimeout> | null>(null);
   const placedOnce = useRef(false);
+  useEffect(
+    () => () => {
+      if (later.current) clearTimeout(later.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     const show = Keyboard.addListener('keyboardDidShow', () => setKeyboard(true));
@@ -138,19 +155,34 @@ function FloatingTabBar({ state, descriptors, navigation }: TabBarProps) {
     placedOnce.current = true;
   }, [target, width, reduce, slide]);
 
+  // Pressed, Spark straightens and squishes down at once; let go without a tap, it springs back.
   const press = (to: number) => {
-    if (reduce) spark.setValue(to);
-    else Animated.spring(spark, { toValue: to, useNativeDriver: true, damping: 12, stiffness: 260 }).start();
+    if (reduce) return spark.setValue(to);
+    Animated.spring(spark, { toValue: to, useNativeDriver: true, damping: 12, stiffness: 260 }).start();
+    if (to) Animated.timing(squish, { toValue: 0.9, duration: 110, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
+    else if (!popping.current) Animated.spring(squish, { toValue: 1, useNativeDriver: true, damping: 12, stiffness: 260 }).start();
   };
-  // Spark twinkles on a press or focus: its star turns and swells and its light circles it, then settles. None with reduce motion.
-  const sparkle = () => {
-    if (reduce) return;
-    twinkle.stopAnimation();
-    twinkle.setValue(0);
+  // A tap plays Spark's tap effect, from the start and to the end: the button pops back with a little
+  // overshoot and brightens for a moment, its spark makes a quarter turn, its light circles it once,
+  // and a soft ring and six specks burst out from behind it. Its menu opens a moment later.
+  // With reduce motion: only a brief dimming, and the menu at once.
+  const tapSpark = () => {
+    tap.stopAnimation();
+    tap.setValue(0);
+    Animated.timing(tap, { toValue: 1, duration: reduce ? 280 : 620, easing: Easing.linear, useNativeDriver: true }).start(({ finished }) => {
+      if (finished) tap.setValue(0);
+    });
+    if (later.current) clearTimeout(later.current);
+    later.current = null;
+    if (reduce) return openMore();
+    later.current = setTimeout(() => ((later.current = null), openMore()), SPARK_MENU_DELAY_MS);
+    // Stopped first: an earlier pop's end would otherwise clear the flag for this one.
+    squish.stopAnimation();
+    popping.current = true;
     Animated.sequence([
-      Animated.timing(twinkle, { toValue: 1, duration: 240, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-      Animated.spring(twinkle, { toValue: 0, useNativeDriver: true, damping: 9, stiffness: 180 }),
-    ]).start();
+      Animated.timing(squish, { toValue: 1.12, duration: 150, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.spring(squish, { toValue: 1, useNativeDriver: true, damping: 12, stiffness: 260, mass: 0.8 }),
+    ]).start(() => (popping.current = false));
   };
 
   if (keyboard) return null;
@@ -190,27 +222,34 @@ function FloatingTabBar({ state, descriptors, navigation }: TabBarProps) {
                   accessibilityLabel={t('nav.create')}
                   accessibilityHint={hint}
                   // The ways to create: hide a stash, a post, reel, story, live or Yap.
-                  onPress={openMore}
-                  onPressIn={() => (press(1), sparkle())}
-                  onFocus={sparkle}
+                  onPress={tapSpark}
+                  onPressIn={() => press(1)}
                   onPressOut={() => press(0)}
                   style={s.sparkHit}
                 >
+                  {reduce ? null : <SparkBurst tap={tap} c={c} />}
                   <Animated.View
                     style={[
                       s.sparkLift,
                       // A coral glow under it in light mode; dark mode has no shadows (and no border here).
                       c.theme === 'light' && { ...elevation(c, 'lg'), shadowColor: c.yapi, shadowOpacity: 0.35 },
                       {
-                        transform: [
-                          { rotate: spark.interpolate({ inputRange: [0, 1], outputRange: ['-8deg', '0deg'] }) },
-                          { scale: spark.interpolate({ inputRange: [0, 1], outputRange: [1, 0.93] }) },
-                        ],
+                        opacity: reduce ? tap.interpolate({ inputRange: [0, 0.4, 1], outputRange: [1, 0.72, 1] }) : 1,
+                        transform: [{ rotate: spark.interpolate({ inputRange: [0, 1], outputRange: ['-8deg', '0deg'] }) }, { scale: squish }],
                       },
                     ]}
                   >
                     <LinearGradient {...gradient(c)} style={s.spark}>
-                      <NavGlyph name="spark" size={28} color={c.onYapi} tone="solid" twinkle={twinkle} />
+                      {reduce ? null : (
+                        <Animated.View
+                          pointerEvents="none"
+                          style={[
+                            StyleSheet.absoluteFill,
+                            { backgroundColor: '#FFFFFF', opacity: tap.interpolate({ inputRange: [0, 0.25, 0.6, 1], outputRange: [0, 0.2, 0, 0] }) },
+                          ]}
+                        />
+                      )}
+                      <NavGlyph name="spark" size={28} color={c.onYapi} tone="solid" tap={reduce ? undefined : tap} />
                     </LinearGradient>
                   </Animated.View>
                 </Pressable>
@@ -268,7 +307,44 @@ function FloatingTabBar({ state, descriptors, navigation }: TabBarProps) {
   );
 }
 
-// Primary navigation: Pulse | Wander | + | Chats | You (route files keep their names: index is Pulse,
+/** Behind Spark, on a tap: a soft ring of the brand colour grows and fades, and six specks fly out and fade. */
+function SparkBurst({ tap, c }: { tap: Animated.Value; c: Palette }) {
+  return (
+    <View pointerEvents="none" style={s.burst}>
+      <Animated.View
+        style={[
+          s.ring,
+          {
+            borderColor: c.yapi,
+            shadowColor: c.yapi,
+            // Hidden at rest (0), then from full to nothing as it grows.
+            opacity: tap.interpolate(curve([0, 0.001, 1], [0, 0.85, 0], burstEase)),
+            transform: [{ scale: tap.interpolate(curve([0, 1], [0.95, 1.8], burstEase)) }],
+          },
+        ]}
+      />
+      {BITS.map((b, i) => (
+        <Animated.View
+          key={i}
+          style={[
+            s.bit,
+            {
+              backgroundColor: i % 2 ? c.saffron : c.yapi,
+              opacity: tap.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0, 1, 0] }),
+              transform: [
+                { translateX: tap.interpolate(curve([0, 0.2, 1], [b.x * 20, b.x * 34, b.x * 44], burstEase)) },
+                { translateY: tap.interpolate(curve([0, 0.2, 1], [b.y * 20, b.y * 34, b.y * 44], burstEase)) },
+                { scale: tap.interpolate({ inputRange: [0, 0.2, 1], outputRange: [1, 1.3, 0] }) },
+              ],
+            },
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
+
+// Primary navigation: Pulse | Wander | Spark | Chats | You (route files keep their names: index is Pulse,
 // discover is Wander, then create, inbox, profile).
 export default function TabsLayout() {
   const c = useColors();
@@ -324,6 +400,19 @@ const s = StyleSheet.create({
   sparkHit: { flex: 1, alignItems: 'center', justifyContent: 'center', height: ROW + 30, marginTop: -30 },
   sparkLift: { borderRadius: 19 },
   spark: { width: 54, height: 54, borderRadius: 19, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  // Spark's burst: centred on the button, drawn behind it, never in the way of a touch.
+  burst: { position: 'absolute', top: 0, bottom: 0, start: 0, end: 0, alignItems: 'center', justifyContent: 'center' },
+  ring: {
+    position: 'absolute',
+    width: 54,
+    height: 54,
+    borderRadius: 19,
+    borderWidth: 2,
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  bit: { position: 'absolute', width: 6, height: 6, borderRadius: 3 },
   badge: {
     position: 'absolute',
     top: -7,

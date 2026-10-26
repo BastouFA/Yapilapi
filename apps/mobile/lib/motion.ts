@@ -22,3 +22,19 @@ export function useScreenReader() {
   }, []);
   return on;
 }
+
+/**
+ * An interpolation's points that follow `easing` between each pair of the given points. Animations on
+ * the native driver ignore an interpolation's `easing` (they go straight from point to point), so
+ * the curve is drawn with a few more points instead. `unit` turns the outputs into strings ('deg').
+ */
+export function curve(input: number[], output: number[], easing: (t: number) => number, unit?: string, steps = 6) {
+  const inputRange = [input[0]!];
+  const values = [output[0]!];
+  for (let i = 1; i < input.length; i++)
+    for (let k = 1; k <= steps; k++) {
+      inputRange.push(input[i - 1]! + ((input[i]! - input[i - 1]!) * k) / steps);
+      values.push(output[i - 1]! + (output[i]! - output[i - 1]!) * easing(k / steps));
+    }
+  return unit ? { inputRange, outputRange: values.map((v) => `${v}${unit}`) } : { inputRange, outputRange: values };
+}

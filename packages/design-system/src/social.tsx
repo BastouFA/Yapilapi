@@ -105,6 +105,8 @@ export type LinkLike = ComponentType<{
   onPointerUp?: () => void;
   onPointerLeave?: () => void;
   onPointerCancel?: () => void;
+  // Space on the middle button opens its menu, as Enter does.
+  onKeyDown?: (e: ReactKeyboardEvent<HTMLAnchorElement>) => void;
 }>;
 const A: LinkLike = ({ href, children, ...rest }) => (
   <a href={href} {...rest}>
@@ -143,6 +145,9 @@ const NAV_GLYPH: Record<Exclude<NavEntry['id'], 'profile'>, IconName> = {
 const isCentre = (id: NavEntry['id']) => id === 'create' || id === 'yap';
 /** How long a press is held before it counts as a long press. */
 const LONG_PRESS_MS = 450;
+/** How long Spark's menu waits after a tap, so its sheet doesn't cover the tap effect as it starts. */
+const SPARK_MENU_DELAY_MS = 180;
+const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /** The person's avatar in a soft squircle; a thin brand-gradient ring when "You" is the current page. */
 function NavAvatar({ name, src }: { name: string; src?: string | null }) {
@@ -161,9 +166,33 @@ function NavItem({ it, on, hint, L, locale }: { it: NavEntry; on: boolean; hint:
   // Held down (or right-clicked, or the context-menu key), the middle button opens its menu
   // instead of following the link; a quick tap still follows it.
   const hold = useLongPress(it.menu?.open, LONG_PRESS_MS);
-  // Spark twinkles once on each press (CSS; none with reduced motion), to the end even after a quick tap.
-  const [twinkle, setTwinkle] = useState(false);
   const centre = isCentre(it.id);
+  // Spark plays its tap effect (CSS, social.css) on each tap, Enter or Space, from the start and to
+  // the end even after a quick tap. Set on the link directly, so that a second tap restarts it; it
+  // stays set afterwards, which plays nothing more.
+  const icon = useRef<HTMLSpanElement>(null);
+  const later = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (later.current) clearTimeout(later.current);
+    },
+    [],
+  );
+  const spark = () => {
+    const item = icon.current?.parentElement;
+    if (!centre || !item) return;
+    item.removeAttribute('data-spark');
+    void item.offsetWidth;
+    item.setAttribute('data-spark', '');
+  };
+  // Its menu opens a moment later, once the effect is under way (at once with reduced motion).
+  const open = () => {
+    spark();
+    if (later.current) clearTimeout(later.current);
+    later.current = null;
+    if (!centre || reducedMotion()) it.opens!();
+    else later.current = setTimeout(() => ((later.current = null), it.opens!()), SPARK_MENU_DELAY_MS);
+  };
   return (
     <L
       href={it.href}
@@ -172,26 +201,31 @@ function NavItem({ it, on, hint, L, locale }: { it: NavEntry; on: boolean; hint:
       aria-describedby={hint}
       aria-haspopup={it.opens ? 'dialog' : undefined}
       {...hold.handlers}
-      onPointerDown={(e) => {
-        if (centre) setTwinkle(true);
-        if ('onPointerDown' in hold.handlers) hold.handlers.onPointerDown(e);
-      }}
       onClick={
         it.opens
           ? (e) => {
               e.preventDefault();
-              it.opens!();
+              open();
             }
           : it.menu
-            ? (e) => hold.wasHeld() && e.preventDefault()
-            : undefined
+            ? (e) => (hold.wasHeld() ? e.preventDefault() : spark())
+            : centre
+              ? spark
+              : undefined
+      }
+      // A button that opens a menu: Space works as well as Enter.
+      onKeyDown={
+        it.opens
+          ? (e) => {
+              if (e.key !== ' ' || e.repeat) return;
+              e.preventDefault();
+              open();
+            }
+          : undefined
       }
     >
-      <span
-        className="yp-nav__icon"
-        data-twinkle={twinkle || undefined}
-        onAnimationEnd={twinkle ? (e) => e.animationName === 'yp-spark-twinkle' && setTwinkle(false) : undefined}
-      >
+      {centre ? <span className="yp-nav__burst" aria-hidden /> : null}
+      <span ref={icon} className="yp-nav__icon">
         {it.id === 'profile' ? (
           <NavAvatar name={it.avatar?.name ?? ''} src={it.avatar?.src} />
         ) : (
@@ -219,9 +253,9 @@ function NavItem({ it, on, hint, L, locale }: { it: NavEntry; on: boolean; hint:
  * Phones: a floating dock. Icons only, except the current page, whose label sits with its icon
  * in a squircle highlight that slides between tabs; other labels show on hover and keyboard focus
  * and are always in the links' accessible names. The middle button is a raised, slightly tilted
- * brand-gradient squircle with a four-point spark that straightens when pressed, and the spark
- * twinkles (its light circling it) on a press or keyboard focus; a tap opens the ways to create
- * (`opens`). Wide screens: a side rail with every label visible.
+ * brand-gradient squircle with a four-point spark that squishes down and straightens when pressed;
+ * a tap (or Enter or Space) pops it back with a quarter turn of the spark, its light circling it
+ * and a small burst, and opens the ways to create (`opens`) a moment later. Wide screens: a side rail with every label visible.
  */
 export function NavBar({
   items,

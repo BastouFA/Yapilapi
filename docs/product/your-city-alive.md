@@ -45,8 +45,11 @@ middle button was called Create with a ＋ until the owner asked for a better na
   discover sections.
 - **Spark** in the middle opens the ways to create: Hide a stash (first), Post, Reel, Story, Live
   (while lives are on) and Yap. Its icon is a bold four-point spark with a small light in its top
-  corner, white on the raised brand-gradient button; the spark twinkles (a quick turn and swell, the
-  light circling it a little) when it is pressed or gets keyboard focus, and not with reduced motion.
+  corner, white on the raised brand-gradient button. Touched, the button squishes down; on a tap (or
+  Enter or Space) it pops back with a little overshoot, the spark makes a quarter turn and flashes,
+  its light circles it once, and a soft ring and six specks of coral and saffron burst out from
+  behind it (about 0.6 s); the menu opens 180 ms into it. With reduced motion only a brief dimming,
+  and the menu opens at once.
   The menu it opens is titled Create. The voice-first Yap button is gone from the middle.
 - **Chats** and **You** as before.
 
