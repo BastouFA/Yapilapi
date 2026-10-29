@@ -7,7 +7,7 @@ import type { AppContext } from './context.ts';
 import { AppError, badRequest, conflict, notFound } from './errors.ts';
 import { enqueue } from './jobs.ts';
 import { detectMedia, NO_METADATA } from './media-formats.ts';
-import { run } from './media-processing.ts';
+import { loudness, run } from './media-processing.ts';
 import { purgeMedia, unusedMedia } from './media-files.ts';
 import { analyzeText, statusForRisk } from './moderation.ts';
 import { decodeCueText, parseVtt } from './webvtt.ts';
@@ -23,12 +23,13 @@ type Q = Pool | PoolClient;
  * Yaps: voice posts of up to a minute, voice replies and voice intros (docs/product/yaps.md).
  *
  * A clip is uploaded on its own (POST /v1/voice): the server decodes it, measures it (the app's
- * word for its length is never taken), stores it small (AAC, mono, 24 kHz, 32 kbit/s: a full
- * minute is about 240 KB, some fifty times lighter than a minute of video) and draws its
- * waveform. It is then attached once: to a Yap (a post with format 'yap'), a comment or a
- * profile. When it's attached, its transcript is made through the configured speech-to-text
- * provider (lib/transcription.ts) and checked like a post's words. Without a provider it is
- * 'unavailable' at once, and moderation relies on reports.
+ * word for its length is never taken), cleans it up gently (rumble off, a steady volume, no
+ * clipping), stores it small (AAC, mono, 44.1 kHz, 64 kbit/s: a full minute is about 500 KB,
+ * some twenty times lighter than a minute of video) and draws its waveform. It is then attached
+ * once: to a Yap (a post with format 'yap'), a comment or a profile. When it's attached, its
+ * transcript is made through the configured speech-to-text provider (lib/transcription.ts) and
+ * checked like a post's words. Without a provider it is 'unavailable' at once, and moderation
+ * relies on reports.
  *
  * Until its words have passed the checks, a Yap reaches its author's followers (and everyone who
  * opens it) but isn't suggested to anyone else: not in For you, the Yaps filter or Fair start
@@ -36,9 +37,23 @@ type Q = Pool | PoolClient;
  */
 export const VOICE_TRANSCRIBE_JOB = 'voice.clip.transcribe';
 
-/** Stored clips: mono AAC at this rate and sample rate, in an M4A every browser and phone plays. */
-const VOICE_BITRATE = '32k';
-const VOICE_SAMPLE_RATE = '24000';
+/**
+ * Stored clips: mono AAC-LC at this rate and sample rate, in an M4A every browser and phone plays.
+ * (At 32 kbit/s and 24 kHz, as clips were first kept, voices sounded muffled and swishy.)
+ */
+const VOICE_BITRATE = '64k';
+const VOICE_SAMPLE_RATE = 44100;
+/** Below this (Hz): rumble, wind and knocks on the table. Voices and music are above it. */
+const VOICE_HIGHPASS_HZ = 80;
+/** Every clip is brought to about this loudness (LUFS), as voice and podcast apps do... */
+const VOICE_LOUDNESS = -16;
+/** ...with one steady gain: raised by at most this (dB, so a quiet room doesn't become loud hiss), lowered by at most that. */
+const VOICE_MAX_GAIN_DB = 24;
+const VOICE_MAX_CUT_DB = 12;
+/** Peaks are held under -3 dBFS, checked at four times the sample rate: nothing clips once encoded. */
+const VOICE_PEAK_LIMIT = 0.708;
+/** One channel with the rumble off: measured for its loudness, then cleaned up from. */
+const VOICE_BASE_FILTER = `aformat=channel_layouts=mono,highpass=f=${VOICE_HIGHPASS_HZ}`;
 /** Decoded at this rate to measure the clip and draw its waveform. */
 const PCM_RATE = 8000;
 /** Decode no more than this much of an upload: anything longer is refused anyway. */
@@ -85,9 +100,32 @@ export async function loadVoice(db: Q, mediaId: string, viewer: string | null): 
   return (rows[0]?.voice as VoiceClip | undefined) ?? null;
 }
 
+/** The steady gain (dB) that brings a clip of this loudness to VOICE_LOUDNESS, within its bounds. */
+function voiceGainDb(measured: number | null): number {
+  if (measured === null || !Number.isFinite(measured)) return 0;
+  return Math.round(Math.min(VOICE_MAX_GAIN_DB, Math.max(-VOICE_MAX_CUT_DB, VOICE_LOUDNESS - measured)) * 10) / 10;
+}
+
 /**
- * An upload made ready to keep: decoded (at most DECODE_LIMIT_S of it), measured from its samples,
- * stored as small mono AAC without any of the tags it came with, and drawn as VOICE_PEAKS bars.
+ * The clean-up every clip gets, for what's kept and the waveform alike (so the waveform is what
+ * people hear): one channel, the rumble off, a steady gain to VOICE_LOUDNESS and the peaks held.
+ * No noise removal: on phone recordings it makes voices sound robotic, and phones already do it.
+ */
+function voiceFilter(gainDb: number): string {
+  return [
+    VOICE_BASE_FILTER,
+    `volume=${gainDb}dB`,
+    'aresample=176400',
+    `alimiter=limit=${VOICE_PEAK_LIMIT}:level=false:latency=1`,
+    `aformat=sample_rates=${VOICE_SAMPLE_RATE}:channel_layouts=mono`,
+    'asetpts=N/SR/TB',
+  ].join(',');
+}
+
+/**
+ * An upload made ready to keep: decoded (at most DECODE_LIMIT_S of it), its loudness measured,
+ * cleaned up (voiceFilter), measured from its samples, stored as mono AAC without any of the tags
+ * it came with, and drawn as VOICE_PEAKS bars.
  */
 export async function prepareVoice(raw: Buffer, declaredMime: string): Promise<{ buf: Buffer; durationMs: number; peaks: number[] }> {
   const detected = detectMedia(raw, declaredMime || 'audio/webm');
@@ -98,18 +136,17 @@ export async function prepareVoice(raw: Buffer, declaredMime: string): Promise<{
     const out = path.join(dir, 'voice.m4a');
     const pcm = path.join(dir, 'voice.pcm');
     await writeFile(input, raw);
+    const gainDb = voiceGainDb(await loudness(input, VOICE_BASE_FILTER, DECODE_LIMIT_S));
     await run([
       '-y',
       '-t',
       String(DECODE_LIMIT_S),
       '-i',
       input,
+      '-filter_complex',
+      `[0:a:0]${voiceFilter(gainDb)},asplit=2[voice][wave]`,
       '-map',
-      '0:a:0',
-      '-ac',
-      '1',
-      '-ar',
-      VOICE_SAMPLE_RATE,
+      '[voice]',
       '-c:a',
       'aac',
       '-b:a',
@@ -119,9 +156,7 @@ export async function prepareVoice(raw: Buffer, declaredMime: string): Promise<{
       '+faststart',
       out,
       '-map',
-      '0:a:0',
-      '-ac',
-      '1',
+      '[wave]',
       '-ar',
       String(PCM_RATE),
       '-f',

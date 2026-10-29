@@ -5764,7 +5764,7 @@ export const id: Catalog = {
   'landing.demo.playlist': 'Bawa playlist-nya',
   'landing.demo.onIt': 'Sudah siap',
   'landing.chip.feed': 'Didengar dalam 24 bahasa',
-  'landing.chip.why': 'Sekitar 240 KB per menit',
+  'landing.chip.why': 'Sekitar 500 KB per menit',
   'landing.talk.title': 'Tahan untuk bicara',
   'landing.talk.body': 'Yap adalah suara Anda hingga satu menit. Tanpa kamera, tanpa wajah, tanpa mengetik.',
   'landing.languages.title': 'Didengar dalam setiap bahasa',
@@ -5772,7 +5772,7 @@ export const id: Catalog = {
     'Setiap Yap hadir dengan kata-katanya yang tertulis, dan orang membaca atau mendengarnya dalam bahasa mereka sendiri, dalam 24 bahasa.',
   'landing.data.title': 'Hemat data',
   'landing.data.body':
-    'Satu menit suara sekitar 240 KB, kira-kira lima puluh kali lebih ringan daripada satu menit video. Tidak ada yang dimuat sampai Anda menekan putar.',
+    'Satu menit suara sekitar 500 KB, kira-kira dua puluh kali lebih ringan daripada satu menit video. Tidak ada yang dimuat sampai Anda menekan putar.',
   'landing.radio.title': 'Radio Yap',
   'landing.radio.body': 'Simpan ponsel Anda dan dengarkan Yap satu demi satu, tanpa perlu memegangnya.',
   'landing.city.title': 'Tanya kota',

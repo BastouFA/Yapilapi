@@ -1,5 +1,4 @@
 import {
-  RecordingPresets,
   requestRecordingPermissionsAsync,
   setAudioModeAsync,
   useAudioPlayer,
@@ -19,6 +18,7 @@ import { useCalls } from '../../lib/calls';
 import { client, errorMessage, mediaUrl } from '../../lib/api';
 import { clock, MAX_UPLOAD_BYTES, pickOne, uploadFile, uploadPicked, VOICE_MIME } from '../../lib/media';
 import { useT } from '../../lib/i18n';
+import { VOICE_RECORDING } from '../../lib/voice';
 import { StoryCardView } from '../../lib/story-stickers';
 import { liveStatus, NowStatusLine } from '../../lib/now-status';
 import { conversationTitle } from '../../lib/post';
@@ -417,7 +417,7 @@ export default function Chat() {
   const [sending, setSending] = useState(false);
   // Set while a text message or an edit is on its way: a second tap on Send does nothing.
   const submitting = useRef(false);
-  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorder = useAudioRecorder(VOICE_RECORDING);
   const recording = useAudioRecorderState(recorder, 250);
   const [recordingOn, setRecordingOn] = useState(false);
   const [micDenied, setMicDenied] = useState(false);

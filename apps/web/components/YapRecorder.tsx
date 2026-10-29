@@ -5,6 +5,7 @@ import { Button, Icon, VoicePlayer } from '@yapilapi/design-system';
 import { peaksFromSamples, VOICE_MIN_MS, type MessageKey, type VoiceClip, type VoicePurpose } from '@yapilapi/shared';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
+import { VOICE_AUDIO, voiceRecorder } from '@/lib/voice-recording';
 
 /**
  * Recording a Yap, a voice reply or a voice intro (docs/product/yaps.md). The big round button:
@@ -98,7 +99,7 @@ export function YapRecorder({
     setState('asking');
     let stream: MediaStream;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream = await navigator.mediaDevices.getUserMedia({ audio: VOICE_AUDIO });
     } catch {
       wanted.current = false;
       setState('idle');
@@ -110,8 +111,7 @@ export function YapRecorder({
       setState('idle');
       return;
     }
-    const type = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].find((m) => MediaRecorder.isTypeSupported(m));
-    const r = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
+    const r = voiceRecorder(stream);
     const chunks: Blob[] = [];
     r.ondataavailable = (e) => e.data.size && chunks.push(e.data);
     r.onstop = () => {

@@ -5,6 +5,7 @@ import { Button, Icon, SensitiveCover, TranslationBar, useTranslatable } from '@
 import { languageName, type Message, type MessageKey, type VoiceTranscript as Transcript } from '@yapilapi/shared';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
+import { VOICE_AUDIO, voiceRecorder } from '@/lib/voice-recording';
 
 type Attachment = Message['attachments'][number];
 
@@ -387,9 +388,8 @@ export function VoiceRecorder({
       return;
     }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const type = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].find((t) => MediaRecorder.isTypeSupported(t));
-      const r = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: VOICE_AUDIO });
+      const r = voiceRecorder(stream);
       chunks.current = [];
       r.ondataavailable = (e) => e.data.size && chunks.current.push(e.data);
       r.onstop = () => {

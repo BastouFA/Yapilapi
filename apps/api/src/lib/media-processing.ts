@@ -89,6 +89,26 @@ export function probe(file: string): Promise<VideoInfo> {
   });
 }
 
+/**
+ * The integrated loudness (LUFS, EBU R128) of the first `limitS` seconds of a file's first audio
+ * stream, after the filters `af`; null when there's nothing to measure.
+ */
+export function loudness(file: string, af: string, limitS: number): Promise<number | null> {
+  return new Promise((resolve) => {
+    if (!ffmpegPath) return resolve(null);
+    const args = ['-hide_banner', '-nostats', '-t', String(limitS), '-i', file, '-map', '0:a:0', '-af', `${af},ebur128=framelog=quiet`, '-f', 'null', '-'];
+    const p = spawn(ffmpegPath as unknown as string, args);
+    let err = '';
+    // The summary comes last: only the end is kept.
+    p.stderr.on('data', (d) => (err = (err + d).slice(-4000)));
+    p.on('error', () => resolve(null));
+    p.on('close', (code) => {
+      const m = /Integrated loudness:\s+I:\s+(-?\d+(?:\.\d+)?) LUFS/.exec(err);
+      resolve(code === 0 && m ? Number(m[1]) : null);
+    });
+  });
+}
+
 async function processImage(deps: ProcessDeps, m: MediaRow) {
   const { id, key } = m;
   const original = await deps.storage.read(key);

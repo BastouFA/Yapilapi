@@ -534,8 +534,20 @@ export function TranscriptText({
 
 // ── Recording ──
 
-/** As voice messages are recorded, with the loudness reported for the live waveform. */
-const RECORDING: RecordingOptions = { ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true };
+/**
+ * How a voice is recorded (Yaps, voice replies and intros, voice messages): AAC at 44.1 kHz, one
+ * channel at 96 kbit/s (the preset's two channels only doubled the upload for a single phone mic).
+ * The server cleans up and re-encodes what it keeps.
+ */
+export const VOICE_RECORDING: RecordingOptions = {
+  ...RecordingPresets.HIGH_QUALITY,
+  sampleRate: 44100,
+  numberOfChannels: 1,
+  bitRate: 96000,
+  web: { mimeType: 'audio/webm', bitsPerSecond: 96000 },
+};
+/** As Yaps are recorded, with the loudness reported for the live waveform. */
+const RECORDING: RecordingOptions = { ...VOICE_RECORDING, isMeteringEnabled: true };
 /** Let go sooner than this (without sliding): a tap, which records hands-free until Stop. */
 const TAP_MS = 300;
 /** Slid this far toward the start edge: cancelled. */

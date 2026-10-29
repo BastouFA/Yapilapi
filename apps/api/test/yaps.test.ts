@@ -1,5 +1,5 @@
-import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -53,8 +53,8 @@ const db = () => t.ctx.db;
 
 /** A tone of the given length: m4a (as the phone records) or webm/opus (as browsers record). */
 const tones = new Map<string, Buffer>();
-function tone(seconds: number, format: 'm4a' | 'webm' = 'm4a'): Buffer {
-  const key = `${seconds}:${format}`;
+function tone(seconds: number, format: 'm4a' | 'webm' = 'm4a', graph = `sine=frequency=330:duration=${seconds}`): Buffer {
+  const key = `${seconds}:${format}:${graph}`;
   if (tones.has(key)) return tones.get(key)!;
   const dir = mkdtempSync(path.join(tmpdir(), 'ypl-yap-'));
   try {
@@ -63,10 +63,8 @@ function tone(seconds: number, format: 'm4a' | 'webm' = 'm4a'): Buffer {
       '-hide_banner',
       '-loglevel',
       'error',
-      '-f',
-      'lavfi',
-      '-i',
-      `sine=frequency=330:duration=${seconds}`,
+      '-filter_complex',
+      graph,
       ...(format === 'webm' ? ['-c:a', 'libopus', '-b:a', '48k'] : ['-c:a', 'aac', '-b:a', '64k']),
       out,
     ]);
@@ -141,13 +139,41 @@ describe('recording', () => {
     expect(m4a.body.voice.peaks).toHaveLength(VOICE_PEAKS);
     expect(Math.max(...m4a.body.voice.peaks)).toBe(100);
     const stored = (await db().query(`SELECT mime, size_bytes, kind FROM media WHERE id = $1`, [m4a.body.voice.id])).rows[0];
-    // Mono AAC at about 32 kbit/s: 3 seconds stays well under 20 KB.
+    // Mono AAC at 64 kbit/s: 3 seconds is about 24 KB.
     expect(stored).toMatchObject({ mime: 'audio/mp4', kind: 'audio' });
-    expect(stored.size_bytes).toBeLessThan(20_000);
+    expect(stored.size_bytes).toBeLessThan(32_000);
 
     const webm = await upload(u, tone(2, 'webm'), 'comment', 'audio/webm', 'voice.weba');
     expect(webm.status).toBe(201);
     expect(Math.abs(webm.body.voice.durationMs - 2000)).toBeLessThan(150);
+  });
+
+  it('is kept as 44.1 kHz mono AAC at 64 kbit/s, brought to a steady loudness without clipping', async () => {
+    const u = await signUp(t.app);
+    // Recorded far too quietly (about -40 LUFS), with some rumble under it.
+    const quiet = tone(4, 'm4a', 'sine=frequency=330:duration=4,volume=-18dB[a];sine=frequency=40:duration=4,volume=-30dB[b];[a][b]amix=normalize=0');
+    const r = await upload(u, quiet);
+    expect(r.status, JSON.stringify(r.body)).toBe(201);
+    expect(Math.abs(r.body.voice.durationMs - 4000)).toBeLessThan(150);
+    const m = (await db().query(`SELECT storage_key, size_bytes FROM media WHERE id = $1`, [r.body.voice.id])).rows[0];
+    const dir = mkdtempSync(path.join(tmpdir(), 'ypl-yap-kept-'));
+    try {
+      const file = path.join(dir, 'kept.m4a');
+      writeFileSync(file, await t.ctx.storage.read(m.storage_key));
+      const ff = (args: string[]) => spawnSync(ffmpegPath as unknown as string, ['-hide_banner', '-nostats', '-i', file, ...args], { encoding: 'utf8' }).stderr;
+      const stream = /Audio: (\S+) \((\w+)\)[^\n]*?, (\d+) Hz, (\w+)[^\n]*?, (\d+) kb\/s/.exec(ff([]))!;
+      expect(stream.slice(1, 5)).toEqual(['aac', 'LC', '44100', 'mono']);
+      expect(Number(stream[5])).toBeGreaterThanOrEqual(56);
+      expect(Number(stream[5])).toBeLessThanOrEqual(72);
+      const summary = ff(['-af', 'ebur128=peak=true:framelog=quiet', '-f', 'null', '-']);
+      const lufs = Number(/I:\s+(-?[\d.]+) LUFS/.exec(summary)![1]);
+      const truePeak = Number(/Peak:\s+(-?[\d.]+) dBFS/.exec(summary)![1]);
+      expect(lufs).toBeGreaterThan(-19);
+      expect(lufs).toBeLessThan(-13);
+      expect(truePeak).toBeLessThanOrEqual(-1);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('is a second to a minute, an intro up to 15 seconds, and only a recording', async () => {

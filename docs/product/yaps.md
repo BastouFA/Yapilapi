@@ -5,7 +5,7 @@ seconds. Hold one button and talk: no camera, no face, no typing. Every Yap gets
 (searchable, checked by moderation, a text alternative for people who can't listen) and, through
 "Speak any language" (docs/product/speak-any-language.md), reaches listeners in their own language,
 with "Listen in …" read out by the speech engine (docs/product/speech-engine.md). A minute of voice
-is about 240 KB, some fifty times lighter than a minute of video, which matters for the people we
+is about 500 KB, some twenty times lighter than a minute of video, which matters for the people we
 build for first (Africa, South Asia, the Middle East). Photos and reels stay; voice leads.
 
 Behind the `YAPS` flag (on). Migration `0090_yaps.sql` (0088 is unused). Code: `packages/shared/src/voice.ts`
@@ -106,7 +106,7 @@ included), place tags, comments, reports, stats, the recommender, export, deleti
 
 | Column | What |
 | --- | --- |
-| `media_id` | The `media` row: the stored file (`audio/mp4`, AAC mono 24 kHz about 32 kbit/s, tags stripped), `duration_ms`, `size_bytes`. Also the clip's id everywhere (`VoiceClip.id`). |
+| `media_id` | The `media` row: the stored file (`audio/mp4`, AAC-LC mono 44.1 kHz 64 kbit/s, cleaned up as in "Files and data", tags stripped), `duration_ms`, `size_bytes`. Also the clip's id everywhere (`VoiceClip.id`). |
 | `owner_id`, `purpose` | Who recorded it and what for: `yap`, `comment` or `intro` (it decides the length limit; a clip is attached only where its purpose says, and only once). |
 | `duration_ms` | Measured by the server from the decoded sound (never the app's word), at most 61 s. |
 | `peaks` | 48 loudness bars, 0 to 100, for drawing the waveform without loading the audio. |
@@ -174,6 +174,16 @@ page) where a reel's says "saw your reel"; its report says "listened to the end"
 
 ## Files and data
 
+- **How a clip is kept** (`prepareVoice` in `apps/api/src/lib/voice.ts`). The apps record one channel
+  of AAC (phone, 44.1 kHz, 96 kbit/s) or Opus (web, AAC in Safari, 96 kbit/s, with the browser's echo cancelling,
+  noise suppression and level control). The server then cleans it up gently and keeps mono AAC-LC
+  at 44.1 kHz and 64 kbit/s (about 500 KB a minute): a high-pass at 80 Hz (rumble, wind, knocks on
+  the table), one steady gain to about -16 LUFS measured over the whole clip (raised by at most 24 dB,
+  so a quiet room doesn't turn into loud hiss; lowered by at most 12 dB) and a limiter holding peaks
+  under -3 dBFS (checked at four times the sample rate), so nothing clips once encoded. No noise
+  removal: on phone recordings it makes voices sound robotic. The waveform is drawn from the same
+  cleaned-up sound. Clips kept before 2026-10-29 were 24 kHz, 32 kbit/s and stay that way (the
+  originals aren't kept). Voice messages in chats don't go through this (`POST /v1/media`, 96 kbit/s).
 - Deleting a Yap or a voice reply deletes its recording at once, unless a report or a moderation case
   about it is still open (then the usual retention erases it later). Changing or removing an intro
   deletes the old one. Deleting the account deletes every file and clears the transcripts.

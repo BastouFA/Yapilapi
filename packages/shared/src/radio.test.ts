@@ -31,7 +31,7 @@ describe('listening', () => {
     const post = (sizes: Record<string, number> | undefined, durationMs: number) =>
       ({ media: [{ kind: 'audio', sizes }], voice: { durationMs } }) as unknown as Pick<Post, 'media' | 'voice'>;
     expect(clipBytes(post({ original: 12_345 }, 30_000))).toBe(12_345);
-    expect(clipBytes(post(undefined, 30_000))).toBe(120_000);
+    expect(clipBytes(post(undefined, 30_000))).toBe(250_000);
   });
 
   it('shows the sleep timer as minutes and seconds', () => {

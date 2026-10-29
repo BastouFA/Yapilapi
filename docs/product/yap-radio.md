@@ -61,7 +61,7 @@ was blocked. On top of that:
   your language (`POST /v1/voice/:id/speech`) instead of the original; otherwise the original voice
   plays with the translated words.
 - **Data.** Data saver: nothing loads ahead. Otherwise only the next Yap's clip loads ahead. The Radio
-  page shows about how much was used this session (clips are about 240 KB a minute).
+  page shows about how much was used this session (clips are about 500 KB a minute).
 
 ## Web
 

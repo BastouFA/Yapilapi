@@ -63,8 +63,8 @@ export const RADIO_SLEEP_MINUTES = [15, 30, 60] as const;
 export type RadioSleepMinutes = (typeof RADIO_SLEEP_MINUTES)[number];
 /** Near you: Yaps tagged within this many kilometres of where you are. */
 export const RADIO_NEAR_KM = 25;
-/** A stored clip is about this many bytes a minute (AAC mono, about 32 kbit/s). */
-export const RADIO_BYTES_PER_MINUTE = 240_000;
+/** A stored clip is about this many bytes a minute (AAC mono, 64 kbit/s). */
+export const RADIO_BYTES_PER_MINUTE = 500_000;
 /** Where you left off is picked up again for this long. */
 export const RADIO_RESUME_MS = 7 * 24 * 3600_000;
 

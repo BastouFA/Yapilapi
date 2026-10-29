@@ -48,7 +48,7 @@ Speak:
 
 - Yaps. A Yap is up to a minute of your voice. Tap the big Yap button in the middle of the app, hold to talk, and let go. Play it back, add a line if you like, choose who hears it, and post.
 - Heard in every language. Every Yap comes with its words written out, so it can be searched and read as well as heard. People who speak another language read it or hear it in theirs ("Listen in …"), in 24 languages.
-- Light on data. A minute of voice is about 240 KB, some fifty times lighter than a minute of video. Nothing loads until you press play.
+- Light on data. A minute of voice is about 500 KB, some twenty times lighter than a minute of video. Nothing loads until you press play.
 - Talk back. Answer any post with a voice reply, and put a voice intro of up to 15 seconds on your profile.
 - Yap Radio. Put your phone away and listen to Yaps one after another, hands-free.
 - Ask the city. Ask a question out loud and hear back from people near you.
