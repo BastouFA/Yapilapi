@@ -234,9 +234,17 @@ describe('plural categories', () => {
   it('writes out the same rules as the runtime’s Intl.PluralRules', () => {
     const counts = [...Array.from({ length: 1201 }, (_, n) => n), 0.5, 1.5, 2.5, 10.5, 1_000_000, 2_000_000, 1_500_000];
     const locales = [...SUPPORTED_LOCALES, 'pt-BR', 'pt-PT', 'ar-EG', 'fr-CA'];
+    // Newer ICU builds (Node 26.12) give Vietnamese a "one" for 0 and 1 where older ones (Node 22)
+    // say "other" for every number. Its `.one` and `.other` texts are the same, so readers see no
+    // difference; the written-out rule may match either.
+    const changing = new Set(['vi']);
     const expected = locales.map((l) => counts.map((n) => new Intl.PluralRules(l).select(n)));
     withoutPluralRules(() => {
-      expect(locales.map((l) => counts.map((n) => pluralCategory(l, n)))).toEqual(expected);
+      const ours = locales.map((l) => counts.map((n) => pluralCategory(l, n)));
+      locales.forEach((l, i) => {
+        if (changing.has(l)) expect([expected[i], counts.map(() => 'other')]).toContainEqual(ours[i]);
+        else expect(ours[i], l).toEqual(expected[i]);
+      });
     });
   });
 });
