@@ -211,8 +211,9 @@ export function YapRecorder({
       <div className={compact ? 'yap-rec yap-rec--compact' : 'yap-rec'}>
         <VoicePlayer clip={preview} label={t('voice.play')} locale={locale} size={compact ? 'sm' : 'md'} transcript={false} testId="yap-preview" />
         <div className="yap-rec__actions">
-          <Button size="sm" variant="ghost" icon="mic" onClick={reset}>
-            {t('voice.rerecord')}
+          {/* Redo: drop this take and record again, right next to the preview. */}
+          <Button size="sm" variant="secondary" icon="mic" onClick={reset} title={t('voice.rerecord')} data-testid="yap-redo">
+            {t('voice.redo')}
           </Button>
           {actions}
         </div>

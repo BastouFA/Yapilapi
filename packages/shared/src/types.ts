@@ -477,6 +477,8 @@ export interface Post {
   lang?: string | null;
   /** Set once the text was changed after publishing: shown as "Edited", which opens the history (GET /v1/posts/:id/history). */
   editedAt?: string;
+  /** A Yap whose author recorded it again (PUT /v1/posts/:id/voice): shown as "Re-recorded"; the history says when, never the old audio. */
+  rerecordedAt?: string;
   /** Only on your own drafts and scheduled posts, which nobody else sees. Published posts leave it out. */
   status?: 'draft' | 'scheduled';
   /** Scheduled posts: when it will be published. */

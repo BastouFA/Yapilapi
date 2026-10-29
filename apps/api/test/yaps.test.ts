@@ -1,4 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -569,6 +570,196 @@ describe('voice intro', () => {
 
     expect((await as(t.app, ada).patch('/v1/me/profile', { voiceIntroId: null })).body.profile.voiceIntro).toBeNull();
     expect((await db().query(`SELECT 1 FROM media WHERE id = $1`, [second.id])).rowCount).toBe(0);
+  });
+});
+
+const redo = (u: TestUser, postId: string, voiceId: string) => as(t.app, u).put(`/v1/posts/${postId}/voice`, { voiceId });
+const kept = async (mediaId: string) => (await db().query(`SELECT 1 FROM media WHERE id = $1`, [mediaId])).rowCount === 1;
+/** A translation of a clip's words, as the transcript under a Yap keeps it. */
+const translateClip = (mediaId: string) =>
+  db().query(
+    `INSERT INTO translations (kind, item_id, target, content_hash, source_lang, body, provider, model) VALUES ('voice', $1, 'fr', 'h', 'en', 'Bonjour', 'stub', 'stub-1')`,
+    [mediaId],
+  );
+const translations = async (kind: string, id: string) => (await db().query(`SELECT 1 FROM translations WHERE kind = $1 AND item_id = $2`, [kind, id])).rowCount;
+/** A clip read out ("Listen in …") for one item. */
+async function spoken(kind: string, itemId: string) {
+  const { rows } = await db().query(
+    `INSERT INTO speech_clips (text_hash, lang, voice, model, provider, storage_key, url, mime, chars, size_bytes)
+     VALUES ($1, 'fr', 'alloy', 'stub', 'stub', 'k', '/media/k.mp3', 'audio/mpeg', 5, 10) RETURNING id`,
+    [`h-${itemId}-${Math.random()}`],
+  );
+  await db().query(`INSERT INTO speech_clip_uses (clip_id, kind, item_id) VALUES ($1, $2, $3)`, [rows[0].id, kind, itemId]);
+}
+const speechUses = async (kind: string, id: string) =>
+  (await db().query(`SELECT 1 FROM speech_clip_uses WHERE kind = $1 AND item_id = $2`, [kind, id])).rowCount;
+
+describe('recording a Yap again', () => {
+  it('swaps the recording, keeps likes, comments and reposts, starts listening again and says Re-recorded', async () => {
+    t.ctx.transcription = provider(() => vtt('The first thing I said'));
+    try {
+      const ada = await creator();
+      const fan = await signUp(t.app);
+      const stranger = await signUp(t.app);
+      await followAccepted(t.app, fan, ada);
+      const post = (await yap(ada, await clip(ada, 2))).body.post;
+      await drain();
+      expect(await yapsFeed(stranger)).toContain(post.id);
+      await as(t.app, fan).put(`/v1/posts/${post.id}/reaction`, { kind: 'like' });
+      await as(t.app, fan).post(`/v1/posts/${post.id}/comments`, { body: 'Nice one' });
+      expect((await as(t.app, fan).put(`/v1/posts/${post.id}/repost`)).status).toBe(200);
+      const ev = (kind: string) => ({ postId: post.id, surface: 'yaps', kind });
+      await as(t.app, fan).post('/v1/feed/events', { events: [ev('listen_start'), ev('listen_complete')] });
+      await translateClip(post.voice.id);
+      await spoken('voice', post.voice.id);
+      const notices = async () => (await db().query(`SELECT count(*)::int AS n FROM notifications WHERE entity_id = $1`, [post.id])).rows[0].n;
+      const noticesBefore = await notices();
+
+      t.ctx.transcription = provider(() => vtt('What I meant to say'));
+      const next = await clip(ada, 3);
+      const r = await redo(ada, post.id, next.id);
+      expect(r.status, JSON.stringify(r.body)).toBe(200);
+      expect(r.body.post.voice).toMatchObject({ id: next.id, transcript: { status: 'pending', text: null } });
+      expect(r.body.post.media.map((m: { id: string }) => m.id)).toEqual([next.id]);
+      expect(r.body.post.rerecordedAt).toBeTruthy();
+      expect(r.body.post.editedAt).toBeUndefined();
+      expect(r.body.post.counts).toMatchObject({ likes: 1, comments: 1, reposts: 1 });
+      // The old file is gone, and with it what its words said in other languages and out loud.
+      expect(await kept(post.voice.id)).toBe(false);
+      expect(await translations('voice', post.voice.id)).toBe(0);
+      expect(await speechUses('voice', post.voice.id)).toBe(0);
+      // Listening starts again.
+      const stats = (await db().query(`SELECT listens, listen_completes FROM post_stats WHERE post_id = $1`, [post.id])).rows[0];
+      expect(stats).toMatchObject({ listens: 0, listen_completes: 0 });
+      expect((await db().query(`SELECT 1 FROM feed_events WHERE post_id = $1 AND kind LIKE 'listen%'`, [post.id])).rowCount).toBe(0);
+      // Like a new Yap: followers only until the new words pass; nobody is told.
+      expect(await yapsFeed(fan)).toContain(post.id);
+      expect(await yapsFeed(stranger)).not.toContain(post.id);
+      expect(await notices()).toBe(noticesBefore);
+      await drain();
+      expect((await as(t.app, stranger).get(`/v1/posts/${post.id}`)).body.post.voice.transcript.text).toBe('What I meant to say');
+      expect(await yapsFeed(stranger)).toContain(post.id);
+      // The history says when, never what was said before.
+      const h = (await as(t.app, stranger).get(`/v1/posts/${post.id}/history`)).body;
+      expect(h.rerecorded).toHaveLength(1);
+      expect(JSON.stringify(h)).not.toContain('The first thing I said');
+      // The line can still be changed the usual way.
+      const edited = (await as(t.app, ada).patch(`/v1/posts/${post.id}`, { body: 'Take two' })).body.post;
+      expect(edited).toMatchObject({ body: 'Take two', editedAt: expect.any(String), rerecordedAt: r.body.post.rerecordedAt });
+    } finally {
+      t.ctx.transcription = null;
+    }
+  });
+
+  it('is only for the author, only for a Yap and only with a new recording made for a Yap', async () => {
+    const ada = await signUp(t.app);
+    const bola = await signUp(t.app);
+    const post = (await yap(ada, await clip(ada))).body.post;
+    expect((await redo(bola, post.id, (await clip(bola)).id)).status).toBe(403);
+    const words = (await as(t.app, ada).post('/v1/posts', { body: 'Just words', visibility: 'public' })).body.post;
+    const r = await redo(ada, words.id, (await clip(ada)).id);
+    expect(r.status).toBe(400);
+    expect(r.body.error.message).toBe('Only a Yap can be recorded again.');
+    // A reply's recording, someone else's, or the one it already has.
+    expect((await redo(ada, post.id, (await clip(ada, 2, 'comment')).id)).status).toBe(400);
+    expect((await redo(ada, post.id, (await clip(bola)).id)).status).toBe(404);
+    expect((await redo(ada, post.id, post.voice.id)).status).toBe(409);
+    expect((await redo(ada, randomUUID(), (await clip(ada)).id)).status).toBe(404);
+    expect((await as(t.app, ada).get(`/v1/posts/${post.id}`)).body.post.voice.id).toBe(post.voice.id);
+  });
+
+  it('is for the first 24 hours, up to 5 times; after that, delete it and post a new one', async () => {
+    const ada = await signUp(t.app);
+    const post = (await yap(ada, await clip(ada))).body.post;
+    for (let i = 0; i < 5; i++) expect((await redo(ada, post.id, (await clip(ada)).id)).status).toBe(200);
+    const sixth = await redo(ada, post.id, (await clip(ada)).id);
+    expect(sixth.status).toBe(403);
+    expect(sixth.body.error.message).toBe('A Yap can be recorded again up to 5 times. You can delete it and post a new one.');
+    expect((await as(t.app, ada).get(`/v1/posts/${post.id}/history`)).body.rerecorded).toHaveLength(5);
+
+    const older = (await yap(ada, await clip(ada))).body.post;
+    await db().query(`UPDATE posts SET created_at = now() - interval '25 hours' WHERE id = $1`, [older.id]);
+    const late = await redo(ada, older.id, (await clip(ada)).id);
+    expect(late.status).toBe(403);
+    expect(late.body.error.message).toBe('A Yap can be recorded again within 24 hours of posting it. You can delete it and post a new one.');
+  });
+
+  it('keeps the old recording for the moderators while a report about the Yap is open', async () => {
+    const ada = await signUp(t.app);
+    const bola = await signUp(t.app);
+    const post = (await yap(ada, await clip(ada))).body.post;
+    expect((await as(t.app, bola).post('/v1/reports', { targetType: 'post', targetId: post.id, reason: 'spam' })).status).toBe(201);
+    expect((await redo(ada, post.id, (await clip(ada)).id)).status).toBe(200);
+    expect(await kept(post.voice.id)).toBe(true);
+  });
+
+  it('never takes a Yap off hold', async () => {
+    t.ctx.transcription = provider(() => vtt('Buy followers here, cheap followers for everyone'));
+    try {
+      const ada = await creator();
+      const post = (await yap(ada, await clip(ada))).body.post;
+      await drain();
+      const status = async () => (await db().query(`SELECT moderation_status FROM posts WHERE id = $1`, [post.id])).rows[0].moderation_status;
+      const held = await status();
+      expect(held).not.toBe('normal');
+      t.ctx.transcription = provider(() => vtt('Hello and good morning'));
+      expect((await redo(ada, post.id, (await clip(ada)).id)).status).toBe(200);
+      await drain();
+      expect(await status()).toBe(held);
+      // The case about the old words is still open, so their recording stays for the moderators.
+      expect(await kept(post.voice.id)).toBe(true);
+    } finally {
+      t.ctx.transcription = null;
+    }
+  });
+});
+
+describe('deleting', () => {
+  it('a Yap takes its recording, translations, spoken clips, listening and notifications with it', async () => {
+    const ada = await signUp(t.app);
+    const bola = await signUp(t.app);
+    const post = (await yap(ada, await clip(ada), { body: 'Hello all' })).body.post;
+    await as(t.app, bola).put(`/v1/posts/${post.id}/reaction`, { kind: 'like' });
+    await as(t.app, bola).post(`/v1/posts/${post.id}/comments`, { body: 'Hi' });
+    await as(t.app, bola).post('/v1/feed/events', { events: [{ postId: post.id, surface: 'yaps', kind: 'listen_start' }] });
+    await translateClip(post.voice.id);
+    await db().query(
+      `INSERT INTO translations (kind, item_id, target, content_hash, source_lang, body, provider, model) VALUES ('post', $1, 'fr', 'h', 'en', 'Bonjour', 'stub', 'stub-1')`,
+      [post.id],
+    );
+    await spoken('voice', post.voice.id);
+    expect((await db().query(`SELECT 1 FROM notifications WHERE user_id = $1 AND entity_id = $2`, [ada.id, post.id])).rowCount).toBeGreaterThan(0);
+    // Only its author can.
+    expect((await as(t.app, bola).del(`/v1/posts/${post.id}`)).status).toBe(404);
+
+    expect((await as(t.app, ada).del(`/v1/posts/${post.id}`)).status).toBe(200);
+    expect((await as(t.app, bola).get(`/v1/posts/${post.id}`)).status).toBe(404);
+    expect(await kept(post.voice.id)).toBe(false);
+    expect((await db().query(`SELECT 1 FROM voice_clips WHERE media_id = $1`, [post.voice.id])).rowCount).toBe(0);
+    expect(await translations('voice', post.voice.id)).toBe(0);
+    expect(await translations('post', post.id)).toBe(0);
+    expect(await speechUses('voice', post.voice.id)).toBe(0);
+    expect((await db().query(`SELECT 1 FROM notifications WHERE entity_id = $1`, [post.id])).rowCount).toBe(0);
+    expect((await db().query(`SELECT 1 FROM feed_events WHERE post_id = $1 AND kind LIKE 'listen%'`, [post.id])).rowCount).toBe(0);
+    expect(await yapsFeed(bola)).not.toContain(post.id);
+  });
+
+  it('a voice reply takes its recording, translations and the notification about it', async () => {
+    const ada = await signUp(t.app);
+    const bola = await signUp(t.app);
+    const post = (await yap(ada, await clip(ada))).body.post;
+    const reply = await clip(bola, 2, 'comment');
+    const c = (await as(t.app, bola).post(`/v1/posts/${post.id}/comments`, { voiceId: reply.id })).body.comment;
+    await translateClip(reply.id);
+    await spoken('voice', reply.id);
+    const told = () => db().query(`SELECT 1 FROM notifications WHERE user_id = $1 AND data->>'commentId' = $2`, [ada.id, c.id]);
+    expect((await told()).rowCount).toBe(1);
+    expect((await as(t.app, await signUp(t.app)).del(`/v1/comments/${c.id}`)).status).toBe(404);
+    expect((await as(t.app, bola).del(`/v1/comments/${c.id}`)).status).toBe(200);
+    expect(await kept(reply.id)).toBe(false);
+    expect(await translations('voice', reply.id)).toBe(0);
+    expect(await speechUses('voice', reply.id)).toBe(0);
+    expect((await told()).rowCount).toBe(0);
   });
 });
 

@@ -15,6 +15,7 @@ import {
 } from 'react';
 import {
   compactCount,
+  canRedoYap,
   extractHashtags,
   formatBytes,
   formatMoney,
@@ -1024,6 +1025,8 @@ export interface PostCardProps {
   onHistory?: (post: Post) => void;
   /** Your own audio post: see and fix its recording's transcript. */
   onEditTranscript?: (post: Post) => void;
+  /** Your own Yap, in its first day: record it again ("Record again", PUT /v1/posts/:id/voice). */
+  onRedoVoice?: (post: Post) => void;
   /** Your own post: hide its like and view counts from everyone else, or show them again. */
   onToggleCounts?: (post: Post) => void;
   /** Send the post into one of your chats ("Send in a chat"). */
@@ -1080,9 +1083,27 @@ export function formatScheduled(iso: string, locale = 'en'): string {
 }
 
 /** The versions of an edited post's text, newest first. */
-export function PostHistory({ versions, locale = 'en', linkAs }: { versions: PostVersion[]; locale?: string; linkAs?: LinkLike }) {
+export function PostHistory({
+  versions,
+  rerecorded = [],
+  locale = 'en',
+  linkAs,
+}: {
+  versions: PostVersion[];
+  /** When a Yap was recorded again, newest first (only when: the old audio is never kept). */
+  rerecorded?: string[];
+  locale?: string;
+  linkAs?: LinkLike;
+}) {
   return (
     <ol className="yp-history">
+      {rerecorded.map((at, i) => (
+        <li key={`r-${at}-${i}`} className="yp-history__item">
+          <p className="yp-history__when">
+            {t('yap.rerecorded', locale)} · <time dateTime={at}>{formatRelativeTime(at, locale)}</time>
+          </p>
+        </li>
+      ))}
       {versions.map((v, i) => (
         <li key={`${v.at}-${i}`} className="yp-history__item">
           <p className="yp-history__when">
@@ -1358,6 +1379,7 @@ export function PostCard({
   onEdit,
   onHistory,
   onEditTranscript,
+  onRedoVoice,
   onToggleCounts,
   onSend,
   onListen,
@@ -1393,6 +1415,7 @@ export function PostCard({
   }
   if (onReport && !isOwn && !coauthor) menu.push({ label: tt('post.report'), icon: 'flag', danger: true, onSelect: () => onReport(post) });
   if (onEdit && isOwn && !post.status) menu.push({ label: tt('m.post.edit'), icon: 'edit', onSelect: () => onEdit(post) });
+  if (onRedoVoice && isOwn && canRedoYap(post)) menu.push({ label: tt('voice.rerecord'), icon: 'mic', onSelect: () => onRedoVoice(post) });
   // A Yap's transcript is made from the clip itself (it isn't a caption track).
   if (onEditTranscript && isOwn && post.format !== 'yap' && post.media.length === 1 && post.media[0]!.kind === 'audio')
     menu.push({ label: tt('transcript.edit'), icon: 'mic', onSelect: () => onEditTranscript(post) });
@@ -1476,6 +1499,18 @@ export function PostCard({
                   </button>
                 ) : (
                   <span>{tt('m.post.edited')}</span>
+                )}
+              </>
+            ) : null}
+            {post.rerecordedAt ? (
+              <>
+                {' · '}
+                {onHistory ? (
+                  <button type="button" className="yp-post__edited" onClick={() => onHistory(post)} data-testid="yap-rerecorded">
+                    {tt('yap.rerecorded')}
+                  </button>
+                ) : (
+                  <span data-testid="yap-rerecorded">{tt('yap.rerecorded')}</span>
                 )}
               </>
             ) : null}

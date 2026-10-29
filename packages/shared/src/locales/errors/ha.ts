@@ -1359,6 +1359,10 @@ export const ha: Record<string, string> = {
   'A voice intro can be up to 15 seconds.': 'Gabatarwar murya na iya kaiwa daƙiƙa 15.',
   'Yaps and voice replies can be up to a minute.': 'Yap da amsoshin murya na iya kaiwa minti ɗaya.',
   'A Yap is one voice recording.': 'Yap rikodin murya ɗaya ne.',
+  'Only a Yap can be recorded again.': 'Yap kaɗai ake iya sake naɗawa.',
+  'A Yap can be recorded again within 24 hours of posting it. You can delete it and post a new one.':
+    'Ana iya sake naɗa Yap cikin awa 24 da wallafa shi. Za ka iya goge shi ka wallafa sabo.',
+  'A Yap can be recorded again up to 5 times. You can delete it and post a new one.': 'Ana iya sake naɗa Yap har sau 5. Za ka iya goge shi ka wallafa sabo.',
   'Write a comment or record one.': 'Rubuta sharhi ko ku naɗa ɗaya.',
   'Listening isn’t available right now. Try again later.': 'Ba a iya sauraro yanzu. Sake gwadawa nan gaba.',
   // apps/api/src/lib/stash.ts

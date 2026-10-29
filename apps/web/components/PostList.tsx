@@ -24,6 +24,7 @@ import {
   noticeText,
   MAX_COLLABORATORS,
   REPORT_REASONS,
+  VOICE_MAX_MS,
   whyReasonText,
   type MediaItem,
   type MessageKey,
@@ -36,6 +37,7 @@ import {
 } from '@yapilapi/shared';
 import { api, errorMessage, fieldErrors, isGone } from '@/lib/api';
 import { recordFeedEvent, useImpression } from '@/lib/feed-events';
+import { announcePostDeleted } from '@/lib/post-events';
 import { NextLink } from '@/lib/link';
 import { VideoCoverEditor } from '@/components/editor/VideoCoverEditor';
 import { AutocompleteText } from '@/components/Autocomplete';
@@ -47,6 +49,7 @@ import { SaveToSheet } from './Boards';
 import { CommentsSheet } from './Comments';
 import { ReportSheet } from './ReportSheet';
 import { TranscriptSheet } from './TranscriptEditor';
+import { uploadVoice, voiceError, YapRecorder, type Recording } from './YapRecorder';
 
 export { ReportSheet };
 import { SuggestAltText } from './AiHelpers';
@@ -109,6 +112,7 @@ export function PostList({
   const [saveTo, setSaveTo] = useState<Post | null>(null);
   const [editing, setEditing] = useState<Post | null>(null);
   const [historyFor, setHistoryFor] = useState<Post | null>(null);
+  const [redoFor, setRedoFor] = useState<Post | null>(null);
   const [transcriptFor, setTranscriptFor] = useState<Post | null>(null);
   // Signed in, sharing offers the link, "Send in a chat" and, for video posts, "Watch together".
   const [shareFor, setShareFor] = useState<Post | null>(null);
@@ -372,9 +376,12 @@ export function PostList({
   }
 
   async function remove(p: Post) {
+    // A Yap's recording is deleted for good with it (docs/product/yaps.md).
+    if (p.format === 'yap' && !confirm(t('yap.deleteConfirm'))) return;
     try {
       await api.posts.remove(p.id);
       setPosts((cur) => cur?.filter((x) => x.id !== p.id) ?? cur);
+      announcePostDeleted(p.id);
       toast(t('postList.deleted'));
     } catch (e) {
       toast(errorMessage(e));
@@ -489,6 +496,7 @@ export function PostList({
               onEdit={me ? setEditing : undefined}
               onHistory={setHistoryFor}
               onEditTranscript={me ? setTranscriptFor : undefined}
+              onRedoVoice={me ? setRedoFor : undefined}
               onToggleCounts={me ? toggleCounts : undefined}
               onListen={me ? (post, e) => recordFeedEvent({ postId: post.id, surface, kind: e.kind, valueMs: e.valueMs }) : undefined}
               onVoiceRefresh={refreshVoice}
@@ -631,6 +639,16 @@ export function PostList({
       {memoryFor ? <AddToMemorySheet post={memoryFor} onClose={() => setMemoryFor(null)} /> : null}
       {editing ? <EditPostSheet post={editing} onClose={() => setEditing(null)} onSaved={(post) => patch(post.id, () => post)} /> : null}
       {historyFor ? <HistorySheet post={historyFor} onClose={() => setHistoryFor(null)} /> : null}
+      {redoFor ? (
+        <RedoYapSheet
+          post={redoFor}
+          onClose={() => setRedoFor(null)}
+          onDone={(post) => {
+            patch(post.id, () => post);
+            setRedoFor(null);
+          }}
+        />
+      ) : null}
       {coauthorsFor && posts.some((x) => x.id === coauthorsFor) ? (
         <CoauthorsSheet
           post={posts.find((x) => x.id === coauthorsFor)!}
@@ -870,17 +888,62 @@ export function EditPostSheet({ post, onClose, onSaved }: { post: Post; onClose:
   );
 }
 
-/** The versions of an edited post's text, newest first. */
+/**
+ * Record your Yap again (docs/product/yaps.md, "Delete or record again"): the recorder, the new
+ * take to play back (or redo), and Replace. Likes, comments and reposts stay; the old recording goes.
+ */
+export function RedoYapSheet({ post, onClose, onDone }: { post: Post; onClose: () => void; onDone: (post: Post) => void }) {
+  const { toast, t } = useSession();
+  const [recording, setRecording] = useState<Recording | null>(null);
+  const [busy, setBusy] = useState(false);
+  const replace = async () => {
+    if (!recording) return;
+    setBusy(true);
+    try {
+      const voice = await uploadVoice(recording, 'yap');
+      const r = await api.posts.redoVoice(post.id, voice.id);
+      toast(t('yap.replaced'));
+      onDone(r.post);
+    } catch (e) {
+      toast(voiceError(e, t));
+      setBusy(false);
+    }
+  };
+  return (
+    <BottomSheet open onClose={onClose} title={t('voice.rerecord')}>
+      <div className="stack">
+        <p className="muted">{t('yap.redoHint')}</p>
+        <YapRecorder
+          maxMs={VOICE_MAX_MS}
+          disabled={busy}
+          onDone={(blob, durationMs, filename) => setRecording({ blob, durationMs, filename })}
+          onReset={() => setRecording(null)}
+          actions={
+            <Button size="sm" icon="check" loading={busy} disabled={busy} onClick={() => void replace()} data-testid="yap-replace">
+              {t('yap.replace')}
+            </Button>
+          }
+        />
+      </div>
+    </BottomSheet>
+  );
+}
+
+/** The versions of an edited post's text, newest first (and when a Yap was recorded again). */
 export function HistorySheet({ post, onClose }: { post: Post; onClose: () => void }) {
   const { toast, locale, t } = useSession();
   const [items, setItems] = useState<PostVersion[] | null>(null);
+  const [rerecorded, setRerecorded] = useState<string[]>([]);
   const close = useRef(onClose);
   useEffect(() => {
     close.current = onClose;
   });
   useEffect(() => {
     api.posts.history(post.id).then(
-      (r) => setItems(r.items),
+      (r) => {
+        setItems(r.items);
+        setRerecorded(r.rerecorded ?? []);
+      },
       (e) => {
         toast(errorMessage(e));
         close.current();
@@ -889,7 +952,7 @@ export function HistorySheet({ post, onClose }: { post: Post; onClose: () => voi
   }, [post.id, toast]);
   return (
     <BottomSheet open onClose={onClose} title={t('m.post.history')}>
-      {items === null ? <Skeleton height={80} /> : <PostHistory versions={items} locale={locale} linkAs={NextLink} />}
+      {items === null ? <Skeleton height={80} /> : <PostHistory versions={items} rerecorded={rerecorded} locale={locale} linkAs={NextLink} />}
     </BottomSheet>
   );
 }

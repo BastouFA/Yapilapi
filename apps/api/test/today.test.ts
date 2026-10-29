@@ -254,6 +254,18 @@ describe('Yapilapi Today', () => {
     expect((await today(vic)).body.today).toBeNull();
   });
 
+  it('drops a segment when the Yap it cites is deleted', async () => {
+    const lia = await person('Lia');
+    const max = await person('Max');
+    await followAccepted(t.app, lia, max);
+    await yap(max, 'maxYap', 'Max says the night market moved to the square.');
+    await settle(lia, { timezone: zoneAt(14), hour: 5, city: false });
+    const cites = (b: any) => (b?.segments ?? []).some((s: any) => s.sources.some((x: any) => x.postId === posts.maxYap));
+    expect(cites((await today(lia)).body.today)).toBe(true);
+    expect((await as(t.app, max).del(`/v1/posts/${posts.maxYap}`)).status).toBe(200);
+    expect(cites((await today(lia)).body.today)).toBe(false);
+  });
+
   it('"Not interested in this" takes the segment away and keeps its people out of the next ones', async () => {
     const b = (await today(ada)).body.today;
     const seg = b.segments.find((s: any) => s.sources[0].postId === posts.bola);

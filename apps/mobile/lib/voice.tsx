@@ -781,7 +781,8 @@ export function VoiceRecorder({
       <View style={{ gap: space[2] }}>
         <VoicePlayer clip={preview} label={t('voice.play')} transcript={false} />
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
-          <Button label={t('voice.rerecord')} icon="mic-outline" variant="secondary" size="sm" disabled={busy} onPress={discard} />
+          {/* Redo: drop this take and record again, right next to the preview. */}
+          <Button label={t('voice.redo')} icon="mic-outline" variant="secondary" size="sm" disabled={busy} onPress={discard} />
           <Button label={t('voice.discard')} icon="trash-outline" variant="ghost" size="sm" disabled={busy} onPress={discard} />
         </View>
       </View>

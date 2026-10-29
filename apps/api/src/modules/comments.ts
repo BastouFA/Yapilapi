@@ -416,17 +416,23 @@ export default async function commentsModule(app: FastifyInstance, ctx: AppConte
       await syncCommentCounts(c, r.rows[0].post_id);
       return r.rows[0].post_id as string;
     });
+    // Notifications about what went, and its translations (a voice reply's words too, and their read-out versions).
+    const gone = (
+      await db.query<{ id: string; voice_media_id: string | null }>(
+        `SELECT id, voice_media_id FROM comments WHERE (id = $1 OR parent_id = $1) AND deleted_at IS NOT NULL`,
+        [id],
+      )
+    ).rows;
+    const goneIds = gone.map((r) => r.id);
+    await db.query(`DELETE FROM notifications WHERE entity_type = 'post' AND entity_id = $1 AND data->>'commentId' = ANY($2::text[])`, [postId, goneIds]);
+    await db.query(`DELETE FROM translations WHERE kind = 'comment' AND item_id = ANY($1::uuid[])`, [goneIds]);
     // Voice replies that went with it: their audio is deleted (lib/voice.ts).
-    const voices = await db.query<{ voice_media_id: string }>(
-      `SELECT voice_media_id FROM comments WHERE (id = $1 OR parent_id = $1) AND voice_media_id IS NOT NULL AND deleted_at IS NOT NULL`,
-      [id],
-    );
-    if (voices.rows.length)
-      await forgetVoice(
-        ctx,
-        voices.rows.map((r) => r.voice_media_id),
-        { type: 'comment', id },
-      );
+    const clips = gone.flatMap((r) => (r.voice_media_id ? [r.voice_media_id] : []));
+    if (clips.length) {
+      await db.query(`DELETE FROM translations WHERE kind = 'voice' AND item_id = ANY($1::uuid[])`, [clips]);
+      await db.query(`DELETE FROM speech_clip_uses WHERE kind = 'voice' AND item_id = ANY($1::uuid[])`, [clips]);
+      await forgetVoice(ctx, clips, { type: 'comment', id });
+    }
     const count = (await db.query(`SELECT comment_count FROM posts WHERE id = $1`, [postId])).rows[0]?.comment_count ?? 0;
     return { ok: true, comments: count };
   });

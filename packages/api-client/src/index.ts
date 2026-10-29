@@ -568,8 +568,10 @@ export function createClient(opts: ClientOptions) {
           await new Promise((r) => setTimeout(r, o.intervalMs ?? 1200));
         }
       },
-      /** Every version of an edited post's text, newest first. */
-      history: (id: string) => get<{ items: PostVersion[] }>(`/v1/posts/${id}/history`),
+      /** Every version of an edited post's text, newest first; for a Yap, when it was recorded again (newest first, never the old audio). */
+      history: (id: string) => get<{ items: PostVersion[]; rerecorded?: string[] }>(`/v1/posts/${id}/history`),
+      /** Record your Yap again: a new clip (api.voice.upload with purpose 'yap') takes the old one's place. */
+      redoVoice: (id: string, voiceId: string) => put<{ post: Post }>(`/v1/posts/${id}/voice`, { voiceId }),
       /** `likes` is left out when the author hid the count. */
       like: (id: string) => put<{ liked: boolean; likes?: number }>(`/v1/posts/${id}/reaction`, { kind: 'like' }),
       unlike: (id: string) => del<{ liked: boolean; likes?: number }>(`/v1/posts/${id}/reaction`),

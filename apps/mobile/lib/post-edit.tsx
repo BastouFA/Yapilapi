@@ -3,6 +3,7 @@ import { ActivityIndicator, Image, Pressable, Text, View } from 'react-native';
 import { SCHEDULE_MAX_DAYS, SCHEDULE_MIN_MINUTES } from '../../../packages/shared/src/constants';
 import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import type { MediaItem, Post, PostVersion } from '../../../packages/shared/src/types';
+import { VOICE_MAX_MS } from '../../../packages/shared/src/voice';
 import { client, errorMessage, mediaUrl } from './api';
 import { DateTimeSheet } from './date-time';
 import { useT } from './i18n';
@@ -10,6 +11,7 @@ import { RichText } from './rich-text';
 import { SuggestAltText } from './ai-helpers';
 import { radius, space } from './theme';
 import { VideoCoverEditor } from './video-cover';
+import { uploadVoice, VoiceRecorder } from './voice';
 import { BottomSheet, Button, Field, Notice, Segmented, useColors, userText } from './ui';
 
 const EDIT_AUDIENCES = [
@@ -179,17 +181,54 @@ export function EditPostSheet({ post, onClose, onSaved }: { post: Post; onClose:
   );
 }
 
-/** The versions of an edited post's text, newest first. */
+/**
+ * Record your Yap again (docs/product/yaps.md, "Delete or record again"): the recorder (hold or
+ * tap, up to a minute), the new take to play back or redo, and Replace. Likes, comments and
+ * reposts stay; the old recording goes.
+ */
+export function RedoYapSheet({ post, onClose, onDone }: { post: Post; onClose: () => void; onDone: (p: Post) => void }) {
+  const c = useColors();
+  const { t } = useT();
+  const [uri, setUri] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const replace = async () => {
+    if (!uri) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const voice = await uploadVoice(uri, 'yap');
+      onDone((await (await client()).posts.redoVoice(post.id, voice.id)).post);
+    } catch (e) {
+      setError(errorMessage(e));
+      setBusy(false);
+    }
+  };
+  return (
+    <BottomSheet visible title={t('voice.rerecord')} onClose={onClose}>
+      <Text style={{ color: c.inkMuted, fontSize: 14 }}>{t('yap.redoHint')}</Text>
+      <VoiceRecorder maxMs={VOICE_MAX_MS} purpose="yap" busy={busy} onDone={(u) => setUri(u)} onCancel={() => setUri(null)} />
+      {error ? <Notice tone="danger">{error}</Notice> : null}
+      {uri ? <Button label={busy ? t('m.common.saving') : t('yap.replace')} icon="checkmark" disabled={busy} onPress={() => void replace()} /> : null}
+    </BottomSheet>
+  );
+}
+
+/** The versions of an edited post's text, newest first, and when a Yap was recorded again. */
 export function HistorySheet({ postId, onClose }: { postId: string; onClose: () => void }) {
   const c = useColors();
   const { t, timeAgo } = useT();
   const [items, setItems] = useState<PostVersion[] | null>(null);
+  const [rerecorded, setRerecorded] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     client()
       .then((api) => api.posts.history(postId))
       .then(
-        (r) => setItems(r.items),
+        (r) => {
+          setItems(r.items);
+          setRerecorded(r.rerecorded ?? []);
+        },
         (e) => setError(errorMessage(e)),
       );
   }, [postId]);
@@ -197,6 +236,13 @@ export function HistorySheet({ postId, onClose }: { postId: string; onClose: () 
     <BottomSheet visible title={t('m.post.history')} onClose={onClose}>
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {items === null && !error ? <ActivityIndicator color={c.yapi} /> : null}
+      {rerecorded.map((at, i) => (
+        <View key={`r-${at}-${i}`} style={{ paddingBottom: space[3], borderBottomWidth: 1, borderColor: c.line }}>
+          <Text style={{ color: c.inkMuted, fontSize: 12 }}>
+            {t('yap.rerecorded')} · {timeAgo(at)}
+          </Text>
+        </View>
+      ))}
       {(items ?? []).map((v, i) => (
         <View key={`${v.at}-${i}`} style={{ gap: space[1], paddingBottom: space[3], borderBottomWidth: i < items!.length - 1 ? 1 : 0, borderColor: c.line }}>
           <Text style={{ color: c.inkMuted, fontSize: 12 }}>

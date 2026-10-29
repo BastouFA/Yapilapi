@@ -163,6 +163,21 @@ describe('friends', () => {
     expect(await allOf(me, 'friends')).toEqual([c, b, a]);
   });
 
+  it('never plays a Yap its author deleted, even from a page asked for before', async () => {
+    const me = await signUp(t.app);
+    const followed = await signUp(t.app);
+    await followAccepted(t.app, me, followed);
+    const a = await yap(followed);
+    const b = await yap(followed);
+    const c = await yap(followed);
+    const first = await radio(me, 'friends?limit=1');
+    expect(first.items.map((p) => p.id)).toEqual([c]);
+    expect((await as(t.app, followed).del(`/v1/posts/${b}`)).status).toBe(200);
+    const rest = await radio(me, `friends?limit=5&cursor=${encodeURIComponent(first.nextCursor!)}`);
+    expect(rest.items.map((p) => p.id)).toEqual([a]);
+    expect(await allOf(me, 'friends')).toEqual([c, a]);
+  });
+
   it('never plays what you finished, or quickly skipped on the radio, again', async () => {
     const me = await signUp(t.app);
     const them = await signUp(t.app);

@@ -1355,6 +1355,11 @@ export const sw: Record<string, string> = {
   'A voice intro can be up to 15 seconds.': 'Utangulizi wa sauti unaweza kuwa hadi sekunde 15.',
   'Yaps and voice replies can be up to a minute.': 'Yap na majibu ya sauti yanaweza kuwa hadi dakika moja.',
   'A Yap is one voice recording.': 'Yap ni rekodi moja ya sauti.',
+  'Only a Yap can be recorded again.': 'Ni Yap pekee inayoweza kurekodiwa upya.',
+  'A Yap can be recorded again within 24 hours of posting it. You can delete it and post a new one.':
+    'Yap inaweza kurekodiwa upya ndani ya saa 24 baada ya kuichapisha. Unaweza kuifuta na kuchapisha mpya.',
+  'A Yap can be recorded again up to 5 times. You can delete it and post a new one.':
+    'Yap inaweza kurekodiwa upya hadi mara 5. Unaweza kuifuta na kuchapisha mpya.',
   'Write a comment or record one.': 'Andika maoni au urekodi moja.',
   'Listening isn’t available right now. Try again later.': 'Kusikiliza hakupatikani kwa sasa. Jaribu tena baadaye.',
   // apps/api/src/lib/stash.ts

@@ -1,6 +1,6 @@
 import { Redirect, router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { AccessibilityInfo, ActivityIndicator, I18nManager, Pressable, ScrollView, Text, View, type GestureResponderEvent } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, Alert, I18nManager, Pressable, ScrollView, Text, View, type GestureResponderEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatBytes } from '../../../packages/shared/src/data-saver';
 import { RADIO_SLEEP_MINUTES, sleepClock, stationId, type RadioStationInfo } from '../../../packages/shared/src/radio';
@@ -257,7 +257,24 @@ export default function RadioScreen() {
             >
               <Text style={{ color: c.ink, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{`${number(r.rate)}×`}</Text>
             </Pressable>
-            {own ? null : (
+            {own ? (
+              <Button
+                label={t('post.delete')}
+                icon="trash-outline"
+                variant="ghost"
+                size="sm"
+                onPress={() =>
+                  Alert.alert(t('yap.deleteConfirm'), undefined, [
+                    { text: t('common.cancel'), style: 'cancel' },
+                    {
+                      text: t('m.common.delete'),
+                      style: 'destructive',
+                      onPress: () => void r.remove().catch((e) => setFollowError(errorMessage(e))),
+                    },
+                  ])
+                }
+              />
+            ) : (
               <Button
                 label={followLabel}
                 accessibilityLabel={`${followLabel}, ${post.author.displayName}`}

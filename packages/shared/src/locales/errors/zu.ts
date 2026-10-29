@@ -1269,6 +1269,11 @@ export const zu: Record<string, string> = {
   'A voice intro can be up to 15 seconds.': 'Isethulo sezwi singaba kuze kube yimizuzwana eyi-15.',
   'Yaps and voice replies can be up to a minute.': 'Ama-Yap nezimpendulo zezwi kungaba kuze kube umzuzu owodwa.',
   'A Yap is one voice recording.': 'I-Yap iwukuqopha kwezwi okukodwa.',
+  'Only a Yap can be recorded again.': 'I-Yap kuphela engaqoshwa kabusha.',
+  'A Yap can be recorded again within 24 hours of posting it. You can delete it and post a new one.':
+    'I-Yap ingaqoshwa kabusha emahoreni angu-24 ngemva kokuyithumela. Ungayisusa bese uthumela entsha.',
+  'A Yap can be recorded again up to 5 times. You can delete it and post a new one.':
+    'I-Yap ingaqoshwa kabusha kuze kube izikhathi ezi-5. Ungayisusa bese uthumela entsha.',
   'Write a comment or record one.': 'Bhala amazwana noma uqophe.',
   'Listening isn’t available right now. Try again later.': 'Ukulalela akutholakali manje. Zama futhi emuva kwesikhathi.',
   // apps/api/src/lib/stash.ts

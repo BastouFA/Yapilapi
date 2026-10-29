@@ -29,7 +29,8 @@ import {
 } from './ui';
 import { LockedPanel, TipButton } from './money';
 import { SensitiveCover } from './safety';
-import { EditPostSheet, HistorySheet } from './post-edit';
+import { EditPostSheet, HistorySheet, RedoYapSheet } from './post-edit';
+import { announcePostDeleted } from './post-events';
 import { TranscriptSheet } from './transcript-edit';
 import { RichText } from './rich-text';
 import { TranslatableText } from './translation';
@@ -49,7 +50,7 @@ import { compactCount } from '../../../packages/shared/src/post-stats';
 import { PostStats } from './post-stats';
 import { useSendPost } from './post-send';
 import { VoicePlayer } from './voice';
-import { voiceClock } from '../../../packages/shared/src/voice';
+import { canRedoYap, voiceClock } from '../../../packages/shared/src/voice';
 
 export { RichText };
 
@@ -214,6 +215,7 @@ function PostCardView({
     router.push(`/u/${post.author.username}`);
   };
   const [editing, setEditing] = useState(false);
+  const [redoing, setRedoing] = useState(false);
   const [history, setHistory] = useState(false);
   const [transcriptOpen, setTranscriptOpen] = useState(false);
   const [liked, setLiked] = useState(post.viewer.liked);
@@ -372,7 +374,8 @@ function PostCardView({
     }
   }
   function remove() {
-    Alert.alert(t('post.delete'), undefined, [
+    // A Yap's recording is deleted for good with it (docs/product/yaps.md).
+    Alert.alert(post.format === 'yap' ? t('yap.deleteConfirm') : t('post.delete'), undefined, [
       { text: t('common.cancel'), style: 'cancel' },
       {
         text: t('m.common.delete'),
@@ -381,6 +384,7 @@ function PostCardView({
           void (async () => {
             try {
               await (await client()).posts.remove(post.id);
+              announcePostDeleted(post.id);
               setFolded(t('postList.deleted'));
               onDeleted?.();
             } catch (e) {
@@ -452,6 +456,7 @@ function PostCardView({
       actions.push({ label: t('m.boost.cta'), icon: 'rocket-outline', onPress: () => router.push({ pathname: '/boost', params: { id: post.id } }) });
     if (canEdit) actions.push({ label: t('m.post.edit'), icon: 'create-outline', onPress: () => setEditing(true) });
     if (canEditTranscript) actions.push({ label: t('transcript.edit'), icon: 'mic-outline', onPress: () => setTranscriptOpen(true) });
+    if (canEdit && canRedoYap(post)) actions.push({ label: t('voice.rerecord'), icon: 'mic-outline', onPress: () => setRedoing(true) });
     if (canPin) actions.push({ label: t(pinned ? 'post.unpin' : 'post.pin'), icon: 'pin-outline', onPress: () => void togglePin() });
     if (canEdit)
       actions.push({
@@ -545,6 +550,19 @@ function PostCardView({
                   </Text>
                 </>
               ) : null}
+              {post.rerecordedAt ? (
+                <>
+                  {' · '}
+                  <Text
+                    accessibilityRole="button"
+                    accessibilityHint={t('m.post.editedHint')}
+                    onPress={() => setHistory(true)}
+                    style={{ textDecorationLine: 'underline', fontWeight: '600' }}
+                  >
+                    {t('yap.rerecorded')}
+                  </Text>
+                </>
+              ) : null}
               {reason ? ` · ${reason}` : ''}
             </Text>
           </View>
@@ -576,6 +594,19 @@ function PostCardView({
                     style={{ textDecorationLine: 'underline', fontWeight: '600' }}
                   >
                     {t('m.post.edited')}
+                  </Text>
+                </>
+              ) : null}
+              {post.rerecordedAt ? (
+                <>
+                  {' · '}
+                  <Text
+                    accessibilityRole="button"
+                    accessibilityHint={t('m.post.editedHint')}
+                    onPress={() => setHistory(true)}
+                    style={{ textDecorationLine: 'underline', fontWeight: '600' }}
+                  >
+                    {t('yap.rerecorded')}
                   </Text>
                 </>
               ) : null}
@@ -864,6 +895,17 @@ function PostCardView({
         />
       ) : null}
       {history ? <HistorySheet postId={post.id} onClose={() => setHistory(false)} /> : null}
+      {redoing ? (
+        <RedoYapSheet
+          post={post}
+          onClose={() => setRedoing(false)}
+          onDone={(p) => {
+            setPost(p);
+            setRedoing(false);
+            setTuneNote(t('yap.replaced'));
+          }}
+        />
+      ) : null}
       {transcriptOpen ? <TranscriptSheet post={post} onClose={() => setTranscriptOpen(false)} onChanged={setPost} /> : null}
       {repostersOpen ? <RepostersSheet postId={post.id} onClose={() => setRepostersOpen(false)} /> : null}
       {remembering ? <AddToMemorySheet postId={post.id} onClose={() => setRemembering(false)} /> : null}

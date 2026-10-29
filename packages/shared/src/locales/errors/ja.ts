@@ -1242,6 +1242,11 @@ export const ja: Record<string, string> = {
   'A voice intro can be up to 15 seconds.': 'ボイス自己紹介は15秒までです。',
   'Yaps and voice replies can be up to a minute.': 'Yapと音声の返信は1分までです。',
   'A Yap is one voice recording.': 'Yapは1つの音声の録音です。',
+  'Only a Yap can be recorded again.': '録音し直せるのはYapだけです。',
+  'A Yap can be recorded again within 24 hours of posting it. You can delete it and post a new one.':
+    'Yapは投稿から24時間以内なら録音し直せます。削除して新しく投稿することもできます。',
+  'A Yap can be recorded again up to 5 times. You can delete it and post a new one.':
+    'Yapを録音し直せるのは5回までです。削除して新しく投稿することもできます。',
   'Write a comment or record one.': 'コメントを書くか、録音してください。',
   'Listening isn’t available right now. Try again later.': '現在、音声で聞くことはできません。後でもう一度お試しください。',
   // apps/api/src/lib/stash.ts

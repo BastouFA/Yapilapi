@@ -1260,6 +1260,11 @@ export const nl: Record<string, string> = {
   'A voice intro can be up to 15 seconds.': 'Een gesproken intro mag maximaal 15 seconden duren.',
   'Yaps and voice replies can be up to a minute.': 'Yaps en gesproken reacties mogen maximaal een minuut duren.',
   'A Yap is one voice recording.': 'Een Yap is één spraakopname.',
+  'Only a Yap can be recorded again.': 'Alleen een Yap kan opnieuw worden opgenomen.',
+  'A Yap can be recorded again within 24 hours of posting it. You can delete it and post a new one.':
+    'Een Yap kan binnen 24 uur na het plaatsen opnieuw worden opgenomen. Je kunt hem verwijderen en een nieuwe plaatsen.',
+  'A Yap can be recorded again up to 5 times. You can delete it and post a new one.':
+    'Een Yap kan tot 5 keer opnieuw worden opgenomen. Je kunt hem verwijderen en een nieuwe plaatsen.',
   'Write a comment or record one.': 'Schrijf een reactie of neem er een op.',
   'Listening isn’t available right now. Try again later.': 'Luisteren is nu niet beschikbaar. Probeer het later opnieuw.',
   // apps/api/src/lib/stash.ts

@@ -35,6 +35,10 @@ export const VOICE_RATES = [1, 1.5, 2] as const;
 export type VoiceRate = (typeof VOICE_RATES)[number];
 /** A listen this far through counts as finished. */
 export const VOICE_COMPLETE_AT = 0.9;
+/** A posted Yap can be recorded again ("Record again") for this long after it went out... */
+export const YAP_REDO_HOURS = 24;
+/** ...and this many times. After that it can be deleted and posted again. */
+export const YAP_REDO_MAX = 5;
 
 /** The longest a clip may be for its purpose. */
 export function voiceLimitMs(purpose: VoicePurpose): number {
@@ -140,4 +144,14 @@ export function seekMs(fraction: number, durationMs: number): number {
 /** Whether a listen of `playedMs` (furthest point reached) counts as finishing the clip. */
 export function listenFinished(playedMs: number, durationMs: number): boolean {
   return durationMs > 0 && playedMs >= durationMs * VOICE_COMPLETE_AT;
+}
+
+/**
+ * Whether the author may still offer "Record again" on their Yap: published, and within
+ * YAP_REDO_HOURS of going out (the server also counts the times, up to YAP_REDO_MAX).
+ */
+export function canRedoYap(post: { format?: string; createdAt: string; status?: string | null }, now = Date.now()): boolean {
+  if (post.format !== 'yap' || post.status) return false;
+  const at = Date.parse(post.createdAt);
+  return Number.isFinite(at) && now - at < YAP_REDO_HOURS * 3600_000;
 }

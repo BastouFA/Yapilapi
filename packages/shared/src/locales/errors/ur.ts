@@ -1255,6 +1255,11 @@ export const ur: Record<string, string> = {
   'A voice intro can be up to 15 seconds.': 'صوتی تعارف زیادہ سے زیادہ 15 سیکنڈ کا ہو سکتا ہے۔',
   'Yaps and voice replies can be up to a minute.': 'Yaps اور صوتی جوابات زیادہ سے زیادہ ایک منٹ کے ہو سکتے ہیں۔',
   'A Yap is one voice recording.': 'Yap ایک صوتی ریکارڈنگ ہوتا ہے۔',
+  'Only a Yap can be recorded again.': 'صرف Yap کو دوبارہ ریکارڈ کیا جا سکتا ہے۔',
+  'A Yap can be recorded again within 24 hours of posting it. You can delete it and post a new one.':
+    'Yap کو پوسٹ کرنے کے 24 گھنٹوں کے اندر دوبارہ ریکارڈ کیا جا سکتا ہے۔ آپ اسے حذف کر کے نیا پوسٹ کر سکتے ہیں۔',
+  'A Yap can be recorded again up to 5 times. You can delete it and post a new one.':
+    'ایک Yap کو زیادہ سے زیادہ 5 بار دوبارہ ریکارڈ کیا جا سکتا ہے۔ آپ اسے حذف کر کے نیا پوسٹ کر سکتے ہیں۔',
   'Write a comment or record one.': 'تبصرہ لکھیں یا ریکارڈ کریں۔',
   'Listening isn’t available right now. Try again later.': 'سننا ابھی دستیاب نہیں ہے۔ بعد میں دوبارہ کوشش کریں۔',
   // apps/api/src/lib/stash.ts

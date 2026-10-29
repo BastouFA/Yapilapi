@@ -1239,6 +1239,11 @@ export const ig: Record<string, string> = {
   'A voice intro can be up to 15 seconds.': 'Mmalite olu nwere ike iru sekọnd 15.',
   'Yaps and voice replies can be up to a minute.': 'Yap na azịza olu nwere ike iru otu nkeji.',
   'A Yap is one voice recording.': 'Yap bụ otu ndekọ olu.',
+  'Only a Yap can be recorded again.': 'Ọ bụ naanị Yap ka a pụrụ idekọ ọzọ.',
+  'A Yap can be recorded again within 24 hours of posting it. You can delete it and post a new one.':
+    'Ị nwere ike idekọ Yap ọzọ n’ime awa 24 ka ibipụtachara ya. Ị nwere ike ihichapụ ya ma bipụta nke ọhụrụ.',
+  'A Yap can be recorded again up to 5 times. You can delete it and post a new one.':
+    'Ị nwere ike idekọ Yap ọzọ ruo ugboro 5. Ị nwere ike ihichapụ ya ma bipụta nke ọhụrụ.',
   'Write a comment or record one.': 'Dee nkọwa ma ọ bụ dekọọ otu.',
   'Listening isn’t available right now. Try again later.': 'Ige ntị adịghị ugbu a. Nwaa ọzọ ma emechaa.',
   // apps/api/src/lib/stash.ts

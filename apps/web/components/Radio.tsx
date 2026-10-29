@@ -28,6 +28,7 @@ import { useSession } from '@/app/providers';
 import { api, errorMessage } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { recordFeedEvent } from '@/lib/feed-events';
+import { announcePostDeleted, onPostDeleted } from '@/lib/post-events';
 
 /**
  * Yap Radio (docs/product/yap-radio.md): press play once and listen hands-free, one Yap after
@@ -85,6 +86,8 @@ export interface Radio extends RadioState {
   setMyLanguage: (on: boolean) => void;
   like: () => void;
   follow: () => void;
+  /** Your own Yap playing now: delete it (asked first on the page); the radio goes on to the next. */
+  remove: () => Promise<void>;
   /** The station's name in the listener's language. */
   stationName: (s: RadioStationInfo | RadioStation | null) => string;
 }
@@ -156,6 +159,8 @@ export function RadioProvider({ children }: { children: ReactNode }) {
   const indexRef = useRef(0);
   const listen = useRef<Listen | null>(null);
   const seekTo = useRef<number | null>(null);
+  // The recording a kept place was in: a Yap recorded again since plays from the start.
+  const seekClip = useRef<string | null>(null);
   const gap = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoplay = useRef(false);
   const path = usePathname();
@@ -199,7 +204,13 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     const p = queueRef.current[indexRef.current];
     const el = audio.current;
     if (!s || !p || !el) return;
-    const r: RadioResume = { station: stationId(s), postId: p.id, positionMs: Math.round(el.currentTime * 1000), at: Date.now() };
+    const r: RadioResume = {
+      station: stationId(s),
+      postId: p.id,
+      positionMs: Math.round(el.currentTime * 1000),
+      ...(p.voice ? { clipId: p.voice.id } : {}),
+      at: Date.now(),
+    };
     store(RESUME_KEY, r);
     setResume(r);
   }, []);
@@ -257,6 +268,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
       setError(null);
       setPositionMs(0);
       seekTo.current = resumeHere?.positionMs ?? null;
+      seekClip.current = resumeHere?.clipId ?? null;
       autoplay.current = true;
       audio.current?.pause();
       void fetchMore(s, { start: resumeHere?.postId ?? null });
@@ -373,6 +385,8 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     const el = audio.current;
     if (!el || !src) return;
     el.playbackRate = rate;
+    if (seekTo.current !== null && seekClip.current && queueRef.current[indexRef.current]?.voice?.id !== seekClip.current) seekTo.current = null;
+    seekClip.current = null;
     if (seekTo.current !== null) {
       const at = seekTo.current / 1000;
       seekTo.current = null;
@@ -539,6 +553,55 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     });
   }, [following, toast]);
 
+  // ── A Yap deleted (here or from its card): out of the queue, and the radio goes on ──
+  const drop = useCallback(
+    (id: string) => {
+      const kept = readResume(readStored(RESUME_KEY));
+      if (kept?.postId === id) {
+        store(RESUME_KEY, null);
+        setResume(null);
+      }
+      const q = queueRef.current;
+      const at = q.findIndex((p) => p.id === id);
+      if (at < 0) return;
+      const rest = q.filter((p) => p.id !== id);
+      queueRef.current = rest;
+      setQueue(rest);
+      if (at < indexRef.current) {
+        indexRef.current -= 1;
+        setIndex(indexRef.current);
+        return;
+      }
+      if (at > indexRef.current) return;
+      const el = audio.current;
+      autoplay.current = !!el && !el.paused;
+      listen.current = null;
+      seekTo.current = null;
+      el?.pause();
+      setPositionMs(0);
+      if (indexRef.current < rest.length) return;
+      if (cursor.current && stationRef.current) void fetchMore(stationRef.current, null);
+      else {
+        setEnded(true);
+        setPlaying(false);
+      }
+    },
+    [fetchMore],
+  );
+  useEffect(() => onPostDeleted(drop), [drop]);
+
+  const remove = useCallback(async () => {
+    const p = queueRef.current[indexRef.current];
+    if (!p || p.author.id !== me?.id) return;
+    try {
+      await api.posts.remove(p.id);
+      announcePostDeleted(p.id);
+      toast(t('postList.deleted'));
+    } catch (e) {
+      toast(errorMessage(e));
+    }
+  }, [me?.id, toast, t]);
+
   // The next Yap, loaded ahead off Data saver (only that one; none on Data saver or while it's read out).
   const upcoming = !saver && !src?.spoken ? (queue[index + 1]?.voice?.url ?? null) : null;
 
@@ -575,6 +638,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
             setMyLanguage,
             like,
             follow,
+            remove,
             stationName,
           }
         : null,
@@ -609,6 +673,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
       setMyLanguage,
       like,
       follow,
+      remove,
       stationName,
     ],
   );

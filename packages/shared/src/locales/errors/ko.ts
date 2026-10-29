@@ -1221,6 +1221,11 @@ export const ko: Record<string, string> = {
   'A voice intro can be up to 15 seconds.': '음성 소개는 최대 15초까지 가능해요.',
   'Yaps and voice replies can be up to a minute.': 'Yap과 음성 답글은 최대 1분까지 가능해요.',
   'A Yap is one voice recording.': 'Yap은 음성 녹음 하나예요.',
+  'Only a Yap can be recorded again.': 'Yap만 다시 녹음할 수 있어요.',
+  'A Yap can be recorded again within 24 hours of posting it. You can delete it and post a new one.':
+    'Yap은 게시 후 24시간 안에 다시 녹음할 수 있어요. 삭제하고 새로 게시할 수 있어요.',
+  'A Yap can be recorded again up to 5 times. You can delete it and post a new one.':
+    'Yap은 최대 5번까지 다시 녹음할 수 있어요. 삭제하고 새로 게시할 수 있어요.',
   'Write a comment or record one.': '댓글을 쓰거나 녹음하세요.',
   'Listening isn’t available right now. Try again later.': '지금은 들을 수 없어요. 나중에 다시 시도해 주세요.',
   // apps/api/src/lib/stash.ts

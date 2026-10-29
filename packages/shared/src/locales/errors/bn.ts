@@ -1240,6 +1240,11 @@ export const bn: Record<string, string> = {
   'A voice intro can be up to 15 seconds.': 'ভয়েস পরিচিতি সর্বোচ্চ ১৫ সেকেন্ডের হতে পারে।',
   'Yaps and voice replies can be up to a minute.': 'Yap আর ভয়েস উত্তর সর্বোচ্চ এক মিনিটের হতে পারে।',
   'A Yap is one voice recording.': 'Yap মানে একটি ভয়েস রেকর্ডিং।',
+  'Only a Yap can be recorded again.': 'শুধু Yap আবার রেকর্ড করা যায়।',
+  'A Yap can be recorded again within 24 hours of posting it. You can delete it and post a new one.':
+    'পোস্ট করার 24 ঘণ্টার মধ্যে একটি Yap আবার রেকর্ড করা যায়। আপনি এটি মুছে নতুন একটি পোস্ট করতে পারেন।',
+  'A Yap can be recorded again up to 5 times. You can delete it and post a new one.':
+    'একটি Yap সর্বোচ্চ 5 বার আবার রেকর্ড করা যায়। আপনি এটি মুছে নতুন একটি পোস্ট করতে পারেন।',
   'Write a comment or record one.': 'একটি মন্তব্য লিখুন বা রেকর্ড করুন।',
   'Listening isn’t available right now. Try again later.': 'শোনা এখন উপলব্ধ নয়। পরে আবার চেষ্টা করুন।',
   // apps/api/src/lib/stash.ts

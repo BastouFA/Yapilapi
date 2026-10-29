@@ -1252,6 +1252,11 @@ export const id: Record<string, string> = {
   'A voice intro can be up to 15 seconds.': 'Intro suara maksimal 15 detik.',
   'Yaps and voice replies can be up to a minute.': 'Yap dan balasan suara maksimal satu menit.',
   'A Yap is one voice recording.': 'Yap adalah satu rekaman suara.',
+  'Only a Yap can be recorded again.': 'Hanya Yap yang bisa direkam ulang.',
+  'A Yap can be recorded again within 24 hours of posting it. You can delete it and post a new one.':
+    'Yap bisa direkam ulang dalam 24 jam setelah diposting. Kamu bisa menghapusnya dan memposting yang baru.',
+  'A Yap can be recorded again up to 5 times. You can delete it and post a new one.':
+    'Yap bisa direkam ulang hingga 5 kali. Kamu bisa menghapusnya dan memposting yang baru.',
   'Write a comment or record one.': 'Tulis komentar atau rekam komentar.',
   'Listening isn’t available right now. Try again later.': 'Mendengarkan belum tersedia saat ini. Coba lagi nanti.',
   // apps/api/src/lib/stash.ts

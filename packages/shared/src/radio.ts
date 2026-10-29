@@ -115,6 +115,8 @@ export interface RadioResume {
   station: string;
   postId: string;
   positionMs: number;
+  /** The recording it was in: a Yap recorded again since starts from the beginning. */
+  clipId?: string;
   /** When it was kept (ms since the epoch). */
   at: number;
 }
@@ -125,5 +127,5 @@ export function readResume(value: unknown, now = Date.now()): RadioResume | null
   if (!r || typeof r !== 'object' || typeof r.station !== 'string' || typeof r.postId !== 'string') return null;
   if (!parseStationId(r.station) || typeof r.at !== 'number' || now - r.at > RADIO_RESUME_MS) return null;
   const positionMs = typeof r.positionMs === 'number' && r.positionMs > 0 ? Math.round(r.positionMs) : 0;
-  return { station: r.station, postId: r.postId, positionMs, at: r.at };
+  return { station: r.station, postId: r.postId, positionMs, ...(typeof r.clipId === 'string' ? { clipId: r.clipId } : {}), at: r.at };
 }

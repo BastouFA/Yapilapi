@@ -684,6 +684,8 @@ export async function fairStartPicks(db: Q, o: RankOptions): Promise<FairPick[]>
        AND NOT EXISTS (SELECT 1 FROM feed_events fe WHERE fe.user_id = $1 AND fe.post_id = p.id AND fe.kind = 'impression')
        AND coalesce((SELECT a.score FROM user_creator_affinity a WHERE a.user_id = $1 AND a.author_id = p.author_id), 0) > -2
        AND p.moderation_status = 'normal' AND ${postVisibleSql('$1')} ${o.personal}
+       -- A Yap waits while its words are checked (one recorded again too: lib/voice.ts).
+       AND (p.format <> 'yap' OR ${yapDistributableSql('p')})
        -- Reels get fair-start reels, the Yaps filter fair-start Yaps, For you either.
        ${reels ? `AND p.format = 'reel'` : o.surface === 'yaps' || o.surface === 'radio' ? `AND p.format = 'yap'` : ''}
        AND ($3 OR NOT EXISTS (SELECT 1 FROM post_media pm JOIN media m ON m.id = pm.media_id WHERE pm.post_id = p.id AND m.moderation = 'sensitive'))

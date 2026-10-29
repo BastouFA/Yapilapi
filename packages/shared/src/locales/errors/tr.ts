@@ -1253,6 +1253,11 @@ export const tr: Record<string, string> = {
   'A voice intro can be up to 15 seconds.': 'Sesli tanıtım en fazla 15 saniye olabilir.',
   'Yaps and voice replies can be up to a minute.': 'Yap’lar ve sesli yanıtlar en fazla bir dakika olabilir.',
   'A Yap is one voice recording.': 'Yap tek bir ses kaydıdır.',
+  'Only a Yap can be recorded again.': 'Yalnızca bir Yap yeniden kaydedilebilir.',
+  'A Yap can be recorded again within 24 hours of posting it. You can delete it and post a new one.':
+    'Bir Yap paylaşıldıktan sonraki 24 saat içinde yeniden kaydedilebilir. Silip yenisini paylaşabilirsin.',
+  'A Yap can be recorded again up to 5 times. You can delete it and post a new one.':
+    'Bir Yap en fazla 5 kez yeniden kaydedilebilir. Silip yenisini paylaşabilirsin.',
   'Write a comment or record one.': 'Bir yorum yaz ya da sesli kaydet.',
   'Listening isn’t available right now. Try again later.': 'Dinleme şu anda kullanılamıyor. Daha sonra tekrar dene.',
   // apps/api/src/lib/stash.ts

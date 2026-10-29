@@ -385,7 +385,21 @@ export async function transcribeVoice(deps: VoiceDeps & Pick<AppContext, 'storag
 }
 
 /**
- * Clips that just stopped being used (a Yap or voice reply deleted, an intro changed or removed):
+ * What was heard of a Yap's recording, for when it's deleted or recorded again (`mediaIds`: the
+ * clips that went): its listening numbers and listens (so finished-elsewhere and resume points
+ * start again), and its words' translations and their read-out versions ("Listen in …").
+ */
+export async function forgetListening(db: Q, postId: string, mediaIds: string[]): Promise<void> {
+  await db.query(`UPDATE post_stats SET listens = 0, listen_ms = 0, listen_completes = 0 WHERE post_id = $1`, [postId]);
+  await db.query(`DELETE FROM feed_events WHERE post_id = $1 AND kind IN ('listen_start', 'listen', 'listen_complete')`, [postId]);
+  await db.query(`DELETE FROM reel_resume WHERE post_id = $1`, [postId]);
+  if (!mediaIds.length) return;
+  await db.query(`DELETE FROM translations WHERE kind = 'voice' AND item_id = ANY($1::uuid[])`, [mediaIds]);
+  await db.query(`DELETE FROM speech_clip_uses WHERE kind = 'voice' AND item_id = ANY($1::uuid[])`, [mediaIds]);
+}
+
+/**
+ * Clips that just stopped being used (a Yap or voice reply deleted, a Yap recorded again, an intro changed or removed):
  * their audio is deleted now, unless something about where they were is still being looked at
  * (an open report or moderation case); then the usual retention erases it later.
  */

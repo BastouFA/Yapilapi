@@ -39,6 +39,7 @@ import { elevation, radius, space } from './theme';
 import { useTranslationSettings } from './translation';
 import { Avatar, Button, Icon, TabBarExtraSpace, useColors, userText } from './ui';
 import { onVoicePlay, pauseVoice } from './voice';
+import { announcePostDeleted, onPostDeleted } from './post-events';
 
 /** Where the radio was, on this phone (a tiny JSON string, so SecureStore is fine). */
 const RESUME_KEY = 'yp.radio.resume';
@@ -140,6 +141,8 @@ export interface Radio extends RadioState {
   like: () => Promise<void>;
   /** Follow the current speaker, or unfollow (or take back a request). Throws with the API's message. */
   toggleFollow: () => Promise<void>;
+  /** Your own Yap playing now: delete it (asked first on the screen); the radio goes on to the next. Throws with the API's message. */
+  remove: () => Promise<void>;
 }
 
 const Ctx = createContext<Radio | null>(null);
@@ -224,7 +227,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     } catch {
       // Released.
     }
-    const kept = { station: stationId(e.station), postId: post.id, positionMs, at: Date.now() };
+    const kept = { station: stationId(e.station), postId: post.id, positionMs, ...(post.voice ? { clipId: post.voice.id } : {}), at: Date.now() };
     SecureStore.setItemAsync(RESUME_KEY, JSON.stringify(kept)).catch(() => {});
   };
 
@@ -507,6 +510,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     let target = station ?? null;
     let start: string | null = null;
     let atMs = 0;
+    let clipId: string | null = null;
     if (!target) {
       const kept = readResume(
         await SecureStore.getItemAsync(RESUME_KEY)
@@ -517,6 +521,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
       if (kept && target) {
         start = kept.postId;
         atMs = kept.positionMs;
+        clipId = kept.clipId ?? null;
       }
     }
     target ??= { kind: 'for_you' };
@@ -565,8 +570,9 @@ export function RadioProvider({ children }: { children: ReactNode }) {
       bump();
       return;
     }
-    // The Yap it was left on comes first: carry on from where it was.
-    await go(0, false, start && e.queue[0]!.id === start ? atMs : 0);
+    // The Yap it was left on comes first: carry on from where it was (from the start when it was recorded again since).
+    const first = e.queue[0]!;
+    await go(0, false, start && first.id === start && (!clipId || first.voice?.id === clipId) ? atMs : 0);
   };
 
   const stop = () => {
@@ -731,6 +737,12 @@ export function RadioProvider({ children }: { children: ReactNode }) {
         set(!next);
       }
     },
+    remove: async () => {
+      const post = current;
+      if (!post || post.author.id !== ctx.current.meId) return;
+      await (await client()).posts.remove(post.id);
+      announcePostDeleted(post.id);
+    },
     toggleFollow: async () => {
       const author = current?.author;
       if (!author) return;
@@ -742,6 +754,34 @@ export function RadioProvider({ children }: { children: ReactNode }) {
       bump();
     },
   };
+
+  // A Yap deleted (here or from its card): out of the queue, and the radio goes on to the next.
+  useEffect(
+    () =>
+      onPostDeleted((id) => {
+        SecureStore.getItemAsync(RESUME_KEY)
+          .then((v) => (v && readResume(JSON.parse(v))?.postId === id ? SecureStore.deleteItemAsync(RESUME_KEY) : undefined))
+          .catch(() => {});
+        const at = e.queue.findIndex((p) => p.id === id);
+        if (at < 0) return;
+        e.queue = e.queue.filter((p) => p.id !== id);
+        if (at < e.index) {
+          e.index -= 1;
+          bump();
+          return;
+        }
+        if (at > e.index) return bump();
+        const wanted = e.want;
+        e.track = null;
+        pausePlayer();
+        if (wanted) void go_.current(at, false);
+        else {
+          e.index = Math.min(at, e.queue.length - 1);
+          bump();
+        }
+      }),
+    [e],
+  );
 
   return (
     <Ctx.Provider value={value}>

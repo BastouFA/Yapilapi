@@ -1353,6 +1353,11 @@ export const pt: Record<string, string> = {
   'A voice intro can be up to 15 seconds.': 'Uma apresentação em voz pode ter até 15 segundos.',
   'Yaps and voice replies can be up to a minute.': 'Yaps e respostas de voz podem ter até um minuto.',
   'A Yap is one voice recording.': 'Um Yap é uma única gravação de voz.',
+  'Only a Yap can be recorded again.': 'Só um Yap pode ser gravado de novo.',
+  'A Yap can be recorded again within 24 hours of posting it. You can delete it and post a new one.':
+    'Um Yap pode ser gravado de novo até 24 horas depois de publicado. Você pode excluí-lo e publicar um novo.',
+  'A Yap can be recorded again up to 5 times. You can delete it and post a new one.':
+    'Um Yap pode ser gravado de novo até 5 vezes. Você pode excluí-lo e publicar um novo.',
   'Write a comment or record one.': 'Escreva um comentário ou grave um.',
   'Listening isn’t available right now. Try again later.': 'Ouvir não está disponível agora. Tente de novo mais tarde.',
   // apps/api/src/lib/stash.ts

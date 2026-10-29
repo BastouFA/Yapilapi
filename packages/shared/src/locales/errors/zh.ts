@@ -1199,6 +1199,10 @@ export const zh: Record<string, string> = {
   'A voice intro can be up to 15 seconds.': '语音介绍最长 15 秒。',
   'Yaps and voice replies can be up to a minute.': 'Yap 和语音回复最长一分钟。',
   'A Yap is one voice recording.': '一条 Yap 就是一段语音录音。',
+  'Only a Yap can be recorded again.': '只有 Yap 可以重新录制。',
+  'A Yap can be recorded again within 24 hours of posting it. You can delete it and post a new one.':
+    'Yap 发布后 24 小时内可以重新录制。你可以删除它并发布一条新的。',
+  'A Yap can be recorded again up to 5 times. You can delete it and post a new one.': '一条 Yap 最多可以重新录制 5 次。你可以删除它并发布一条新的。',
   'Write a comment or record one.': '写条评论，或者录一段。',
   'Listening isn’t available right now. Try again later.': '暂时无法收听。请稍后再试。',
   // apps/api/src/lib/stash.ts

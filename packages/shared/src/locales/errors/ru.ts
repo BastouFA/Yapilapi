@@ -1249,6 +1249,11 @@ export const ru: Record<string, string> = {
   'A voice intro can be up to 15 seconds.': 'Голосовое приветствие может длиться до 15 секунд.',
   'Yaps and voice replies can be up to a minute.': 'Yap и голосовые ответы могут длиться до минуты.',
   'A Yap is one voice recording.': 'Yap — это одна голосовая запись.',
+  'Only a Yap can be recorded again.': 'Перезаписать можно только Yap.',
+  'A Yap can be recorded again within 24 hours of posting it. You can delete it and post a new one.':
+    'Yap можно перезаписать в течение 24 часов после публикации. Можно удалить его и опубликовать новый.',
+  'A Yap can be recorded again up to 5 times. You can delete it and post a new one.':
+    'Yap можно перезаписать не больше 5 раз. Можно удалить его и опубликовать новый.',
   'Write a comment or record one.': 'Напишите комментарий или запишите его голосом.',
   'Listening isn’t available right now. Try again later.': 'Прослушивание сейчас недоступно. Попробуйте позже.',
   // apps/api/src/lib/stash.ts

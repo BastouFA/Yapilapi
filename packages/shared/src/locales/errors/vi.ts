@@ -1245,6 +1245,11 @@ export const vi: Record<string, string> = {
   'A voice intro can be up to 15 seconds.': 'Lời giới thiệu bằng giọng nói có thể dài tối đa 15 giây.',
   'Yaps and voice replies can be up to a minute.': 'Yap và câu trả lời bằng giọng nói có thể dài tối đa một phút.',
   'A Yap is one voice recording.': 'Mỗi Yap là một bản ghi âm giọng nói.',
+  'Only a Yap can be recorded again.': 'Chỉ có thể ghi âm lại một Yap.',
+  'A Yap can be recorded again within 24 hours of posting it. You can delete it and post a new one.':
+    'Bạn có thể ghi âm lại một Yap trong vòng 24 giờ sau khi đăng. Bạn có thể xóa và đăng một Yap mới.',
+  'A Yap can be recorded again up to 5 times. You can delete it and post a new one.':
+    'Bạn có thể ghi âm lại một Yap tối đa 5 lần. Bạn có thể xóa và đăng một Yap mới.',
   'Write a comment or record one.': 'Hãy viết bình luận hoặc ghi âm một bình luận.',
   'Listening isn’t available right now. Try again later.': 'Hiện chưa nghe được. Hãy thử lại sau.',
   // apps/api/src/lib/stash.ts

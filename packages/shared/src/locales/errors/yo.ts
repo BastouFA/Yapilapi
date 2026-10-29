@@ -1340,6 +1340,11 @@ export const yo: Record<string, string> = {
   'A voice intro can be up to 15 seconds.': 'Ìfihàn ohùn kò gbọ́dọ̀ ju ìṣẹ́jú-àáyá 15 lọ.',
   'Yaps and voice replies can be up to a minute.': 'Yap àti èsì ohùn kò gbọ́dọ̀ ju ìṣẹ́jú kan lọ.',
   'A Yap is one voice recording.': 'Yap jẹ́ ohùn kan tí a gbà sílẹ̀.',
+  'Only a Yap can be recorded again.': 'Yap nìkan ni a lè tún gbà sílẹ̀.',
+  'A Yap can be recorded again within 24 hours of posting it. You can delete it and post a new one.':
+    'A lè tún Yap gbà sílẹ̀ láàárín wákàtí 24 lẹ́yìn tí o fi síta. O lè pa á rẹ́ kí o sì fi tuntun síta.',
+  'A Yap can be recorded again up to 5 times. You can delete it and post a new one.':
+    'A lè tún Yap gbà sílẹ̀ títí dé ìgbà 5. O lè pa á rẹ́ kí o sì fi tuntun síta.',
   'Write a comment or record one.': 'Kọ èrò rẹ tàbí gba ọ̀kan sílẹ̀.',
   'Listening isn’t available right now. Try again later.': 'Gbígbọ́ kò sí báyìí. Gbìyànjú lẹ́ẹ̀kan sí i nígbà míì.',
   // apps/api/src/lib/stash.ts

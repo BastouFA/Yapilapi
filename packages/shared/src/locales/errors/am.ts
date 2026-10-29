@@ -1204,6 +1204,10 @@ export const am: Record<string, string> = {
   'A voice intro can be up to 15 seconds.': 'የድምጽ መግቢያ እስከ 15 ሰከንድ ሊሆን ይችላል።',
   'Yaps and voice replies can be up to a minute.': 'Yapዎች እና የድምጽ ምላሾች እስከ አንድ ደቂቃ ሊሆኑ ይችላሉ።',
   'A Yap is one voice recording.': 'Yap አንድ የድምጽ ቅጂ ነው።',
+  'Only a Yap can be recorded again.': 'እንደገና ሊቀዳ የሚችለው Yap ብቻ ነው።',
+  'A Yap can be recorded again within 24 hours of posting it. You can delete it and post a new one.':
+    'Yap ከተለጠፈ በኋላ በ24 ሰዓታት ውስጥ እንደገና ሊቀዳ ይችላል። ሰርዘው አዲስ መለጠፍ ይችላሉ።',
+  'A Yap can be recorded again up to 5 times. You can delete it and post a new one.': 'Yap እስከ 5 ጊዜ ድረስ እንደገና ሊቀዳ ይችላል። ሰርዘው አዲስ መለጠፍ ይችላሉ።',
   'Write a comment or record one.': 'አስተያየት ይጻፉ ወይም ይቅዱ።',
   'Listening isn’t available right now. Try again later.': 'ማዳመጥ አሁን አይገኝም። ቆይተው እንደገና ይሞክሩ።',
   // apps/api/src/lib/stash.ts

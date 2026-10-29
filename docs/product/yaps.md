@@ -91,6 +91,15 @@ Ids and URLs keep their old names (`NavEntry` ids `home`, `discover`, `yap` or `
   with or without words, in threads that mix voice and text. Notifications as for comments.
 - **Voice intro.** Up to 15 seconds on your profile, played from the header; recorded, replaced or
   removed in profile settings (web: Settings → Account; phone: Edit profile).
+- **Delete or record again.** The author's options on their own Yap (its card on Pulse, the Yaps
+  filter, profiles and its page; the Radio page and screen have Delete for your own Yap playing)
+  offer **Delete** ("Delete this Yap? This can’t be undone.") and, in its first 24 hours, **Record
+  again**: the recorder opens (hold or tap, up to a minute), the new take plays back (or Redo), and
+  **Replace** swaps it in. Up to 5 times a Yap; after that, or after 24 hours, delete it and post a
+  new one. Likes, comments, reposts and the line stay (the line is changed with the usual Edit);
+  the card says **Re-recorded**, whose history says only when (never the old audio). Nobody is
+  notified. Before posting, the recorder's **Redo** button sits next to the preview. Voice replies
+  are deleted like comments, and the voice intro is removed in profile settings.
 - **Data saver.** No clip loads until play is pressed (the length and waveform come with the post).
   Off Data saver, when one clip plays the next one on the page loads ahead; with Data saver on,
   nothing loads ahead.
@@ -115,6 +124,9 @@ included), place tags, comments, reports, stats, the recommender, export, deleti
 | `screened` | `passed` or `held`: whether the words passed the text checks. |
 | `search` | `to_tsvector('simple', transcript)`, GIN-indexed: search finds Yaps by what they say. |
 
+`posts.voice_redone_at` (the "Re-recorded" label, `Post.rerecordedAt`) and `post_voice_redos` (one row
+each time, for the count and the history), migration `0095_yap_redo.sql`.
+
 Elsewhere: `comments.voice_media_id` (a voice reply), `profiles.voice_intro_media_id`,
 `feed_events` kinds `listen_start`, `listen`, `listen_complete` and surfaces `yaps`, `squad`,
 `place`; `post_stats.listens`, `listen_ms`, `listen_completes`; `feed_sessions.surface` `yaps`;
@@ -132,6 +144,17 @@ on `Post.voice` (format 'yap'), `Comment.voice` and `Profile.voiceIntro`.
 - `POST /v1/posts` with `format: 'yap'` and `media: [{ id, url, kind: 'audio' }]` (the clip, which must
   be yours, recorded for a Yap and unused). At most 30 Yaps an hour.
 - `POST /v1/posts/:id/comments` with `voiceId` (a clip recorded for a reply); `body` is then optional.
+- `PUT /v1/posts/:id/voice` `{ voiceId }`: record your Yap again (a clip uploaded for a Yap, unused).
+  Only its author, only a published Yap, within `YAP_REDO_HOURS` (24) of posting and up to
+  `YAP_REDO_MAX` (5) times, 10 a minute. The old file is deleted unless a report or moderation case
+  about the Yap is open; the new one is transcribed and checked like a new Yap's (until its words pass,
+  followers only: `yapDistributableSql`, now also in Fair start's picks); listening numbers, listens,
+  resume points, the old words' translations and spoken clips are cleared (`forgetListening`); a Yap
+  on hold stays on hold. `GET /v1/posts/:id/history` adds `rerecorded` (times, newest first).
+- `DELETE /v1/posts/:id` (and `DELETE /v1/comments/:id`) also delete the notifications about it and its
+  translations and spoken clips; for a Yap, its listening too. Feeds, Yap Radio's pages and Today's
+  segments leave a deleted post out by themselves (each is checked against what can still be seen),
+  and the apps drop it from a radio queue fetched before.
 - `PATCH /v1/me/profile` with `voiceIntroId` (or `null` to remove it; the old clip's file is deleted).
 - `GET /v1/voice/:id`: one clip the viewer can hear (the apps ask again while its transcript is pending).
 - `POST /v1/voice/:id/speech` `{ target }`: "Listen in …", the transcript's translation read out
@@ -184,7 +207,7 @@ page) where a reel's says "saw your reel"; its report says "listened to the end"
   removal: on phone recordings it makes voices sound robotic. The waveform is drawn from the same
   cleaned-up sound. Clips kept before 2026-10-29 were 24 kHz, 32 kbit/s and stay that way (the
   originals aren't kept). Voice messages in chats don't go through this (`POST /v1/media`, 96 kbit/s).
-- Deleting a Yap or a voice reply deletes its recording at once, unless a report or a moderation case
+- Deleting a Yap or a voice reply (or recording a Yap again) deletes its recording at once, unless a report or a moderation case
   about it is still open (then the usual retention erases it later). Changing or removing an intro
   deletes the old one. Deleting the account deletes every file and clears the transcripts.
 - The data export has `content.voice`: each clip's purpose, where it went, its address while it can

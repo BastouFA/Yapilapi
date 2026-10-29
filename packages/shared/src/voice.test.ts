@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   activeSegment,
+  canRedoYap,
   listenFinished,
   nextVoiceRate,
   peaksFromSamples,
@@ -76,5 +77,18 @@ describe('Yap schemas', () => {
     expect(commentSchema.safeParse({ body: '' }).success).toBe(false);
     expect(commentSchema.safeParse({ voiceId: media[0]!.id }).success).toBe(true);
     expect(commentSchema.safeParse({ body: 'Nice' }).success).toBe(true);
+  });
+});
+
+describe('canRedoYap', () => {
+  const now = Date.parse('2026-10-29T12:00:00Z');
+  const at = (hoursAgo: number) => new Date(now - hoursAgo * 3600_000).toISOString();
+  it('offers "Record again" on a published Yap for its first 24 hours', () => {
+    expect(canRedoYap({ format: 'yap', createdAt: at(1) }, now)).toBe(true);
+    expect(canRedoYap({ format: 'yap', createdAt: at(23.9) }, now)).toBe(true);
+    expect(canRedoYap({ format: 'yap', createdAt: at(24) }, now)).toBe(false);
+    expect(canRedoYap({ format: 'post', createdAt: at(1) }, now)).toBe(false);
+    expect(canRedoYap({ format: 'yap', createdAt: at(1), status: 'draft' }, now)).toBe(false);
+    expect(canRedoYap({ format: 'yap', createdAt: 'nonsense' }, now)).toBe(false);
   });
 });

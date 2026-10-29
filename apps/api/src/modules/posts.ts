@@ -22,6 +22,9 @@ import {
   type PostWhy,
   type WhyReason,
   YAP_TEXT_MAX,
+  YAP_REDO_HOURS,
+  YAP_REDO_MAX,
+  redoVoiceSchema,
 } from '@yapilapi/shared';
 import { z } from 'zod';
 import { AppError, badRequest, featureDisabled, forbidden, notFound, parse } from '../lib/errors.ts';
@@ -61,7 +64,7 @@ import { checkMilestones } from '../lib/milestones.ts';
 import { messageFailureCode, messageFailureEnglish } from '../lib/failures.ts';
 import { asSameUser } from './moments.ts';
 import { recordShare } from './recommendations.ts';
-import { assertYapPace, forgetVoice } from '../lib/voice.ts';
+import { assertYapPace, claimVoice, forgetListening, forgetVoice, startTranscript } from '../lib/voice.ts';
 import { mixInQuestions } from '../lib/ask-city.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
@@ -213,21 +216,71 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     return { post };
   });
 
+  /**
+   * Delete your post. Notifications about it go with it, and so do its translations and the ones
+   * read out ("Listen in …"). Feeds, Yap Radio and Yapilapi Today never show a deleted post again
+   * (each page and briefing is checked against what can still be seen).
+   */
   app.delete('/v1/posts/:id', { preHandler: requireAuth }, async (req) => {
     const u = me(req);
     const { id } = parse(idParam, req.params);
     const r = await db.query(`UPDATE posts SET deleted_at = now() WHERE id = $1 AND author_id = $2 AND deleted_at IS NULL RETURNING format`, [id, u.id]);
     if (!r.rowCount) throw notFound('That post');
-    // A Yap's recording is deleted with it (lib/voice.ts): other posts' files go with the retention sweep.
+    await db.query(`DELETE FROM notifications WHERE entity_type = 'post' AND entity_id = $1`, [id]);
+    await db.query(`DELETE FROM translations WHERE kind = 'post' AND item_id = $1`, [id]);
+    await db.query(`DELETE FROM speech_clip_uses WHERE kind = 'post' AND item_id = $1`, [id]);
+    // A Yap's recording is deleted with it (lib/voice.ts), with what was heard of it: other posts' files go with the retention sweep.
     if (r.rows[0].format === 'yap') {
-      const media = await db.query<{ media_id: string }>(`SELECT media_id FROM post_media WHERE post_id = $1`, [id]);
-      await forgetVoice(
-        ctx,
-        media.rows.map((m) => m.media_id),
-        { type: 'post', id },
-      );
+      const media = (await db.query<{ media_id: string }>(`SELECT media_id FROM post_media WHERE post_id = $1`, [id])).rows.map((m) => m.media_id);
+      await forgetListening(db, id, media);
+      await forgetVoice(ctx, media, { type: 'post', id });
     }
     return { ok: true };
+  });
+
+  /**
+   * Record a Yap again (docs/product/yaps.md, "Delete or record again"): its author swaps the
+   * recording for a new one (uploaded with POST /v1/voice?purpose=yap), within YAP_REDO_HOURS of
+   * posting and up to YAP_REDO_MAX times. Likes, comments and reposts stay. The old file is deleted
+   * (unless a report or case about the Yap is still open), the new one is transcribed and checked
+   * like a new Yap's, so until its words pass it reaches followers only. What was heard of the old
+   * one (listening numbers, translations, "Listen in …") starts again. Nobody is notified; the Yap
+   * says "Re-recorded". It is never taken off hold.
+   */
+  app.put('/v1/posts/:id/voice', { preHandler: requireAuth, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    const { voiceId } = parse(redoVoiceSchema, req.body);
+    if (!(await isEnabled(db, 'YAPS'))) throw featureDisabled('Yaps');
+    const before = await tx(db, async (c) => {
+      const post = (
+        await c.query(
+          `SELECT p.author_id, p.format, p.status, p.moderation_status, p.created_at > now() - make_interval(hours => $3) AS recent,
+                  (SELECT count(*)::int FROM post_voice_redos r WHERE r.post_id = p.id) AS redos
+           ${POST_FROM} WHERE p.id = $2 AND ${VISIBLE} FOR UPDATE OF p`,
+          [u.id, id, YAP_REDO_HOURS],
+        )
+      ).rows[0];
+      if (!post) throw notFound('That post');
+      if (post.author_id !== u.id) throw forbidden('Only the person who shared this post can change it.');
+      if (post.format !== 'yap' || post.status !== 'published') throw badRequest('Only a Yap can be recorded again.');
+      if (post.moderation_status === 'removed') throw forbidden("This post was removed, so it can't be changed.");
+      if (!post.recent) throw forbidden('A Yap can be recorded again within 24 hours of posting it. You can delete it and post a new one.');
+      if (post.redos >= YAP_REDO_MAX) throw forbidden('A Yap can be recorded again up to 5 times. You can delete it and post a new one.');
+      await claimVoice(c, u.id, voiceId, 'yap');
+      const old = (await c.query<{ media_id: string }>(`DELETE FROM post_media WHERE post_id = $1 RETURNING media_id`, [id])).rows.map((m) => m.media_id);
+      await c.query(`INSERT INTO post_media (post_id, media_id, position) VALUES ($1, $2, 0)`, [id, voiceId]);
+      await c.query(`INSERT INTO post_voice_redos (post_id) VALUES ($1)`, [id]);
+      await c.query(`UPDATE posts SET voice_redone_at = now(), updated_at = now() WHERE id = $1`, [id]);
+      await forgetListening(c, id, old);
+      return old;
+    });
+    await forgetVoice(ctx, before, { type: 'post', id });
+    // Words checked like a new Yap's; meanwhile it isn't suggested beyond followers (yapDistributableSql).
+    await startTranscript(ctx, voiceId);
+    track(db, u.id, 'yap_rerecorded');
+    const [post] = await hydratePosts(db, [id], u.id);
+    return { post };
   });
 
   /**
@@ -350,7 +403,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     return { post: updated, moderation: edit.screened && screening ? moderationNotice({ ...screening, status: edit.status }, limitedNow) : undefined };
   });
 
-  /** Every version of a post's text, newest first, for anyone who can see and open the post. */
+  /** Every version of a post's text, newest first, for anyone who can see and open the post (and when a Yap was recorded again). */
   app.get('/v1/posts/:id/history', { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (req) => {
     const { id } = parse(idParam, req.params);
     await assertUnlocked(id, req.user?.id ?? null);
@@ -363,13 +416,17 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     );
     const r = rows[0];
     const edits = r.edits as { body: string; editedAt: string }[];
+    // A Yap recorded again says when, never what was said before.
+    const rerecorded = (await db.query<{ at: Date }>(`SELECT redone_at AS at FROM post_voice_redos WHERE post_id = $1 ORDER BY redone_at DESC`, [id])).rows.map(
+      (x) => x.at.toISOString(),
+    );
     // Each text was written when the one before it was replaced; the first one when the post was shared.
     const writtenAt = (i: number) => (i === 0 ? (r.created_at as Date).toISOString() : new Date(edits[i - 1]!.editedAt).toISOString());
     const items: PostVersion[] = [
       ...edits.map((e, i) => ({ body: e.body, at: writtenAt(i), current: false })),
       { body: r.body, at: writtenAt(edits.length), current: true },
     ];
-    return { items: items.reverse() };
+    return { items: items.reverse(), rerecorded };
   });
 
   /**

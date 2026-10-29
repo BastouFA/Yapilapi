@@ -95,3 +95,59 @@ test('records, posts, plays and transcribes a Yap, and takes a voice reply', asy
   await expect(page.getByTestId('comment-voice').first()).toBeVisible({ timeout: 20_000 });
   await listener.close();
 });
+
+test('redoes a take before posting, records a posted Yap again, and deletes it', async ({ page }) => {
+  test.setTimeout(120_000);
+  const speakerName = await account(page.request, 'redo');
+
+  // Before posting: Redo, right next to the preview, drops the take for a new one.
+  await page.goto('/create?mode=yap');
+  await record(page, 1500);
+  await page.getByTestId('yap-redo').click();
+  await expect(page.getByTestId('yap-preview')).toBeHidden();
+  await record(page, 2200);
+  await page.getByLabel('Add a line (optional)').fill('[Dev data] Take two of my Yap');
+  await page.getByTestId('yap-post').click();
+  await page.waitForURL(/\/home/);
+  const mine = (await (await page.request.get(`/api/v1/users/${speakerName}/posts`)).json()).items as { id: string; voice: { id: string } }[];
+  const yap = mine[0]!;
+
+  // Posted: Record again, then Replace. The line stays; the card says Re-recorded and plays the new take.
+  await page.goto(`/p/${yap.id}`);
+  const card = page.getByTestId('yap-card');
+  await expect(card).toBeVisible();
+  await card.getByRole('button', { name: 'Post options' }).click();
+  await page.getByRole('menuitem', { name: 'Record again' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Record again' });
+  await expect(sheet).toBeVisible();
+  await record(page, 2000);
+  await sheet.getByTestId('yap-replace').click();
+  await expect(page.getByText('Recording replaced.')).toBeVisible({ timeout: 20_000 });
+  await expect(sheet).toBeHidden();
+  await expect(card.getByTestId('yap-rerecorded')).toBeVisible();
+  await expect(card.getByText('Take two of my Yap')).toBeVisible();
+  const after = (await (await page.request.get(`/api/v1/posts/${yap.id}`)).json()).post as { voice: { id: string }; rerecordedAt?: string };
+  expect(after.voice.id).not.toBe(yap.voice.id);
+  expect(after.rerecordedAt).toBeTruthy();
+  await card.getByTestId('yap-play').click();
+  await expect(card.getByTestId('yap-play')).toHaveAccessibleName('Pause');
+  await card.getByTestId('yap-play').click();
+  // Its history says when, nothing more.
+  await card.getByTestId('yap-rerecorded').click();
+  const history = page.getByRole('dialog', { name: 'Edit history' });
+  await expect(history.getByText(/^Re-recorded ·/)).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(history).toBeHidden();
+
+  // Delete, after saying yes.
+  page.once('dialog', (d) => {
+    expect(d.message()).toBe('Delete this Yap? This can’t be undone.');
+    void d.accept();
+  });
+  await card.getByRole('button', { name: 'Post options' }).click();
+  await page.getByRole('menuitem', { name: 'Delete post' }).click();
+  await expect(page.getByText('Post deleted')).toBeVisible();
+  await expect(page.getByTestId('yap-card')).toHaveCount(0);
+  expect((await page.request.get(`/api/v1/posts/${yap.id}`)).status()).toBe(404);
+  expect((await page.request.get(`/api/v1/voice/${after.voice.id}`)).status()).toBe(404);
+});

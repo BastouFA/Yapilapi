@@ -216,7 +216,19 @@ export default function RadioPage() {
               <Button size="sm" variant="secondary" icon={followingAuthor ? 'check' : 'user-plus'} aria-pressed={followingAuthor} onClick={radio.follow}>
                 {t(followingAuthor ? 'profile.unfollow' : 'profile.follow')}
               </Button>
-            ) : null}
+            ) : (
+              <Button
+                size="sm"
+                variant="ghost"
+                icon="trash"
+                onClick={() => {
+                  if (confirm(t('yap.deleteConfirm'))) void radio.remove();
+                }}
+                data-testid="radio-delete"
+              >
+                {t('post.delete')}
+              </Button>
+            )}
             <button
               type="button"
               className="yp-voice__rate"
