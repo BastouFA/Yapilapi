@@ -208,7 +208,7 @@ a.yp-aside-row__meta {
   display: grid;
   place-items: center;
   min-width: 0;
-  height: 54px;
+  height: 58px;
   border-radius: 18px;
   color: var(--ink-muted);
   text-decoration: none;
@@ -218,11 +218,23 @@ a.yp-aside-row__meta {
 .yp-nav__icon {
   display: grid;
   place-items: center;
-  transition: transform 360ms var(--yp-nav-spring);
+  transition:
+    transform 360ms var(--yp-nav-spring),
+    scale 360ms var(--yp-nav-spring),
+    filter var(--duration-base);
 }
 .yp-nav__item svg {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
+}
+/* Pressed, an icon dips a little and springs back. */
+.yp-nav__item:not(.yp-nav__item--create):active .yp-nav__icon {
+  scale: 0.86;
+  transition-duration: 120ms;
+}
+/* The current page's icon rises into its highlight, in the brand colour with a soft glow of it. */
+.yp-nav__item[aria-current='page']:not(.yp-nav__item--create) .yp-nav__icon {
+  filter: drop-shadow(0 4px 8px color-mix(in oklab, var(--yapi) 38%, transparent));
 }
 .yp-nav__item:focus-visible {
   outline: none;
@@ -266,11 +278,11 @@ a.yp-aside-row__meta {
   color: var(--yapi);
 }
 .yp-nav__item[aria-current='page']:not(.yp-nav__item--create) .yp-nav__icon {
-  transform: translateY(-9px);
+  transform: translateY(-10px);
 }
 .yp-nav__item[aria-current='page']:not(.yp-nav__item--create) .yp-nav__label {
   top: auto;
-  bottom: 5px;
+  bottom: 6px;
   left: 3px;
   right: 3px;
   padding: 0;
@@ -290,8 +302,8 @@ a.yp-aside-row__meta {
 
 /* Spark: a raised brand-gradient squircle, tilted like a spark; it straightens when pressed. */
 .yp-nav__item--create .yp-nav__icon {
-  width: 52px;
-  height: 52px;
+  width: 56px;
+  height: 56px;
   border-radius: 18px;
   background: var(--grad);
   color: var(--on-yapi);
@@ -299,15 +311,15 @@ a.yp-aside-row__meta {
     0 12px 22px -10px color-mix(in oklab, var(--yapi) 85%, transparent),
     inset 0 1px 0 color-mix(in oklab, #fff 40%, transparent),
     inset 0 -2px 0 color-mix(in oklab, #000 10%, transparent);
-  transform: translateY(-13px) rotate(-8deg);
+  transform: translateY(-14px) rotate(-8deg);
   transition:
     transform 360ms var(--yp-nav-spring),
     scale 360ms var(--yp-nav-spring),
     box-shadow var(--duration-base);
 }
 .yp-nav__item--create svg {
-  width: 28px;
-  height: 28px;
+  width: 31px;
+  height: 31px;
   /* Its light circles the spark on a tap and passes the edge of the drawing. */
   overflow: visible;
 }
@@ -344,11 +356,11 @@ a.yp-aside-row__meta {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 52px;
-  height: 52px;
-  margin: -26px 0 0 -26px;
+  width: 56px;
+  height: 56px;
+  margin: -28px 0 0 -28px;
   border-radius: 18px;
-  transform: translateY(-13px);
+  transform: translateY(-14px);
   pointer-events: none;
 }
 .yp-nav__burst::before,
@@ -512,21 +524,21 @@ a.yp-aside-row__meta {
     color: var(--on-yapi);
   }
   .yp-nav__item--create:hover .yp-nav__icon {
-    transform: translateY(-15px) rotate(0deg);
+    transform: translateY(-16px) rotate(0deg);
   }
   .yp-nav__item--create:hover .yp-nav__burst {
-    transform: translateY(-15px);
+    transform: translateY(-16px);
   }
 }
 .yp-nav__item--create[aria-current='page'] {
   color: var(--on-yapi);
 }
 .yp-nav__item--create[aria-current='page'] .yp-nav__icon {
-  transform: translateY(-13px) rotate(0deg);
+  transform: translateY(-14px) rotate(0deg);
 }
 /* Pressed, it straightens and squishes down at once (the pop back is the tap effect above). */
 .yp-nav__item--create:active .yp-nav__icon {
-  transform: translateY(-11px) rotate(0deg);
+  transform: translateY(-12px) rotate(0deg);
   scale: 0.9;
   transition-duration: 120ms;
 }
@@ -587,7 +599,7 @@ a.yp-aside-row__meta {
 /* Unread count: a small squircle with the number, up at the icon's shoulder. */
 .yp-nav__badge {
   position: absolute;
-  top: 6px;
+  top: 9px;
   inset-inline-start: calc(50% + 4px);
   min-width: 18px;
   height: 18px;
@@ -601,7 +613,7 @@ a.yp-aside-row__meta {
   transition: transform 360ms var(--yp-nav-spring);
 }
 .yp-nav__item[aria-current='page'] .yp-nav__badge {
-  transform: translateY(-9px);
+  transform: translateY(-10px);
 }
 
 /* You: the person's avatar in a soft squircle; a thin brand-gradient ring when current. */
@@ -609,12 +621,12 @@ a.yp-aside-row__meta {
   position: relative;
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 9px;
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
   background: var(--surface-sunken);
   color: var(--ink);
-  font: 700 10px/1 var(--font-sans);
+  font: 700 11px/1 var(--font-sans);
   box-shadow: 0 0 0 1.5px color-mix(in oklab, var(--ink-muted) 60%, transparent);
 }
 .yp-nav__you img {
@@ -634,7 +646,7 @@ a.yp-aside-row__meta {
   position: absolute;
   inset: -3.5px;
   padding: 1.75px;
-  border-radius: 11px;
+  border-radius: 12px;
   background: var(--grad-fx);
   -webkit-mask:
     linear-gradient(#000 0 0) content-box,
@@ -763,6 +775,13 @@ a.yp-aside-row__meta {
   }
   .yp-nav__item[aria-current='page'] svg {
     color: var(--yapi);
+  }
+  .yp-nav__item:not(.yp-nav__item--create):not(.yp-nav__item--yap) svg {
+    width: 26px;
+    height: 26px;
+  }
+  .yp-nav__item[aria-current='page']:not(.yp-nav__item--create) .yp-nav__icon {
+    filter: none;
   }
   .yp-nav__item[aria-current='page']:not(.yp-nav__item--create) .yp-nav__icon,
   .yp-nav__item[aria-current='page'] .yp-nav__badge {
@@ -2470,7 +2489,8 @@ a.yp-ecard:hover {
     animation: none !important;
   }
   /* A tap on Spark only dims it for a moment: no squish, pop, turn, orbit or burst. */
-  .yp-nav__item--create:active .yp-nav__icon {
+  .yp-nav__item--create:active .yp-nav__icon,
+  .yp-nav__item:not(.yp-nav__item--create):active .yp-nav__icon {
     scale: none;
   }
   .yp-nav__item[data-spark] .yp-nav__icon {
