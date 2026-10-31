@@ -1,6 +1,6 @@
 import { ROOM_MAX_LISTENERS, ROOM_MAX_SPEAKERS, type RoomMediaSession } from '@yapilapi/shared';
 import type { Config } from '../config.ts';
-import { iceServers, turnConfigured } from './ice.ts';
+import { iceServers, turnConfigured, type IceConfig } from './ice.ts';
 import type { RealtimeHub } from './realtime.ts';
 
 export type RoomRole = 'speaker' | 'listener';
@@ -28,7 +28,7 @@ export interface RoomMedia {
   readonly mode: RoomMediaSession['mode'];
   readonly limits: { speakers: number; listeners: number };
   /** What one person's client needs to connect its audio. */
-  session(user: { id: string; minor: boolean }): RoomMediaSession;
+  session(user: { id: string; minor: boolean }): Promise<RoomMediaSession>;
   /** Whether two people in the same room exchange audio directly (and so may signal each other). */
   connects(a: RoomRole, b: RoomRole): boolean;
   /** Deliver one signaling message. Callers have already checked that both people are in the room and `connects` allows it. */
@@ -39,13 +39,13 @@ export interface RoomMedia {
 }
 
 /** Audio peer to peer over WebRTC; the API relays offers, answers and ICE candidates over the realtime socket. */
-export function meshRoomMedia(config: Pick<Config, 'TURN_URLS' | 'TURN_SECRET'>, realtime: RealtimeHub): RoomMedia {
+export function meshRoomMedia(config: IceConfig, realtime: RealtimeHub): RoomMedia {
   return {
     mode: 'mesh',
     limits: { speakers: ROOM_MAX_SPEAKERS, listeners: ROOM_MAX_LISTENERS },
-    session: (user) => ({
+    session: async (user) => ({
       mode: 'mesh',
-      iceServers: iceServers(config, user.id),
+      iceServers: await iceServers(config, user.id),
       // People under 18 send and receive through TURN when it's set up, so strangers in the room never see their network address.
       iceTransportPolicy: user.minor && turnConfigured(config) ? 'relay' : 'all',
     }),

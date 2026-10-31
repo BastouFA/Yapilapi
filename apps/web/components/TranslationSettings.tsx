@@ -7,14 +7,14 @@ import { useSession } from '@/app/providers';
 
 /**
  * Settings: "Languages I understand" (the app's language always counts, so it's
- * ticked and fixed) and "Translate automatically" (on by default). Saved on the
+ * ticked and fixed) and "Translate automatically" (off until they turn it on). Saved on the
  * account, so every device translates (or offers "See translation") the same way.
  */
 export function TranslationCard() {
   const { me, setMe, toast, t, locale, flags } = useSession();
   if (!me) return null;
   const app = baseLanguage(locale);
-  const settings: TranslationSettings = me.translation ?? { languages: [], auto: true };
+  const settings: TranslationSettings = me.translation ?? { languages: [], auto: false };
   const listed = settings.languages.filter((l) => l !== app);
   const full = listed.length >= MAX_UNDERSTOOD_LANGUAGES;
 
@@ -61,11 +61,34 @@ export function TranslationCard() {
             </p>
           ) : null}
         </fieldset>
-        <div className="stack-sm">
-          <Switch label={t('translate.auto')} checked={settings.auto} onChange={(v) => void save({ ...settings, auto: v })} />
-          <p className="muted setting-hint">{t('translate.autoHint')}</p>
-        </div>
+        <AutoTranslateSwitch />
       </div>
     </Card>
+  );
+}
+
+/**
+ * "Translate automatically", in Settings and in a chat's menu: off until the person turns it on.
+ * Off, every message, post and comment in another language offers "See translation" instead.
+ */
+export function AutoTranslateSwitch() {
+  const { me, setMe, toast, t } = useSession();
+  if (!me) return null;
+  const settings: TranslationSettings = me.translation ?? { languages: [], auto: false };
+  const save = async (auto: boolean) => {
+    const before = me;
+    setMe({ ...me, translation: { ...settings, auto } });
+    try {
+      await api.me.setTranslation({ ...settings, auto });
+    } catch (e) {
+      setMe(before);
+      toast(errorMessage(e));
+    }
+  };
+  return (
+    <div className="stack-sm">
+      <Switch label={t('translate.auto')} checked={settings.auto} onChange={(v) => void save(v)} />
+      <p className="muted setting-hint">{t('translate.autoHint')}</p>
+    </div>
   );
 }

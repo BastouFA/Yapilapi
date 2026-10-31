@@ -362,6 +362,8 @@ describe('Where a place never goes', () => {
   it('AI helpers never see a shared place', async () => {
     const [a, b] = [await adult(), await adult()];
     const convo = await direct(a, b);
+    // Suggested replies are off until A turns them on in this chat.
+    await as(t.app, a).put(`/v1/conversations/${convo}/smart-replies`, { enabled: true });
     await as(t.app, a).post(`/v1/conversations/${convo}/messages`, { body: 'Where are you?' });
     await startLive(b, convo);
     await share(b, convo, { mode: 'once' });

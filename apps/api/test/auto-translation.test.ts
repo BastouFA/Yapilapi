@@ -66,12 +66,15 @@ describe('automatic translation', () => {
     eve = await signUp(t.app);
     await as(t.app, bola).post(`/v1/users/${ada.id}/follow`);
     await as(t.app, carl).post(`/v1/users/${ada.id}/follow`);
+    // Automatic translation is something people turn on.
+    for (const u of [ada, bola, carl]) await as(t.app, u).put('/v1/me/translation', { languages: [], auto: true });
   });
   afterAll(() => t.close());
 
-  it('is on by default, and says so in /v1/flags only when a real model translates', async () => {
-    expect((await as(t.app, eve).get('/v1/auth/me')).body.user.translation).toEqual({ languages: [], auto: true });
-    expect((await as(t.app, eve).get('/v1/me/translation')).body).toEqual({ languages: [], auto: true });
+  it('is off until the person turns it on, and says so in /v1/flags only when a real model translates', async () => {
+    expect((await as(t.app, eve).get('/v1/auth/me')).body.user.translation).toEqual({ languages: [], auto: false });
+    expect((await as(t.app, eve).get('/v1/me/translation')).body).toEqual({ languages: [], auto: false });
+    expect((await batch(eve, [{ kind: 'post', id: (await newPost(french())).id }])).body).toEqual({ items: [], pending: [], auto: false });
     expect((await as(t.app, null).get('/v1/flags')).body).toMatchObject({ autoTranslation: true, flags: { AUTO_TRANSLATE: true } });
     const standIn = await testApp();
     try {
@@ -122,6 +125,8 @@ describe('automatic translation', () => {
       { kind: 'message', id: msg.id },
     ];
 
+    // Eve turns it on too: what she gets is still only what she can see.
+    await as(t.app, eve).put('/v1/me/translation', { languages: [], auto: true });
     const forEve = await batch(eve, all);
     expect(forEve.status).toBe(200);
     expect(forEve.body.items.map((i: { id: string }) => i.id)).toEqual([open.id]);
@@ -209,6 +214,7 @@ describe('automatic translation', () => {
       const writer = await signUp(limited.app);
       const reader = await signUp(limited.app);
       const other = await signUp(limited.app);
+      for (const u of [reader, other]) await as(limited.app, u).put('/v1/me/translation', { languages: [], auto: true });
       const posts = [];
       for (let i = 0; i < 3; i++) posts.push(await newPost(french(), {}, writer, limited));
       const items = posts.map((p) => ({ kind: 'post', id: p.id }));
@@ -235,6 +241,7 @@ describe('automatic translation', () => {
     try {
       const writer = await signUp(tight.app);
       const reader = await signUp(tight.app);
+      await as(tight.app, reader).put('/v1/me/translation', { languages: [], auto: true });
       const a = await newPost(french(), {}, writer, tight);
       const b = await newPost(french(), {}, writer, tight);
       const r = await batch(
@@ -260,6 +267,8 @@ describe('automatic translation', () => {
     try {
       const writer = await signUp(standIn.app);
       const reader = await signUp(standIn.app);
+      // Even for a reader who turned it on.
+      await as(standIn.app, reader).put('/v1/me/translation', { languages: [], auto: true });
       const post = await newPost(french(), {}, writer, standIn);
       expect((await batch(reader, [{ kind: 'post', id: post.id }], 'en', standIn)).body).toEqual({ items: [], pending: [], auto: false });
       // Development: the manual, marked pseudo-translation still works, and is cached...

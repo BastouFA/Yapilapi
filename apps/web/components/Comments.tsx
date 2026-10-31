@@ -16,6 +16,7 @@ import {
   type MessageKey,
   type Post,
   type PublicUser,
+  replaceFinalEmoticon,
 } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { NextLink } from '@/lib/link';
@@ -231,7 +232,8 @@ export function Comments({
   };
 
   const submit = async () => {
-    const text = body.trim();
+    // "nice :)" sent with Enter: the last emoticon becomes the emoji too.
+    const text = replaceFinalEmoticon(body.trim());
     if (!text) return;
     setBusy(true);
     try {

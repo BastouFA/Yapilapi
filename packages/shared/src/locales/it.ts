@@ -3770,14 +3770,14 @@ export const it: Catalog = {
   'smartReplies.hint': 'La inserisce nella casella del messaggio. Non viene inviato niente finché non lo invii tu.',
   'smartReplies.chatHint':
     'Risposte brevi sotto l’ultimo messaggio ricevuto, scritte dall’IA a partire da questa chat. Non viene inviato niente finché non lo invii tu.',
-  'smartReplies.defaultDirect': 'Attive per impostazione predefinita nelle chat individuali.',
-  'smartReplies.defaultGroup': 'Disattivate per impostazione predefinita nei gruppi.',
+  'smartReplies.defaultDirect': 'Disattivato finché non lo attivi qui.',
+  'smartReplies.defaultGroup': 'Disattivato finché non lo attivi qui.',
   'smartReplies.offEverywhere': 'Disattivate per tutte le chat in Impostazioni.',
   'st.ai.title': 'Aiuti dell’IA',
   'st.ai.desc': 'Cosa può suggerirti l’IA. Usa solo ciò che puoi vedere, e non pubblica né invia mai niente al posto tuo.',
   'st.ai.smartReplies': 'Risposte suggerite nelle chat',
   'st.ai.smartRepliesHint':
-    'Fino a tre risposte brevi sotto l’ultimo messaggio ricevuto. Disattivate per impostazione predefinita nei gruppi e per chi ha meno di 18 anni.',
+    'Fino a tre risposte brevi sotto l’ultimo messaggio ricevuto. Disattivate in ogni chat finché non le attivi dal menu di quella chat.',
   'st.ai.catchUp': 'Aggiornami su Battito',
   'st.ai.catchUpHint': 'Dopo 12 ore o più di assenza, un breve riepilogo di ciò che hanno condiviso le tue persone.',
   'altText.suggest': 'Suggerisci una descrizione',
@@ -6860,6 +6860,7 @@ export const it: Catalog = {
   'chat.call.minutes.other': '{count} minuti',
   'calls.otherBusy': 'È impegnato in un’altra chiamata. Riprova tra un attimo.',
   'calls.answeredElsewhere': 'Risposto su un altro dispositivo',
+  'calls.reconnecting': 'Riconnessione…',
   'moderation.decision.warn': 'Avvertimento',
   'email.suspension.suspended.subject': 'Il tuo account YAPILAPI è sospeso',
   'email.suspension.suspended.body':

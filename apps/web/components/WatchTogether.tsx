@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { Avatar, BottomSheet, Icon, Skeleton } from '@yapilapi/design-system';
 import {
@@ -16,6 +16,7 @@ import {
 } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { useRealtime, useSession, type Session } from '@/app/providers';
+import { useCalls } from '@/components/Calls';
 
 /**
  * Watch together: people in a one-to-one chat or a small group watch reels and video posts at
@@ -258,4 +259,23 @@ export function WatchBanner({ session }: { session: WatchSummary | null }) {
       </Link>
     </div>
   );
+}
+
+/**
+ * Someone in one of your chats starts watching together: the watch screen opens by itself and
+ * plays in step (muted until a tap where the browser wants one). Not while you're making
+ * something, live or in a call, and not over a watch screen you already have open.
+ */
+export function WatchAutoOpen() {
+  const { me } = useSession();
+  const { current: call } = useCalls();
+  const router = useRouter();
+  const path = usePathname();
+  useRealtime((e) => {
+    if (e.type !== 'watch.started' || !me || e.data?.startedBy === me.id) return;
+    const busy = ['/watch', '/create', '/camera', '/live', '/recaps/new'].some((p) => path.startsWith(p));
+    if (busy || call || typeof e.data?.sessionId !== 'string') return;
+    router.push(`/watch/${e.data.sessionId}`);
+  });
+  return null;
 }

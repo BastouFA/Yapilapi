@@ -137,7 +137,7 @@ export default async function callsModule(app: FastifyInstance, ctx: AppContext)
     if (!(await messagesAllowed(db, callerId, otherId))) throw new AppError(403, 'messages_limited', 'This person only gets calls from people they know.');
   }
 
-  app.get('/v1/calls/ice-servers', { preHandler: requireAuth }, async (req) => ({ iceServers: iceServers(me(req).id) }));
+  app.get('/v1/calls/ice-servers', { preHandler: requireAuth }, async (req) => ({ iceServers: await iceServers(me(req).id) }));
 
   app.post('/v1/conversations/:id/calls', { preHandler: requireAuth, config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (req, reply) => {
     const u = me(req);
@@ -191,12 +191,12 @@ export default async function callsModule(app: FastifyInstance, ctx: AppContext)
       });
     track(db, u.id, 'call_started', { kind, size: members.length });
     reply.code(201);
-    return { call, iceServers: iceServers(me(req).id) };
+    return { call, iceServers: await iceServers(me(req).id) };
   });
 
   app.get('/v1/calls/:id', { preHandler: requireAuth }, async (req) => {
     const { id } = parse(z.object({ id: z.string().uuid() }), req.params);
-    return { call: dto(await loadCall(id, me(req).id)), iceServers: iceServers(me(req).id) };
+    return { call: dto(await loadCall(id, me(req).id)), iceServers: await iceServers(me(req).id) };
   });
 
   app.post('/v1/calls/:id/answer', { preHandler: requireAuth }, async (req) => {
@@ -208,7 +208,7 @@ export default async function callsModule(app: FastifyInstance, ctx: AppContext)
     await db.query(`UPDATE call_participants SET joined_at = now(), left_at = NULL WHERE call_id = $1 AND user_id = $2`, [id, u.id]);
     const call = dto(await loadCall(id, u.id));
     await ctx.realtime.publish(call.participants, { type: 'call.answered', data: { callId: id, userId: u.id } });
-    return { call, iceServers: iceServers(me(req).id) };
+    return { call, iceServers: await iceServers(me(req).id) };
   });
 
   /** Say no to a call (`busy`: the app did, because you're on another one). When nobody else is left, it's over. */

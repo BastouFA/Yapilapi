@@ -1,8 +1,8 @@
 import { useEventListener } from 'expo';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, usePathname } from 'expo-router';
 import { useVideoPlayer } from 'expo-video';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Easing, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, Animated, Easing, Pressable, Text, View } from 'react-native';
 import { ApiError } from '../../../packages/api-client/src/index';
 import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import { hls360 } from '../../../packages/shared/src/data-saver';
@@ -30,6 +30,7 @@ import { REACTION_ICON } from './rooms';
 import { useRealtime, useSession } from './session';
 import { radius, space } from './theme';
 import { Avatar, BottomSheet, Button, Icon, Notice, useColors, userText } from './ui';
+import { micInUse } from './yaps';
 
 /**
  * Watch together on the phone: the chat picker that starts a session from a reel or a video
@@ -119,6 +120,32 @@ export async function startWatch(conversationId: string, postIds: string[] = [])
     r.session.id,
     r.skipped.map((s) => s.reason),
   );
+}
+
+// Screens nobody is taken away from when Watch together starts: another watch screen, the camera,
+// Real, Live, the Create tab and the forms that make something (which would lose what's typed).
+const BUSY_SCREEN = /^\/(watch|camera|real|live|create|onboarding)(\/|$)|(^|\/)new(\/|$)|-(new|edit)$|^\/new-group$/;
+// Sessions opened by themselves already: closing one doesn't bring it back.
+const autoOpened = new Set<string>();
+
+/**
+ * Someone in one of your chats started watching together: the watch screen opens for you by
+ * itself and plays along. Not while the app is in the background, over a call (or one ringing),
+ * a room or a recording, nor from the screens above. Starting it yourself opens it already (startWatch).
+ */
+export function useWatchAutoOpen() {
+  const { me } = useSession();
+  const path = usePathname();
+  const pathRef = useRef(path);
+  pathRef.current = path;
+  useRealtime((e) => {
+    if (e.type !== 'watch.started' || !me) return;
+    const sessionId = e.data?.sessionId;
+    if (typeof sessionId !== 'string' || e.data?.startedBy === me.id || autoOpened.has(sessionId)) return;
+    if (AppState.currentState !== 'active' || micInUse() || BUSY_SCREEN.test(pathRef.current)) return;
+    autoOpened.add(sessionId);
+    openWatch(sessionId);
+  });
 }
 
 /** Watch together works in one-to-one chats and groups of up to 8 people. */
@@ -356,6 +383,8 @@ export function useWatchSync(id: string, { saver }: { saver: boolean }) {
   const [time, setTime] = useState({ positionMs: 0, durationMs: 0 });
   /** Another of your devices is the one playing (one device per person). */
   const [elsewhere, setElsewhereState] = useState(false);
+  // You pressed Leave on another device: the screen closes (see app/watch/[id].tsx).
+  const [leftElsewhere, setLeftElsewhere] = useState(false);
   const elsewhereRef = useRef(false);
   const setElsewhere = (on: boolean) => {
     elsewhereRef.current = on;
@@ -742,6 +771,14 @@ export function useWatchSync(id: string, { saver }: { saver: boolean }) {
         setElsewhere(true);
         ours(() => player.pause());
       }
+    } else if (e.type === 'watch.left') {
+      // You pressed Leave on another device: this screen closes too.
+      if (d.deviceId !== DEVICE) {
+        joinedRef.current = false;
+        setJoined(false);
+        ours(() => player.pause());
+        setLeftElsewhere(true);
+      }
     } else if (e.type === 'watch.updated') void fns.current.refetch();
     else if (e.type === 'watch.ended') markEnded();
     else if (e.type === 'watch.reaction' && d.kind && REACTION_ICON[d.kind as WatchReaction]) {
@@ -872,7 +909,8 @@ export function useWatchSync(id: string, { saver }: { saver: boolean }) {
     joinedRef.current = false;
     setJoined(false);
     ours(() => player.pause());
-    if (was) await (await client()).watch.leave(id, DEVICE).catch(() => {});
+    // Leave on every device of yours: their screens close too.
+    if (was) await (await client()).watch.leave(id, DEVICE, true).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, player]);
 
@@ -923,6 +961,7 @@ export function useWatchSync(id: string, { saver }: { saver: boolean }) {
     add,
     remove,
     leave,
+    leftElsewhere,
     end,
   };
 }

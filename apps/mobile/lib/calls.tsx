@@ -1,7 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import { LinearGradient } from 'expo-linear-gradient';
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Alert, Linking, Modal, Pressable, StyleSheet, Text, Vibration, View } from 'react-native';
+import { Alert, Animated, Easing, Linking, Modal, Platform, Pressable, StyleSheet, Text, Vibration, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { MediaStream, RTCPeerConnection } from 'react-native-webrtc';
 import type { CallInfo } from '../../../packages/api-client/src/index';
@@ -11,6 +11,7 @@ import { tr } from './locale';
 import { configureCallNotifications } from './push';
 import { useRealtime, useSession } from './session';
 import { useMicInUse } from './yaps';
+import { useReducedMotion } from './motion';
 import { gradient, radius, space } from './theme';
 import { Avatar, Icon, useColors, userText, type IconName } from './ui';
 import { audio, callsSupported, rtc } from './webrtc';
@@ -18,6 +19,7 @@ import { audio, callsSupported, rtc } from './webrtc';
 type Phase = 'idle' | 'incoming' | 'outgoing' | 'active';
 type Kind = 'audio' | 'video';
 type SignalData = Record<string, unknown>;
+type Person = { id: string; name: string; avatarUrl: string | null };
 
 interface CallsCtx {
   /** Start a call in a conversation. Resolves once ringing (or after explaining why it can't). */
@@ -28,6 +30,9 @@ const Ctx = createContext<CallsCtx>({ start: async () => {}, supported: false })
 export const useCalls = () => useContext(Ctx);
 
 const RING_MS = 45_000;
+// Two buzzes every 2.2 seconds while a call rings, like the web app. Android reads the pattern as
+// wait, buzz, wait, buzz…; iPhones buzz for a fixed 400 ms and read it as the pauses between buzzes.
+const RING_BUZZ = Platform.OS === 'android' ? [0, 400, 150, 400, 1250] : [0, 550, 1650];
 
 class PermissionError extends Error {}
 class UnsupportedError extends Error {}
@@ -67,11 +72,15 @@ export function CallsProvider({ children }: { children: ReactNode }) {
   const [frontCamera, setFrontCamera] = useState(true);
   const [speaker, setSpeaker] = useState(false);
   const [connectedAt, setConnectedAt] = useState<number | null>(null);
-  const [names, setNames] = useState<Record<string, { name: string; avatarUrl: string | null }>>({});
+  // Connection state per person: 'connected', or anything else while it's (re)connecting.
+  const [links, setLinks] = useState<Record<string, string>>({});
+  const [names, setNames] = useState<Record<string, Person>>({});
   const [notice, setNotice] = useState<string | null>(null);
 
   const localRef = useRef<MediaStream | null>(null);
   const peers = useRef(new Map<string, RTCPeerConnection>());
+  // The people this phone sent the offer to: it's the one to restart the connection if it fails.
+  const offered = useRef(new Set<string>());
   const pendingCandidates = useRef(new Map<string, SignalData[]>());
   const ice = useRef<RTCIceServer[]>([]);
   const callRef = useRef<CallInfo | null>(null);
@@ -90,6 +99,7 @@ export function CallsProvider({ children }: { children: ReactNode }) {
   const cleanup = useCallback(() => {
     peers.current.forEach((p) => p.close());
     peers.current.clear();
+    offered.current.clear();
     pendingCandidates.current.clear();
     localRef.current?.getTracks().forEach((t) => t.stop());
     localRef.current?.release();
@@ -106,6 +116,8 @@ export function CallsProvider({ children }: { children: ReactNode }) {
     setFrontCamera(true);
     setSpeaker(false);
     setConnectedAt(null);
+    setLinks({});
+    setNames({});
     setKeepAlive(false);
   }, [setKeepAlive]);
 
@@ -143,10 +155,18 @@ export function CallsProvider({ children }: { children: ReactNode }) {
   const loadNames = useCallback(async (c: CallInfo) => {
     try {
       const { conversation } = await (await client()).conversations.get(c.conversationId);
-      setNames(Object.fromEntries(conversation.members.map((m) => [m.id, { name: m.displayName, avatarUrl: m.avatarUrl }])));
+      setNames(Object.fromEntries(conversation.members.map((m) => [m.id, { id: m.id, name: m.displayName, avatarUrl: m.avatarUrl }])));
     } catch {
       /* names are a nicety */
     }
+  }, []);
+
+  /** Send a fresh offer to someone (`restart` repairs a connection that failed, over new routes). */
+  const offerTo = useCallback(async (callId: string, pc: RTCPeerConnection, userId: string, restart = false) => {
+    offered.current.add(userId);
+    const offer = await pc.createOffer(restart ? { iceRestart: true } : {});
+    await pc.setLocalDescription(offer);
+    await (await client()).calls.signal(callId, userId, 'offer', { type: offer.type, sdp: offer.sdp });
   }, []);
 
   const peerFor = useCallback(
@@ -154,7 +174,10 @@ export function CallsProvider({ children }: { children: ReactNode }) {
       let pc = peers.current.get(userId);
       if (pc) return pc;
       const RTC = rtc!;
-      const created = new RTC.RTCPeerConnection({ iceServers: ice.current as never });
+      // The API's servers as they come (STUN, TURN with several urls each). The package rewrites the
+      // objects it's given, so each connection gets its own copies.
+      const iceServers = ice.current.map((s) => ({ ...s, urls: Array.isArray(s.urls) ? [...s.urls] : s.urls }));
+      const created = new RTC.RTCPeerConnection({ iceServers: iceServers as never });
       pc = created;
       localRef.current?.getTracks().forEach((t) => created.addTrack(t, localRef.current!));
       // The package's event typings are incomplete, so the handlers describe the fields they use.
@@ -169,14 +192,29 @@ export function CallsProvider({ children }: { children: ReactNode }) {
         const stream = (e as { streams: MediaStream[] }).streams[0];
         if (stream) setRemotes((r) => ({ ...r, [userId]: stream }));
       };
+      let restarts = 0;
       created.onconnectionstatechange = () => {
-        if (created.connectionState === 'connected') setConnectedAt((t) => t ?? Date.now());
-        if (created.connectionState === 'failed') flash(tr('m.calls.dropped'));
+        const state = created.connectionState;
+        // A connection replaced or closed after the person left says nothing about the call.
+        if (peers.current.get(userId) !== created) return;
+        setLinks((l) => ({ ...l, [userId]: state }));
+        if (state === 'connected') {
+          restarts = 0;
+          setConnectedAt((t) => t ?? Date.now());
+        }
+        // A network change (Wi-Fi to mobile data) or a blocked route: the side that sent the offer
+        // tries new routes twice before giving up; the other side waits for those offers.
+        if (state === 'failed') {
+          if (restarts < 2) {
+            restarts++;
+            if (offered.current.has(userId)) void offerTo(callId, created, userId, true).catch(() => {});
+          } else flash(tr('m.calls.dropped'));
+        }
       };
       peers.current.set(userId, created);
       return created;
     },
-    [flash],
+    [flash, offerTo],
   );
 
   async function flushCandidates(userId: string, pc: RTCPeerConnection) {
@@ -211,8 +249,7 @@ export function CallsProvider({ children }: { children: ReactNode }) {
   async function answer(incoming?: CallInfo) {
     const cur = incoming ?? callRef.current;
     if (!cur) return;
-    audio.stopRing();
-    Vibration.cancel();
+    stopRinging();
     answering.current = true;
     try {
       // Media and ICE servers first, so the caller's offer finds everything ready.
@@ -245,16 +282,21 @@ export function CallsProvider({ children }: { children: ReactNode }) {
     cleanup();
   }
 
+  // The ringtone (when the native audio module is there) and a buzz until the call is answered or over.
   const ringIncoming = useCallback(
     (c: CallInfo) => {
       setCall(c);
       setPhase('incoming');
       void loadNames(c);
-      if (audio.available) audio.ring();
-      else Vibration.vibrate([0, 800, 600], true);
+      audio.ring();
+      Vibration.vibrate(RING_BUZZ, true);
     },
     [loadNames],
   );
+  function stopRinging() {
+    audio.stopRing();
+    Vibration.cancel();
+  }
 
   useRealtime(async (e) => {
     if (!me) return;
@@ -281,10 +323,7 @@ export function CallsProvider({ children }: { children: ReactNode }) {
       if (e.type === 'call.answered' && e.data.userId !== me.id) {
         if (cur.callerId !== me.id && phaseRef.current !== 'active') return;
         setPhase('active');
-        const pc = peerFor(cur.id, e.data.userId);
-        const offer = await pc.createOffer({});
-        await pc.setLocalDescription(offer);
-        await (await client()).calls.signal(cur.id, e.data.userId, 'offer', { type: offer.type, sdp: offer.sdp });
+        await offerTo(cur.id, peerFor(cur.id, e.data.userId), e.data.userId);
       }
       if (e.type === 'call.answered' && e.data.userId === me.id && phaseRef.current === 'incoming' && !answering.current) {
         // Answered on another device.
@@ -329,13 +368,17 @@ export function CallsProvider({ children }: { children: ReactNode }) {
           if (phaseRef.current === 'incoming') cleanup();
           return;
         }
-        peers.current.get(uid)?.close();
+        const pc = peers.current.get(uid);
         peers.current.delete(uid);
-        setRemotes((r) => {
+        pc?.close();
+        offered.current.delete(uid);
+        const without = <T,>(r: Record<string, T>) => {
           const n = { ...r };
           delete n[uid];
           return n;
-        });
+        };
+        setRemotes(without);
+        setLinks(without);
         if (cur.participants.length === 2) {
           flash(e.type === 'call.declined' ? (e.data.busy ? tr('calls.otherBusy') : tr('m.calls.declined')) : tr('m.calls.ended'));
           cleanup();
@@ -388,8 +431,24 @@ export function CallsProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me, flash, ringIncoming]);
 
-  const others = call ? call.participants.filter((p) => p !== me?.id) : [];
-  const title = others.map((id) => names[id]?.name ?? t('m.calls.someone')).join(', ') || t('m.calls.call');
+  // Who's in the call, from the chat: the caller while it rings here, everyone else once it's going.
+  const someone = (id: string): Person => names[id] ?? { id, name: t('m.calls.someone'), avatarUrl: null };
+  const others = call ? [...new Set([call.callerId, ...call.participants])].filter((id) => id !== me?.id) : [];
+  const shown = (phase === 'incoming' && call && call.callerId !== me?.id ? [call.callerId] : others).map(someone);
+  const connected = Object.values(links).some((l) => l === 'connected');
+
+  /** Front or back camera: the same track switches over, so nothing needs renegotiating. */
+  async function flipCamera() {
+    const track = localRef.current?.getVideoTracks()[0];
+    if (!track) return;
+    const next = frontCamera ? 'environment' : 'user';
+    try {
+      await track.applyConstraints({ facingMode: next });
+    } catch {
+      return; // one camera only
+    }
+    setFrontCamera((track.getSettings().facingMode ?? next) === 'user');
+  }
 
   return (
     <Ctx.Provider value={{ start, supported: callsSupported }}>
@@ -404,8 +463,7 @@ export function CallsProvider({ children }: { children: ReactNode }) {
           <CallView
             call={call}
             phase={phase}
-            title={title}
-            avatarUrl={others.length === 1 ? (names[others[0]!]?.avatarUrl ?? null) : null}
+            people={shown}
             local={local}
             remotes={remotes}
             muted={muted}
@@ -413,6 +471,7 @@ export function CallsProvider({ children }: { children: ReactNode }) {
             frontCamera={frontCamera}
             speaker={speaker}
             connectedAt={connectedAt}
+            repairing={!!connectedAt && !connected}
             notice={notice}
             onAnswer={() => void answer()}
             onDecline={decline}
@@ -425,10 +484,7 @@ export function CallsProvider({ children }: { children: ReactNode }) {
               localRef.current?.getVideoTracks().forEach((t) => (t.enabled = cameraOff));
               setCameraOff(!cameraOff);
             }}
-            onFlip={() => {
-              localRef.current?.getVideoTracks().forEach((t) => t._switchCamera());
-              setFrontCamera(!frontCamera);
-            }}
+            onFlip={() => void flipCamera()}
             onSpeaker={() => {
               audio.speaker(!speaker);
               setSpeaker(!speaker);
@@ -453,6 +509,15 @@ function Toast({ text }: { text: string }) {
   );
 }
 
+/** 0:42, 12:05, 1:02:09. */
+function clock(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const ss = String(s % 60).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
+}
+
 function useElapsed(since: number | null) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -460,16 +525,13 @@ function useElapsed(since: number | null) {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, [since]);
-  if (!since) return null;
-  const s = Math.max(0, Math.floor((now - since) / 1000));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  return since ? clock(now - since) : null;
 }
 
 function CallView(p: {
   call: CallInfo;
   phase: Phase;
-  title: string;
-  avatarUrl: string | null;
+  people: Person[];
   local: MediaStream | null;
   remotes: Record<string, MediaStream>;
   muted: boolean;
@@ -477,6 +539,7 @@ function CallView(p: {
   frontCamera: boolean;
   speaker: boolean;
   connectedAt: number | null;
+  repairing: boolean;
   notice: string | null;
   onAnswer: () => void;
   onDecline: () => void;
@@ -493,35 +556,65 @@ function CallView(p: {
   const video = p.call.kind === 'video';
   const remote = Object.values(p.remotes).find((s) => s.getVideoTracks().length);
   const RTCView = rtc?.RTCView;
+  // A video call fills the screen with the other person's picture once it arrives; until then (and
+  // for voice calls) it's their faces, big, in the middle.
+  const showVideo = video && !!remote && !!RTCView && p.phase === 'active';
+  const ringing = p.phase === 'incoming' || p.phase === 'outgoing';
+  const title = p.people.map((x) => x.name).join(', ') || t('m.calls.someone');
   const status =
     p.phase === 'incoming'
-      ? t(p.call.kind === 'video' ? 'm.calls.incoming.video' : 'm.calls.incoming.audio')
+      ? t(video ? 'm.calls.incoming.video' : 'm.calls.incoming.audio')
       : p.phase === 'outgoing'
         ? t('m.calls.calling')
-        : (elapsed ?? t('m.calls.connecting'));
+        : p.repairing
+          ? t('calls.reconnecting')
+          : (elapsed ?? t('m.calls.connecting'));
+  const faces = p.people.length ? p.people.slice(0, 3) : [{ id: '', name: title, avatarUrl: null }];
+  const faceSize = faces.length > 1 ? 88 : 112;
 
   return (
     <View style={{ flex: 1, backgroundColor: '#0B0C14' }}>
-      {video && remote && RTCView && p.phase === 'active' ? (
-        <RTCView streamURL={remote.toURL()} objectFit="cover" style={StyleSheet.absoluteFill} />
+      {showVideo && remote && RTCView ? (
+        <RTCView streamURL={remote.toURL()} objectFit="cover" zOrder={0} style={StyleSheet.absoluteFill} accessibilityLabel={title} />
       ) : (
         <LinearGradient colors={['#3A1624', '#151726', '#0B0C14']} style={StyleSheet.absoluteFill} />
       )}
 
-      <View style={{ paddingTop: insets.top + space[6], alignItems: 'center', gap: space[3], paddingHorizontal: space[6] }}>
-        {!(video && remote && p.phase === 'active') ? <Avatar name={p.title} url={p.avatarUrl} size={104} /> : null}
-        <Text style={[s.name, userText]} numberOfLines={2}>
-          {p.title}
-        </Text>
-        <Text style={s.status} accessibilityLiveRegion="polite">
-          {status}
-        </Text>
-        {p.notice ? <Text style={[s.status, { color: '#FFBE3D' }]}>{p.notice}</Text> : null}
-        {!callsSupported ? <Text style={[s.status, { textAlign: 'center' }]}>{t('m.calls.unsupported.note')}</Text> : null}
-      </View>
+      {showVideo ? (
+        // Name and time in a pill at the top, over the picture.
+        <View style={{ paddingTop: insets.top + space[3], alignItems: 'center', paddingHorizontal: space[4] }}>
+          <View style={s.pill}>
+            <Text style={[s.pillName, userText]} numberOfLines={1}>
+              {title}
+            </Text>
+            <Text style={s.pillStatus} accessibilityLiveRegion="polite">
+              {status}
+            </Text>
+          </View>
+          {p.notice ? <Text style={[s.status, s.notice]}>{p.notice}</Text> : null}
+        </View>
+      ) : (
+        <View
+          style={{ flex: 1, paddingTop: insets.top + space[6], alignItems: 'center', justifyContent: 'center', gap: space[3], paddingHorizontal: space[6] }}
+        >
+          <View style={{ flexDirection: 'row', marginBottom: space[3] }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+            {faces.map((x, i) => (
+              <Face key={x.id || i} person={x} size={faceSize} ringing={ringing} first={i === 0} />
+            ))}
+          </View>
+          <Text style={[s.name, userText]} numberOfLines={2}>
+            {title}
+          </Text>
+          <Text style={s.status} accessibilityLiveRegion="polite">
+            {status}
+          </Text>
+          {p.notice ? <Text style={[s.status, s.notice]}>{p.notice}</Text> : null}
+          {!callsSupported ? <Text style={[s.status, { textAlign: 'center' }]}>{t('m.calls.unsupported.note')}</Text> : null}
+        </View>
+      )}
 
       {video && p.local && RTCView && !p.cameraOff && p.phase !== 'incoming' ? (
-        <View style={[s.self, { top: insets.top + space[4] }]}>
+        <View style={[s.self, { bottom: insets.bottom + 150 }]}>
           <RTCView
             streamURL={p.local.toURL()}
             mirror={p.frontCamera}
@@ -533,7 +626,7 @@ function CallView(p: {
         </View>
       ) : null}
 
-      <View style={{ flex: 1 }} />
+      {showVideo ? <View style={{ flex: 1 }} /> : null}
 
       {p.phase === 'incoming' ? (
         <View style={[s.controls, { paddingBottom: insets.bottom + space[8], justifyContent: 'space-evenly' }]}>
@@ -568,6 +661,45 @@ function CallView(p: {
   );
 }
 
+/** A face in the call; while it rings, a ring in the brand colour pulses out from it (not with Reduce Motion). */
+function Face({ person, size, ringing, first }: { person: Person; size: number; ringing: boolean; first: boolean }) {
+  const c = useColors();
+  const reduce = useReducedMotion();
+  const pulse = useRef(new Animated.Value(0)).current;
+  const animate = ringing && !reduce;
+  useEffect(() => {
+    if (!animate) return;
+    const loop = Animated.loop(Animated.timing(pulse, { toValue: 1, duration: 1600, easing: Easing.out(Easing.ease), useNativeDriver: true }));
+    loop.start();
+    return () => {
+      loop.stop();
+      pulse.setValue(0);
+    };
+  }, [animate, pulse]);
+  const ring = size + 8;
+  return (
+    <View style={{ width: ring, height: ring, marginStart: first ? 0 : -16, alignItems: 'center', justifyContent: 'center' }}>
+      {animate ? (
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            width: ring,
+            height: ring,
+            borderRadius: ring / 2,
+            backgroundColor: c.yapi,
+            opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.6, 0] }),
+            transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, (ring + 48) / ring] }) }],
+          }}
+        />
+      ) : null}
+      <View style={{ width: ring, height: ring, borderRadius: ring / 2, backgroundColor: '#0B0C14', alignItems: 'center', justifyContent: 'center' }}>
+        <Avatar name={person.name} url={person.avatarUrl} size={size} />
+      </View>
+    </View>
+  );
+}
+
 function RoundButton({
   label,
   icon,
@@ -589,7 +721,8 @@ function RoundButton({
   const fg = on && !tone ? '#0B0C14' : '#FFFFFF';
   const size = tone ? 68 : 56;
   return (
-    <View style={{ alignItems: 'center', gap: 6, opacity: disabled ? 0.4 : 1 }}>
+    // Each button takes an equal share of the row, so five fit on a small phone and long labels wrap.
+    <View style={{ flex: 1, maxWidth: 88, alignItems: 'center', gap: 6, opacity: disabled ? 0.4 : 1 }}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={label}
@@ -610,7 +743,12 @@ function RoundButton({
           <Icon name={icon} size={tone ? 30 : 24} color={fg} />
         </View>
       </Pressable>
-      <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '600' }} numberOfLines={1}>
+      <Text
+        style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '600', textAlign: 'center' }}
+        numberOfLines={2}
+        importantForAccessibility="no"
+        accessibilityElementsHidden
+      >
         {label}
       </Text>
     </View>
@@ -619,7 +757,20 @@ function RoundButton({
 
 const s = StyleSheet.create({
   name: { color: '#FFFFFF', fontSize: 28, fontWeight: '800', textAlign: 'center', letterSpacing: -0.4 },
-  status: { color: 'rgba(255,255,255,0.78)', fontSize: 16, fontWeight: '500' },
+  status: { color: 'rgba(255,255,255,0.78)', fontSize: 16, fontWeight: '500', fontVariant: ['tabular-nums'] },
+  notice: { color: '#FFBE3D', textAlign: 'center' },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[3],
+    maxWidth: '100%',
+    paddingHorizontal: space[4],
+    paddingVertical: space[2],
+    borderRadius: radius.full,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  pillName: { color: '#FFFFFF', fontSize: 16, fontWeight: '700', flexShrink: 1 },
+  pillStatus: { color: 'rgba(255,255,255,0.78)', fontSize: 15, fontWeight: '500', fontVariant: ['tabular-nums'] },
   self: {
     position: 'absolute',
     end: space[4],

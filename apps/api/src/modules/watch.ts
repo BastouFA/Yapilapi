@@ -83,6 +83,7 @@ const device = z
   .regex(/^[A-Za-z0-9_-]{8,64}$/)
   .optional();
 const deviceBody = z.object({ device });
+const leaveBody = z.object({ device, everywhere: z.boolean().optional() });
 
 const heartbeatSchema = z.object({
   device,
@@ -380,13 +381,19 @@ export function registerWatch(app: FastifyInstance, ctx: AppContext, h: ChatHelp
 
   /**
    * Leave anytime. When the host leaves, the person watching longest becomes host; when the last
-   * person leaves, it ends. A device that isn't the one playing for you leaving changes nothing.
+   * person leaves, it ends. A device that isn't the one playing for you closing its screen changes
+   * nothing; pressing Leave (`everywhere`) leaves on all your devices, and their screens close too.
    */
   app.post('/v1/watch/:id/leave', { preHandler: requireAuth }, async (req) => {
     const u = me(req);
     const { id } = parse(idParam, req.params);
-    const { device } = parse(deviceBody, req.body ?? {});
+    const { device, everywhere } = parse(leaveBody, req.body ?? {});
     await sessionRow(id, u.id);
+    if (everywhere) {
+      await leaveSession(deps, id, u.id);
+      await ctx.realtime.publish([u.id], { type: 'watch.left', data: { sessionId: id, deviceId: device ?? null } });
+      return { ok: true };
+    }
     if (device) {
       const other = await db.query(
         `SELECT 1 FROM watch_participants WHERE session_id = $1 AND user_id = $2 AND left_at IS NULL AND device_id IS NOT NULL AND device_id <> $3`,
@@ -418,7 +425,8 @@ export function registerWatch(app: FastifyInstance, ctx: AppContext, h: ChatHelp
     if (s.status !== 'active') throw ended();
     await assertWatching(id, u.id);
     const toAdd = await additions(u.id, await chatMembers(db, s.conversation_id), input);
-    const out = await tx(db, (c) => addToQueue(c, id, s.conversation_id, u.id, toAdd));
+    // The first thing added to an empty screen plays straight away, for everyone.
+    const out = await tx(db, (c) => addToQueue(c, id, s.conversation_id, u.id, toAdd, true));
     if (out.added.length) await publishUpdated(deps, id, 'queue');
     if (out.changedPlayback) await publishPlayback(deps, id);
     return { session: await sessionFor(db, id, u.id), added: out.added, skipped: out.skipped };

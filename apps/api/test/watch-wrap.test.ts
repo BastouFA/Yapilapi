@@ -153,9 +153,9 @@ describe('watch together: the queue only holds what everyone can see', () => {
       { postId: blockedB, reason: 'not_visible' },
       { postId: gone, reason: 'unavailable' },
     ]);
-    // The first thing added goes on screen, paused.
+    // The first thing added goes on screen and plays.
     expect(r.body.session.queue.map((i: any) => i.post.id)).toEqual([open]);
-    expect(r.body.session.playback).toMatchObject({ itemId: r.body.added[0], playing: false });
+    expect(r.body.session.playback).toMatchObject({ itemId: r.body.added[0], playing: true });
     expect((await as(t.app, a).post(`/v1/watch/${id}/queue`, { postIds: [open] })).body.skipped).toEqual([{ postId: open, reason: 'already_queued' }]);
 
     // B joins; what they see of the queue is what they can see.

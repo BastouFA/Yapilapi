@@ -3763,13 +3763,14 @@ export const vi: Catalog = {
   'smartReplies.hint': 'Đưa vào ô tin nhắn. Không có gì được gửi cho đến khi bạn gửi.',
   'smartReplies.chatHint':
     'Câu trả lời ngắn bên dưới tin nhắn cuối bạn nhận được, do AI viết dựa trên cuộc trò chuyện này. Không có gì được gửi cho đến khi bạn gửi.',
-  'smartReplies.defaultDirect': 'Mặc định bật trong cuộc trò chuyện riêng.',
-  'smartReplies.defaultGroup': 'Mặc định tắt trong nhóm.',
+  'smartReplies.defaultDirect': 'Tắt cho đến khi bạn bật ở đây.',
+  'smartReplies.defaultGroup': 'Tắt cho đến khi bạn bật ở đây.',
   'smartReplies.offEverywhere': 'Đã tắt cho mọi cuộc trò chuyện trong Cài đặt.',
   'st.ai.title': 'Trợ lý AI',
   'st.ai.desc': 'Những gì AI có thể gợi ý cho bạn. AI chỉ dùng những gì bạn xem được, và không bao giờ đăng hay gửi gì thay bạn.',
   'st.ai.smartReplies': 'Câu trả lời gợi ý trong cuộc trò chuyện',
-  'st.ai.smartRepliesHint': 'Tối đa ba câu trả lời ngắn bên dưới tin nhắn cuối bạn nhận được. Mặc định tắt trong nhóm, và với người dưới 18 tuổi.',
+  'st.ai.smartRepliesHint':
+    'Tối đa ba câu trả lời ngắn dưới tin nhắn cuối cùng bạn nhận được. Tắt trong mọi cuộc trò chuyện cho đến khi bạn bật từ menu của cuộc trò chuyện đó.',
   'st.ai.catchUp': 'Tóm tắt Nhịp cho tôi',
   'st.ai.catchUpHint': 'Sau khi vắng mặt từ 12 giờ trở lên, một bản tóm tắt ngắn những gì mọi người của bạn đã chia sẻ.',
   'altText.suggest': 'Gợi ý mô tả',
@@ -6837,6 +6838,7 @@ export const vi: Catalog = {
   'chat.call.minutes.other': '{count} phút',
   'calls.otherBusy': 'Họ đang trong một cuộc gọi khác. Hãy thử lại sau giây lát.',
   'calls.answeredElsewhere': 'Đã nghe máy trên thiết bị khác',
+  'calls.reconnecting': 'Đang kết nối lại…',
   'moderation.decision.warn': 'Cảnh cáo',
   'email.suspension.suspended.subject': 'Tài khoản YAPILAPI của bạn đã bị tạm khóa',
   'email.suspension.suspended.body':

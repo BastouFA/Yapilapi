@@ -6,6 +6,7 @@ import type { MessageKey } from '../../../../packages/shared/src/i18n-core';
 import type { Comment, CommentPage, Post, PublicUser } from '../../../../packages/shared/src/types';
 import type { CommentPolicy, CommentSort } from '../../../../packages/shared/src/constants';
 import { formatReelTime } from '../../../../packages/shared/src/reels';
+import { replaceFinalEmoticon } from '../../../../packages/shared/src/emoticons';
 import { client, errorMessage, isGone } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import { useAutocomplete } from '../../lib/autocomplete';
@@ -241,10 +242,12 @@ export default function PostScreen() {
       try {
         const atMs = pointAt && !replyTo && momentMs !== null && post.format === 'reel' ? momentMs : undefined;
         const api = await client();
+        // "nice :)" sent as it is: the last emoticon becomes the emoji too.
+        const text = replaceFinalEmoticon(body.trim());
         // A voice reply goes up first; its words (if any) go with it.
         const { comment } = voice
-          ? await api.posts.voiceComment(post.id, (await uploadVoice(voice.uri, 'comment')).id, { body: body.trim(), parentId: replyTo?.id })
-          : await api.posts.comment(post.id, body.trim(), replyTo?.id, atMs);
+          ? await api.posts.voiceComment(post.id, (await uploadVoice(voice.uri, 'comment')).id, { body: text, parentId: replyTo?.id })
+          : await api.posts.comment(post.id, text, replyTo?.id, atMs);
         if (voice) {
           setVoice(null);
           setTalking(false);

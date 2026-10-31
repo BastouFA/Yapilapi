@@ -243,12 +243,19 @@ export function Providers({ children }: { children: React.ReactNode }) {
     if (start !== null && ready) revealLocale();
   }, [start, ready]);
 
-  // Unread counts, then realtime updates. The socket reconnects with backoff.
+  // Unread counts, then realtime updates. The socket reconnects with backoff, and at once when the
+  // page comes back (a phone's home-screen app woken from the background, the network back): a
+  // socket the phone froze can look open but be dead, so after a while away it's replaced. Each new
+  // socket says `ready`, and the open pages fetch what came in meanwhile (the same messages on every device).
   useEffect(() => {
     if (!me) return;
     let stopped = false;
     let ws: WebSocket | null = null;
     let attempt = 0;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    let hiddenAt = 0;
+    // Only the newest connect() opens a socket (one may still be waiting for its ticket).
+    let generation = 0;
     // Shared with the inbox and notifications pages, which ask for the same lists as they open.
     const loadCounts = () => {
       sharedRequest('notifications', () => api.notifications.list())
@@ -261,22 +268,31 @@ export function Providers({ children }: { children: React.ReactNode }) {
     loadCounts();
     const connect = async () => {
       if (stopped) return;
+      const gen = ++generation;
       // The API may be on another host, where the session cookie doesn't reach: open the socket with a short ticket.
       const ticket = await api.realtime.ticket().then(
         (r) => r.ticket,
         () => null,
       );
-      if (stopped) return;
+      if (stopped || gen !== generation) return;
       const sock = new WebSocket(ticket ? `${WS_URL}?ticket=${encodeURIComponent(ticket)}` : WS_URL);
       ws = sock;
       socket.current = sock;
       // A ping now and then keeps proxies from closing a quiet socket.
+      // No pong for two pings: the connection is gone without saying so; start a new one.
       let ping: ReturnType<typeof setInterval> | undefined;
+      let heard = Date.now();
       sock.onopen = () => {
         attempt = 0;
-        ping = setInterval(() => sock.readyState === WebSocket.OPEN && sock.send(JSON.stringify({ type: 'ping' })), 25_000);
+        heard = Date.now();
+        ping = setInterval(() => {
+          if (sock.readyState !== WebSocket.OPEN) return;
+          if (Date.now() - heard > 60_000) return sock.close();
+          sock.send(JSON.stringify({ type: 'ping' }));
+        }, 25_000);
       };
       sock.onmessage = (ev) => {
+        heard = Date.now();
         let event: RealtimeEvent;
         try {
           event = JSON.parse(ev.data);
@@ -307,18 +323,46 @@ export function Providers({ children }: { children: React.ReactNode }) {
       sock.onclose = () => {
         clearInterval(ping);
         if (socket.current === sock) socket.current = null;
-        if (stopped) return;
+        // A socket replaced on purpose (the page came back) doesn't schedule another.
+        if (stopped || ws !== sock) return;
         attempt++;
-        setTimeout(() => void connect(), Math.min(30_000, 1000 * 2 ** attempt));
+        clearTimeout(retry);
+        retry = setTimeout(() => void connect(), Math.min(30_000, 1000 * 2 ** attempt));
       };
     };
     void connect();
+    const reconnectNow = () => {
+      clearTimeout(retry);
+      attempt = 0;
+      const old = ws;
+      ws = null;
+      if (old && old.readyState !== WebSocket.CLOSED) old.close();
+      if (socket.current === old) socket.current = null;
+      void connect();
+    };
+    const back = () => {
+      loadCounts();
+      const away = hiddenAt ? Date.now() - hiddenAt : 0;
+      hiddenAt = 0;
+      if (!ws || ws.readyState !== WebSocket.OPEN || away > 15_000) reconnectNow();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') hiddenAt = Date.now();
+      else back();
+    };
     const onFocus = () => loadCounts();
     window.addEventListener('focus', onFocus);
+    window.addEventListener('online', reconnectNow);
+    window.addEventListener('pageshow', back);
+    document.addEventListener('visibilitychange', onVisibility);
     return () => {
       stopped = true;
+      clearTimeout(retry);
       ws?.close();
       window.removeEventListener('focus', onFocus);
+      window.removeEventListener('online', reconnectNow);
+      window.removeEventListener('pageshow', back);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [me]);
 
@@ -347,7 +391,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         ? {
             locale,
             languages: me.translation?.languages ?? [],
-            auto: autoTranslation && (me.translation?.auto ?? true),
+            auto: autoTranslation && (me.translation?.auto ?? false),
             translate: (kind, id, target) => api.translate({ kind, id, target }).then((r) => r.translation),
             translateMany: (items, target) => api.translations({ target, items }),
             captionUrl: autoTranslation ? (mediaId, lang, target) => api.studio.translatedCaptionUrl(mediaId, lang, target) : undefined,

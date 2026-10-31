@@ -14,7 +14,7 @@ import { CAN_DETECT_CELLULAR, useDataSaver, type DeviceDataSaver } from './data-
 import type { DataSaverMode } from '../../../packages/shared/src/data-saver';
 import { HIDDEN_WORD_MAX, HIDDEN_WORDS_MAX } from '../../../packages/shared/src/constants';
 import { baseLanguage, languageName, MAX_UNDERSTOOD_LANGUAGES, TRANSLATION_LANGUAGES } from '../../../packages/shared/src/translation';
-import { useTranslationSettings } from './translation';
+import { AutoTranslateSwitch, useTranslationSettings } from './translation';
 
 /**
  * "Let people who have my email or phone number find me" and "Allow downloads of my reels" (both
@@ -288,7 +288,7 @@ export function DataSaver() {
 
 /**
  * "Languages I understand" (the app's language always counts, so it's ticked and fixed)
- * and "Translate automatically" (on by default). Saved on the account; the Yap app shows it too.
+ * and "Translate automatically" (off by default). Saved on the account; the Yap app shows it too.
  */
 export function Translation() {
   const c = useColors();
@@ -343,7 +343,7 @@ export function Translation() {
           </Text>
         ) : null}
       </View>
-      <SwitchRow label={t('translate.auto')} hint={t('translate.autoHint')} value={settings.auto} onValueChange={(v) => update({ ...settings, auto: v })} />
+      <AutoTranslateSwitch onError={setError} />
     </Card>
   );
 }

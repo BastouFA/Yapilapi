@@ -1417,7 +1417,9 @@ export function createClient(opts: ClientOptions) {
        */
       join: (id: string, device?: string) => post<{ session: WatchSession }>(`/v1/watch/${id}/join`, device ? { device } : {}),
       /** From a device that isn't the one playing for you, leaving changes nothing. */
-      leave: (id: string, device?: string) => post<{ ok: true }>(`/v1/watch/${id}/leave`, device ? { device } : {}),
+      /** `everywhere`: the Leave button, so your other devices leave (and close the screen) too. */
+      leave: (id: string, device?: string, everywhere?: boolean) =>
+        post<{ ok: true }>(`/v1/watch/${id}/leave`, { ...(device ? { device } : {}), ...(everywhere ? { everywhere } : {}) }),
       /** The host ends it for everyone. */
       end: (id: string) => post<{ ok: true }>(`/v1/watch/${id}/end`),
       /**

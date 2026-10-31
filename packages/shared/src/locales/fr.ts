@@ -3786,13 +3786,14 @@ export const fr: Catalog = {
   'smartReplies.hint': 'Le place dans la zone de message. Rien n’est envoyé tant que tu ne l’envoies pas.',
   'smartReplies.chatHint':
     'De courtes réponses sous le dernier message reçu, écrites par l’IA à partir de cette discussion. Rien n’est envoyé tant que tu ne l’envoies pas.',
-  'smartReplies.defaultDirect': 'Activé par défaut dans les discussions à deux.',
-  'smartReplies.defaultGroup': 'Désactivé par défaut dans les groupes.',
+  'smartReplies.defaultDirect': 'Désactivé tant que tu ne l’actives pas ici.',
+  'smartReplies.defaultGroup': 'Désactivé tant que tu ne l’actives pas ici.',
   'smartReplies.offEverywhere': 'Désactivé pour toutes les discussions dans les réglages.',
   'st.ai.title': 'Aides IA',
   'st.ai.desc': 'Ce que l’IA peut te suggérer. Elle n’utilise que ce que tu peux voir, et ne publie ni n’envoie jamais rien à ta place.',
   'st.ai.smartReplies': 'Réponses suggérées dans les discussions',
-  'st.ai.smartRepliesHint': 'Jusqu’à trois courtes réponses sous le dernier message reçu. Désactivé par défaut dans les groupes et pour les moins de 18 ans.',
+  'st.ai.smartRepliesHint':
+    'Jusqu’à trois courtes réponses sous le dernier message reçu. Désactivé dans chaque discussion tant que tu ne l’actives pas depuis son menu.',
   'st.ai.catchUp': 'Me mettre à jour dans Pouls',
   'st.ai.catchUpHint': 'Après 12 heures d’absence ou plus, un court résumé de ce que tes proches ont partagé.',
   'altText.suggest': 'Suggérer une description',
@@ -6878,6 +6879,7 @@ export const fr: Catalog = {
   'chat.call.minutes.other': '{count} minutes',
   'calls.otherBusy': 'Cette personne est déjà en appel. Réessaie dans un instant.',
   'calls.answeredElsewhere': 'Répondu sur un autre appareil',
+  'calls.reconnecting': 'Reconnexion…',
   'moderation.decision.warn': 'Avertissement',
   'email.suspension.suspended.subject': 'Ton compte YAPILAPI est suspendu',
   'email.suspension.suspended.body':

@@ -447,6 +447,8 @@ describe('Fair start', () => {
   it('fits readers of its language best, and those who get it translated as well as a reel with no language', async () => {
     const ada = await creator();
     const viewer = await adult();
+    // "Translate automatically" is off until they turn it on.
+    await as(t.app, viewer).put('/v1/me/translation', { languages: [], auto: true });
     const r = await reel(ada, { body: 'Ẹ káàbọ̀' });
     await db().query(`UPDATE posts SET lang = 'yo' WHERE id = $1`, [r.id]);
     const fit = async (reader: { understood: string[]; translated: boolean }) =>
@@ -471,6 +473,8 @@ describe('Fair start', () => {
   it('leaves out reels in a language the viewer doesn’t understand once they turned off "Translate automatically"', async () => {
     const ada = await creator();
     const viewer = await adult();
+    // They had turned "Translate automatically" on (it's off until they do).
+    await as(t.app, viewer).put('/v1/me/translation', { languages: [], auto: true });
     const r = await reel(ada, { body: 'Ẹ káàbọ̀' });
     await db().query(`UPDATE posts SET lang = 'yo' WHERE id = $1`, [r.id]);
     const picked = async (understood: string[], translated: boolean) =>

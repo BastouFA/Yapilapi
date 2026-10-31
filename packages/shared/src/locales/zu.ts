@@ -3785,14 +3785,14 @@ export const zu: Catalog = {
   'smartReplies.hint': 'Iyifaka ebhokisini lomlayezo. Akukho okuthunyelwayo uze ukuthumele.',
   'smartReplies.chatHint':
     'Izimpendulo ezimfushane ngaphansi komlayezo wokugcina owutholile, ezibhalwe yi-AI kusuka kule ngxoxo. Akukho okuthunyelwayo uze ukuthumele.',
-  'smartReplies.defaultDirect': 'Kuvuliwe ngokuzenzakalelayo ezingxoxweni zomuntu nomuntu.',
-  'smartReplies.defaultGroup': 'Kuvaliwe ngokuzenzakalelayo emaqenjini.',
+  'smartReplies.defaultDirect': 'Kuvaliwe uze ukuvule lapha.',
+  'smartReplies.defaultGroup': 'Kuvaliwe uze ukuvule lapha.',
   'smartReplies.offEverywhere': 'Kuvaliwe kuzo zonke izingxoxo Kuzilungiselelo.',
   'st.ai.title': 'Abasizi be-AI',
   'st.ai.desc': 'Lokho i-AI engakuphakamisela kona. Isebenzisa kuphela lokho okubonayo, futhi ayilokothi ithumele lutho esikhundleni sakho.',
   'st.ai.smartReplies': 'Izimpendulo eziphakanyisiwe ezingxoxweni',
   'st.ai.smartRepliesHint':
-    'Kuze kube izimpendulo ezintathu ezimfushane ngaphansi komlayezo wokugcina owutholile. Kuvaliwe ngokuzenzakalelayo emaqenjini, nakubantu abangaphansi kweminyaka engu-18.',
+    'Kuze kube izimpendulo ezimfushane ezintathu ngaphansi komlayezo wokugcina owutholile. Kuvaliwe kuyo yonke ingxoxo uze uzivule kumenyu yaleyo ngxoxo.',
   'st.ai.catchUp': 'Ngibikele okwenzeke ku-Isigqi',
   'st.ai.catchUpHint': 'Ngemuva kwamahora angu-12 noma ngaphezulu ungekho, isifinyezo esifushane salokho abantu bakho ababelane ngakho.',
   'altText.suggest': 'Phakamisa incazelo',
@@ -6877,6 +6877,7 @@ export const zu: Catalog = {
   'chat.call.minutes.other': 'Imizuzu engu-{count}',
   'calls.otherBusy': 'Basekholini elinye. Zama futhi emzuzwini.',
   'calls.answeredElsewhere': 'Kuphendulwe kwenye idivayisi',
+  'calls.reconnecting': 'Iyaxhuma kabusha…',
   'moderation.decision.warn': 'Isexwayiso',
   'email.suspension.suspended.subject': 'I-akhawunti yakho ye-YAPILAPI imisiwe',
   'email.suspension.suspended.body':

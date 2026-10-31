@@ -93,6 +93,8 @@ export function useWatchSync(id: string) {
   const [soundHeld, setSoundHeld] = useState(false);
   /** Another of your devices is the one playing. */
   const [elsewhere, setElsewhereState] = useState(false);
+  // You pressed Leave on another device: this screen closes too.
+  const [leftElsewhere, setLeftElsewhere] = useState(false);
   /** "Ada joined", "Sam left", "Ada reacted": a short note in the player. */
   const [note, setNote] = useState<{ id: number; text: string } | null>(null);
 
@@ -439,6 +441,13 @@ export function useWatchSync(id: string) {
     if (!e.type.startsWith('watch.') || e.data?.sessionId !== id) return;
     const f = fns.current;
     if (e.type === 'watch.ended') return f.markEnded();
+    if (e.type === 'watch.left') {
+      if (e.data.deviceId !== device.current) {
+        alive.current = false;
+        setLeftElsewhere(true);
+      }
+      return;
+    }
     if (e.type === 'watch.device') {
       if (e.data.deviceId !== device.current) f.goElsewhere();
       return;
@@ -500,6 +509,7 @@ export function useWatchSync(id: string) {
     muted,
     soundHeld,
     elsewhere,
+    leftElsewhere,
     note: note?.text ?? null,
     applySession,
     retry: () => {
@@ -570,7 +580,7 @@ export function useWatchSync(id: string) {
     leave: async () => {
       if (alive.current) {
         alive.current = false;
-        leaving = api.watch.leave(id, device.current).catch(() => {});
+        leaving = api.watch.leave(id, device.current, true).catch(() => {});
         await leaving;
       }
     },
@@ -1023,6 +1033,13 @@ export function WatchScreen({ id }: { id: string }) {
   const [unread, setUnread] = useState(0);
   const narrow = useNarrow();
   const { session, current, playback, isHost, video } = w;
+  // Left on your other device: back to the chat here too.
+  const conversationId = session?.conversationId;
+  useEffect(() => {
+    if (!w.leftElsewhere) return;
+    toast(t('watch.left'));
+    router.replace(conversationId ? `/inbox/${conversationId}` : '/inbox');
+  }, [w.leftElsewhere, conversationId, router, toast, t]);
 
   async function add(a: Addition): Promise<boolean> {
     setAdding(true);

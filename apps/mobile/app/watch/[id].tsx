@@ -102,6 +102,11 @@ export default function WatchScreen() {
   const backRef = useRef(backToChat);
   backRef.current = backToChat;
 
+  // Left on your other device: back to the chat here too.
+  useEffect(() => {
+    if (w.leftElsewhere) backRef.current();
+  }, [w.leftElsewhere]);
+
   const { show: showMenu } = menu;
   const { leave, end, host } = w;
   const ended = w.ended;

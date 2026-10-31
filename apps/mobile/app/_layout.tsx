@@ -12,6 +12,7 @@ import { SessionProvider, useSession } from '../lib/session';
 import { useColors } from '../lib/ui';
 import { useUsageHeartbeat } from '../lib/usage';
 import { YapPlayer } from '../lib/yaps';
+import { useWatchAutoOpen } from '../lib/watch';
 import { useNotificationLinks } from '../lib/links';
 import { OfflineBanner } from '../lib/offline';
 import { AccountMenuProvider } from '../lib/account-menu';
@@ -26,6 +27,7 @@ function Heartbeat() {
   useUsageHeartbeat(!!me);
   useNotificationLinks();
   useWelcomeAfterSignOut();
+  useWatchAutoOpen();
   return null;
 }
 

@@ -124,24 +124,21 @@ describe('pace limits for new accounts', () => {
     const r = await as(t.app, u).post('/v1/posts', { body: 'One more', visibility: 'private' });
     expect(r.status).toBe(429);
     expect(r.body.error.code).toBe('slow_down');
-    expect(r.body.error.message).toMatch(/New accounts can share up to 10 posts an hour/);
+    expect(r.body.error.message).toMatch(/New accounts can share up to 30 posts an hour/);
     expect((await signals(u.id)).map((x) => x.kind)).toEqual(['post_velocity']);
     // Older accounts aren't held to the new-account pace.
     await age(u, 2);
     expect((await as(t.app, u).post('/v1/posts', { body: 'Back again', visibility: 'private' })).status).toBe(201);
   });
 
-  it('limits messages per hour in the first 24 hours', async () => {
+  it('never limits how many messages a new account sends', async () => {
     const u = await newUser();
     const friend = await newUser();
     await befriend(u, friend);
     const conv = (await as(t.app, u).post('/v1/conversations', { memberIds: [friend.id] })).body.conversation;
-    for (let i = 0; i < SPAM_RULES.newAccountMessagesPerHour; i++)
-      expect((await as(t.app, u).post(`/v1/conversations/${conv.id}/messages`, { body: `hi ${i}` })).status).toBe(201);
-    const r = await as(t.app, u).post(`/v1/conversations/${conv.id}/messages`, { body: 'one more' });
-    expect(r.status).toBe(429);
-    expect(r.body.error.message).toMatch(/New accounts can send up to 30 messages an hour/);
-    expect((await signals(u.id)).map((x) => x.kind)).toEqual(['message_velocity']);
+    expect(SPAM_RULES.newAccountMessagesPerHour).toBeNull();
+    for (let i = 0; i < 40; i++) expect((await as(t.app, u).post(`/v1/conversations/${conv.id}/messages`, { body: `hi ${i}` })).status).toBe(201);
+    expect((await signals(u.id)).map((x) => x.kind)).not.toContain('message_velocity');
   });
 });
 

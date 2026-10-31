@@ -41,7 +41,8 @@ export default function Inbox() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useRealtime((e) => {
-    if (['message.created', 'conversation.created', 'conversation.changed', 'conversation.removed'].includes(e.type)) void load();
+    // `ready`: a new live connection, so whatever came in while it was down shows too.
+    if (['ready', 'message.created', 'conversation.created', 'conversation.changed', 'conversation.removed'].includes(e.type)) void load();
   });
 
   return (

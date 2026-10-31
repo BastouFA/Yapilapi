@@ -159,6 +159,46 @@ describe('live video hook and call relay credentials', () => {
   });
 });
 
+describe('calls relay on Cloudflare', () => {
+  it('passes on the ICE servers Cloudflare issues, asks once, and still gives STUN when it fails', async () => {
+    const { iceServers } = await import('../src/lib/ice.ts');
+    const config = { TURN_URLS: '', TURN_SECRET: '', CLOUDFLARE_TURN_KEY_ID: 'key-1', CLOUDFLARE_TURN_KEY_TOKEN: 'tok' };
+    const real = globalThis.fetch;
+    const asked: { url: string; init: RequestInit }[] = [];
+    let fail = true;
+    globalThis.fetch = (async (url: string, init: RequestInit) => {
+      asked.push({ url, init });
+      if (fail) return new Response('nope', { status: 500 });
+      return new Response(
+        JSON.stringify({
+          iceServers: [
+            { urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.cloudflare.com:53'] },
+            { urls: ['turn:turn.cloudflare.com:3478?transport=udp', 'turn:turn.cloudflare.com:53?transport=udp'], username: 'u', credential: 'c' },
+          ],
+        }),
+        { status: 201 },
+      );
+    }) as typeof fetch;
+    try {
+      expect(await iceServers(config, 'someone')).toEqual([{ urls: 'stun:stun.l.google.com:19302' }]);
+      fail = false;
+      const servers = await iceServers(config, 'someone');
+      expect(servers).toEqual([
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: ['stun:stun.cloudflare.com:3478'] },
+        { urls: ['turn:turn.cloudflare.com:3478?transport=udp'], username: 'u', credential: 'c' },
+      ]);
+      expect(asked[1]!.url).toBe('https://rtc.live.cloudflare.com/v1/turn/keys/key-1/credentials/generate-ice-servers');
+      expect((asked[1]!.init.headers as Record<string, string>).authorization).toBe('Bearer tok');
+      // Cached: no third request.
+      await iceServers(config, 'someone else');
+      expect(asked).toHaveLength(2);
+    } finally {
+      globalThis.fetch = real;
+    }
+  });
+});
+
 describe('push notifications', () => {
   it('registers devices and sends to Expo, removing dead tokens', async () => {
     const u = await signUp(t.app);

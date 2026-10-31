@@ -458,6 +458,8 @@ describe('transcripts', () => {
       const ada = await signUp(t.app);
       const fan = await signUp(t.app);
       const stranger = await signUp(t.app);
+      // Both turned "Translate automatically" on (it's off until they do): only who can hear it differs.
+      for (const u of [fan, stranger]) await as(t.app, u).put('/v1/me/translation', { languages: [], auto: true });
       await followAccepted(t.app, fan, ada);
       const r = await yap(ada, await clip(ada), { visibility: 'followers' });
       const voiceId = r.body.post.voice.id as string;

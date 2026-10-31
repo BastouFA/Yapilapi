@@ -299,6 +299,34 @@ describe('watch together: one device per person', () => {
     aDevices.remove();
     bDevice.remove();
   });
+
+  it('pressing Leave on one device leaves on all of them, and their screens hear so', async () => {
+    const [a, b] = [await adult(), await adult()];
+    const convo = await chat(a, [b]);
+    const phone = 'phone-0000000003';
+    const mac = 'mac-00000000000004';
+    const id = (await start(a, convo, { device: phone, postIds: [await reel(a)] })).body.session.id;
+    await as(t.app, b).post(`/v1/watch/${id}/join`, { device: 'b-device-0002' });
+    await as(t.app, a).post(`/v1/watch/${id}/join`, { device: mac });
+    const aDevices = connect(a);
+    const bDevice = connect(b);
+    // Leave on the phone (which isn't the one playing): A is out everywhere, and only A's devices are told.
+    expect((await as(t.app, a).post(`/v1/watch/${id}/leave`, { device: phone, everywhere: true })).status).toBe(200);
+    expect(aDevices.of('watch.left').map((e) => e.data)).toEqual([{ sessionId: id, deviceId: phone }]);
+    expect(bDevice.of('watch.left')).toEqual([]);
+    expect((await as(t.app, b).get(`/v1/watch/${id}`)).body.session.watching.map((u: any) => u.id)).toEqual([b.id]);
+    aDevices.remove();
+    bDevice.remove();
+  });
+
+  it('plays the first thing added to an empty screen straight away', async () => {
+    const [a, b] = [await adult(), await adult()];
+    const convo = await chat(a, [b]);
+    const id = (await start(a, convo)).body.session.id;
+    expect((await as(t.app, a).get(`/v1/watch/${id}`)).body.session.playback.playing).toBe(false);
+    await as(t.app, a).post(`/v1/watch/${id}/queue`, { postIds: [await reel(a)] });
+    expect((await as(t.app, a).get(`/v1/watch/${id}`)).body.session.playback.playing).toBe(true);
+  });
 });
 
 describe('watch together: what to watch next', () => {

@@ -28,6 +28,8 @@ import type { StickerResults, StoryCard, StoryPostCard, StorySticker } from '../
 import type { PublicUser } from '../../../packages/shared/src/types';
 import { compactCount } from '../../../packages/shared/src/post-stats';
 import { SQUAD_INK, squadColor } from '../../../packages/shared/src/squads';
+import { replaceFinalEmoticon } from '../../../packages/shared/src/emoticons';
+import { swapEmoticon } from './emoticons';
 import { useSession } from './session';
 import { client, errorMessage, mediaUrl, webUrl } from './api';
 import { useDataSaver } from './data-saver';
@@ -701,7 +703,8 @@ function Viewer({
                   placeholder={t('m.stories.replyTo', { name })}
                   placeholderTextColor="rgba(255,255,255,0.75)"
                   value={reply}
-                  onChangeText={setReply}
+                  // ":)" then a space becomes "🙂 ".
+                  onChangeText={(v) => setReply(swapEmoticon(reply, v)?.text ?? v)}
                   onFocus={() => setTyping(true)}
                   onBlur={() => setTyping(false)}
                   maxLength={1000}
@@ -864,7 +867,7 @@ function Viewer({
   );
 
   async function sendReply() {
-    const body = reply.trim();
+    const body = replaceFinalEmoticon(reply.trim());
     if (!body || !story || replyingRef.current) return;
     replyingRef.current = true;
     setReplying(true);

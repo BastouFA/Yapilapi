@@ -18,6 +18,7 @@ import { UsageHeartbeat } from '@/components/UsageHeartbeat';
 import { YapPlayer } from '@/components/Yap';
 import { PageBack } from '@/components/BackButton';
 import { RadioBar, RadioProvider } from '@/components/Radio';
+import { WatchAutoOpen } from '@/components/WatchTogether';
 import { useSession } from '../providers';
 
 function currentTab(path: string, username?: string): NavEntry['id'] | undefined {
@@ -113,6 +114,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </main>
               <YapPlayer />
               <RadioBar />
+              <WatchAutoOpen />
             </RadioProvider>
           </CheckoutProvider>
         </RoomsProvider>
@@ -147,6 +149,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <UsageHeartbeat />
               <YapPlayer />
               <RadioBar />
+              <WatchAutoOpen />
             </div>
           </RadioProvider>
         </CheckoutProvider>

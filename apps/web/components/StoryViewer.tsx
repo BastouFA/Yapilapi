@@ -29,8 +29,10 @@ import {
   type PublicUser,
   type StickerResults,
   type StorySticker,
+  replaceFinalEmoticon,
 } from '@yapilapi/shared';
 import { api, ApiError, errorMessage } from '@/lib/api';
+import { withEmoticons } from '@/lib/emoticons';
 import { useSession } from '@/app/providers';
 import { AddToChapter } from '@/components/Chapters';
 import { ReportSheet } from '@/components/ReportSheet';
@@ -423,7 +425,7 @@ export function StoryViewer({
               e.preventDefault();
               if (!reply.trim()) return;
               try {
-                await api.moments.reply(story.id, reply.trim());
+                await api.moments.reply(story.id, replaceFinalEmoticon(reply.trim()));
                 setReply('');
                 toast(t('m.stories.sent', { name: group.author.displayName }));
               } catch (err) {
@@ -445,7 +447,8 @@ export function StoryViewer({
               value={reply}
               maxLength={1000}
               placeholder={t('m.stories.replyTo', { name: group.author.displayName })}
-              onChange={(e) => setReply(e.currentTarget.value)}
+              // ":)" then a space becomes "🙂 ".
+              onChange={(e) => setReply(withEmoticons(e, reply))}
             />
             <button
               type="button"

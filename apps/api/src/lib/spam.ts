@@ -20,8 +20,9 @@ export const SPAM_RULES = {
   linkWatchDays: 7,
   signupsPerIpPerHour: 5,
   signupsPerSubnetPerHour: 20,
-  newAccountPostsPerHour: 10,
-  newAccountMessagesPerHour: 30,
+  newAccountPostsPerHour: 30,
+  /** Messages have no pace: spam is caught by what it says and where it goes (below), not by how much. */
+  newAccountMessagesPerHour: null as number | null,
   /** The 3rd identical post from one account within an hour is held for review. */
   duplicatePostsPerHour: 3,
   /** The 5th identical post with a link, from any accounts, within an hour is held for review. */
@@ -163,15 +164,23 @@ export async function assertPostPace(db: Q, config: Config, userId: string): Pro
   throw new AppError(429, 'slow_down', `New accounts can share up to ${SPAM_RULES.newAccountPostsPerHour} posts an hour. You can post again a little later.`);
 }
 
+/**
+ * Messages are unlimited (`newAccountMessagesPerHour` null). Set a number to hold new accounts to
+ * that many messages an hour to people who haven't written back; a conversation going both ways never counts.
+ */
 export async function assertMessagePace(db: Q, config: Config, userId: string): Promise<void> {
-  if (!config.SPAM_CHECKS) return;
+  const limit = SPAM_RULES.newAccountMessagesPerHour;
+  if (!config.SPAM_CHECKS || limit === null) return;
   const { rows } = await db.query(
     `SELECT u.created_at > now() - make_interval(hours => $2) AS new_account,
-            (SELECT count(*) FROM messages m WHERE m.sender_id = u.id AND m.kind <> 'system' AND m.created_at > now() - interval '1 hour')::int AS n
+            (SELECT count(*) FROM messages m
+             WHERE m.sender_id = u.id AND m.kind <> 'system' AND m.created_at > now() - interval '1 hour'
+               AND NOT EXISTS (SELECT 1 FROM messages o WHERE o.conversation_id = m.conversation_id AND o.sender_id <> u.id AND o.kind <> 'system')
+            )::int AS n
      FROM users u WHERE u.id = $1`,
     [userId, SPAM_RULES.newAccountHours],
   );
-  if (!rows[0]?.new_account || rows[0].n < SPAM_RULES.newAccountMessagesPerHour) return;
+  if (!rows[0]?.new_account || rows[0].n < limit) return;
   await velocitySignal(db, userId, 'message_velocity', rows[0].n);
   throw new AppError(
     429,

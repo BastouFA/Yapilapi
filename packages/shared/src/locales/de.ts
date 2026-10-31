@@ -3781,14 +3781,14 @@ export const de: Catalog = {
   'smartReplies.hint': 'Fügt es in das Nachrichtenfeld ein. Nichts wird gesendet, bis du es sendest.',
   'smartReplies.chatHint':
     'Kurze Antworten unter der letzten Nachricht, die du bekommen hast, von KI aus diesem Chat geschrieben. Nichts wird gesendet, bis du es sendest.',
-  'smartReplies.defaultDirect': 'In Einzelchats standardmäßig an.',
-  'smartReplies.defaultGroup': 'In Gruppen standardmäßig aus.',
+  'smartReplies.defaultDirect': 'Aus, bis du es hier einschaltest.',
+  'smartReplies.defaultGroup': 'Aus, bis du es hier einschaltest.',
   'smartReplies.offEverywhere': 'In den Einstellungen für alle Chats ausgeschaltet.',
   'st.ai.title': 'KI-Helfer',
   'st.ai.desc': 'Was KI dir vorschlagen kann. Sie nutzt nur, was du sehen kannst, und postet oder sendet nie etwas für dich.',
   'st.ai.smartReplies': 'Vorgeschlagene Antworten in Chats',
   'st.ai.smartRepliesHint':
-    'Bis zu drei kurze Antworten unter der letzten Nachricht, die du bekommen hast. In Gruppen und für Personen unter 18 standardmäßig aus.',
+    'Bis zu drei kurze Antworten unter der letzten Nachricht, die du bekommen hast. In jedem Chat aus, bis du sie im Menü dieses Chats einschaltest.',
   'st.ai.catchUp': 'Bring mich in Puls auf den neuesten Stand',
   'st.ai.catchUpHint': 'Nach 12 Stunden oder mehr Abwesenheit eine kurze Zusammenfassung dessen, was deine Leute geteilt haben.',
   'altText.suggest': 'Eine Beschreibung vorschlagen',
@@ -6872,6 +6872,7 @@ export const de: Catalog = {
   'chat.call.minutes.other': '{count} Minuten',
   'calls.otherBusy': 'Die Person telefoniert gerade. Versuch es gleich noch einmal.',
   'calls.answeredElsewhere': 'Auf einem anderen Gerät angenommen',
+  'calls.reconnecting': 'Verbindung wird wiederhergestellt…',
   'moderation.decision.warn': 'Verwarnung',
   'email.suspension.suspended.subject': 'Dein YAPILAPI-Konto ist gesperrt',
   'email.suspension.suspended.body':

@@ -3780,15 +3780,15 @@ export const id: Catalog = {
   'smartReplies.hint': 'Memasukkannya ke kotak pesan. Tidak ada yang dikirim sampai Anda mengirimnya.',
   'smartReplies.chatHint':
     'Balasan singkat di bawah pesan terakhir yang Anda terima, ditulis oleh AI dari obrolan ini. Tidak ada yang dikirim sampai Anda mengirimnya.',
-  'smartReplies.defaultDirect': 'Aktif secara default di obrolan pribadi.',
-  'smartReplies.defaultGroup': 'Nonaktif secara default di grup.',
+  'smartReplies.defaultDirect': 'Mati sampai kamu menyalakannya di sini.',
+  'smartReplies.defaultGroup': 'Mati sampai kamu menyalakannya di sini.',
   'smartReplies.offEverywhere': 'Dinonaktifkan untuk semua obrolan di Pengaturan.',
   'st.ai.title': 'Bantuan AI',
   'st.ai.desc':
     'Apa yang bisa disarankan AI untuk Anda. AI hanya menggunakan apa yang bisa Anda lihat, dan tidak pernah memposting atau mengirim apa pun atas nama Anda.',
   'st.ai.smartReplies': 'Saran balasan di obrolan',
   'st.ai.smartRepliesHint':
-    'Hingga tiga balasan singkat di bawah pesan terakhir yang Anda terima. Nonaktif secara default di grup, dan untuk orang di bawah 18 tahun.',
+    'Hingga tiga balasan singkat di bawah pesan terakhir yang kamu terima. Mati di setiap chat sampai kamu menyalakannya dari menu chat itu.',
   'st.ai.catchUp': 'Kabari saya di Denyut',
   'st.ai.catchUpHint': 'Setelah 12 jam atau lebih pergi, ringkasan singkat tentang yang dibagikan orang-orang Anda.',
   'altText.suggest': 'Sarankan deskripsi',
@@ -6868,6 +6868,7 @@ export const id: Catalog = {
   'chat.call.minutes.other': '{count} menit',
   'calls.otherBusy': 'Dia sedang dalam panggilan lain. Coba lagi sebentar lagi.',
   'calls.answeredElsewhere': 'Dijawab di perangkat lain',
+  'calls.reconnecting': 'Menyambungkan ulang…',
   'moderation.decision.warn': 'Peringatan',
   'email.suspension.suspended.subject': 'Akun YAPILAPI Anda ditangguhkan',
   'email.suspension.suspended.body':

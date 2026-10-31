@@ -102,6 +102,9 @@ const schema = z.object({
   // TURN (coturn, REST credentials): shared secret and URLs.
   TURN_URLS: z.string().optional().default(''),
   TURN_SECRET: z.string().optional().default(''),
+  /** Hosted TURN (Cloudflare Realtime: a TURN key and its API token). Used instead of coturn when set. */
+  CLOUDFLARE_TURN_KEY_ID: z.string().optional().default(''),
+  CLOUDFLARE_TURN_KEY_TOKEN: z.string().optional().default(''),
   UPLOAD_DIR: z.string().default('./uploads'),
   STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
   S3_ENDPOINT: z.string().optional().default(''),

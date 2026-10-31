@@ -201,7 +201,11 @@ describe('AI helpers', () => {
 
     beforeAll(async () => {
       await as(t.app, bola).post(`/v1/users/${ada.id}/follow`);
-      direct = (await as(t.app, ada).post('/v1/conversations', { memberIds: [bola.id] })).body.conversation.id;
+      const d = (await as(t.app, ada).post('/v1/conversations', { memberIds: [bola.id] })).body.conversation;
+      // Off in every chat until the person turns them on there.
+      expect(d.smartReplies).toEqual({ on: false, setting: null, defaultOn: false, everywhere: true });
+      direct = d.id;
+      for (const u of [ada, bola]) await as(t.app, u).put(`/v1/conversations/${direct}/smart-replies`, { enabled: true });
       group = (await as(t.app, ada).post('/v1/conversations', { memberIds: [bola.id, cleo.id], title: 'Weekend' })).body.conversation.id;
     });
 
@@ -256,7 +260,7 @@ describe('AI helpers', () => {
       await as(t.app, ada).del(`/v1/users/${cleo.id}/block`);
     });
 
-    it('is off by default in groups, and follows the chat switch, the Settings switch and the flag', async () => {
+    it('is off by default, and follows the chat switch, the Settings switch and the flag', async () => {
       const g2 = (await as(t.app, bola).post('/v1/conversations', { memberIds: [ada.id, cleo.id], title: 'Book club' })).body.conversation;
       expect(g2.smartReplies).toEqual({ on: false, setting: null, defaultOn: false, everywhere: true });
       await send(bola, g2.id, 'Which book should we read next month?');
@@ -264,7 +268,11 @@ describe('AI helpers', () => {
       const set = await as(t.app, ada).put(`/v1/conversations/${g2.id}/smart-replies`, { enabled: true });
       expect(set.body.smartReplies).toEqual({ on: true, setting: true, defaultOn: false, everywhere: true });
       expect((await suggest(ada, g2.id)).body.suggestions).toHaveLength(3);
-      expect((await as(t.app, ada).get(`/v1/conversations/${direct}`)).body.conversation.smartReplies).toMatchObject({ on: true, defaultOn: true });
+      expect((await as(t.app, ada).get(`/v1/conversations/${direct}`)).body.conversation.smartReplies).toMatchObject({
+        on: true,
+        setting: true,
+        defaultOn: false,
+      });
 
       await as(t.app, ada).put('/v1/me/ai-settings', { smartReplies: false });
       expect((await as(t.app, ada).get(`/v1/conversations/${g2.id}`)).body.conversation.smartReplies.on).toBe(false);

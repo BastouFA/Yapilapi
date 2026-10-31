@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState, type InputHTMLAttributes, type Keyb
 import { Avatar } from '@yapilapi/design-system';
 import { api } from '@/lib/api';
 import { useSession } from '@/app/providers';
+import { withEmoticons } from '@/lib/emoticons';
 
 type Suggestion = { key: string; insert: string; primary: string; secondary?: string; avatar?: { name: string; src: string | null } };
 
@@ -25,7 +26,7 @@ type Props =
 /**
  * A text box that suggests people as you type @name (people you know first)
  * and tags as you type #tag (from what's trending). Arrow keys move, Enter or
- * Tab picks, Escape closes.
+ * Tab picks, Escape closes. Emoticons typed in it turn into emoji (":)" → "🙂").
  */
 export function AutocompleteText(props: Props) {
   const {
@@ -101,8 +102,9 @@ export function AutocompleteText(props: Props) {
     'aria-autocomplete': 'list' as const,
     'aria-controls': open ? listId : undefined,
     'aria-activedescendant': open ? `${listId}-${active}` : undefined,
-    onChange: (e: { currentTarget: HTMLTextAreaElement | HTMLInputElement }) => {
-      onValueChange(e.currentTarget.value);
+    onChange: (e: { currentTarget: HTMLTextAreaElement | HTMLInputElement; nativeEvent: Event }) => {
+      // ":)" then a space becomes "🙂 " before the @name or #tag is read again.
+      onValueChange(withEmoticons(e, value));
       readToken(e.currentTarget);
     },
     onClick: (e: { currentTarget: HTMLTextAreaElement | HTMLInputElement }) => readToken(e.currentTarget),

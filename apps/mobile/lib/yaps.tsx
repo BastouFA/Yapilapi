@@ -18,6 +18,9 @@ export const YAP_MIN_MS = 400;
 /** How many things are using the microphone now (a voice message or yap being recorded, a call, a room). */
 let micUsers = 0;
 
+/** Something is using the microphone now: a call (or one ringing), a room, or a recording. */
+export const micInUse = () => micUsers > 0;
+
 /**
  * While `on`, this screen is using the microphone: yaps don't play out loud meanwhile (switching the
  * audio to play one would cut the recording or the call short); they wait in the chat.

@@ -262,7 +262,10 @@ Both stay off on a plain Render deploy; everything else works without them.
   yapilapi-api's Environment and writing `+` as `%2B`, `/` as `%2F` and `=` as `%3D`. Leave
   `LIVE_RECORDINGS_DIR` empty (recordings need a folder shared with the API). Then turn on the
   `LIVE` feature flag in the admin area.
-- **Calls relay (TURN)** helps calls connect on networks that block direct connections. It needs UDP,
+- **Calls relay (TURN)** helps calls connect on networks that block direct connections (often mobile
+  data). The simplest is Cloudflare's: in the Cloudflare dashboard, Realtime → TURN Server → Create,
+  then set on yapilapi-api `CLOUDFLARE_TURN_KEY_ID` (the Turn Token ID) and `CLOUDFLARE_TURN_KEY_TOKEN`
+  (the API token shown once). The first 1,000 GB a month are free. Or run your own: it needs UDP,
   which Render doesn't offer: run coturn with `infrastructure/media/turnserver.conf` on a small server
   (change `static-auth-secret` and `realm`), open UDP 3478 and 51160–51200, and set on yapilapi-api
   `TURN_URLS=turn:turn.yapilapi.com:3478?transport=udp,turn:turn.yapilapi.com:3478?transport=tcp` and

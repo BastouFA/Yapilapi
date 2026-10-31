@@ -11,18 +11,19 @@ import {
   type Translation,
   type TranslationSettings,
 } from '../../../packages/shared/src/translation';
-import { client } from './api';
+import { client, errorMessage } from './api';
 import { useT } from './i18n';
 import { RichText } from './rich-text';
 import { useSession } from './session';
-import { useColors, userText } from './ui';
+import { SwitchRow, useColors, userText } from './ui';
 
 /**
  * "See translation" and automatic translation on the phone (docs/product/speak-any-language.md):
  * posts, comments, story text and chat messages in a language the reader doesn't understand
  * show their translation with "Translated from French · See original", or a "See translation"
  * link when translation isn't automatic. The settings ("Languages I understand", "Translate
- * automatically") live on the account (Me.translation), so they match the web app.
+ * automatically", off until the reader turns it on) live on the account (Me.translation), so
+ * they match the web app.
  */
 interface TranslationCtx {
   /** Signed in and translation is turned on. */
@@ -42,7 +43,7 @@ const Ctx = createContext<TranslationCtx>({
   enabled: false,
   auto: false,
   available: false,
-  settings: { languages: [], auto: true },
+  settings: { languages: [], auto: false },
   save: async () => {},
   voice: NO_VOICE,
 });
@@ -73,7 +74,7 @@ export function TranslationProvider({ children }: { children: ReactNode }) {
     };
   }, [me]);
   useEffect(() => setChosen(null), [me?.translation]);
-  const settings = chosen ?? me?.translation ?? { languages: [], auto: true };
+  const settings = chosen ?? me?.translation ?? { languages: [], auto: false };
   const save = useCallback(
     async (next: TranslationSettings) => {
       const before = chosen;
@@ -99,6 +100,23 @@ export function TranslationProvider({ children }: { children: ReactNode }) {
     };
   }, [me, flags, settings, save]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+}
+
+/** "Translate automatically": the account's switch, in Settings and in a chat's menu. It applies at once. */
+export function AutoTranslateSwitch({ onError }: { onError: (message: string | null) => void }) {
+  const { t } = useT();
+  const { settings, save } = useContext(Ctx);
+  return (
+    <SwitchRow
+      label={t('translate.auto')}
+      hint={t('translate.autoHint')}
+      value={settings.auto}
+      onValueChange={(auto) => {
+        onError(null);
+        save({ ...settings, auto }).catch((e) => onError(errorMessage(e)));
+      }}
+    />
+  );
 }
 
 // ── This session's memory ───────────────────────────────────────────────────

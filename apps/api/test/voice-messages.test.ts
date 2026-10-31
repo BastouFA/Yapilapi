@@ -147,6 +147,8 @@ beforeAll(async () => {
   const r = await as(t.app, ada).post('/v1/conversations', { memberIds: [bola.id, carl.id, dan.id], title: 'Crew' });
   expect(r.status).toBe(201);
   crew = r.body.conversation.id;
+  // Bola and Carl read in English and turned "Translate automatically" on (it's off until they do).
+  for (const u of [bola, carl]) await as(t.app, u).put('/v1/me/translation', { languages: [], auto: true });
 });
 beforeEach(() => setPushSender(record));
 afterAll(async () => {

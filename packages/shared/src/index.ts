@@ -73,3 +73,4 @@ export * from './stash-schemas.ts';
 export * from './plans.ts';
 export * from './plan-schemas.ts';
 export * from './today.ts';
+export * from './emoticons.ts';

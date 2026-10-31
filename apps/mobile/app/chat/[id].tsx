@@ -14,8 +14,10 @@ import { AccessibilityInfo, Alert, FlatList, Image, Linking, Platform, Pressable
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { ChatGame, Conversation, Message, PinnedMessage } from '../../../../packages/shared/src/types';
 import { MESSAGE_EDIT_MINUTES } from '../../../../packages/shared/src/constants';
+import { replaceFinalEmoticon } from '../../../../packages/shared/src/emoticons';
 import { useCalls } from '../../lib/calls';
 import { client, errorMessage, mediaUrl } from '../../lib/api';
+import { swapEmoticon } from '../../lib/emoticons';
 import { clock, MAX_UPLOAD_BYTES, pickOne, uploadFile, uploadPicked, VOICE_MIME } from '../../lib/media';
 import { useT } from '../../lib/i18n';
 import { VOICE_RECORDING } from '../../lib/voice';
@@ -60,7 +62,7 @@ import {
   SystemLine,
   type SheetAction,
 } from '../../lib/chat-extras';
-import { TranslatableText } from '../../lib/translation';
+import { AutoTranslateSwitch, TranslatableText, useTranslationSettings } from '../../lib/translation';
 import { VoiceTranscript } from '../../lib/voice-transcript';
 import { useReport } from '../../lib/report';
 import { ListCard, ListComposer, PollCard, PollComposer, ReminderNote, ReminderPicker } from '../../lib/chat-polls';
@@ -111,7 +113,9 @@ export default function Chat() {
   useEffect(() => () => clearTimeout(typingTimer.current), []);
   // When you last told the others you were typing: at most every few seconds.
   const typingSent = useRef(0);
-  const onType = (text: string) => {
+  const onType = (typed: string) => {
+    // ":)" then a space becomes "🙂 ".
+    const text = swapEmoticon(body, typed, input.current)?.text ?? typed;
     setBody(text);
     if (!text.trim() || editing || Date.now() - typingSent.current < 3000) return;
     typingSent.current = Date.now();
@@ -353,6 +357,9 @@ export default function Chat() {
   const yaps = conversation?.yaps;
   const [yapSettings, setYapSettings] = useState(false);
   const [smartSettings, setSmartSettings] = useState(false);
+  // "Translate automatically" is the account's setting (off until you turn it on); offered here too.
+  const translation = useTranslationSettings();
+  const [translateSettings, setTranslateSettings] = useState(false);
   // A setting that didn't save says so in its sheet, not behind it.
   const [settingsError, setSettingsError] = useState<string | null>(null);
 
@@ -665,7 +672,8 @@ export default function Chat() {
   }
 
   async function sendNow() {
-    const text = body.trim();
+    // "see you :)" sent as it is: the last emoticon becomes the emoji too, as a space would have made it.
+    const text = replaceFinalEmoticon(body.trim());
     if (editing) return saveEdit(editing, text);
     if (!text) return;
     const quoting = replyTo;
@@ -1370,6 +1378,12 @@ export default function Chat() {
           />
         </BottomSheet>
       ) : null}
+      {translation.available ? (
+        <BottomSheet visible={translateSettings} title={t('translate.auto')} onClose={() => setTranslateSettings(false)} done gap={space[4]}>
+          {settingsError ? <Notice tone="danger">{settingsError}</Notice> : null}
+          <AutoTranslateSwitch onError={setSettingsError} />
+        </BottomSheet>
+      ) : null}
       <MessageActions
         open={!!actionsFor}
         onClose={() => setActionsFor(null)}
@@ -1401,6 +1415,9 @@ export default function Chat() {
           },
           ...(conversation?.smartReplies
             ? [{ label: t('smartReplies.label'), icon: 'sparkles-outline' as const, onPress: () => (setSettingsError(null), setSmartSettings(true)) }]
+            : []),
+          ...(translation.available
+            ? [{ label: t('translate.auto'), icon: 'language-outline' as const, onPress: () => (setSettingsError(null), setTranslateSettings(true)) }]
             : []),
           { label: t('m.chat.look.title'), icon: 'color-palette-outline', onPress: () => setLookOpen(true) },
           ...(canAlbum

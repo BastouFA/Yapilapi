@@ -90,11 +90,11 @@ export async function logAiCall(
 
 /**
  * Suggested replies in one chat for one person. Everywhere: their switch in Settings (on
- * by default, off by default under 18). In this chat: their choice, or by default on in
- * one-to-one chats and off in groups and community chats.
+ * by default, off by default under 18). In this chat: their choice, off until they turn it on
+ * (in every kind of chat: suggestions are something people ask for, not something they get).
  */
-export function smartRepliesState(kind: string, setting: boolean | null, everywhere: boolean, flag: boolean): ConversationSmartReplies {
-  const defaultOn = kind === 'direct';
+export function smartRepliesState(_kind: string, setting: boolean | null, everywhere: boolean, flag: boolean): ConversationSmartReplies {
+  const defaultOn = false;
   return { on: flag && everywhere && (setting ?? defaultOn), setting, defaultOn, everywhere };
 }
 

@@ -225,7 +225,7 @@ export default async function roomsModule(app: FastifyInstance, ctx: AppContext)
       room,
       removed: !!r.removed_at,
       canHost: (r.created_by === u.id || isModerator(r.c_role, r.c_status)) && !r.minor,
-      media: inRoom ? media.session({ id: u.id, minor: r.minor }) : null,
+      media: inRoom ? await media.session({ id: u.id, minor: r.minor }) : null,
     };
   });
 
@@ -333,7 +333,7 @@ export default async function roomsModule(app: FastifyInstance, ctx: AppContext)
       room: await roomDetail(deps, id, u.id),
       removed: false,
       canHost: isHost,
-      media: media.session({ id: u.id, minor: before.minor }),
+      media: await media.session({ id: u.id, minor: before.minor }),
     };
   });
 

@@ -38,9 +38,10 @@ export const audio = {
       incall?.setForceSpeakerphoneOn(on);
     } catch {}
   },
+  /** The ringtone only: the call screen buzzes the phone itself (InCallManager's buzz plays once on iPhones). */
   ring() {
     try {
-      incall?.startRingtone('_DEFAULT_', [0, 800, 600], 'playback', 45);
+      incall?.startRingtone('_DEFAULT_', 0, 'playback', 45);
     } catch {}
   },
   stopRing() {

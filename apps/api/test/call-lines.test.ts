@@ -87,7 +87,8 @@ describe('call history in the chat', () => {
     // The pace check itself, as it runs with spam checks on (the test app has them off).
     await expect(assertMessagePace(db(), { ...t.ctx.config, SPAM_CHECKS: true }, ada.id)).resolves.toBeUndefined();
     await db().query(`INSERT INTO messages (conversation_id, sender_id, body) SELECT $1, $2, 'hi' FROM generate_series(1, 40)`, [c, ada.id]);
-    await expect(assertMessagePace(db(), { ...t.ctx.config, SPAM_CHECKS: true }, ada.id)).rejects.toMatchObject({ code: 'slow_down' });
+    // Messages have no pace now; with one set, only people's own messages would count.
+    await expect(assertMessagePace(db(), { ...t.ctx.config, SPAM_CHECKS: true }, ada.id)).resolves.toBeUndefined();
   });
 
   it('tells the caller someone is busy, and ends a group call when nobody is left', async () => {

@@ -4,6 +4,7 @@ import {
   formatList,
   noticeText,
   isVideoFile,
+  replaceFinalEmoticon,
   MEDIA_ACCEPT,
   MESSAGE_EDIT_MINUTES,
   messagePreviewOf,
@@ -20,6 +21,7 @@ import type { ChatGame, Conversation, Message, ScheduledMessage } from '@yapilap
 import { api, errorMessage, isGone } from '@/lib/api';
 import { useChatBase } from '@/lib/chat-base';
 import { closeChatNotifications } from '@/lib/push';
+import { withEmoticons } from '@/lib/emoticons';
 import { GroupInfoSheet } from '@/components/GroupInfo';
 import { ReportSheet } from '@/components/PostList';
 import { useRealtime, useSession } from '../../../providers';
@@ -45,6 +47,7 @@ import {
   SystemLine,
 } from '@/components/ChatExtras';
 import { SmartReplyChips } from '@/components/AiHelpers';
+import { AutoTranslateSwitch } from '@/components/TranslationSettings';
 import { ListSheet, ListView, PollSheet, PollView, ReminderNote, ReminderSheet } from '@/components/ChatPolls';
 import { ChatLookSheet, chatThemeClass, chatThemeVars, ScheduledList, ScheduleSheet, useScheduled } from '@/components/ChatLater';
 import { addNotes, useChatWatch, WatchBanner, watchDeviceId } from '@/components/WatchTogether';
@@ -407,6 +410,7 @@ export default function ChatPage() {
   const [uploading, setUploading] = useState<string | null>(null);
   const [yapSettings, setYapSettings] = useState(false);
   const [smartSettings, setSmartSettings] = useState(false);
+  const [translateSettings, setTranslateSettings] = useState(false);
   // Suggested replies follow the newest message that has arrived (not one of yours still sending).
   const lastArrived = messages?.filter((m) => !m.pending).at(-1)?.id ?? null;
 
@@ -430,7 +434,7 @@ export default function ChatPage() {
   }
 
   async function saveEdit(m: Message) {
-    const text = body.trim();
+    const text = replaceFinalEmoticon(body.trim());
     if (!text) return toast(t('m.chat.editEmpty'));
     if (text === m.body) return cancelCompose();
     try {
@@ -450,7 +454,8 @@ export default function ChatPage() {
 
   async function send() {
     if (editing) return saveEdit(editing);
-    const text = body.trim();
+    // "see you :)" sent with Enter: the last emoticon becomes the emoji too, as a space would have made it.
+    const text = replaceFinalEmoticon(body.trim());
     if (!text || !me) return;
     const quoting = replyTo;
     const clientId = crypto.randomUUID();
@@ -749,6 +754,7 @@ export default function ChatPage() {
                 : []),
               ...(conv?.yaps?.available ? [{ label: t('m.yap.settings'), icon: 'volume' as const, onSelect: () => setYapSettings(true) }] : []),
               ...(conv?.smartReplies ? [{ label: t('smartReplies.label'), icon: 'sparkle' as const, onSelect: () => setSmartSettings(true) }] : []),
+              ...(flags.AI_TRANSLATION ? [{ label: t('translate.auto'), icon: 'globe' as const, onSelect: () => setTranslateSettings(true) }] : []),
             ]}
           />
         </div>
@@ -1156,8 +1162,10 @@ export default function ChatPage() {
           value={body}
           maxLength={4000}
           onChange={(e) => {
-            setBody(e.currentTarget.value);
-            if (e.currentTarget.value.trim() && !editing) saidTyping();
+            // ":)" then a space becomes "🙂 ".
+            const next = withEmoticons(e, body);
+            setBody(next);
+            if (next.trim() && !editing) saidTyping();
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -1370,6 +1378,11 @@ export default function ChatPage() {
                   : null}
             </p>
           </div>
+        </BottomSheet>
+      ) : null}
+      {flags.AI_TRANSLATION ? (
+        <BottomSheet open={translateSettings} onClose={() => setTranslateSettings(false)} title={t('translate.auto')}>
+          <AutoTranslateSwitch />
         </BottomSheet>
       ) : null}
       <MiniAppsSheet

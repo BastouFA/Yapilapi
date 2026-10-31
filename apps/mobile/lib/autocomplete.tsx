@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, Text, View, type NativeSyntheticEvent, type TextInput, type TextInputSelectionChangeEventData } from 'react-native';
 import { client } from './api';
+import { swapEmoticon } from './emoticons';
 import { useT } from './i18n';
 import { elevation, radius, space } from './theme';
 import { Avatar, useColors, userText } from './ui';
@@ -56,7 +57,8 @@ async function suggest(token: Token): Promise<Suggestion[]> {
 /**
  * Hashtag and mention suggestions for a text box. Typing @ and a letter suggests people (people
  * you know first); typing # suggests tags (trending ones, then tags people use). Picking one
- * replaces what was typed with `@username ` or `#tag `.
+ * replaces what was typed with `@username ` or `#tag `. Emoticons typed in it turn into emoji
+ * (":)" → "🙂").
  *
  * `inputProps` go on the TextInput (it needs the ref and the selection events); render `list`
  * where the suggestions should show, above or below the box.
@@ -116,11 +118,15 @@ export function useAutocomplete(value: string, onChangeText: (v: string) => void
     inputProps: {
       ref,
       value,
-      onChangeText: (next: string) => {
+      onChangeText: (typed: string) => {
         // On most keyboards the caret is right after what was just typed; the selection event that
         // follows corrects it when not.
-        const grew = next.length - text.current.length;
-        caret.current = Math.max(0, Math.min(next.length, caret.current + grew));
+        const grew = typed.length - text.current.length;
+        caret.current = Math.max(0, Math.min(typed.length, caret.current + grew));
+        // ":)" then a space becomes "🙂 ".
+        const swapped = swapEmoticon(text.current, typed, ref.current, caret.current);
+        const next = swapped?.text ?? typed;
+        if (swapped) caret.current = swapped.caret;
         text.current = next;
         onChangeText(next);
         readToken(next, caret.current);

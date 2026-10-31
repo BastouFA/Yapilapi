@@ -215,7 +215,7 @@ export async function readerLanguages(db: Q, userId: string, machineTranslation:
   const r = rows[0];
   return {
     understood: understoodLanguages(r?.locale ?? 'en', r?.languages),
-    translated: machineTranslation && flags.AI_TRANSLATION && flags.AUTO_TRANSLATE && (r?.auto_translate ?? true),
+    translated: machineTranslation && flags.AI_TRANSLATION && flags.AUTO_TRANSLATE && (r?.auto_translate ?? false),
   };
 }
 
@@ -225,5 +225,5 @@ export async function translationSettings(db: Q, userId: string): Promise<{ lang
     `SELECT languages, auto_translate FROM user_preferences WHERE user_id = $1`,
     [userId],
   );
-  return { languages: rows[0]?.languages ?? [], auto: rows[0]?.auto_translate ?? true };
+  return { languages: rows[0]?.languages ?? [], auto: rows[0]?.auto_translate ?? false };
 }

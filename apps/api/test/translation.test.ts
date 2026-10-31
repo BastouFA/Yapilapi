@@ -228,8 +228,8 @@ describe('translation', () => {
 
   it('keeps "Languages I understand" and "Translate automatically" on the account', async () => {
     const me0 = (await as(t.app, eve).get('/v1/auth/me')).body.user;
-    // "Translate automatically" is on until the person turns it off.
-    expect(me0.translation).toEqual({ languages: [], auto: true });
+    // "Translate automatically" is off until the person turns it on.
+    expect(me0.translation).toEqual({ languages: [], auto: false });
     const saved = await as(t.app, eve).put('/v1/me/translation', { languages: ['fr', 'yo', 'fr'], auto: false });
     expect(saved.body).toEqual({ languages: ['fr', 'yo'], auto: false });
     expect((await as(t.app, eve).get('/v1/auth/me')).body.user.translation).toEqual({ languages: ['fr', 'yo'], auto: false });
