@@ -3,7 +3,7 @@ import { expect, test, type APIRequestContext, type Browser, type Page } from '@
 
 /**
  * Go out together (docs/product/go-out-together.md) at phone width (390 px): Ada says she's free;
- * Ben, her friend, sees her in "Who's free" in Chats and taps to make a plan with her; Ada answers
+ * Ben, her friend, sees her in "Who's free" in Yap and taps to make a plan with her; Ada answers
  * I'm in and is in the plan's chat, with its card at the top; Ben adds an expense and the plan says
  * who owes whom, and that no money moves through YAPILAPI. SHOTS (a folder) keeps screenshots.
  */

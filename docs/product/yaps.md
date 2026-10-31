@@ -21,7 +21,7 @@ Not to be confused with Yap in chats (hold to talk, plays out loud like a walkie
 ## Naming (decided 2026-10-08, navigation changed 2026-10-24 and 2026-10-25)
 
 **Since 2026-10-25** ("Your city, alive", docs/product/your-city-alive.md, "The menu") the
-navigation reads **Pulse · Wander · Spark · Chats · You** on the web and the phone. The big Yap button
+navigation reads **Pulse · Wander · Spark · Yap · You** (Chats was renamed Yap on 2026-10-31) on the web and the phone. The big Yap button
 left the middle: **Spark** (`NavEntry` id `create`, message key `nav.create`, back to its Spark
 wording in all 24 languages after a few hours as "Create" with a ＋; a four-point spark icon) opens
 the ways to create (a menu titled Create), a stash first, then a post, reel, story, live and **Yap**

@@ -4,7 +4,7 @@ import { expect, test, type APIRequestContext, type Page } from '@playwright/tes
 /**
  * The signed-out landing page in English and French (still "The social network you speak" until
  * step 3 of docs/product/your-city-alive.md), signing in landing on Pulse, the navigation,
- * Pulse · Wander · Spark · Chats · You, with Spark in the middle (a tap offers a stash, post, reel,
+ * Pulse · Wander · Spark · Yap · You, with Spark in the middle (a tap offers a stash, post, reel,
  * story, live or Yap), at phone width and on a computer, and onboarding's first step, a voice hello that can
  * be recorded or skipped. Chrome's fake media flags stand in for a real microphone. Each project
  * (light and dark, desktop and phone) runs the page checks; recording runs in the light ones.
@@ -75,11 +75,11 @@ test.describe('landing page', () => {
 });
 
 /** The five places in the navigation, in order, by their labels. */
-const MENU = ['Pulse', 'Wander', 'Spark', 'Chats', 'You'];
+const MENU = ['Pulse', 'Wander', 'Spark', 'Yap', 'You'];
 const menuLabels = (page: Page) => page.getByRole('navigation', { name: 'Primary' }).locator('.yp-nav__list > .yp-nav__item .yp-nav__label');
 
 test.describe('navigation', () => {
-  // docs/product/your-city-alive.md, "The menu": Pulse · Wander · Spark · Chats · You, Spark in the middle.
+  // docs/product/your-city-alive.md, "The menu": Pulse · Wander · Spark · Yap · You, Spark in the middle.
   test('signing in lands on Pulse', async ({ page, request }) => {
     const password = randomBytes(18).toString('base64url');
     const username = await account(request, 'signin', true, password);
@@ -95,14 +95,14 @@ test.describe('navigation', () => {
     await expect(page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: /^Wander/ })).toHaveAttribute('aria-current', 'page');
   });
 
-  test('Pulse · Wander · Spark · Chats · You, with Spark in the middle', async ({ page, isMobile }) => {
+  test('Pulse · Wander · Spark · Yap · You, with Spark in the middle', async ({ page, isMobile }) => {
     await account(page.request, 'nav');
     await page.goto('/home');
     const nav = page.getByRole('navigation', { name: 'Primary' });
     await expect(menuLabels(page)).toHaveText(MENU);
     await expect(nav.getByRole('link', { name: /^Pulse/ })).toHaveAttribute('href', '/home');
     await expect(nav.getByRole('link', { name: /^Wander/ })).toHaveAttribute('href', '/discover');
-    await expect(nav.getByRole('link', { name: /^Chats/ })).toHaveAttribute('href', '/inbox');
+    await expect(nav.getByRole('link', { name: /^Yap/ })).toHaveAttribute('href', '/inbox');
     await expect(nav.getByRole('link', { name: /^Near/ })).toHaveCount(0);
     const create = nav.getByRole('link', { name: 'Spark', exact: true });
     await expect(create).toBeInViewport();

@@ -250,7 +250,7 @@ function NavItem({ it, on, hint, L, locale }: { it: NavEntry; on: boolean; hint:
 }
 
 /**
- * Primary navigation: Pulse | Wander | Spark | Chats | You (ids home, discover, create, inbox, profile).
+ * Primary navigation: Pulse | Wander | Spark | Yap | You (ids home, discover, create, inbox, profile).
  * Phones: a floating dock. Icons only, except the current page, whose label sits with its icon
  * in a squircle highlight that slides between tabs; other labels show on hover and keyboard focus
  * and are always in the links' accessible names. The middle button is a raised, slightly tilted

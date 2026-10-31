@@ -40,7 +40,7 @@ the signed-in screens says the app is voice-first any more (the old tagline left
 
 ## The menu
 
-**Pulse · Wander · Spark · Chats · You** on the web and the phone (the owner's pick, 2026-10-25; the
+**Pulse · Wander · Spark · Yap · You** on the web and the phone (the owner's pick, 2026-10-25, with Chats renamed Yap on 2026-10-31; the
 middle button was called Create with a ＋ until the owner asked for a better name and icon the same day).
 
 - **Pulse** (the feed) is the first tab and where the app opens: after signing in, finishing
