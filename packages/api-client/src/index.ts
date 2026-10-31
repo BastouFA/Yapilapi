@@ -1610,14 +1610,15 @@ export function createClient(opts: ClientOptions) {
       tips: (direction: 'received' | 'sent' = 'received') => get<{ direction: 'received' | 'sent'; items: TipRecord[] }>(`/v1/me/tips${qs({ direction })}`),
     },
     /**
-     * Feature flags, how the phone apps offer digital goods (`purchases`), whether automatic translation works here now
-     * (`autoTranslation`), and what voice messages offer: transcripts, their translation and "Listen in …" (`voice*`).
+     * Feature flags, how the phone apps offer digital goods (`purchases`), whether "See translation" works (`translation`)
+     * and automatic translation works here now (`autoTranslation`), and what voice messages offer: transcripts, their translation and "Listen in …" (`voice*`).
      * All but `flags` are missing from older servers.
      */
     flags: () =>
       get<{
         flags: Record<string, boolean>;
         purchases?: StorePurchasePolicy;
+        translation?: boolean;
         autoTranslation?: boolean;
         voiceTranscripts?: boolean;
         voiceTranslation?: boolean;

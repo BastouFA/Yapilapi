@@ -1109,6 +1109,8 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
     return {
       flags,
       purchases: storePurchasePolicy(ctx.config),
+      // "See translation" works: a real model, or the offline stand-in outside production.
+      translation: flags.AI_TRANSLATION && (ctx.ai.machineTranslation || ctx.config.APP_ENV !== 'production'),
       autoTranslation: machine && flags.AUTO_TRANSLATE,
       voiceTranscripts,
       voiceTranslation,

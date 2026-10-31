@@ -75,7 +75,10 @@ describe('automatic translation', () => {
     expect((await as(t.app, null).get('/v1/flags')).body).toMatchObject({ autoTranslation: true, flags: { AUTO_TRANSLATE: true } });
     const standIn = await testApp();
     try {
-      expect((await as(standIn.app, null).get('/v1/flags')).body.autoTranslation).toBe(false);
+      expect((await as(standIn.app, null).get('/v1/flags')).body).toMatchObject({ autoTranslation: false, translation: true });
+      // In production the stand-in doesn't translate: "See translation" isn't offered at all.
+      (standIn.ctx.config as { APP_ENV: string }).APP_ENV = 'production';
+      expect((await as(standIn.app, null).get('/v1/flags')).body.translation).toBe(false);
     } finally {
       await standIn.close();
     }

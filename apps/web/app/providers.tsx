@@ -118,6 +118,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const [flags, setFlags] = useState<Record<string, boolean>>({});
   // Automatic translation works on the server now (both flags on, and a real model).
   const [autoTranslation, setAutoTranslation] = useState(false);
+  // Whether the server can translate at all (older servers don't say: assume it can).
+  const [translationWorks, setTranslationWorks] = useState(true);
   const [voice, setVoice] = useState<VoiceOffers>({ transcripts: false, translation: false, listen: false });
   const [unread, setUnreadState] = useState({ notifications: 0, messages: 0 });
   const [toastState, setToastState] = useState<{ id: number; message: string; action?: ToastAction } | null>(null);
@@ -207,6 +209,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         .then((r) => {
           setFlags(r.flags);
           setAutoTranslation(!!r.autoTranslation);
+          setTranslationWorks(r.translation ?? true);
           setVoice({ transcripts: !!r.voiceTranscripts, translation: !!r.voiceTranslation, listen: !!r.voiceListen });
         })
         .catch(() => {}),
@@ -334,9 +337,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
     [locale],
   );
 
-  // "See translation": signed in, and while translation is turned on. Automatic translation (and
+  // "See translation": signed in, while translation is turned on and the server has a model to
+  // translate with (else every tap would end in "couldn't be translated"). Automatic translation (and
   // translated caption tracks) when the server can, and the reader hasn't turned it off.
-  const translationOn = !!me && !!flags.AI_TRANSLATION;
+  const translationOn = !!me && !!flags.AI_TRANSLATION && translationWorks;
   const translation = useMemo<TranslationContextValue | null>(
     () =>
       translationOn && me
