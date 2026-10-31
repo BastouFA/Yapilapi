@@ -1113,6 +1113,12 @@ export const sw: Record<string, string> = {
   '{total_chunks} chunks are still missing.': 'Vipande {total_chunks} bado havijafika.',
   'The uploaded size does not match.': 'Ukubwa uliopakiwa haulingani.',
   // apps/api/src/modules/watch.ts
+  'That isn’t a link to a YouTube video.': 'Hicho si kiungo cha video ya YouTube.',
+  'This video’s owner doesn’t let it play outside YouTube. Open it on YouTube instead.':
+    'Mmiliki wa video hii haruhusu ichezwe nje ya YouTube. Ifungue kwenye YouTube badala yake.',
+  'That YouTube video isn’t available. It may be private or removed.': 'Video hiyo ya YouTube haipatikani. Huenda ni ya faragha au imeondolewa.',
+  'Add a photo or video you uploaded for watch together.': 'Ongeza picha au video uliyopakia kwa ajili ya kutazama pamoja.',
+  'Only photos and videos can be watched together.': 'Picha na video pekee ndizo zinazoweza kutazamwa pamoja.',
   'Watch together is for chats of up to 8 people, you included.': 'Kutazama pamoja ni kwa gumzo za hadi watu 8, ukiwemo wewe.',
   'Join to do that.': 'Jiunge ili ufanye hivyo.',
   'This watch together session has ended.': 'Kipindi hiki cha kutazama pamoja kimeisha.',

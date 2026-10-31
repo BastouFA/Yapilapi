@@ -1084,6 +1084,12 @@ export const ar: Record<string, string> = {
   '{total_chunks} chunks are still missing.': 'عدد الأجزاء التي لا تزال ناقصة: {total_chunks}.',
   'The uploaded size does not match.': 'الحجم المرفوع غير مطابق.',
   // apps/api/src/modules/watch.ts
+  'That isn’t a link to a YouTube video.': 'هذا ليس رابطًا لفيديو على YouTube.',
+  'This video’s owner doesn’t let it play outside YouTube. Open it on YouTube instead.':
+    'لا يسمح صاحب هذا الفيديو بتشغيله خارج YouTube. افتحه على YouTube بدلًا من ذلك.',
+  'That YouTube video isn’t available. It may be private or removed.': 'فيديو YouTube هذا غير متاح. ربما يكون خاصًا أو محذوفًا.',
+  'Add a photo or video you uploaded for watch together.': 'أضف صورة أو فيديو رفعته للمشاهدة معًا.',
+  'Only photos and videos can be watched together.': 'لا يمكن مشاهدة غير الصور والفيديوهات معًا.',
   'Watch together is for chats of up to 8 people, you included.': 'المشاهدة معًا للمحادثات التي تضم 8 أشخاص كحد أقصى، بمن فيهم أنت.',
   'Join to do that.': 'انضم لتفعل ذلك.',
   'This watch together session has ended.': 'انتهت جلسة المشاهدة معًا هذه.',

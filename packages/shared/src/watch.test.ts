@@ -7,8 +7,70 @@ import {
   isNewerPlayback,
   WATCH_DRIFT_OK_MS,
   WATCH_DRIFT_SEEK_MS,
+  WATCH_DRIFT_SEEK_NO_RATE_MS,
   WATCH_MAX_RATE_NUDGE,
+  youtubeIdFrom,
 } from './watch.ts';
+import { watchLineText } from './message-preview.ts';
+
+describe('players without rate control (YouTube)', () => {
+  it('leaves small drift alone and seeks once it is noticeable', () => {
+    expect(driftFix(1000, 1000 + WATCH_DRIFT_OK_MS + 200, true, false)).toEqual({ kind: 'none', rate: 1 });
+    expect(driftFix(1000, 1000 + WATCH_DRIFT_SEEK_NO_RATE_MS, true, false)).toEqual({ kind: 'seek', toMs: 1000 + WATCH_DRIFT_SEEK_NO_RATE_MS, rate: 1 });
+  });
+});
+
+describe('YouTube links', () => {
+  it('reads the id from the usual addresses', () => {
+    for (const link of [
+      'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      'https://youtube.com/watch?v=dQw4w9WgXcQ&t=42s',
+      'youtube.com/watch?v=dQw4w9WgXcQ',
+      'https://m.youtube.com/watch?v=dQw4w9WgXcQ',
+      'https://youtu.be/dQw4w9WgXcQ?si=abc',
+      'https://www.youtube.com/shorts/dQw4w9WgXcQ',
+      'https://www.youtube.com/live/dQw4w9WgXcQ',
+      'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+      '  https://YOUTU.BE/dQw4w9WgXcQ  ',
+    ])
+      expect(youtubeIdFrom(link), link).toBe('dQw4w9WgXcQ');
+  });
+
+  it('refuses other sites, look-alikes and bad ids', () => {
+    for (const link of [
+      'https://vimeo.com/123456',
+      'https://www.youtube.com.evil.test/watch?v=dQw4w9WgXcQ',
+      'https://notyoutube.com/watch?v=dQw4w9WgXcQ',
+      'https://www.youtube.com/watch?v=short',
+      'https://www.youtube.com/watch?v=dQw4w9WgXcQ1',
+      'https://www.youtube.com/watch?v=dQw4w9WgX<Q',
+      'https://user:pw@www.youtube.com/watch?v=dQw4w9WgXcQ',
+      'https://www.youtube.com:8443/watch?v=dQw4w9WgXcQ',
+      'javascript:alert(1)//youtu.be/dQw4w9WgXcQ',
+      'https://www.youtube.com/channel/UCdQw4w9WgXcQ',
+      '',
+    ])
+      expect(youtubeIdFrom(link), link).toBeNull();
+  });
+});
+
+describe('the watch together line', () => {
+  const tr = {
+    t: (k: string, v?: Record<string, string | number>) => `${k}${v ? JSON.stringify(v) : ''}`,
+    tp: (k: string, n: number) => `${k}:${n}`,
+    meId: 'me',
+    locale: 'en',
+  };
+  it('says who started it while it runs, and how long they watched once it ended', () => {
+    expect(watchLineText({ type: 'watch', sessionId: 's' }, 'me', 'Ada', tr as never)).toBe('watch.system.startedYou');
+    expect(watchLineText({ type: 'watch', sessionId: 's' }, 'ada', 'Ada', tr as never)).toBe('watch.system.started{"name":"Ada"}');
+    expect(watchLineText({ type: 'watch', sessionId: 's', ended: true, seconds: 700 }, 'ada', 'Ada', tr as never)).toBe(
+      'watch.system.ended{"duration":"chat.call.minutes:12"}',
+    );
+    // Nobody else came: the line just says it was started (and leaves the chat later).
+    expect(watchLineText({ type: 'watch', sessionId: 's', ended: true, seconds: null }, 'me', 'Ada', tr as never)).toBe('watch.system.startedYou');
+  });
+});
 import { isEmptyWeek, weekOf } from './wrap.ts';
 
 describe('clock offset', () => {

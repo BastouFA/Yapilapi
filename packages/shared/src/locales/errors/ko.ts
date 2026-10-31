@@ -1,5 +1,11 @@
 /** The API's error messages in Korean, keyed by the English it writes. */
 export const ko: Record<string, string> = {
+  'That isn’t a link to a YouTube video.': 'YouTube 동영상 링크가 아니에요.',
+  'This video’s owner doesn’t let it play outside YouTube. Open it on YouTube instead.':
+    '이 동영상의 소유자가 YouTube 밖에서의 재생을 허용하지 않아요. YouTube에서 열어 주세요.',
+  'That YouTube video isn’t available. It may be private or removed.': '이 YouTube 동영상은 볼 수 없어요. 비공개이거나 삭제되었을 수 있어요.',
+  'Add a photo or video you uploaded for watch together.': '함께 보기용으로 올린 사진이나 동영상을 추가하세요.',
+  'Only photos and videos can be watched together.': '사진과 동영상만 함께 볼 수 있어요.',
   'The request body is not valid JSON.': '요청 본문이 올바른 JSON이 아니에요.',
   'Media not found.': '미디어를 찾을 수 없어요.',
   'Something went wrong on our side. Try again.': '저희 쪽에 문제가 생겼어요. 다시 시도해 주세요.',

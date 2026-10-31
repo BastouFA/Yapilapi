@@ -2,6 +2,10 @@ import type { Pool, PoolClient } from 'pg';
 import {
   WATCH_PRESENCE_SECONDS,
   WATCH_QUEUE_MAX,
+  WATCH_REOPEN_MINUTES,
+  type MediaItem,
+  type MessageSystemInfo,
+  type Post,
   type PublicUser,
   type WatchPlayback,
   type WatchQueueItem,
@@ -9,6 +13,8 @@ import {
   type WatchSkipReason,
   type WatchSummary,
 } from '@yapilapi/shared';
+import { mediaSizesSql } from './data-saver.ts';
+import { enqueue } from './jobs.ts';
 import { hydratePosts } from './posts.ts';
 import type { RealtimeHub } from './realtime.ts';
 import { seesSensitiveSql } from './interactions.ts';
@@ -77,6 +83,52 @@ export async function checkWatchable(db: Q, postIds: string[], members: string[]
   return out;
 }
 
+/** Media aliased `m` that is still there to show: not deleted, not blocked, processing didn't fail. */
+const UPLOAD_SHOWABLE_SQL = `(m.deleted_at IS NULL AND m.moderation <> 'blocked' AND m.status <> 'failed' AND m.kind IN ('image', 'video'))`;
+
+/**
+ * Of these uploads (photos and videos added from a device), which can go on screen for everyone
+ * in the chat. `owner`, when given, must have uploaded them for watch together ('invalid'
+ * otherwise). Gone or blocked: 'unavailable'; marked sensitive while someone in the chat doesn't
+ * see sensitive media: 'not_visible'.
+ */
+export async function checkUploads(
+  db: Q,
+  mediaIds: string[],
+  members: string[],
+  owner?: string,
+): Promise<Map<string, 'ok' | 'invalid' | 'unavailable' | 'not_visible'>> {
+  const out = new Map<string, 'ok' | 'invalid' | 'unavailable' | 'not_visible'>(mediaIds.map((id) => [id, owner ? 'invalid' : 'unavailable']));
+  if (!mediaIds.length) return out;
+  const { rows } = await db.query<{ id: string; mine: boolean; showable: boolean; everyone: boolean }>(
+    `SELECT m.id, (m.for_watch AND NOT m.private AND m.owner_id = $3::uuid AND m.kind IN ('image', 'video')) AS mine, ${UPLOAD_SHOWABLE_SQL} AS showable,
+            (m.moderation <> 'sensitive' OR NOT EXISTS (SELECT 1 FROM unnest($2::uuid[]) AS ms(id) WHERE NOT ${seesSensitiveSql('ms.id')})) AS everyone
+     FROM media m WHERE m.id = ANY($1::uuid[]) AND m.for_watch`,
+    [mediaIds, members, owner ?? null],
+  );
+  for (const r of rows) {
+    if (owner && !r.mine) continue;
+    out.set(r.id, !r.showable ? 'unavailable' : r.everyone ? 'ok' : 'not_visible');
+  }
+  return out;
+}
+
+/** A YouTube video to add: its id, with what YouTube said about it (when it could be asked). */
+export interface YouTubeToAdd {
+  videoId: string;
+  title: string | null;
+  thumbnailUrl: string | null;
+}
+
+/** What goes in a queue at once: posts, uploads and YouTube videos. */
+export interface QueueInput {
+  postIds?: string[];
+  mediaIds?: string[];
+  youtube?: YouTubeToAdd[];
+}
+
+export type QueueSkip = { postId?: string; mediaId?: string; videoId?: string; reason: WatchSkipReason };
+
 export function playbackOf(r: Record<string, any>): WatchPlayback {
   return {
     itemId: r.current_item_id ?? null,
@@ -130,17 +182,44 @@ export async function sessionFor(db: Q, sessionId: string, viewer: string): Prom
   const members = await chatMembers(db, s.conversation_id);
   const watching = await watchingIds(db, s.id);
   const items = (
-    await db.query<{ id: string; post_id: string; added_by: string | null; status: 'queued' | 'playing' }>(
-      `SELECT id, post_id, added_by, status FROM watch_queue_items WHERE session_id = $1 AND status IN ('queued', 'playing') ORDER BY (status = 'playing') DESC, position`,
-      [s.id],
+    await db.query<{
+      id: string;
+      kind: 'post' | 'upload' | 'youtube';
+      post_id: string | null;
+      added_by: string | null;
+      status: 'queued' | 'playing';
+      youtube_id: string | null;
+      title: string | null;
+      thumbnail_url: string | null;
+      media: (MediaItem & { ready: boolean }) | null;
+    }>(
+      // Uploads: shown while they're still there and not blocked, and to people who see sensitive
+      // media when it was marked so. Ready once processed (a photo's sizes, a video's poster).
+      `SELECT q.id, q.kind, q.post_id, q.added_by, q.status, q.youtube_id, q.title, q.thumbnail_url,
+              (SELECT json_build_object('id', m.id, 'kind', m.kind, 'url', m.url, 'altText', m.alt_text, 'width', m.width, 'height', m.height,
+                        'variants', m.variants, 'sizes', ${mediaSizesSql()}, 'posterUrl', m.poster_url, 'hlsUrl', m.hls_url, 'placeholder', m.blurhash,
+                        'sensitive', m.moderation = 'sensitive',
+                        'ready', m.status = 'ready' AND (CASE WHEN m.kind = 'video' THEN m.poster_url IS NOT NULL ELSE m.variants <> '{}'::jsonb END))
+                 FROM media m WHERE m.id = q.media_id AND ${UPLOAD_SHOWABLE_SQL} AND (m.moderation <> 'sensitive' OR ${seesSensitiveSql('$2::uuid')})) AS media
+       FROM watch_queue_items q WHERE q.session_id = $1 AND q.status IN ('queued', 'playing') ORDER BY (q.status = 'playing') DESC, q.position`,
+      [s.id, viewer],
     )
   ).rows;
   const users = await people(db, [...new Set([...members, ...watching, s.started_by, ...items.map((i) => i.added_by).filter((x): x is string => !!x)])]);
-  const posts = new Map((await hydratePosts(db, [...new Set(items.map((i) => i.post_id))], viewer)).map((p) => [p.id, p]));
+  const postIds = [...new Set(items.map((i) => i.post_id).filter((x): x is string => !!x))];
+  const posts = new Map((await hydratePosts(db, postIds, viewer)).map((p) => [p.id, p]));
   const queue: WatchQueueItem[] = [];
   for (const i of items) {
-    const post = posts.get(i.post_id);
-    if (post) queue.push({ id: i.id, post, addedBy: (i.added_by && users.get(i.added_by)) || null, status: i.status });
+    const base = { id: i.id, addedBy: (i.added_by && users.get(i.added_by)) || null, status: i.status };
+    if (i.kind === 'youtube' && i.youtube_id)
+      queue.push({ ...base, kind: 'youtube', youtube: { videoId: i.youtube_id, title: i.title, thumbnailUrl: i.thumbnail_url } });
+    else if (i.kind === 'upload' && i.media) {
+      const { ready, ...media } = i.media;
+      queue.push({ ...base, kind: 'upload', media: { ...media, variants: media.variants ?? {} }, ready });
+    } else if (i.kind === 'post' && i.post_id) {
+      const post = posts.get(i.post_id);
+      if (post) queue.push({ ...base, kind: 'post', post });
+    }
   }
   return {
     id: s.id,
@@ -162,42 +241,67 @@ export async function sessionFor(db: Q, sessionId: string, viewer: string): Prom
 }
 
 /**
- * Put posts at the end of a session's queue. Each goes in only when everyone in the chat can
- * watch it; the others come back with the reason. With nothing on screen, the first one added
- * goes on screen (paused unless `play`).
+ * Put posts, uploads and YouTube videos at the end of a session's queue. A post goes in only when
+ * everyone in the chat can watch it, an upload only when it's the adder's own (made for watch
+ * together; the caller checks that first) and everyone may see it; the others come back with the
+ * reason. With nothing on screen, the first one added goes on screen (paused unless `play`).
  */
 export async function addToQueue(
   c: PoolClient,
   sessionId: string,
   conversationId: string,
   userId: string,
-  postIds: string[],
+  input: QueueInput,
   play = false,
-): Promise<{ added: string[]; skipped: { postId: string; reason: WatchSkipReason }[]; changedPlayback: boolean }> {
+): Promise<{ added: string[]; skipped: QueueSkip[]; changedPlayback: boolean }> {
   const members = await chatMembers(c, conversationId);
-  const unique = [...new Set(postIds)];
-  const verdicts = await checkWatchable(c, unique, members);
-  const waiting = new Set(
-    (
-      await c.query<{ post_id: string }>(`SELECT post_id FROM watch_queue_items WHERE session_id = $1 AND status IN ('queued', 'playing')`, [sessionId])
-    ).rows.map((r) => r.post_id),
-  );
+  const postIds = [...new Set(input.postIds ?? [])];
+  const mediaIds = [...new Set(input.mediaIds ?? [])];
+  const youtube = [...new Map((input.youtube ?? []).map((y) => [y.videoId, y])).values()];
+  const verdicts = await checkWatchable(c, postIds, members);
+  const uploads = await checkUploads(c, mediaIds, members);
+  const waitingRows = (
+    await c.query<{ post_id: string | null; media_id: string | null; youtube_id: string | null }>(
+      `SELECT post_id, media_id, youtube_id FROM watch_queue_items WHERE session_id = $1 AND status IN ('queued', 'playing')`,
+      [sessionId],
+    )
+  ).rows;
+  const waiting = new Set(waitingRows.map((r) => r.post_id ?? r.media_id ?? r.youtube_id));
   let room = WATCH_QUEUE_MAX - waiting.size;
   const added: string[] = [];
-  const skipped: { postId: string; reason: WatchSkipReason }[] = [];
+  const skipped: QueueSkip[] = [];
   let next = Number((await c.query(`SELECT coalesce(max(position), 0) + 1 AS n FROM watch_queue_items WHERE session_id = $1`, [sessionId])).rows[0].n);
-  for (const postId of unique) {
-    const v = verdicts.get(postId)!;
-    if (v !== 'ok') skipped.push({ postId, reason: v });
-    else if (waiting.has(postId)) skipped.push({ postId, reason: 'already_queued' });
-    else if (room <= 0) skipped.push({ postId, reason: 'queue_full' });
+  type Candidate = { key: string; verdict: 'ok' | WatchSkipReason; skip: Omit<QueueSkip, 'reason'>; kind: 'post' | 'upload' | 'youtube'; yt?: YouTubeToAdd };
+  const candidates: Candidate[] = [
+    ...postIds.map((postId): Candidate => ({ key: postId, verdict: verdicts.get(postId)!, skip: { postId }, kind: 'post' })),
+    ...mediaIds.map((mediaId): Candidate => {
+      const v = uploads.get(mediaId)!;
+      return { key: mediaId, verdict: v === 'invalid' ? 'unavailable' : v, skip: { mediaId }, kind: 'upload' };
+    }),
+    ...youtube.map((yt): Candidate => ({ key: yt.videoId, verdict: 'ok', skip: { videoId: yt.videoId }, kind: 'youtube', yt })),
+  ];
+  for (const cand of candidates) {
+    if (cand.verdict !== 'ok') skipped.push({ ...cand.skip, reason: cand.verdict });
+    else if (waiting.has(cand.key)) skipped.push({ ...cand.skip, reason: 'already_queued' });
+    else if (room <= 0) skipped.push({ ...cand.skip, reason: 'queue_full' });
     else {
       const { rows } = await c.query<{ id: string }>(
-        `INSERT INTO watch_queue_items (session_id, post_id, added_by, position) VALUES ($1,$2,$3,$4) RETURNING id`,
-        [sessionId, postId, userId, next++],
+        `INSERT INTO watch_queue_items (session_id, added_by, position, kind, post_id, media_id, youtube_id, title, thumbnail_url)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
+        [
+          sessionId,
+          userId,
+          next++,
+          cand.kind,
+          cand.skip.postId ?? null,
+          cand.skip.mediaId ?? null,
+          cand.yt?.videoId ?? null,
+          cand.yt?.title ?? null,
+          cand.yt?.thumbnailUrl ?? null,
+        ],
       );
       added.push(rows[0]!.id);
-      waiting.add(postId);
+      waiting.add(cand.key);
       room--;
     }
   }
@@ -229,20 +333,27 @@ export async function advance(
 ): Promise<{ skipped: WatchSkipReason[]; itemId: string | null; moved: boolean }> {
   const members = await chatMembers(c, session.conversation_id);
   const queued = (
-    await c.query<{ id: string; post_id: string }>(
-      `SELECT id, post_id FROM watch_queue_items WHERE session_id = $1 AND status = 'queued' ${target ? 'AND id = $2' : ''} ORDER BY position`,
+    await c.query<{ id: string; post_id: string | null; media_id: string | null }>(
+      `SELECT id, post_id, media_id FROM watch_queue_items WHERE session_id = $1 AND status = 'queued' ${target ? 'AND id = $2' : ''} ORDER BY position`,
       target ? [session.id, target] : [session.id],
     )
   ).rows;
+  // Posts are checked against everyone in the chat again, and so are uploads (blocked or marked
+  // sensitive since they were added); YouTube's own player decides about its videos.
   const verdicts = await checkWatchable(
     c,
-    queued.map((q) => q.post_id),
+    queued.map((q) => q.post_id).filter((x): x is string => !!x),
+    members,
+  );
+  const uploads = await checkUploads(
+    c,
+    queued.map((q) => q.media_id).filter((x): x is string => !!x),
     members,
   );
   const skipped: WatchSkipReason[] = [];
   let chosen: string | null = null;
   for (const q of queued) {
-    const v = verdicts.get(q.post_id)!;
+    const v = q.post_id ? verdicts.get(q.post_id)! : q.media_id ? uploads.get(q.media_id)! : 'ok';
     if (v === 'ok') {
       chosen = q.id;
       break;
@@ -282,23 +393,99 @@ export async function publishUpdated(deps: WatchDeps, sessionId: string, reason:
   await deps.realtime.publish([...new Set([...ids, ...also])], { type: 'watch.updated', data: { sessionId, reason } });
 }
 
-/** End a session: everyone leaves, and everyone in the chat hears it ended. */
+/** The job that takes the line of a session nobody else joined out of the chat, once it can't be opened again. */
+export const WATCH_TIDY_LINE_JOB = 'watch.tidy_line';
+
+/** Tell everyone in a chat that a line changed (`message.system`). */
+async function publishLine(deps: WatchDeps, conversationId: string, lineId: string, system: MessageSystemInfo): Promise<void> {
+  await deps.realtime.publish(await chatMembers(deps.db, conversationId), { type: 'message.system', data: { id: lineId, conversationId, system } });
+}
+
+/**
+ * End a session: everyone leaves, and everyone in the chat hears it ended. Its line says how long
+ * people watched together; when nobody else joined, the line leaves the chat after
+ * WATCH_REOPEN_MINUTES (unless its starter opens it again before then). Files added from devices
+ * are deleted (after the usual grace period for deleted files).
+ */
 export async function endSession(deps: WatchDeps, sessionId: string): Promise<boolean> {
-  const { rows } = await deps.db.query<{ conversation_id: string }>(
-    `UPDATE watch_sessions SET status = 'ended', ended_at = now(), playing = false WHERE id = $1 AND status = 'active' RETURNING conversation_id`,
+  const { rows } = await deps.db.query<{ conversation_id: string; line_id: string | null; seconds: number | null }>(
+    `UPDATE watch_sessions SET status = 'ended', ended_at = now(), playing = false WHERE id = $1 AND status = 'active'
+     RETURNING conversation_id, line_id, CASE WHEN together_at IS NOT NULL THEN greatest(0, round(extract(epoch FROM now() - together_at)))::int END AS seconds`,
     [sessionId],
   );
-  if (!rows[0]) return false;
+  const s = rows[0];
+  if (!s) return false;
   const left = await deps.db.query<{ user_id: string }>(
     `UPDATE watch_participants SET left_at = now() WHERE session_id = $1 AND left_at IS NULL RETURNING user_id`,
     [sessionId],
   );
-  const members = await chatMembers(deps.db, rows[0].conversation_id);
+  await deleteUploads(deps.db, sessionId);
+  const members = await chatMembers(deps.db, s.conversation_id);
   await deps.realtime.publish([...new Set([...members, ...left.rows.map((r) => r.user_id)])], {
     type: 'watch.ended',
-    data: { sessionId, conversationId: rows[0].conversation_id },
+    data: { sessionId, conversationId: s.conversation_id },
   });
+  if (s.line_id) {
+    const system: MessageSystemInfo = { type: 'watch', sessionId, ended: true, seconds: s.seconds };
+    const r = await deps.db.query(`UPDATE messages SET meta = $2 WHERE id = $1 AND kind = 'system'`, [s.line_id, system]);
+    if (r.rowCount) await publishLine(deps, s.conversation_id, s.line_id, system);
+    if (s.seconds === null) await enqueue(deps.db, WATCH_TIDY_LINE_JOB, { sessionId }, WATCH_REOPEN_MINUTES * 60 + 5);
+  }
   return true;
+}
+
+/**
+ * Files added to a session from devices are deleted when it ends, unless they're used somewhere
+ * else (a post, a story, a listing, a stash, a Together album or a message of the person who
+ * uploaded them, or another session still running). The usual clean-up erases them after the
+ * grace period for deleted files.
+ */
+async function deleteUploads(db: Q, sessionId: string): Promise<void> {
+  await db.query(
+    `UPDATE media m SET deleted_at = now()
+     WHERE m.for_watch AND m.deleted_at IS NULL
+       AND m.id IN (SELECT q.media_id FROM watch_queue_items q WHERE q.session_id = $1 AND q.media_id IS NOT NULL)
+       AND NOT EXISTS (SELECT 1 FROM post_media pm WHERE pm.media_id = m.id)
+       AND NOT EXISTS (SELECT 1 FROM moments st WHERE st.media_id = m.id)
+       AND NOT EXISTS (SELECT 1 FROM market_listing_photos lp WHERE lp.media_id = m.id)
+       AND NOT EXISTS (SELECT 1 FROM stashes sh WHERE sh.media_id = m.id)
+       AND NOT EXISTS (SELECT 1 FROM together_contributions tc WHERE tc.media_id = m.id)
+       AND NOT EXISTS (SELECT 1 FROM messages x WHERE x.sender_id = m.owner_id AND x.attachments @> jsonb_build_array(jsonb_build_object('mediaId', m.id::text)))
+       AND NOT EXISTS (SELECT 1 FROM watch_queue_items o JOIN watch_sessions os ON os.id = o.session_id
+                       WHERE o.media_id = m.id AND os.status = 'active' AND os.id <> $1)`,
+    [sessionId],
+  );
+}
+
+/** A session opened again: the files added to it from devices come back (they were only marked deleted). */
+export async function restoreUploads(db: Q, sessionId: string): Promise<void> {
+  await db.query(
+    `UPDATE media m SET deleted_at = NULL
+     WHERE m.for_watch AND m.deleted_at IS NOT NULL AND m.deleted_at > now() - make_interval(mins => $2)
+       AND m.id IN (SELECT q.media_id FROM watch_queue_items q WHERE q.session_id = $1 AND q.media_id IS NOT NULL AND q.status IN ('queued', 'playing'))`,
+    [sessionId, WATCH_REOPEN_MINUTES + 1],
+  );
+}
+
+/**
+ * Take the line of an ended session nobody else joined out of the chat: once it can't be opened
+ * again (`olderThanMinutes`), or straight away when someone starts a new session in that chat.
+ */
+export async function tidyLonelyLines(deps: WatchDeps, where: { sessionId: string } | { conversationId: string }): Promise<number> {
+  const { rows } = await deps.db.query<{ id: string; conversation_id: string }>(
+    // The session's line_id empties itself (ON DELETE SET NULL).
+    `DELETE FROM messages m USING watch_sessions s
+     WHERE m.id = s.line_id AND m.kind = 'system' AND s.status = 'ended' AND s.together_at IS NULL
+       AND ${'sessionId' in where ? `s.id = $1 AND s.ended_at <= now() - make_interval(mins => ${WATCH_REOPEN_MINUTES})` : 's.conversation_id = $1'}
+     RETURNING m.id, m.conversation_id`,
+    ['sessionId' in where ? where.sessionId : where.conversationId],
+  );
+  for (const r of rows)
+    await deps.realtime.publish(await chatMembers(deps.db, r.conversation_id), {
+      type: 'message.deleted',
+      data: { id: r.id, conversationId: r.conversation_id },
+    });
+  return rows.length;
 }
 
 /**
@@ -364,4 +551,29 @@ export async function sweepWatch(deps: WatchDeps): Promise<number> {
       gone.rows.filter((g) => g.session_id === id).map((g) => g.user_id),
     );
   return changed.size;
+}
+
+/**
+ * What to watch next, for everyone in a session's chat to see the same few: reels and video posts
+ * every one of them can see and open (the queue's own rule), not watched or waiting in this
+ * session yet. First the newest from people in the chat, then the most liked of the last month.
+ * Hydrated as `viewer` sees them.
+ */
+export async function suggestions(db: Q, sessionId: string, conversationId: string, viewer: string, limit = 6): Promise<Post[]> {
+  const members = await chatMembers(db, conversationId);
+  const { rows } = await db.query<{ id: string }>(
+    `SELECT p.id FROM posts p JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id
+     WHERE p.deleted_at IS NULL AND p.status = 'published' AND p.format IN ('reel', 'post')
+       AND p.created_at > now() - interval '30 days'
+       AND NOT EXISTS (SELECT 1 FROM watch_queue_items q WHERE q.session_id = $2 AND q.post_id = p.id)
+       AND ${WATCHABLE_SQL} AND ${visibleToAllSql('$1::uuid[]')}
+     ORDER BY (p.author_id = ANY($1::uuid[])) DESC, CASE WHEN p.author_id = ANY($1::uuid[]) THEN extract(epoch FROM p.created_at) ELSE p.like_count END DESC, p.id
+     LIMIT $3`,
+    [members, sessionId, limit],
+  );
+  return hydratePosts(
+    db,
+    rows.map((r) => r.id),
+    viewer,
+  );
 }

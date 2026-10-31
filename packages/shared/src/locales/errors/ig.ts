@@ -1,5 +1,11 @@
 /** The API's error messages in Igbo, keyed by the English it writes. */
 export const ig: Record<string, string> = {
+  'That isn’t a link to a YouTube video.': 'Nke a abụghị njikọ na vidiyo YouTube.',
+  'This video’s owner doesn’t let it play outside YouTube. Open it on YouTube instead.':
+    'Onye nwe vidiyo a anaghị ekwe ka a kpọọ ya na mpụga YouTube. Mepee ya na YouTube kama.',
+  'That YouTube video isn’t available. It may be private or removed.': 'Vidiyo YouTube ahụ adịghị. O nwere ike ịbụ nzuzo ma ọ bụ e wepụla ya.',
+  'Add a photo or video you uploaded for watch together.': 'Tinye foto ma ọ bụ vidiyo i bulitere maka ilere ọnụ.',
+  'Only photos and videos can be watched together.': 'Ọ bụ naanị foto na vidiyo ka a ga-elere ọnụ.',
   'The request body is not valid JSON.': 'Ahụ arịrịọ ahụ abụghị JSON ziri ezi.',
   'Media not found.': 'Ahụghị mgbasa ahụ.',
   'Something went wrong on our side. Try again.': 'Ihe adịghị mma mere n’akụkụ anyị. Nwaa ọzọ.',

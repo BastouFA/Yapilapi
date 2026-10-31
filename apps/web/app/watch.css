@@ -143,6 +143,10 @@
 .watch-top__actions {
   flex-wrap: nowrap;
 }
+/* The top bar is see-through: over the dark video, a plain-text button needs its own background. */
+.watch-top__actions .yp-btn--ghost {
+  background: var(--surface);
+}
 .watch-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -890,4 +894,260 @@
   display: flex;
   justify-content: flex-end;
   margin-top: var(--space-3);
+}
+
+/* ── Watch together, better ────────────────────────────────────────────── */
+
+/* In a chat's header: "Join" in words while a session runs, so it's easy to find on a phone. */
+.chat-head__watch {
+  gap: 4px;
+  min-height: 44px;
+  padding-inline: 12px;
+}
+/* A shared reel or video in a chat bubble: open it, or watch it together. */
+.shared-post__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+.shared-post__watch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: inherit;
+  font: 600 0.85rem/1 var(--font-sans);
+  cursor: pointer;
+}
+.shared-post__watch:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* Who's watching, above the video, with a short note when someone comes or goes. */
+.watch-presence {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  min-width: 0;
+}
+.watch-presence__faces {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+.watch-presence__face {
+  display: grid;
+  border-radius: var(--radius-full);
+}
+.watch-presence__face--host {
+  box-shadow: 0 0 0 2px var(--yapi);
+}
+.watch-presence__count {
+  flex: none;
+  font-size: 13px;
+  line-height: 18px;
+}
+.watch-presence__note {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 13px/18px var(--font-sans);
+  color: var(--yapi);
+}
+
+/* What's on screen: a photo, YouTube's player, an upload getting ready, another device. */
+.watch-stage__photo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.watch-stage__yt,
+.watch-stage__yt-host,
+.watch-stage__yt-host iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.watch-stage__yt-host[hidden] {
+  display: none;
+}
+.watch-stage--embed {
+  aspect-ratio: 16 / 9;
+  height: auto;
+  min-height: 0;
+  max-height: 58dvh;
+}
+.watch-stage--drop {
+  outline: 3px dashed var(--yapi);
+  outline-offset: 2px;
+}
+.watch-stage__elsewhere p {
+  max-width: 34ch;
+}
+.watch-stage__spin {
+  width: 28px;
+  height: 28px;
+  border-color: rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+}
+/* No sound until a tap (iPhones): the video plays muted in step, and this turns the sound on. */
+.watch-sound-pill {
+  position: absolute;
+  inset-block-start: var(--space-3);
+  inset-inline-end: var(--space-3);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  font: 600 14px/1 var(--font-sans);
+  cursor: pointer;
+}
+.watch-sound-pill:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.watch-embed-taps {
+  gap: var(--space-2);
+}
+.watch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.watch-chat-toggle {
+  position: relative;
+  gap: 6px;
+}
+.watch-chat-toggle__dot {
+  position: absolute;
+  inset-block-start: 6px;
+  inset-inline-end: 6px;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-full);
+  background: var(--yapi);
+  box-shadow: 0 0 0 2px var(--surface);
+}
+
+/* Uploading from this device: a file button, a place to drop a file, and how far it got. */
+.watch-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding: var(--space-4);
+  border: 2px dashed var(--line-strong);
+  border-radius: var(--radius-lg);
+}
+.watch-drop--over {
+  border-color: var(--yapi);
+  background: var(--yapi-soft);
+}
+.watch-drop__hint {
+  margin: 0;
+  font-size: 14px;
+}
+.watch-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+.watch-upload__label {
+  font: 600 14px/20px var(--font-sans);
+}
+.watch-upload__bar {
+  width: 100%;
+  height: 8px;
+  accent-color: var(--yapi);
+}
+.watch-suggest {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* The chat: beside (or below) the video on wider screens; on phones a sheet over the lower part of
+   the screen that opens and closes, the video still in view above it (WatchScreen puts it in
+   <body> then, out of the page's layout). */
+.watch-chat__close {
+  display: none;
+}
+.watch-actions .watch-chat-toggle {
+  display: none;
+}
+@media (max-width: 819px) {
+  .watch-actions .watch-chat-toggle {
+    display: inline-flex;
+  }
+}
+.watch-chat.watch-chat--sheet {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 1100;
+  display: none;
+  height: min(56dvh, 520px);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.25);
+}
+.watch-chat.watch-chat--sheet.watch-chat--open {
+  display: flex;
+}
+.watch-chat--sheet .watch-chat__close {
+  display: grid;
+  position: absolute;
+  inset-block-start: 6px;
+  inset-inline-end: 6px;
+}
+.watch-chat--sheet .watch-chat__head {
+  padding-inline-end: 48px;
+}
+/* Room to scroll the page past the open sheet. */
+.watch-page--chat .watch-layout {
+  padding-bottom: min(56dvh, 520px);
+}
+
+/* A voice call while watching: a small bar at the top instead of the full call screen. */
+.call-bar {
+  position: fixed;
+  inset-inline: var(--space-3);
+  top: calc(var(--space-2) + env(safe-area-inset-top, 0px));
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px 6px 6px 14px;
+  border-radius: var(--radius-full);
+  background: #050807;
+  color: #f1f5f3;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+.call-bar__status {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 14px/20px var(--font-sans);
+}
+.call-bar .call__audio {
+  position: absolute;
 }

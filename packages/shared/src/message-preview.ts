@@ -116,7 +116,23 @@ export function lastMessageText(
   const s = m.kind === 'system' ? m.system : undefined;
   if (s?.type === 'call') return callLineText(s, m.sender.id, tr);
   if (s?.type === 'group') return groupLineText(s, m.sender.id === tr.meId ? tr.t('m.chat.you') : m.sender.displayName, tr);
+  if (s?.type === 'watch') return watchLineText(s, m.sender.id, m.sender.displayName, tr);
   return messagePreviewText(m.preview ?? messagePreviewOf(m), tr);
+}
+
+/**
+ * A watch together line: "Ada started watching together" (or "You started…") while it runs and
+ * when nobody else joined, "Watched together · 12 minutes" once people watched and it ended.
+ */
+export function watchLineText(
+  info: { type?: 'watch'; sessionId?: string; ended?: boolean; seconds?: number | null },
+  starterId: string,
+  starterName: string,
+  tr: PreviewTranslator & { tp: (key: PluralKey, count: number, vars?: Record<string, string | number>) => string },
+): string {
+  if (info.ended && typeof info.seconds === 'number')
+    return tr.t('watch.system.ended', { duration: tr.tp('chat.call.minutes', Math.max(1, Math.round(info.seconds / 60))) });
+  return starterId === tr.meId ? tr.t('watch.system.startedYou') : tr.t('watch.system.started', { name: starterName });
 }
 
 /**

@@ -7,6 +7,7 @@ import {
   chatTheme,
   chessDrawReason,
   callLineText,
+  watchLineText,
   DISAPPEARING_SECONDS,
   groupLineText,
   messagePreviewText,
@@ -202,11 +203,12 @@ export function SystemLine({
     );
   }
   if (s?.type === 'watch') {
-    const text = message.sender.id === meId ? t('watch.system.startedYou') : t('watch.system.started', { name: message.sender.displayName });
+    // "Ada started watching together" with Join while it runs; "Watched together · 12 minutes" once it ended.
+    const text = watchLineText(s, message.sender.id, message.sender.displayName, { t, tp, locale, meId });
     return (
       <p className="chat-system" role="note">
         <Icon name="play" size={14} /> <bdi>{text}</bdi>
-        {watchSessionId && watchSessionId === s.sessionId ? (
+        {!s.ended && watchSessionId && watchSessionId === s.sessionId ? (
           <>
             {' '}
             <Link href={`/watch/${s.sessionId}`} className="chat-system__join">

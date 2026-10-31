@@ -1,5 +1,11 @@
 /** The API's error messages in Vietnamese, keyed by the English it writes. */
 export const vi: Record<string, string> = {
+  'That isn’t a link to a YouTube video.': 'Đó không phải là liên kết đến video YouTube.',
+  'This video’s owner doesn’t let it play outside YouTube. Open it on YouTube instead.':
+    'Chủ sở hữu video này không cho phát bên ngoài YouTube. Hãy mở trên YouTube.',
+  'That YouTube video isn’t available. It may be private or removed.': 'Video YouTube đó không có sẵn. Có thể video ở chế độ riêng tư hoặc đã bị xóa.',
+  'Add a photo or video you uploaded for watch together.': 'Hãy thêm ảnh hoặc video bạn đã tải lên để xem cùng nhau.',
+  'Only photos and videos can be watched together.': 'Chỉ có thể xem cùng nhau ảnh và video.',
   'The request body is not valid JSON.': 'Nội dung yêu cầu không phải JSON hợp lệ.',
   'Media not found.': 'Không tìm thấy nội dung đa phương tiện.',
   'Something went wrong on our side. Try again.': 'Đã xảy ra lỗi ở phía chúng tôi. Hãy thử lại.',

@@ -1098,6 +1098,12 @@ export const yo: Record<string, string> = {
   '{total_chunks} chunks are still missing.': 'Chunk {total_chunks} ṣì kù.',
   'The uploaded size does not match.': 'Ìwọ̀n ohun tí a gbé sókè kò bá a mu.',
   // apps/api/src/modules/watch.ts
+  'That isn’t a link to a YouTube video.': 'Èyí kì í ṣe ìjápọ̀ sí fídíò YouTube.',
+  'This video’s owner doesn’t let it play outside YouTube. Open it on YouTube instead.':
+    'Ẹni tó ni fídíò yìí kò gbà kí a wò ó lẹ́yìn YouTube. Ṣí i lórí YouTube dípò.',
+  'That YouTube video isn’t available. It may be private or removed.': 'Fídíò YouTube yẹn kò sí. Ó lè jẹ́ àdáni tàbí kí wọ́n ti yọ ọ́ kúrò.',
+  'Add a photo or video you uploaded for watch together.': 'Ṣàfikún fọ́tò tàbí fídíò tí o gbé sókè fún wíwò papọ̀.',
+  'Only photos and videos can be watched together.': 'Fọ́tò àti fídíò nìkan ni a lè wò papọ̀.',
   'Watch together is for chats of up to 8 people, you included.': 'Wíwò pọ̀ wà fún ìjíròrò tí kò ju ènìyàn 8 lọ, pẹ̀lú ìwọ náà.',
   'Join to do that.': 'Darapọ̀ láti ṣe ìyẹn.',
   'This watch together session has ended.': 'Ìgbà wíwò pọ̀ yìí ti parí.',

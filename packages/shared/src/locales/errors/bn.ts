@@ -1,5 +1,11 @@
 /** The API's error messages in Bengali, keyed by the English it writes. */
 export const bn: Record<string, string> = {
+  'That isn’t a link to a YouTube video.': 'এটি কোনো YouTube ভিডিওর লিংক নয়।',
+  'This video’s owner doesn’t let it play outside YouTube. Open it on YouTube instead.':
+    'এই ভিডিওর মালিক YouTube-এর বাইরে এটি চালাতে দেন না। এর বদলে YouTube-এ খুলুন।',
+  'That YouTube video isn’t available. It may be private or removed.': 'এই YouTube ভিডিওটি পাওয়া যাচ্ছে না। এটি ব্যক্তিগত বা সরানো হতে পারে।',
+  'Add a photo or video you uploaded for watch together.': 'একসাথে দেখার জন্য আপলোড করা একটি ছবি বা ভিডিও যোগ করুন।',
+  'Only photos and videos can be watched together.': 'শুধু ছবি আর ভিডিও একসাথে দেখা যায়।',
   'The request body is not valid JSON.': 'অনুরোধের বডি বৈধ JSON নয়।',
   'Media not found.': 'মিডিয়া পাওয়া যায়নি।',
   'Something went wrong on our side. Try again.': 'আমাদের দিকে কিছু একটা ভুল হয়েছে। আবার চেষ্টা করুন।',

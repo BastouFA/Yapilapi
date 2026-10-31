@@ -1,5 +1,11 @@
 /** The API's error messages in Urdu, keyed by the English it writes. */
 export const ur: Record<string, string> = {
+  'That isn’t a link to a YouTube video.': 'یہ YouTube ویڈیو کا لنک نہیں ہے۔',
+  'This video’s owner doesn’t let it play outside YouTube. Open it on YouTube instead.':
+    'اس ویڈیو کا مالک اسے YouTube کے باہر چلانے کی اجازت نہیں دیتا۔ اسے YouTube پر کھولیں۔',
+  'That YouTube video isn’t available. It may be private or removed.': 'یہ YouTube ویڈیو دستیاب نہیں۔ ہو سکتا ہے یہ نجی ہو یا ہٹا دی گئی ہو۔',
+  'Add a photo or video you uploaded for watch together.': 'وہ تصویر یا ویڈیو شامل کریں جو آپ نے ساتھ دیکھنے کے لیے اپ لوڈ کی۔',
+  'Only photos and videos can be watched together.': 'صرف تصاویر اور ویڈیوز ساتھ دیکھی جا سکتی ہیں۔',
   'The request body is not valid JSON.': 'درخواست کا مواد درست JSON نہیں ہے۔',
   'Media not found.': 'میڈیا نہیں ملا۔',
   'Something went wrong on our side. Try again.': 'ہماری طرف سے کچھ غلط ہو گیا۔ دوبارہ کوشش کریں۔',

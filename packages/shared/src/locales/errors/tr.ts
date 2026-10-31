@@ -1,5 +1,11 @@
 /** The API's error messages in Turkish, keyed by the English it writes. */
 export const tr: Record<string, string> = {
+  'That isn’t a link to a YouTube video.': 'Bu bir YouTube videosu bağlantısı değil.',
+  'This video’s owner doesn’t let it play outside YouTube. Open it on YouTube instead.':
+    'Bu videonun sahibi YouTube dışında oynatılmasına izin vermiyor. Bunun yerine YouTube’da aç.',
+  'That YouTube video isn’t available. It may be private or removed.': 'Bu YouTube videosu kullanılamıyor. Gizli ya da kaldırılmış olabilir.',
+  'Add a photo or video you uploaded for watch together.': 'Birlikte izlemek için yüklediğin bir fotoğraf veya video ekle.',
+  'Only photos and videos can be watched together.': 'Yalnızca fotoğraflar ve videolar birlikte izlenebilir.',
   'The request body is not valid JSON.': 'İstek gövdesi geçerli bir JSON değil.',
   'Media not found.': 'Medya bulunamadı.',
   'Something went wrong on our side. Try again.': 'Bizim tarafımızda bir sorun oluştu. Tekrar dene.',

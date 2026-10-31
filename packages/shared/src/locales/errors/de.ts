@@ -1,5 +1,12 @@
 /** The API's error messages in German, keyed by the English it writes. */
 export const de: Record<string, string> = {
+  'That isn’t a link to a YouTube video.': 'Das ist kein Link zu einem YouTube-Video.',
+  'This video’s owner doesn’t let it play outside YouTube. Open it on YouTube instead.':
+    'Der Inhaber dieses Videos erlaubt keine Wiedergabe außerhalb von YouTube. Öffne es stattdessen auf YouTube.',
+  'That YouTube video isn’t available. It may be private or removed.':
+    'Dieses YouTube-Video ist nicht verfügbar. Es ist vielleicht privat oder wurde entfernt.',
+  'Add a photo or video you uploaded for watch together.': 'Füge ein Foto oder Video hinzu, das du für gemeinsames Schauen hochgeladen hast.',
+  'Only photos and videos can be watched together.': 'Nur Fotos und Videos können gemeinsam angeschaut werden.',
   'The request body is not valid JSON.': 'Der Inhalt der Anfrage ist kein gültiges JSON.',
   'Media not found.': 'Medium nicht gefunden.',
   'Something went wrong on our side. Try again.': 'Bei uns ist etwas schiefgelaufen. Versuch es noch einmal.',

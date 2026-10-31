@@ -50,7 +50,18 @@ function loadPost(id: string) {
  * words of whoever posted it link to the whole thing. Shows nothing when the post can't be seen
  * (deleted, private, for subscribers): the message's link is still there.
  */
-export function SharedPostCard({ id, href, onMissing }: { id: string; href: string; onMissing?: () => void }) {
+export function SharedPostCard({
+  id,
+  href,
+  onMissing,
+  onWatch,
+}: {
+  id: string;
+  href: string;
+  onMissing?: () => void;
+  /** In a chat where people can watch together: "Watch together" on a reel or video starts (or joins) a session with it. */
+  onWatch?: () => void;
+}) {
   const { t, dataSaver } = useSession();
   const [post, setPost] = useState<Post | null | undefined>(undefined);
   useEffect(() => {
@@ -91,10 +102,18 @@ export function SharedPostCard({ id, href, onMissing }: { id: string; href: stri
           {words ? <span dir="auto">{words}</span> : null}
         </span>
       </Link>
-      <Link href={href} className="shared-post__open">
-        {reel ? t('chat.watchReel') : t('chat.openPost')}
-        <Icon name="chevron-right" size={16} />
-      </Link>
+      <div className="shared-post__actions">
+        <Link href={href} className="shared-post__open">
+          {reel ? t('chat.watchReel') : t('chat.openPost')}
+          <Icon name="chevron-right" size={16} />
+        </Link>
+        {onWatch && media?.kind === 'video' ? (
+          <button type="button" className="shared-post__watch" onClick={onWatch}>
+            <Icon name="play" size={16} />
+            {t('watch.start')}
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }

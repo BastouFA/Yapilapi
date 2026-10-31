@@ -13,7 +13,7 @@ export const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 /** Shorter than this, a recording has nothing in it. */
 const EMPTY_AUDIO_MS = 200;
 
-const uploadQuery = z.object({ viewOnce: z.enum(['true', 'false', '1', '0']).optional() });
+const uploadQuery = z.object({ viewOnce: z.enum(['true', 'false', '1', '0']).optional(), for: z.enum(['watch']).optional() });
 
 /**
  * Media upload. Files are type-checked by magic bytes, stored through the
@@ -23,6 +23,10 @@ const uploadQuery = z.object({ viewOnce: z.enum(['true', 'false', '1', '0']).opt
  * With ?viewOnce=true the photo, video or voice note is for a view-once chat message: it is
  * stored privately (never at a public address, url is empty) and can only be
  * sent with `viewOnce: true`.
+ *
+ * With ?for=watch the photo or video is for a watch together queue (POST /v1/watch/:id/queue
+ * with `mediaIds`): processed and checked like any upload, shown only through that session to the
+ * people in its chat, and deleted when the session ends.
  */
 export default async function mediaModule(app: FastifyInstance, ctx: AppContext) {
   app.post('/v1/media', { preHandler: requireAuth, config: { rateLimit: { max: 60, timeWindow: '1 hour' } } }, async (req, reply) => {
@@ -58,10 +62,13 @@ export default async function mediaModule(app: FastifyInstance, ctx: AppContext)
       return { media: { id: rows[0].id, kind: rows[0].kind, url: '', altText: alt, viewOnce: true } };
     }
 
+    const forWatch = q.for === 'watch';
+    if (forWatch && detected.kind !== 'image' && detected.kind !== 'video')
+      throw new AppError(415, 'unsupported_media', 'Only photos and videos can be watched together.');
     const stored = await ctx.storage.put(web.buf, web.ext, web.mime);
     const { rows } = await ctx.db.query(
-      `INSERT INTO media (owner_id, kind, url, mime, alt_text, status, storage_key, size_bytes, duration_ms) VALUES ($1,$2,$3,$4,$5,'ready',$6,$7,$8) RETURNING id, kind, url, alt_text`,
-      [u.id, detected.kind, stored.url, web.mime, alt, stored.key, web.buf.length, web.durationMs ?? null],
+      `INSERT INTO media (owner_id, kind, url, mime, alt_text, status, storage_key, size_bytes, duration_ms, for_watch) VALUES ($1,$2,$3,$4,$5,'ready',$6,$7,$8,$9) RETURNING id, kind, url, alt_text`,
+      [u.id, detected.kind, stored.url, web.mime, alt, stored.key, web.buf.length, web.durationMs ?? null, forWatch],
     );
     await enqueue(ctx.db, 'media.process', { mediaId: rows[0].id, filename });
     reply.code(201);

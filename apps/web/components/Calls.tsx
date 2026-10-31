@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { Button, Icon, useModalFocus } from '@yapilapi/design-system';
 import type { CallInfo } from '@yapilapi/api-client';
 import { api, errorMessage } from '@/lib/api';
@@ -9,8 +10,10 @@ import { useRealtime, useSession } from '@/app/providers';
 type Phase = 'idle' | 'incoming' | 'outgoing' | 'active';
 interface CallsCtx {
   start: (conversationId: string, kind: 'audio' | 'video') => Promise<void>;
+  /** The call on this device now (ringing, calling or going), if any. */
+  current: { conversationId: string; kind: 'audio' | 'video' } | null;
 }
-const Ctx = createContext<CallsCtx>({ start: async () => {} });
+const Ctx = createContext<CallsCtx>({ start: async () => {}, current: null });
 export const useCalls = () => useContext(Ctx);
 
 /**
@@ -37,7 +40,10 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
   const overlay = useRef<HTMLDivElement>(null);
   callRef.current = call;
   // Keep keyboard focus in the call UI while it's up. No Escape: that shouldn't hang up.
-  useModalFocus(overlay, phase !== 'idle' && !!call);
+  // A voice call while watching together sits in a small bar, so the video and its controls stay usable.
+  const pathname = usePathname();
+  const compact = !!call && call.kind === 'audio' && phase !== 'idle' && phase !== 'incoming' && !!pathname?.startsWith('/watch/');
+  useModalFocus(overlay, phase !== 'idle' && !!call && !compact);
 
   const cleanup = useCallback(() => {
     peers.current.forEach((p) => p.close());
@@ -208,9 +214,32 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
   }, [phase]);
 
   return (
-    <Ctx.Provider value={{ start }}>
+    <Ctx.Provider value={{ start, current: call && phase !== 'idle' ? { conversationId: call.conversationId, kind: call.kind } : null }}>
       {children}
-      {phase !== 'idle' && call ? (
+      {compact && call ? (
+        <div className="call-bar" role="region" aria-label={t('m.calls.call')}>
+          {Object.entries(remotes).map(([uid, stream]) => (
+            <RemoteVideo key={uid} stream={stream} audioOnly />
+          ))}
+          <Icon name="phone" size={18} />
+          <span className="call-bar__status" role="status">
+            {Object.keys(remotes).length ? t('m.calls.call') : phase === 'outgoing' ? t('m.calls.calling') : t('m.calls.connecting')}
+          </span>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              local.current?.getAudioTracks().forEach((t) => (t.enabled = muted));
+              setMuted(!muted);
+            }}
+          >
+            {muted ? t('m.calls.unmute') : t('m.calls.mute')}
+          </Button>
+          <Button size="sm" variant="danger" onClick={hangUp}>
+            {t('m.calls.hangUp')}
+          </Button>
+        </div>
+      ) : phase !== 'idle' && call ? (
         <div
           className="call"
           role="dialog"

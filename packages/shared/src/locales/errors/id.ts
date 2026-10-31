@@ -1,5 +1,11 @@
 /** The API's error messages in Indonesian, keyed by the English it writes. */
 export const id: Record<string, string> = {
+  'That isn’t a link to a YouTube video.': 'Itu bukan tautan ke video YouTube.',
+  'This video’s owner doesn’t let it play outside YouTube. Open it on YouTube instead.':
+    'Pemilik video ini tidak mengizinkannya diputar di luar YouTube. Buka di YouTube saja.',
+  'That YouTube video isn’t available. It may be private or removed.': 'Video YouTube itu tidak tersedia. Mungkin privat atau sudah dihapus.',
+  'Add a photo or video you uploaded for watch together.': 'Tambahkan foto atau video yang kamu unggah untuk nonton bareng.',
+  'Only photos and videos can be watched together.': 'Hanya foto dan video yang bisa ditonton bersama.',
   'The request body is not valid JSON.': 'Isi permintaan bukan JSON yang valid.',
   'Media not found.': 'Media tidak ditemukan.',
   'Something went wrong on our side. Try again.': 'Terjadi kesalahan di pihak kami. Coba lagi.',

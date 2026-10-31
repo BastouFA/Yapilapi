@@ -1,5 +1,11 @@
 /** The API's error messages in Zulu, keyed by the English it writes. */
 export const zu: Record<string, string> = {
+  'That isn’t a link to a YouTube video.': 'Lokho akusona isixhumanisi sevidiyo ye-YouTube.',
+  'This video’s owner doesn’t let it play outside YouTube. Open it on YouTube instead.':
+    'Umnikazi wale vidiyo akavumeli ukuthi idlalwe ngaphandle kwe-YouTube. Yivule ku-YouTube esikhundleni salokho.',
+  'That YouTube video isn’t available. It may be private or removed.': 'Leyo vidiyo ye-YouTube ayitholakali. Kungenzeka iyimfihlo noma isusiwe.',
+  'Add a photo or video you uploaded for watch together.': 'Engeza isithombe noma ividiyo oyilayishele ukubuka ndawonye.',
+  'Only photos and videos can be watched together.': 'Izithombe namavidiyo kuphela okungabukwa ndawonye.',
   'The request body is not valid JSON.': 'Umzimba wesicelo awuyona i-JSON evumelekile.',
   'Media not found.': 'Imidiya ayitholakalanga.',
   'Something went wrong on our side. Try again.': 'Kukhona okungahambanga kahle ngasohlangothini lwethu. Zama futhi.',

@@ -6,6 +6,7 @@ import {
   Alert,
   FlatList,
   Image,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -17,7 +18,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Message, Post, PublicUser } from '../../../../packages/shared/src/types';
-import { WATCH_REACTIONS, type WatchQueueItem, type WatchSkipReason } from '../../../../packages/shared/src/watch';
+import { WATCH_REACTIONS, youtubeWatchUrl, type WatchQueueItem, type WatchSkipReason } from '../../../../packages/shared/src/watch';
 import { client, errorMessage } from '../../lib/api';
 import { previewOf, previewText, SystemLine } from '../../lib/chat-extras';
 import { useDataSaver } from '../../lib/data-saver';
@@ -42,7 +43,7 @@ import {
   useColors,
   userText,
 } from '../../lib/ui';
-import { canWatch, FloatingReaction, postIdFromLink, postThumb, useWatchSync, videoOf } from '../../lib/watch';
+import { canWatch, FloatingReaction, itemName, itemThumb, itemVideo, postIdFromLink, postThumb, useWatchSync } from '../../lib/watch';
 
 const WHITE = '#FFFFFF';
 const SCRIM = 'rgba(5,6,11,0.55)';
@@ -176,7 +177,10 @@ export default function WatchScreen() {
   if (!s || !me) return <Loading />;
 
   const item = w.current;
-  const media = item ? videoOf(item.post) : undefined;
+  const media = itemVideo(item);
+  // Photos and YouTube videos show as a picture on the phone (YouTube with "Open on YouTube").
+  const still = item && !media ? itemThumb(item) : null;
+  const itemLabel = item ? `${itemName(item, t)}${item.kind === 'post' && item.post.body ? `: ${item.post.body}` : ''}` : '';
   const ratio = media?.width && media.height ? media.width / media.height : 9 / 16;
   const videoHeight = Math.round(Math.min(width / ratio, windowHeight * 0.36));
   const up = s.queue.filter((q) => q.status === 'queued');
@@ -188,14 +192,35 @@ export default function WatchScreen() {
     <KeyboardAvoid style={{ backgroundColor: c.ground }}>
       {/* The video, with reactions floating over it. */}
       <View style={{ width: '100%', height: videoHeight, backgroundColor: '#000' }}>
-        {item ? (
-          <VideoView
-            player={w.player}
-            style={{ flex: 1 }}
-            contentFit="contain"
-            nativeControls={false}
-            accessibilityLabel={item.post.body ? `${item.post.author.displayName}: ${item.post.body}` : item.post.author.displayName}
-          />
+        {w.elsewhere ? (
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: space[4], gap: space[2] }}>
+            <Text style={{ color: WHITE, fontSize: 16, fontWeight: '700', textAlign: 'center' }}>{t('watch.elsewhere')}</Text>
+            <Text style={{ color: WHITE, fontSize: 14, textAlign: 'center', lineHeight: 20 }}>{t('watch.elsewhereHint')}</Text>
+            <Button label={t('watch.watchHere')} size="sm" onPress={w.watchHere} />
+          </View>
+        ) : item && media ? (
+          <VideoView player={w.player} style={{ flex: 1 }} contentFit="contain" nativeControls={false} accessibilityLabel={itemLabel} />
+        ) : item ? (
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: space[2] }}>
+            {still ? (
+              <Image
+                source={{ uri: still }}
+                style={StyleSheet.absoluteFill}
+                resizeMode="contain"
+                accessibilityLabel={itemLabel}
+                accessibilityIgnoresInvertColors
+              />
+            ) : null}
+            {item.kind === 'upload' && !item.ready ? <Text style={{ color: WHITE, fontSize: 15, textAlign: 'center' }}>{t('watch.preparing')}</Text> : null}
+            {item.kind === 'youtube' ? (
+              <Button
+                label={t('watch.openYoutube')}
+                size="sm"
+                variant="secondary"
+                onPress={() => void Linking.openURL(youtubeWatchUrl(item.youtube.videoId))}
+              />
+            ) : null}
+          </View>
         ) : (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: space[4], gap: space[3] }}>
             <Text style={{ color: WHITE, fontSize: 15, textAlign: 'center', lineHeight: 21 }}>{t('watch.queueEmpty')}</Text>
@@ -268,7 +293,7 @@ export default function WatchScreen() {
         </View>
         {item ? (
           <Text numberOfLines={1} style={[{ color: c.inkMuted, fontSize: 13 }, userText]}>
-            {`${t('watch.nowPlaying')} · ${item.post.author.displayName}${item.post.body ? ` · ${item.post.body}` : ''}`}
+            {`${t('watch.nowPlaying')} · ${itemName(item, t)}${item.kind === 'post' && item.post.body ? ` · ${item.post.body}` : ''}`}
           </Text>
         ) : null}
         {w.notice ? (
@@ -522,7 +547,7 @@ function Queue({
       live = false;
     };
   }, [source]);
-  const queued = new Set(items.map((q) => q.post.id));
+  const queued = new Set(items.flatMap((q) => (q.kind === 'post' ? [q.post.id] : [])));
 
   return (
     <ScrollView
@@ -617,10 +642,16 @@ function Queue({
       </View>
       {!items.length ? <Text style={{ color: c.inkMuted, lineHeight: 20 }}>{t('watch.queueEmpty')}</Text> : null}
       {items.map((q) => {
-        const thumb = postThumb(q.post);
+        const thumb = itemThumb(q);
         const on = q.id === playingId;
         const canRemove = !on && (host || q.addedBy?.id === meId);
-        const caption = q.post.body.trim();
+        const name = itemName(q, t);
+        const caption =
+          q.kind === 'post'
+            ? q.post.body.trim()
+            : q.kind === 'youtube'
+              ? t('watch.youtube')
+              : `${q.media.kind === 'image' ? t('m.post.photo') : t('m.chat.video')}${q.ready ? '' : ` · ${t('watch.preparing')}`}`;
         return (
           <View
             key={q.id}
@@ -638,7 +669,7 @@ function Queue({
           >
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={caption ? `${q.post.author.displayName}: ${caption}` : q.post.author.displayName}
+              accessibilityLabel={caption ? `${name}: ${caption}` : name}
               accessibilityHint={on ? undefined : t('watch.playNow')}
               accessibilityState={{ selected: on, disabled: on }}
               disabled={on}
@@ -662,7 +693,7 @@ function Queue({
               <View style={{ flex: 1, gap: 2 }}>
                 {on ? <Text style={{ color: c.yapi, fontSize: 12, fontWeight: '700' }}>{t('watch.nowPlaying')}</Text> : null}
                 <Text numberOfLines={1} style={[{ color: c.ink, fontWeight: '700', fontSize: 14 }, userText]}>
-                  {q.post.author.displayName}
+                  {name}
                 </Text>
                 {caption ? (
                   <Text numberOfLines={2} style={[{ color: c.ink, fontSize: 13, lineHeight: 18 }, userText]}>
@@ -676,7 +707,7 @@ function Queue({
               <Pressable
                 accessibilityRole="button"
                 // Several of these in a list: say which video each one takes out.
-                accessibilityLabel={`${t('watch.remove')}: ${caption || q.post.author.displayName}`}
+                accessibilityLabel={`${t('watch.remove')}: ${name}`}
                 hitSlop={6}
                 onPress={() => onRemove(q.id)}
                 style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}

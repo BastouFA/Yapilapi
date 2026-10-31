@@ -786,9 +786,16 @@ export type MessageSystemInfo =
       message?: MessagePreview | null;
     }
   | {
-      /** "Watch together" started here. The sender started it; the session may have ended since. */
+      /**
+       * "Watch together" started here; the sender started it. One line per session: starting again
+       * soon after (when nobody else joined) opens the same session and keeps this line.
+       */
       type: 'watch';
       sessionId: string;
+      /** It has ended. */
+      ended?: boolean;
+      /** Once ended: how long people watched together, or null when nobody else joined (the line leaves the chat soon). */
+      seconds?: number | null;
     }
   | {
       /** The sender started a Together album for the people in this chat. Opens it for those in it. */

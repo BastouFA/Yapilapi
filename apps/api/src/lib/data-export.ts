@@ -293,7 +293,7 @@ export async function exportSections(db: Q, userId: string) {
     ),
     watchTogether: await q(
       `SELECT s.id AS session_id, s.conversation_id, s.started_by = $1 AS you_started_it, s.created_at, s.ended_at, p.joined_at, p.left_at,
-              coalesce((SELECT json_agg(json_build_object('post_id', i.post_id, 'added_at', i.created_at)) FROM watch_queue_items i WHERE i.session_id = s.id AND i.added_by = $1), '[]') AS you_added
+              coalesce((SELECT json_agg(json_build_object('kind', i.kind, 'post_id', i.post_id, 'media_id', i.media_id, 'youtube_id', i.youtube_id, 'added_at', i.created_at)) FROM watch_queue_items i WHERE i.session_id = s.id AND i.added_by = $1), '[]') AS you_added
        FROM watch_sessions s LEFT JOIN watch_participants p ON p.session_id = s.id AND p.user_id = $1
        WHERE s.started_by = $1 OR p.user_id = $1 ORDER BY s.created_at DESC`,
     ),

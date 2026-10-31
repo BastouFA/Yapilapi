@@ -816,15 +816,18 @@ export function createClient(opts: ClientOptions) {
         ),
     },
     media: {
-      /** `viewOnce`: stored privately for a view-once chat message (no public address; url is empty). */
-      upload: async (file: File, altText?: string, o: { viewOnce?: boolean } = {}) => {
+      /**
+       * `viewOnce`: stored privately for a view-once chat message (no public address; url is empty).
+       * `forWatch`: a photo or video for a watch together queue (shown only through the session, deleted when it ends).
+       */
+      upload: async (file: File, altText?: string, o: { viewOnce?: boolean; forWatch?: boolean } = {}) => {
         if (opts.prepareUpload) file = await opts.prepareUpload(file);
         const fd = new FormData();
         if (altText) fd.append('altText', altText);
         fd.append('file', file);
         return req<{ media: { id: string; kind: 'image' | 'video' | 'audio'; url: string; altText: string | null } }>(
           'POST',
-          `/v1/media${o.viewOnce ? '?viewOnce=true' : ''}`,
+          `/v1/media${o.viewOnce ? '?viewOnce=true' : o.forWatch ? '?for=watch' : ''}`,
           fd,
         );
       },
@@ -1356,16 +1359,34 @@ export function createClient(opts: ClientOptions) {
      * conversation (conversations.send).
      */
     watch: {
-      /** Start in a chat, or join the session already running there. `postIds` go in the queue (only ones everyone in the chat can see). */
-      start: (conversationId: string, postIds: string[] = []) => post<WatchQueueResult & { created: boolean }>('/v1/watch', { conversationId, postIds }),
+      /**
+       * Start in a chat, or join the session already running there. What's given goes in the queue
+       * (see `add`). Your own session that ended a few minutes ago with nobody else comes back
+       * (`reopened`), keeping its line in the chat.
+       */
+      start: (conversationId: string, postIds: string[] = [], more: { mediaIds?: string[]; links?: string[]; device?: string } = {}) =>
+        post<WatchQueueResult & { created: boolean; reopened: boolean }>('/v1/watch', { conversationId, postIds, ...more }),
+      /** Reels and video posts everyone in the chat can watch, to add when the queue runs out. */
+      suggestions: (id: string) => get<{ items: Post[] }>(`/v1/watch/${id}/suggestions`),
       /** The session running in a chat, if any. */
       forChat: (conversationId: string) => get<{ session: WatchSummary | null }>(`/v1/conversations/${conversationId}/watch`),
       get: (id: string) => get<{ session: WatchSession }>(`/v1/watch/${id}`),
-      join: (id: string) => post<{ session: WatchSession }>(`/v1/watch/${id}/join`),
-      leave: (id: string) => post<{ ok: true }>(`/v1/watch/${id}/leave`),
+      /**
+       * One device plays per person: `device` (a random id per open watch screen) becomes the one
+       * that plays for you; your other devices get `watch.device` ({ sessionId, deviceId }) and stop.
+       */
+      join: (id: string, device?: string) => post<{ session: WatchSession }>(`/v1/watch/${id}/join`, device ? { device } : {}),
+      /** From a device that isn't the one playing for you, leaving changes nothing. */
+      leave: (id: string, device?: string) => post<{ ok: true }>(`/v1/watch/${id}/leave`, device ? { device } : {}),
       /** The host ends it for everyone. */
       end: (id: string) => post<{ ok: true }>(`/v1/watch/${id}/end`),
-      add: (id: string, postIds: string[]) => post<WatchQueueResult>(`/v1/watch/${id}/queue`, { postIds }),
+      /**
+       * Add to the queue: reels and video posts everyone in the chat can see (`postIds`), your own
+       * photos and videos uploaded with `media.upload(file, alt, { forWatch: true })` (`mediaIds`), and
+       * YouTube links (`links`).
+       */
+      add: (id: string, postIds: string[], more: { mediaIds?: string[]; links?: string[] } = {}) =>
+        post<WatchQueueResult>(`/v1/watch/${id}/queue`, { postIds, ...more }),
       remove: (id: string, itemId: string) => del<{ session: WatchSession }>(`/v1/watch/${id}/queue/${itemId}`),
       /**
        * Play, pause, seek, next or jump. `atServerMs` is your estimate of the server's clock when
@@ -1380,8 +1401,8 @@ export function createClient(opts: ClientOptions) {
           | { action: 'jump'; itemId: string },
       ) => post<{ playback: WatchPlayback; skipped: WatchSkipReason[]; serverTime: number }>(`/v1/watch/${id}/control`, c),
       /** Every WATCH_HEARTBEAT_MS while watching. The host also sends its player's position, item and the playback `seq` it follows. */
-      heartbeat: (id: string, b: { positionMs?: number; itemId?: string | null; seq?: number; atServerMs?: number } = {}) =>
-        post<{ ok: true; serverTime: number }>(`/v1/watch/${id}/heartbeat`, b),
+      heartbeat: (id: string, b: { positionMs?: number; itemId?: string | null; seq?: number; atServerMs?: number; device?: string } = {}) =>
+        post<{ ok: true; here: boolean; serverTime: number }>(`/v1/watch/${id}/heartbeat`, b),
       react: (id: string, kind: WatchReaction) => post<{ ok: true }>(`/v1/watch/${id}/reactions`, { kind }),
     },
     /** Yapilapi Today: the morning briefing on Pulse (private to you), and its settings. */

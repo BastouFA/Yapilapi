@@ -1115,6 +1115,12 @@ export const ha: Record<string, string> = {
   '{total_chunks} chunks are still missing.': 'Har yanzu guntaye {total_chunks} ba su iso ba.',
   'The uploaded size does not match.': 'Girman da aka loda bai yi daidai ba.',
   // apps/api/src/modules/watch.ts
+  'That isn’t a link to a YouTube video.': 'Wannan ba hanyar bidiyon YouTube ba ce.',
+  'This video’s owner doesn’t let it play outside YouTube. Open it on YouTube instead.':
+    'Mai wannan bidiyon bai yarda a kunna shi a wajen YouTube ba. Buɗe shi a YouTube maimakon haka.',
+  'That YouTube video isn’t available. It may be private or removed.': 'Babu wannan bidiyon YouTube. Wataƙila na sirri ne ko an cire shi.',
+  'Add a photo or video you uploaded for watch together.': 'Ƙara hoto ko bidiyon da ka ɗora don kallo tare.',
+  'Only photos and videos can be watched together.': 'Hotuna da bidiyo kaɗai ake iya kallo tare.',
   'Watch together is for chats of up to 8 people, you included.': 'Kallo tare na hirarrakin da ba su wuce mutum 8 ba ne, har da ku.',
   'Join to do that.': 'Ku shiga don yin hakan.',
   'This watch together session has ended.': 'Wannan zaman kallo tare ya ƙare.',

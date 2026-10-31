@@ -47,7 +47,7 @@ import {
 import { SmartReplyChips } from '@/components/AiHelpers';
 import { ListSheet, ListView, PollSheet, PollView, ReminderNote, ReminderSheet } from '@/components/ChatPolls';
 import { ChatLookSheet, chatThemeClass, chatThemeVars, ScheduledList, ScheduleSheet, useScheduled } from '@/components/ChatLater';
-import { useChatWatch, WatchBanner } from '@/components/WatchTogether';
+import { addNotes, useChatWatch, WatchBanner, watchDeviceId } from '@/components/WatchTogether';
 import { GameCard } from '@/components/ChatGames';
 import { ChatMixCard, ShareMixHereSheet } from '@/components/Mixes';
 import { LocationCard, LocationRequestLine, ShareLocationSheet, SharingBanner, useLocationSharing } from '@/components/ChatLocation';
@@ -116,11 +116,14 @@ export default function ChatPage() {
   const router = useRouter();
   const { session: watching } = useChatWatch(id);
   const [startingWatch, setStartingWatch] = useState(false);
-  async function watchTogether() {
-    if (watching) return router.push(`/watch/${watching.id}`);
+  /** Join the session running here, or start one (with a shared reel or video, when given). */
+  async function watchTogether(postIds: string[] = []) {
+    if (watching && !postIds.length) return router.push(`/watch/${watching.id}`);
     setStartingWatch(true);
     try {
-      const r = await api.watch.start(id);
+      const r = await api.watch.start(id, postIds, { device: watchDeviceId() });
+      const note = addNotes(t, r.skipped);
+      if (note) toast(note);
       router.push(`/watch/${r.session.id}`);
     } catch (e) {
       toast(errorMessage(e));
@@ -678,16 +681,18 @@ export default function ChatPage() {
         </div>
         <div ref={chatMenu} className="row chat-head__actions">
           {watchable ? (
+            // While a session runs here it says so in words ("Join"), so it's easy to find on a phone.
             <button
               type="button"
-              className="yp-action"
+              className={watching ? 'yp-btn yp-btn--primary yp-btn--sm chat-head__watch' : 'yp-action'}
               aria-label={watching ? `${t('watch.now')}: ${t('watch.join')}` : t('watch.start')}
               title={watching ? t('watch.now') : t('watch.start')}
               aria-busy={startingWatch || undefined}
               disabled={startingWatch}
               onClick={() => void watchTogether()}
             >
-              <Icon name="play" />
+              <Icon name="play" size={watching ? 16 : undefined} />
+              {watching ? <span aria-hidden>{t('watch.join')}</span> : null}
             </button>
           ) : null}
           {/* Calls sit in the header, as on the phone: chats of 2 to 8 people, not communities. */}
@@ -912,7 +917,12 @@ export default function ChatPage() {
               </>
             ) : shared ? (
               <>
-                <SharedPostCard id={shared.id} href={shared.href} onMissing={() => setUnseenPosts((cur) => [...cur, m.id])} />
+                <SharedPostCard
+                  id={shared.id}
+                  href={shared.href}
+                  onMissing={() => setUnseenPosts((cur) => [...cur, m.id])}
+                  onWatch={watchable && !startingWatch ? () => void watchTogether([shared.id]) : undefined}
+                />
                 {text}
               </>
             ) : (
@@ -1098,6 +1108,7 @@ export default function ChatPage() {
           actions={[
             { label: t('m.chat.poll.new'), icon: 'poll', onSelect: () => setPollOpen(true) },
             { label: t('m.chat.list.new'), icon: 'check-circle', onSelect: () => setListOpen(true) },
+            ...(watchable ? [{ label: t('watch.start'), icon: 'play' as const, onSelect: () => void watchTogether() }] : []),
             ...(conv && conv.kind !== 'community' ? [{ label: t('m.chat.game.new'), icon: 'game' as const, onSelect: () => setGameStartOpen(true) }] : []),
             ...(conv && conv.kind !== 'community' ? [{ label: t('mixes.shareHere'), icon: 'mix' as const, onSelect: () => setMixShareOpen(true) }] : []),
             // Where you are: live for a while or once (the browser asks for permission only when you tap Share), or ask the others.

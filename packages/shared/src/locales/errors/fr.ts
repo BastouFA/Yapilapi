@@ -1130,6 +1130,12 @@ export const fr: Record<string, string> = {
   '{total_chunks} chunks are still missing.': 'Il manque encore {total_chunks} fragments.',
   'The uploaded size does not match.': 'La taille envoyée ne correspond pas.',
   // apps/api/src/modules/watch.ts
+  'That isn’t a link to a YouTube video.': 'Ce n’est pas un lien vers une vidéo YouTube.',
+  'This video’s owner doesn’t let it play outside YouTube. Open it on YouTube instead.':
+    'Le propriétaire de cette vidéo ne permet pas de la lire en dehors de YouTube. Ouvre-la plutôt sur YouTube.',
+  'That YouTube video isn’t available. It may be private or removed.': 'Cette vidéo YouTube n’est pas disponible. Elle est peut-être privée ou supprimée.',
+  'Add a photo or video you uploaded for watch together.': 'Ajoute une photo ou une vidéo que tu as importée pour regarder ensemble.',
+  'Only photos and videos can be watched together.': 'Seules les photos et les vidéos peuvent être regardées ensemble.',
   'Watch together is for chats of up to 8 people, you included.': 'Regarder ensemble est prévu pour les discussions de 8 personnes maximum, toi compris.',
   'Join to do that.': 'Rejoins la séance pour faire ça.',
   'This watch together session has ended.': 'Cette séance a pris fin.',

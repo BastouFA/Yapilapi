@@ -6,7 +6,7 @@ import type { Message, MessagePreview, PinnedMessage } from '../../../packages/s
 import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import { chatTheme } from '../../../packages/shared/src/chat-theme';
 import { chessDrawReason } from '../../../packages/shared/src/games/index';
-import { callLineText, groupLineText, messagePreviewOf, messagePreviewText } from '../../../packages/shared/src/message-preview';
+import { callLineText, groupLineText, messagePreviewOf, messagePreviewText, watchLineText } from '../../../packages/shared/src/message-preview';
 import { client, errorMessage } from './api';
 import { useT } from './i18n';
 import { useSession } from './session';
@@ -180,14 +180,15 @@ export function SystemLine({
     );
   }
   if (s?.type === 'watch') {
-    const text = message.sender.id === meId ? t('watch.system.startedYou') : t('watch.system.started', { name: message.sender.displayName });
+    // "Ada started watching together" with Join while it runs; "Watched together · 12 minutes" once it ended.
+    const text = watchLineText(s, message.sender.id, message.sender.displayName, { t, tp, locale, meId });
     return (
       <View style={{ alignSelf: 'center', alignItems: 'center', gap: space[1], maxWidth: '90%', paddingVertical: space[1] }}>
         <View style={{ flexDirection: 'row', gap: space[1], alignItems: 'center' }}>
           <Icon name="tv-outline" size={14} color={c.inkMuted} />
           <Text style={[{ color: c.inkMuted, fontSize: 13, textAlign: 'center', lineHeight: 18 }, userText]}>{text}</Text>
         </View>
-        {watchLive ? <Button label={t('watch.join')} size="sm" variant="secondary" icon="play" onPress={() => openWatch(s.sessionId)} /> : null}
+        {watchLive && !s.ended ? <Button label={t('watch.join')} size="sm" variant="secondary" icon="play" onPress={() => openWatch(s.sessionId)} /> : null}
       </View>
     );
   }

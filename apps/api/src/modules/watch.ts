@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { tx } from '@yapilapi/database';
-import { WATCH_MAX_MEMBERS, WATCH_REACTIONS, type WatchSkipReason } from '@yapilapi/shared';
+import { WATCH_ADD_MAX, WATCH_MAX_MEMBERS, WATCH_REACTIONS, WATCH_REOPEN_MINUTES, youtubeIdFrom, type WatchSkipReason } from '@yapilapi/shared';
 import { z } from 'zod';
 import { AppError, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
@@ -11,19 +11,33 @@ import {
   addToQueue,
   advance,
   chatMembers,
+  checkUploads,
   endSession,
   leaveSession,
   publishPlayback,
   publishUpdated,
+  restoreUploads,
   sessionFor,
+  suggestions,
+  tidyLonelyLines,
   watchingIds,
+  WATCH_TIDY_LINE_JOB,
+  type QueueInput,
+  type YouTubeToAdd,
 } from '../lib/watch.ts';
+import { youtubeLookup } from '../lib/youtube.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 import type { ChatHelpers } from './chat-polls-lists.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
 const itemParams = z.object({ id: z.string().uuid(), itemId: z.string().uuid() });
 const postIds = z.array(z.string().uuid()).max(10);
+/** What can be added at once: posts, photos and videos uploaded for watch together, and YouTube links. */
+const addition = {
+  postIds: postIds.default([]),
+  mediaIds: z.array(z.string().uuid()).max(WATCH_ADD_MAX).default([]),
+  links: z.array(z.string().max(500)).max(5).default([]),
+};
 /** A moment on the server's clock, as the player estimated it; ignored when it's far from the server's own. */
 const atServer = z.number().int().nonnegative().optional();
 
@@ -63,7 +77,15 @@ const controlSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('jump'), itemId: z.string().uuid() }),
 ]);
 
+/** The device a request comes from: a random id each open watch screen makes (one device plays per person). */
+const device = z
+  .string()
+  .regex(/^[A-Za-z0-9_-]{8,64}$/)
+  .optional();
+const deviceBody = z.object({ device });
+
 const heartbeatSchema = z.object({
+  device,
   /** The host's player: where it is, on which item, at which state. Others send nothing. */
   positionMs: z
     .number()
@@ -79,6 +101,25 @@ const heartbeatSchema = z.object({
 const tooBig = () => new AppError(400, 'watch_too_many', `Watch together is for chats of up to ${WATCH_MAX_MEMBERS} people, you included.`);
 const notWatching = () => new AppError(409, 'watch_not_watching', 'Join to do that.');
 const ended = () => new AppError(410, 'watch_ended', 'This watch together session has ended.');
+
+/**
+ * The YouTube videos in pasted links, looked up on YouTube (its title and picture). A link that
+ * isn't to a YouTube video, or a video YouTube won't play outside its site, is refused with why.
+ */
+async function youtubeFrom(links: string[]): Promise<YouTubeToAdd[]> {
+  const ids = links.map((l) => youtubeIdFrom(l));
+  if (ids.some((id) => !id)) throw new AppError(400, 'watch_bad_link', 'That isn’t a link to a YouTube video.');
+  const out: YouTubeToAdd[] = [];
+  for (const videoId of [...new Set(ids as string[])]) {
+    const info = await youtubeLookup(videoId);
+    if (info && !info.ok)
+      throw info.reason === 'not_embeddable'
+        ? new AppError(422, 'watch_not_embeddable', 'This video’s owner doesn’t let it play outside YouTube. Open it on YouTube instead.')
+        : new AppError(422, 'watch_link_unavailable', 'That YouTube video isn’t available. It may be private or removed.');
+    out.push({ videoId, title: info?.title ?? null, thumbnailUrl: info?.thumbnailUrl ?? null });
+  }
+  return out;
+}
 
 /** A moment the player gave, or now when it's missing or more than 10 seconds from the server's clock. */
 function momentOf(atServerMs: number | undefined): Date {
@@ -131,46 +172,134 @@ export function registerWatch(app: FastifyInstance, ctx: AppContext, h: ChatHelp
        ON CONFLICT (session_id, user_id) DO UPDATE SET left_at = NULL, last_seen_at = now(), joined_at = CASE WHEN watch_participants.left_at IS NULL THEN watch_participants.joined_at ELSE now() END`,
       [sessionId, userId],
     );
+    await markTogether(db, sessionId, userId);
   }
 
-  /** Start watching together in a chat, or join the session already running there. `postIds` go in the queue. */
+  /**
+   * One device per person: the device they joined from last plays. Their other devices hear
+   * `watch.device` (and their heartbeats answer `here: false`) and stop, showing "Watch here".
+   */
+  async function playHere(sessionId: string, userId: string, deviceId: string | undefined) {
+    if (!deviceId) return;
+    const { rows } = await db.query<{ before: string | null }>(
+      `UPDATE watch_participants wp SET device_id = $3 FROM (SELECT device_id AS before FROM watch_participants WHERE session_id = $1 AND user_id = $2) old
+       WHERE wp.session_id = $1 AND wp.user_id = $2 RETURNING old.before`,
+      [sessionId, userId, deviceId],
+    );
+    if (rows[0] && rows[0].before !== deviceId) await ctx.realtime.publish([userId], { type: 'watch.device', data: { sessionId, deviceId } });
+  }
+
+  /** Someone other than the starter is watching: from now on it's watching together. */
+  async function markTogether(q: Pick<typeof db, 'query'>, sessionId: string, userId: string) {
+    await q.query(`UPDATE watch_sessions SET together_at = now() WHERE id = $1 AND together_at IS NULL AND started_by <> $2`, [sessionId, userId]);
+  }
+
+  /**
+   * What someone asked to add, checked: uploads must be their own photos and videos uploaded for
+   * watch together (POST /v1/media?for=watch), links must be to YouTube videos that may play
+   * outside YouTube.
+   */
+  async function additions(userId: string, members: string[], input: { postIds: string[]; mediaIds: string[]; links: string[] }): Promise<QueueInput> {
+    if (input.mediaIds.length) {
+      const uploads = await checkUploads(db, [...new Set(input.mediaIds)], members, userId);
+      if ([...uploads.values()].includes('invalid')) throw new AppError(400, 'watch_upload_invalid', 'Add a photo or video you uploaded for watch together.');
+    }
+    return { postIds: input.postIds, mediaIds: input.mediaIds, youtube: input.links.length ? await youtubeFrom(input.links) : [] };
+  }
+
+  // The line of a session nobody else joined leaves the chat once it can't be opened again.
+  ctx.jobs[WATCH_TIDY_LINE_JOB] = async ({ sessionId }: { sessionId: string }) => {
+    await tidyLonelyLines(deps, { sessionId });
+  };
+
+  /**
+   * Start watching together in a chat, or join the session already running there. What's given
+   * goes in the queue. One line in the chat per session: your own session that ended within
+   * WATCH_REOPEN_MINUTES without anyone else joining opens again (same line, nobody told twice).
+   */
   app.post('/v1/watch', { preHandler: requireAuth, config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (req, reply) => {
     const u = me(req);
-    const input = parse(z.object({ conversationId: z.string().uuid(), postIds: postIds.default([]) }), req.body);
+    const input = parse(z.object({ conversationId: z.string().uuid(), device, ...addition }), req.body);
     const members = await assertWatchableChat(input.conversationId, u.id);
+    const toAdd = await additions(u.id, members, input);
+    const fresh = !!(toAdd.postIds?.length || toAdd.mediaIds?.length || toAdd.youtube?.length);
     const run = () =>
       tx(db, async (c) => {
         const existing = (await c.query(`SELECT id FROM watch_sessions WHERE conversation_id = $1 AND status = 'active' FOR UPDATE`, [input.conversationId]))
           .rows[0];
         let sessionId: string;
         let created = false;
+        let reopened = false;
         let lineId: string | null = null;
         if (existing) sessionId = existing.id;
         else {
-          const { rows } = await c.query<{ id: string }>(
-            `INSERT INTO watch_sessions (conversation_id, started_by, host_id, state_by) VALUES ($1,$2,$2,$2) RETURNING id`,
-            [input.conversationId, u.id],
-          );
-          sessionId = rows[0]!.id;
-          created = true;
-          // A line in the chat: "{name} started watching together", with a way to join.
-          const line = await c.query<{ id: string }>(
-            `INSERT INTO messages (conversation_id, sender_id, body, kind, meta) VALUES ($1,$2,'','system',$3) RETURNING id`,
-            [input.conversationId, u.id, { type: 'watch', sessionId }],
-          );
-          lineId = line.rows[0]!.id;
-          await c.query(`UPDATE conversations SET last_message_at = now() WHERE id = $1`, [input.conversationId]);
+          // Yours, ended a moment ago and nobody else came: open it again.
+          const recent = (
+            await c.query<{ id: string; line_id: string }>(
+              `SELECT id, line_id FROM watch_sessions
+               WHERE conversation_id = $1 AND started_by = $2 AND status = 'ended' AND together_at IS NULL AND line_id IS NOT NULL
+                 AND ended_at > now() - make_interval(mins => $3)
+               ORDER BY ended_at DESC LIMIT 1 FOR UPDATE`,
+              [input.conversationId, u.id, WATCH_REOPEN_MINUTES],
+            )
+          ).rows[0];
+          if (recent) {
+            sessionId = recent.id;
+            reopened = true;
+            lineId = recent.line_id;
+            // Started again with something to watch: that goes on screen, not what was left before.
+            if (fresh) {
+              await c.query(`UPDATE watch_queue_items SET status = 'removed' WHERE session_id = $1 AND status IN ('queued', 'playing')`, [sessionId]);
+              await c.query(`UPDATE watch_sessions SET current_item_id = NULL WHERE id = $1`, [sessionId]);
+            }
+            await c.query(
+              `UPDATE watch_sessions SET status = 'active', ended_at = NULL, host_id = $2, playing = false, created_at = now(),
+                      state_at = now(), state_seq = state_seq + 1, state_by = $2 WHERE id = $1`,
+              [sessionId, u.id],
+            );
+            await c.query(`UPDATE messages SET meta = $2 WHERE id = $1`, [lineId, { type: 'watch', sessionId }]);
+            await restoreUploads(c, sessionId);
+          } else {
+            const { rows } = await c.query<{ id: string }>(
+              `INSERT INTO watch_sessions (conversation_id, started_by, host_id, state_by) VALUES ($1,$2,$2,$2) RETURNING id`,
+              [input.conversationId, u.id],
+            );
+            sessionId = rows[0]!.id;
+            created = true;
+            // A line in the chat: "{name} started watching together", with a way to join.
+            const line = await c.query<{ id: string }>(
+              `INSERT INTO messages (conversation_id, sender_id, body, kind, meta) VALUES ($1,$2,'','system',$3) RETURNING id`,
+              [input.conversationId, u.id, { type: 'watch', sessionId }],
+            );
+            lineId = line.rows[0]!.id;
+            await c.query(`UPDATE watch_sessions SET line_id = $2 WHERE id = $1`, [sessionId, lineId]);
+            await c.query(`UPDATE conversations SET last_message_at = now() WHERE id = $1`, [input.conversationId]);
+          }
         }
         await c.query(
           `INSERT INTO watch_participants (session_id, user_id) VALUES ($1,$2)
          ON CONFLICT (session_id, user_id) DO UPDATE SET left_at = NULL, last_seen_at = now()`,
           [sessionId, u.id],
         );
-        const q = await addToQueue(c, sessionId, input.conversationId, u.id, input.postIds, true);
-        return { sessionId, created, lineId, ...q };
+        if (existing) await markTogether(c, sessionId, u.id);
+        const q = await addToQueue(c, sessionId, input.conversationId, u.id, toAdd, true);
+        return { sessionId, created, reopened, lineId, ...q };
       });
     // Two people starting in the same chat at the same moment: the second joins the first one's session.
     const out = await run().catch((e: { code?: string }) => (e.code === '23505' ? run() : Promise.reject(e)));
+    await playHere(out.sessionId, u.id, input.device);
+    // A new session: lines of earlier sessions here that nobody else joined go now.
+    if (out.created) await tidyLonelyLines(deps, { conversationId: input.conversationId });
+    if (out.reopened && out.lineId) {
+      await ctx.realtime.publish(members, {
+        type: 'message.system',
+        data: { id: out.lineId, conversationId: input.conversationId, system: { type: 'watch', sessionId: out.sessionId } },
+      });
+      await ctx.realtime.publish(members, {
+        type: 'watch.started',
+        data: { sessionId: out.sessionId, conversationId: input.conversationId, startedBy: u.id },
+      });
+    }
     if (out.created) {
       const others = await h.notBlocking(
         u.id,
@@ -195,10 +324,16 @@ export function registerWatch(app: FastifyInstance, ctx: AppContext, h: ChatHelp
           entityId: out.sessionId,
           data: { conversationId: input.conversationId },
         });
-    } else await publishUpdated(deps, out.sessionId, out.added.length ? 'queue' : 'people');
+    } else if (!out.reopened) await publishUpdated(deps, out.sessionId, out.added.length ? 'queue' : 'people');
     if (out.changedPlayback) await publishPlayback(deps, out.sessionId);
     reply.code(out.created ? 201 : 200);
-    return { session: await sessionFor(db, out.sessionId, u.id), created: out.created, added: out.added, skipped: out.skipped };
+    return {
+      session: await sessionFor(db, out.sessionId, u.id),
+      created: out.created,
+      reopened: out.reopened,
+      added: out.added,
+      skipped: out.skipped,
+    };
   });
 
   /** The session running in a chat, if any (people in the chat only). */
@@ -216,24 +351,49 @@ export function registerWatch(app: FastifyInstance, ctx: AppContext, h: ChatHelp
     return { session: await sessionFor(db, id, u.id) };
   });
 
+  /**
+   * A few reels and video posts to watch next that everyone in the chat can see and open, not
+   * already watched or waiting here: shown when the queue runs out, one tap to add.
+   */
+  app.get('/v1/watch/:id/suggestions', { preHandler: requireAuth, config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    const s = await sessionRow(id, u.id);
+    if (s.status !== 'active') throw ended();
+    return { items: await suggestions(db, id, s.conversation_id, u.id) };
+  });
+
   app.post('/v1/watch/:id/join', { preHandler: requireAuth, config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req) => {
     const u = me(req);
     const { id } = parse(idParam, req.params);
     const s = await sessionRow(id, u.id);
     if (s.status !== 'active') throw ended();
     await assertWatchableChat(s.conversation_id, u.id);
+    const { device } = parse(deviceBody, req.body ?? {});
     const before = await watchingIds(db, id);
     await join(id, u.id);
+    await playHere(id, u.id, device);
     if (!s.host_id) await db.query(`UPDATE watch_sessions SET host_id = $2 WHERE id = $1 AND host_id IS NULL`, [id, u.id]);
     if (!before.includes(u.id)) await publishUpdated(deps, id, 'people');
     return { session: await sessionFor(db, id, u.id) };
   });
 
-  /** Leave anytime. When the host leaves, the person watching longest becomes host; when the last person leaves, it ends. */
+  /**
+   * Leave anytime. When the host leaves, the person watching longest becomes host; when the last
+   * person leaves, it ends. A device that isn't the one playing for you leaving changes nothing.
+   */
   app.post('/v1/watch/:id/leave', { preHandler: requireAuth }, async (req) => {
     const u = me(req);
     const { id } = parse(idParam, req.params);
+    const { device } = parse(deviceBody, req.body ?? {});
     await sessionRow(id, u.id);
+    if (device) {
+      const other = await db.query(
+        `SELECT 1 FROM watch_participants WHERE session_id = $1 AND user_id = $2 AND left_at IS NULL AND device_id IS NOT NULL AND device_id <> $3`,
+        [id, u.id, device],
+      );
+      if (other.rowCount) return { ok: true };
+    }
     await leaveSession(deps, id, u.id);
     return { ok: true };
   });
@@ -252,11 +412,13 @@ export function registerWatch(app: FastifyInstance, ctx: AppContext, h: ChatHelp
   app.post('/v1/watch/:id/queue', { preHandler: requireAuth, config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (req) => {
     const u = me(req);
     const { id } = parse(idParam, req.params);
-    const input = parse(z.object({ postIds: postIds.min(1) }), req.body);
+    const input = parse(z.object(addition), req.body);
+    if (!input.postIds.length && !input.mediaIds.length && !input.links.length) throw new AppError(400, 'validation_error', 'Add something to watch first.');
     const s = await sessionRow(id, u.id);
     if (s.status !== 'active') throw ended();
     await assertWatching(id, u.id);
-    const out = await tx(db, (c) => addToQueue(c, id, s.conversation_id, u.id, input.postIds));
+    const toAdd = await additions(u.id, await chatMembers(db, s.conversation_id), input);
+    const out = await tx(db, (c) => addToQueue(c, id, s.conversation_id, u.id, toAdd));
     if (out.added.length) await publishUpdated(deps, id, 'queue');
     if (out.changedPlayback) await publishPlayback(deps, id);
     return { session: await sessionFor(db, id, u.id), added: out.added, skipped: out.skipped };
@@ -331,10 +493,16 @@ export function registerWatch(app: FastifyInstance, ctx: AppContext, h: ChatHelp
     const input = parse(heartbeatSchema, req.body);
     const s = await sessionRow(id, u.id);
     if (s.status !== 'active') throw ended();
-    const seen = await db.query(`UPDATE watch_participants SET last_seen_at = now() WHERE session_id = $1 AND user_id = $2 AND left_at IS NULL`, [id, u.id]);
+    // Any open screen of yours keeps you here; only the device playing for you is the host clock.
+    const seen = await db.query<{ device_id: string | null }>(
+      `UPDATE watch_participants SET last_seen_at = now() WHERE session_id = $1 AND user_id = $2 AND left_at IS NULL RETURNING device_id`,
+      [id, u.id],
+    );
     if (!seen.rowCount) throw notWatching();
+    const here = !input.device || !seen.rows[0]!.device_id || seen.rows[0]!.device_id === input.device;
     let updated = false;
     if (
+      here &&
       s.host_id === u.id &&
       s.playing &&
       input.positionMs !== undefined &&
@@ -350,7 +518,8 @@ export function registerWatch(app: FastifyInstance, ctx: AppContext, h: ChatHelp
       updated = !!r.rowCount;
     }
     if (updated) await publishPlayback(deps, id);
-    return { ok: true, serverTime: Date.now() };
+    // `here: false`: another of your devices is the one playing (in case its `watch.device` was missed).
+    return { ok: true, here, serverTime: Date.now() };
   });
 
   /** A reaction floating over the video for everyone watching (icon names, never emoji). */

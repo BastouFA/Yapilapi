@@ -1,5 +1,10 @@
 /** The API's error messages in Chinese (Simplified), keyed by the English it writes. */
 export const zh: Record<string, string> = {
+  'That isn’t a link to a YouTube video.': '这不是 YouTube 视频的链接。',
+  'This video’s owner doesn’t let it play outside YouTube. Open it on YouTube instead.': '这个视频的所有者不允许在 YouTube 以外播放。请在 YouTube 上打开。',
+  'That YouTube video isn’t available. It may be private or removed.': '这个 YouTube 视频不可用，可能是私密的或已被删除。',
+  'Add a photo or video you uploaded for watch together.': '请添加你为一起看上传的照片或视频。',
+  'Only photos and videos can be watched together.': '只有照片和视频可以一起看。',
   'The request body is not valid JSON.': '请求正文不是有效的 JSON。',
   'Media not found.': '找不到媒体。',
   'Something went wrong on our side. Try again.': '我们这边出了点问题。请重试。',

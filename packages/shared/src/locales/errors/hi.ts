@@ -1,5 +1,11 @@
 /** The API's error messages in Hindi, keyed by the English it writes. */
 export const hi: Record<string, string> = {
+  'That isn’t a link to a YouTube video.': 'यह YouTube वीडियो का लिंक नहीं है।',
+  'This video’s owner doesn’t let it play outside YouTube. Open it on YouTube instead.':
+    'इस वीडियो के मालिक ने इसे YouTube के बाहर चलाने की अनुमति नहीं दी है। इसे YouTube पर खोलें।',
+  'That YouTube video isn’t available. It may be private or removed.': 'यह YouTube वीडियो उपलब्ध नहीं है। हो सकता है यह निजी हो या हटा दिया गया हो।',
+  'Add a photo or video you uploaded for watch together.': 'वह फ़ोटो या वीडियो जोड़ें जो आपने साथ देखने के लिए अपलोड किया है।',
+  'Only photos and videos can be watched together.': 'सिर्फ़ फ़ोटो और वीडियो साथ देखे जा सकते हैं।',
   'The request body is not valid JSON.': 'रिक्वेस्ट का बॉडी मान्य JSON नहीं है।',
   'Media not found.': 'मीडिया नहीं मिला।',
   'Something went wrong on our side. Try again.': 'हमारी तरफ़ कुछ गड़बड़ हो गई। फिर से कोशिश करें।',

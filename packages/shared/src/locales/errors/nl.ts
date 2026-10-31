@@ -1,5 +1,11 @@
 /** The API's error messages in Dutch, keyed by the English it writes. */
 export const nl: Record<string, string> = {
+  'That isn’t a link to a YouTube video.': 'Dat is geen link naar een YouTube-video.',
+  'This video’s owner doesn’t let it play outside YouTube. Open it on YouTube instead.':
+    'De eigenaar van deze video staat afspelen buiten YouTube niet toe. Open hem op YouTube.',
+  'That YouTube video isn’t available. It may be private or removed.': 'Die YouTube-video is niet beschikbaar. Misschien is hij privé of verwijderd.',
+  'Add a photo or video you uploaded for watch together.': 'Voeg een foto of video toe die je voor samen kijken hebt geüpload.',
+  'Only photos and videos can be watched together.': 'Alleen foto’s en video’s kun je samen bekijken.',
   'The request body is not valid JSON.': 'De body van het verzoek is geen geldige JSON.',
   'Media not found.': 'Media niet gevonden.',
   'Something went wrong on our side. Try again.': 'Er ging bij ons iets mis. Probeer het opnieuw.',

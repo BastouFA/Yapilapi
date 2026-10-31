@@ -1,5 +1,10 @@
 /** The API's error messages in Amharic, keyed by the English it writes. */
 export const am: Record<string, string> = {
+  'That isn’t a link to a YouTube video.': 'ይህ የYouTube ቪዲዮ አገናኝ አይደለም።',
+  'This video’s owner doesn’t let it play outside YouTube. Open it on YouTube instead.': 'የዚህ ቪዲዮ ባለቤት ከYouTube ውጭ እንዲጫወት አይፈቅዱም። በምትኩ በYouTube ላይ ይክፈቱት።',
+  'That YouTube video isn’t available. It may be private or removed.': 'ያ የYouTube ቪዲዮ አይገኝም። የግል ሊሆን ወይም ተወግዶ ሊሆን ይችላል።',
+  'Add a photo or video you uploaded for watch together.': 'አብሮ ለመመልከት የሰቀሉትን ፎቶ ወይም ቪዲዮ ያክሉ።',
+  'Only photos and videos can be watched together.': 'አብሮ መመልከት የሚቻለው ፎቶዎችን እና ቪዲዮዎችን ብቻ ነው።',
   'The request body is not valid JSON.': 'የጥያቄው አካል ትክክለኛ JSON አይደለም።',
   'Media not found.': 'ሚዲያው አልተገኘም።',
   'Something went wrong on our side. Try again.': 'በእኛ በኩል የሆነ ችግር ተፈጥሯል። እንደገና ይሞክሩ።',

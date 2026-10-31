@@ -7,9 +7,14 @@ const localApi = /^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(API);
 
 /** Stripe.js and its card form (https://docs.stripe.com/security/guide#content-security-policy). */
 const STRIPE_SCRIPTS = 'https://js.stripe.com https://*.js.stripe.com';
+/**
+ * YouTube's IFrame Player API (www.youtube.com/iframe_api and the player script it loads), for
+ * YouTube videos in watch together. The player itself is a youtube-nocookie.com frame.
+ */
+const YOUTUBE_SCRIPTS = 'https://www.youtube.com';
 
 /**
- * What pages may load. Scripts only from this site and Stripe (Next's own inline bootstrap needs
+ * What pages may load. Scripts only from this site, Stripe and YouTube's player API (Next's own inline bootstrap needs
  * 'unsafe-inline'; dev's fast refresh needs eval). Media may come from a storage host or CDN,
  * the realtime socket may be on the API's host, and Mini Apps are iframes on their own https sites.
  * Nothing may frame YAPILAPI, and there are no plugins.
@@ -19,7 +24,7 @@ function contentSecurityPolicy(): string {
   const local = dev || localApi ? ' http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*' : '';
   return [
     `default-src 'self'`,
-    `script-src 'self' 'unsafe-inline' ${STRIPE_SCRIPTS}${dev ? ` 'unsafe-eval'` : ''}`,
+    `script-src 'self' 'unsafe-inline' ${STRIPE_SCRIPTS} ${YOUTUBE_SCRIPTS}${dev ? ` 'unsafe-eval'` : ''}`,
     `style-src 'self' 'unsafe-inline'`,
     `img-src 'self' data: blob: https:${local}`,
     `media-src 'self' data: blob: https:${local}`,

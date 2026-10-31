@@ -1,5 +1,11 @@
 /** The API's error messages in Russian, keyed by the English it writes. */
 export const ru: Record<string, string> = {
+  'That isn’t a link to a YouTube video.': 'Это не ссылка на видео YouTube.',
+  'This video’s owner doesn’t let it play outside YouTube. Open it on YouTube instead.':
+    'Владелец этого видео не разрешает смотреть его вне YouTube. Откройте его на YouTube.',
+  'That YouTube video isn’t available. It may be private or removed.': 'Это видео YouTube недоступно. Возможно, оно скрыто или удалено.',
+  'Add a photo or video you uploaded for watch together.': 'Добавьте фото или видео, загруженное для совместного просмотра.',
+  'Only photos and videos can be watched together.': 'Вместе можно смотреть только фото и видео.',
   'The request body is not valid JSON.': 'Тело запроса не является корректным JSON.',
   'Media not found.': 'Медиафайл не найден.',
   'Something went wrong on our side. Try again.': 'У нас что-то пошло не так. Попробуйте ещё раз.',

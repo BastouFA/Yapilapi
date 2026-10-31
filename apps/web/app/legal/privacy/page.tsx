@@ -88,7 +88,9 @@ export default async function PrivacyPage() {
           maps” gives the place to the maps service you open (OpenStreetMap on the web, your phone’s maps app), only when you choose it.
         </li>
         <li>
-          Watch together: while people in a chat watch videos together, we keep the session, who joined and left, the queue of videos and where playback is.
+          Watch together: while people in a chat watch videos together, we keep the session, who joined and left, the queue of videos and where playback is, and
+          which of your devices is playing it. A photo or video you add from your device is shown only to the people in that chat, checked like any upload,
+          never posted, and deleted when the session ends. For a YouTube video we keep only its YouTube address, title and picture.
         </li>
         <li>
           Market: when you list something, we keep its photos, words, price, the area you wrote and, if you choose “Use my approximate location”, a place
@@ -296,8 +298,9 @@ export default async function PrivacyPage() {
         </li>
         <li>
           Some companies are contacted by your device directly and see your IP address: Jamendo or a music licensing partner, when you play a song from their
-          catalogue (nothing loads before you press play); Google’s servers, which help calls connect (STUN); Stripe, whose payment form loads at checkout; and
-          the developer of a mini app you open. The website’s fonts are served by YAPILAPI itself, not by Google.
+          catalogue (nothing loads before you press play); Google’s servers, which help calls connect (STUN); Stripe, whose payment form loads at checkout;
+          YouTube, when a YouTube video someone added plays in watch together (its privacy-enhanced player, under Google’s privacy policy); and the developer of
+          a mini app you open. The website’s fonts are served by YAPILAPI itself, not by Google.
         </li>
         <li>
           Authorities, when the law requires it or to protect someone from serious harm, and specialised organisations when we find child sexual abuse material.

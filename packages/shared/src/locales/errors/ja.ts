@@ -1,5 +1,11 @@
 /** The API's error messages in Japanese, keyed by the English it writes. */
 export const ja: Record<string, string> = {
+  'That isn’t a link to a YouTube video.': 'YouTube動画へのリンクではありません。',
+  'This video’s owner doesn’t let it play outside YouTube. Open it on YouTube instead.':
+    'この動画の所有者はYouTube以外での再生を許可していません。YouTubeで開いてください。',
+  'That YouTube video isn’t available. It may be private or removed.': 'このYouTube動画は利用できません。非公開か削除された可能性があります。',
+  'Add a photo or video you uploaded for watch together.': '一緒に視聴のためにアップロードした写真か動画を追加してください。',
+  'Only photos and videos can be watched together.': '一緒に視聴できるのは写真と動画だけです。',
   'The request body is not valid JSON.': 'リクエストの本文が有効なJSONではありません。',
   'Media not found.': 'メディアが見つかりません。',
   'Something went wrong on our side. Try again.': 'こちらで問題が発生しました。もう一度お試しください。',

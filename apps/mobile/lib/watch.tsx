@@ -13,6 +13,7 @@ import {
   driftFix,
   expectedPositionMs,
   isNewerPlayback,
+  watchItemName,
   WATCH_HEARTBEAT_MS,
   WATCH_MAX_MEMBERS,
   type WatchPlayback,
@@ -42,6 +43,30 @@ type Control = Parameters<Api['watch']['control']>[1];
 
 /** The video in a post (a reel or a video post), if it has one. */
 export const videoOf = (p: Post): MediaItem | undefined => p.media.find((m) => m.kind === 'video');
+
+/**
+ * The video a queue item plays on the phone: a post's video, or a video someone added from their
+ * device once it's ready. Photos and YouTube videos show as a picture here (with "Open on
+ * YouTube"); their own players are on the web for now.
+ */
+export const itemVideo = (item: WatchQueueItem | null): MediaItem | undefined =>
+  !item ? undefined : item.kind === 'post' ? videoOf(item.post) : item.kind === 'upload' && item.ready && item.media.kind === 'video' ? item.media : undefined;
+
+/** A small picture for a queue item (a post's, an upload's, or YouTube's). */
+export function itemThumb(item: WatchQueueItem): string | null {
+  if (item.kind === 'post') return postThumb(item.post);
+  if (item.kind === 'youtube') return item.youtube.thumbnailUrl;
+  const m = item.media;
+  if (m.sensitive) return null;
+  const pic = m.kind === 'video' ? (m.variants?.thumb ?? m.posterUrl) : (m.variants?.thumb ?? m.variants?.medium ?? m.url);
+  return pic ? mediaUrl(pic) : null;
+}
+
+/** What a queue item is called: the post's author, the YouTube video's title, or who added the upload. */
+export const itemName = (item: WatchQueueItem, t: Translator['t']) => watchItemName(item, { youtube: t('watch.youtube'), upload: t('m.chat.video') });
+
+/** This app's device id for "one device per person": the device that joined last plays. */
+const DEVICE = `app${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
 
 /** Whether a post can go in a watch together queue: published, not locked, with a video. */
 export const canWatch = (p: Post) => !p.status && !p.locked && !!videoOf(p);
@@ -329,6 +354,13 @@ export function useWatchSync(id: string, { saver }: { saver: boolean }) {
   const [reactions, setReactions] = useState<Floating[]>([]);
   const [localPlaying, setLocalPlaying] = useState(false);
   const [time, setTime] = useState({ positionMs: 0, durationMs: 0 });
+  /** Another of your devices is the one playing (one device per person). */
+  const [elsewhere, setElsewhereState] = useState(false);
+  const elsewhereRef = useRef(false);
+  const setElsewhere = (on: boolean) => {
+    elsewhereRef.current = on;
+    setElsewhereState(on);
+  };
 
   // Everything the timers, events and callbacks read lives in refs, so none of them see stale state.
   const sessionRef = useRef<WatchSession | null>(null);
@@ -431,9 +463,17 @@ export function useWatchSync(id: string, { saver }: { saver: boolean }) {
     const allowed = started.current || !saverRef.current;
     setNeedsTap(!allowed);
     if (!allowed) return;
+    if (elsewhereRef.current) {
+      ours(() => player.pause());
+      return;
+    }
     if (loadedItem.current !== item.id) {
-      const media = videoOf(item.post);
-      if (!media) return;
+      const media = itemVideo(item);
+      if (!media) {
+        // A photo, a YouTube video or an upload still being made ready: nothing to play here.
+        ours(() => player.pause());
+        return;
+      }
       loadedItem.current = item.id;
       ready.current = false;
       setTime({ positionMs: 0, durationMs: 0 });
@@ -527,9 +567,10 @@ export function useWatchSync(id: string, { saver }: { saver: boolean }) {
     if (endedRef.current || !mounted.current || !joinedRef.current) return;
     try {
       const sent = Date.now();
-      const r = await (await client()).watch.join(id);
+      const r = await (await client()).watch.join(id, DEVICE);
       sample(sent, r.session.serverTime);
       joinedRef.current = true;
+      setElsewhere(false);
       if (mounted.current) takeSession(r.session);
     } catch (e) {
       if (e instanceof ApiError && (e.status === 410 || e.code === 'watch_ended')) markEnded();
@@ -539,7 +580,8 @@ export function useWatchSync(id: string, { saver }: { saver: boolean }) {
   function onError(e: unknown) {
     if (!mounted.current) return;
     if (e instanceof ApiError && (e.status === 410 || e.code === 'watch_ended')) return markEnded();
-    if (e instanceof ApiError && e.code === 'watch_not_watching') return void rejoin();
+    // Not watching any more: join again, unless another of your devices is the one playing.
+    if (e instanceof ApiError && e.code === 'watch_not_watching') return elsewhereRef.current ? undefined : void rejoin();
     flash(errorMessage(e));
   }
 
@@ -552,15 +594,16 @@ export function useWatchSync(id: string, { saver }: { saver: boolean }) {
     try {
       const api = await client();
       const sent = Date.now();
-      const r = await api.watch.join(id);
+      const r = await api.watch.join(id, DEVICE);
       sample(sent, r.session.serverTime);
       if (!mounted.current) {
         // Closed while joining: leave again.
-        void api.watch.leave(id).catch(() => {});
+        void api.watch.leave(id, DEVICE).catch(() => {});
         return;
       }
       joinedRef.current = true;
       setJoined(true);
+      setElsewhere(false);
       fns.current.takeSession(r.session);
     } catch (e) {
       if (e instanceof ApiError && (e.status === 410 || e.code === 'watch_ended')) {
@@ -593,7 +636,7 @@ export function useWatchSync(id: string, { saver }: { saver: boolean }) {
       if (joinedRef.current && !endedRef.current) {
         joinedRef.current = false;
         void client()
-          .then((api) => api.watch.leave(id))
+          .then((api) => api.watch.leave(id, DEVICE))
           .catch(() => {});
       }
     };
@@ -605,19 +648,24 @@ export function useWatchSync(id: string, { saver }: { saver: boolean }) {
     const beat = async () => {
       clockAge.current++;
       const pb = pbRef.current;
-      let body: { positionMs?: number; itemId?: string | null; seq?: number; atServerMs?: number } = {};
+      let body: { positionMs?: number; itemId?: string | null; seq?: number; atServerMs?: number; device?: string } = { device: DEVICE };
       let playingNow = false;
       try {
         playingNow = player.playing;
       } catch {
         return;
       }
-      if (isHost() && pb?.playing && pb.itemId && loadedItem.current === pb.itemId && ready.current && playingNow)
-        body = { positionMs: localMs(), itemId: pb.itemId, seq: pb.seq, atServerMs: Math.round(serverNow()) };
+      if (!elsewhereRef.current && isHost() && pb?.playing && pb.itemId && loadedItem.current === pb.itemId && ready.current && playingNow)
+        body = { ...body, positionMs: localMs(), itemId: pb.itemId, seq: pb.seq, atServerMs: Math.round(serverNow()) };
       try {
         const sent = Date.now();
         const r = await (await client()).watch.heartbeat(id, body);
         sample(sent, r.serverTime);
+        // Another of your devices plays now (its `watch.device` may have been missed).
+        if (r.here === false && !elsewhereRef.current) {
+          setElsewhere(true);
+          ours(() => player.pause());
+        }
       } catch (e) {
         fns.current.onError(e);
       }
@@ -632,7 +680,7 @@ export function useWatchSync(id: string, { saver }: { saver: boolean }) {
     if (!joined || ended) return;
     const h = setInterval(() => {
       const pb = pbRef.current;
-      if (!pb?.playing || !pb.itemId || loadedItem.current !== pb.itemId || !ready.current) return;
+      if (!pb?.playing || !pb.itemId || loadedItem.current !== pb.itemId || !ready.current || elsewhereRef.current) return;
       if (saverRef.current && !started.current) return;
       try {
         const dur = durationMs();
@@ -688,6 +736,12 @@ export function useWatchSync(id: string, { saver }: { saver: boolean }) {
     if (e.type === 'watch.playback' && d.playback) {
       fns.current.takePlayback(d.playback as WatchPlayback);
       if (Array.isArray(d.skipped) && d.skipped.length) flashSkipped(d.skipped as WatchSkipReason[]);
+    } else if (e.type === 'watch.device') {
+      // You opened it on another device: that one plays, this one stops.
+      if (d.deviceId !== DEVICE && !elsewhereRef.current) {
+        setElsewhere(true);
+        ours(() => player.pause());
+      }
     } else if (e.type === 'watch.updated') void fns.current.refetch();
     else if (e.type === 'watch.ended') markEnded();
     else if (e.type === 'watch.reaction' && d.kind && REACTION_ICON[d.kind as WatchReaction]) {
@@ -818,7 +872,7 @@ export function useWatchSync(id: string, { saver }: { saver: boolean }) {
     joinedRef.current = false;
     setJoined(false);
     ours(() => player.pause());
-    if (was) await (await client()).watch.leave(id).catch(() => {});
+    if (was) await (await client()).watch.leave(id, DEVICE).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, player]);
 
@@ -850,6 +904,12 @@ export function useWatchSync(id: string, { saver }: { saver: boolean }) {
     reactions,
     playing: localPlaying,
     time,
+    elsewhere,
+    /** "Watch here": this device plays from now on (your other one stops). */
+    watchHere: () => {
+      started.current = true;
+      void open();
+    },
     retry: open,
     flash,
     flashSkipped,

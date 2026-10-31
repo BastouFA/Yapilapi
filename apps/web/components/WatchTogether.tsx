@@ -29,6 +29,30 @@ import { useRealtime, useSession, type Session } from '@/app/providers';
 type T = Session['t'];
 type TP = Session['tp'];
 
+let device: string | null = null;
+
+/**
+ * This browser tab, for "one device per person": the device that joins last plays, the others
+ * show "Watching on another device". Kept for the tab's life (a reload is the same device).
+ */
+export function watchDeviceId(): string {
+  if (device) return device;
+  try {
+    device = sessionStorage.getItem('watch-device');
+  } catch {
+    /* storage may be off: a fresh id each page load is fine */
+  }
+  if (!device || !/^[A-Za-z0-9_-]{8,64}$/.test(device)) {
+    device = crypto.randomUUID().replace(/-/g, '');
+    try {
+      sessionStorage.setItem('watch-device', device);
+    } catch {
+      /* see above */
+    }
+  }
+  return device;
+}
+
 /** A post has something to watch together: a video. */
 export const hasVideo = (p: Post) => p.media.some((m) => m.kind === 'video');
 
@@ -121,7 +145,7 @@ export function WatchChatPicker({ post, onClose }: { post: Post | null; onClose:
     if (!post) return;
     setBusy(c.id);
     try {
-      const r = await api.watch.start(c.id, [post.id]);
+      const r = await api.watch.start(c.id, [post.id], { device: watchDeviceId() });
       const note = addNotes(t, r.skipped);
       if (note) toast(note);
       onClose();
