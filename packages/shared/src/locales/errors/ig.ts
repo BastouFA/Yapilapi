@@ -618,6 +618,7 @@ export const ig: Record<string, string> = {
     'Akaụntụ gị nwere oke mgbe ndị otu anyị na-enyocha ụfọdụ ihe na-adịbeghị anya, ya mere ị nwere ike izitere naanị ndị enyi ozi ugbu a. Nke a na-ewekarị otu ụbọchị ma ọ bụ abụọ.',
   "That offer doesn't exist or isn't visible to you.": 'Ọnụahịa ahụ adịghị ma ọ bụ ị nweghị ike ịhụ ya.',
   "You can't answer this offer.": 'Ị nweghị ike ịza ọnụahịa a.',
+  'That recording was empty. Check that your microphone works and try again.': 'Ndekọ ahụ tọgbọrọ chakoo. Lelee ma igwe okwu gị na-arụ ọrụ wee nwaa ọzọ.',
   'Files can be up to 50 MB.': 'Faịlụ nwere ike iru 50 MB.',
   "That file type isn't supported. Photos: JPEG, PNG, HEIC, HEIF, WebP, AVIF, GIF, TIFF, BMP. Videos: MP4, MOV, WebM, MKV, AVI, 3GP, MPEG. Audio: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, AMR.":
     'A naghị akwado ụdị faịlụ ahụ. Foto: JPEG, PNG, HEIC, HEIF, WebP, AVIF, GIF, TIFF, BMP. Vidiyo: MP4, MOV, WebM, MKV, AVI, 3GP, MPEG. Olu: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, AMR.',

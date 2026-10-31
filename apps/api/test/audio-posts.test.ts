@@ -64,6 +64,31 @@ async function upload(u: TestUser, name: string, mime: string, data: Buffer) {
   return res.json().media as { id: string; url: string; kind: string };
 }
 
+/** Uploads without checking the answer. */
+function send(u: TestUser, name: string, mime: string, data: Buffer) {
+  const boundary = '----yp' + Math.random().toString(16).slice(2);
+  return t.app.inject({
+    method: 'POST',
+    url: '/v1/media',
+    headers: { authorization: `Bearer ${u.token}`, 'content-type': `multipart/form-data; boundary=${boundary}` },
+    payload: Buffer.concat([
+      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${name}"\r\nContent-Type: ${mime}\r\n\r\n`),
+      data,
+      Buffer.from(`\r\n--${boundary}--\r\n`),
+    ]),
+  });
+}
+
+describe('empty recordings', () => {
+  it('turns down a recording with nothing in it, so no voice message that never plays is sent', async () => {
+    const u = await signUp(t.app);
+    const empty = await send(u, 'voice.m4a', 'audio/mp4', tone(0.05));
+    expect(empty.statusCode).toBe(422);
+    expect(empty.json().error.code).toBe('empty_audio');
+    expect((await send(u, 'voice.m4a', 'audio/mp4', tone(1))).statusCode).toBe(201);
+  });
+});
+
 /** A stored recording of a given length, as if uploaded (the upload measures the length). */
 async function recording(owner: TestUser, durationMs: number): Promise<{ id: string; url: string }> {
   const { rows } = await db().query(

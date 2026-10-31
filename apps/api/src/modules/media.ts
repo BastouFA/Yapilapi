@@ -10,6 +10,9 @@ import { me, requireAuth } from '../plugins/auth.ts';
 
 export const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 
+/** Shorter than this, a recording has nothing in it. */
+const EMPTY_AUDIO_MS = 200;
+
 const uploadQuery = z.object({ viewOnce: z.enum(['true', 'false', '1', '0']).optional() });
 
 /**
@@ -37,6 +40,9 @@ export default async function mediaModule(app: FastifyInstance, ctx: AppContext)
       throw new AppError(415, 'unsupported_media', "That file couldn't be read. It may be damaged; try exporting it again.");
     };
     let web = await toWebFormat(raw, detected).catch(unreadable);
+    // A recording with nothing in it (a phone browser can hand one over): say so now, instead of a voice message that never plays.
+    if (detected.kind === 'audio' && web.durationMs !== undefined && web.durationMs < EMPTY_AUDIO_MS)
+      throw new AppError(422, 'empty_audio', 'That recording was empty. Check that your microphone works and try again.');
     const alt = (file.fields.altText as { value?: string } | undefined)?.value?.slice(0, 500) ?? null;
     const filename = file.filename?.slice(0, 200) ?? null;
 

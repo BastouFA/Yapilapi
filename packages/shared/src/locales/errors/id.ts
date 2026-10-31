@@ -625,6 +625,7 @@ export const id: Record<string, string> = {
     'Akun Anda dibatasi selama tim kami meninjau beberapa aktivitas terbaru, jadi untuk sementara Anda hanya bisa mengirim pesan ke teman. Ini biasanya butuh satu atau dua hari.',
   "That offer doesn't exist or isn't visible to you.": 'Tawaran itu tidak ada atau tidak bisa Anda lihat.',
   "You can't answer this offer.": 'Anda tidak bisa menjawab tawaran ini.',
+  'That recording was empty. Check that your microphone works and try again.': 'Rekaman itu kosong. Pastikan mikrofonmu berfungsi lalu coba lagi.',
   'Files can be up to 50 MB.': 'File maksimal 50 MB.',
   "That file type isn't supported. Photos: JPEG, PNG, HEIC, HEIF, WebP, AVIF, GIF, TIFF, BMP. Videos: MP4, MOV, WebM, MKV, AVI, 3GP, MPEG. Audio: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, AMR.":
     'Jenis file itu tidak didukung. Foto: JPEG, PNG, HEIC, HEIF, WebP, AVIF, GIF, TIFF, BMP. Video: MP4, MOV, WebM, MKV, AVI, 3GP, MPEG. Audio: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, AMR.',

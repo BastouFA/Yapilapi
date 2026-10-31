@@ -624,6 +624,7 @@ export const ru: Record<string, string> = {
     'Ваш аккаунт ограничен, пока наша команда изучает недавнюю активность, поэтому пока вы можете писать только друзьям. Обычно это занимает день-два.',
   "That offer doesn't exist or isn't visible to you.": 'Это предложение не существует или вам не видно.',
   "You can't answer this offer.": 'Вы не можете ответить на это предложение.',
+  'That recording was empty. Check that your microphone works and try again.': 'Запись оказалась пустой. Проверьте, работает ли микрофон, и попробуйте снова.',
   'Files can be up to 50 MB.': 'Размер файла — не больше 50 МБ.',
   "That file type isn't supported. Photos: JPEG, PNG, HEIC, HEIF, WebP, AVIF, GIF, TIFF, BMP. Videos: MP4, MOV, WebM, MKV, AVI, 3GP, MPEG. Audio: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, AMR.":
     'Этот тип файла не поддерживается. Фото: JPEG, PNG, HEIC, HEIF, WebP, AVIF, GIF, TIFF, BMP. Видео: MP4, MOV, WebM, MKV, AVI, 3GP, MPEG. Аудио: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, AMR.',

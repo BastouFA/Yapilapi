@@ -630,6 +630,8 @@ export const ur: Record<string, string> = {
     'جب تک ہماری ٹیم کچھ حالیہ سرگرمی کا جائزہ لے رہی ہے، آپ کا اکاؤنٹ محدود ہے، اس لیے فی الحال آپ صرف دوستوں کو پیغام بھیج سکتے ہیں۔ اس میں عام طور پر ایک دو دن لگتے ہیں۔',
   "That offer doesn't exist or isn't visible to you.": 'یہ پیشکش موجود نہیں یا آپ اسے نہیں دیکھ سکتے۔',
   "You can't answer this offer.": 'آپ اس پیشکش کا جواب نہیں دے سکتے۔',
+  'That recording was empty. Check that your microphone works and try again.':
+    'یہ ریکارڈنگ خالی تھی۔ دیکھیں کہ آپ کا مائیکروفون کام کر رہا ہے اور دوبارہ کوشش کریں۔',
   'Files can be up to 50 MB.': 'فائلیں زیادہ سے زیادہ 50 MB کی ہو سکتی ہیں۔',
   "That file type isn't supported. Photos: JPEG, PNG, HEIC, HEIF, WebP, AVIF, GIF, TIFF, BMP. Videos: MP4, MOV, WebM, MKV, AVI, 3GP, MPEG. Audio: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, AMR.":
     'یہ فائل کی قسم سپورٹ نہیں ہوتی۔ تصاویر: JPEG، PNG، HEIC، HEIF، WebP، AVIF، GIF، TIFF، BMP۔ ویڈیوز: MP4، MOV، WebM، MKV، AVI، 3GP، MPEG۔ آڈیو: MP3، M4A، AAC، WAV، OGG، Opus، FLAC، AMR۔',

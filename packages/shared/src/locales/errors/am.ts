@@ -595,6 +595,7 @@ export const am: Record<string, string> = {
     'ቡድናችን አንዳንድ የቅርብ ጊዜ እንቅስቃሴዎችን እየገመገመ ስለሆነ መለያዎ ተገድቧል፣ ስለዚህ ለአሁን መልዕክት መላክ የሚችሉት ለጓደኞች ብቻ ነው። ይህ ብዙውን ጊዜ አንድ ወይም ሁለት ቀን ይወስዳል።',
   "That offer doesn't exist or isn't visible to you.": 'ያ ቅናሽ የለም ወይም ለእርስዎ አይታይም።',
   "You can't answer this offer.": 'ለዚህ ቅናሽ መልስ መስጠት አይችሉም።',
+  'That recording was empty. Check that your microphone works and try again.': 'ቅጂው ባዶ ነበር። ማይክሮፎንዎ እየሰራ መሆኑን ያረጋግጡና እንደገና ይሞክሩ።',
   'Files can be up to 50 MB.': 'ፋይሎች እስከ 50 MB ሊሆኑ ይችላሉ።',
   "That file type isn't supported. Photos: JPEG, PNG, HEIC, HEIF, WebP, AVIF, GIF, TIFF, BMP. Videos: MP4, MOV, WebM, MKV, AVI, 3GP, MPEG. Audio: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, AMR.":
     'ያ የፋይል ዓይነት አይደገፍም። ፎቶዎች፦ JPEG፣ PNG፣ HEIC፣ HEIF፣ WebP፣ AVIF፣ GIF፣ TIFF፣ BMP። ቪዲዮዎች፦ MP4፣ MOV፣ WebM፣ MKV፣ AVI፣ 3GP፣ MPEG። ድምጽ፦ MP3፣ M4A፣ AAC፣ WAV፣ OGG፣ Opus፣ FLAC፣ AMR።',

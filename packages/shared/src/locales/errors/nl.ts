@@ -630,6 +630,7 @@ export const nl: Record<string, string> = {
     'Je account is beperkt terwijl ons team recente activiteit bekijkt, dus je kunt voorlopig alleen vrienden berichten sturen. Dit duurt meestal een dag of twee.',
   "That offer doesn't exist or isn't visible to you.": 'Dat bod bestaat niet of is niet zichtbaar voor jou.',
   "You can't answer this offer.": 'Je kunt niet op dit bod reageren.',
+  'That recording was empty. Check that your microphone works and try again.': 'Deze opname was leeg. Controleer of je microfoon werkt en probeer het opnieuw.',
   'Files can be up to 50 MB.': 'Bestanden mogen maximaal 50 MB zijn.',
   "That file type isn't supported. Photos: JPEG, PNG, HEIC, HEIF, WebP, AVIF, GIF, TIFF, BMP. Videos: MP4, MOV, WebM, MKV, AVI, 3GP, MPEG. Audio: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, AMR.":
     "Dat bestandstype wordt niet ondersteund. Foto's: JPEG, PNG, HEIC, HEIF, WebP, AVIF, GIF, TIFF, BMP. Video's: MP4, MOV, WebM, MKV, AVI, 3GP, MPEG. Audio: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, AMR.",

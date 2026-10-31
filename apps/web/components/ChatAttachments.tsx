@@ -5,7 +5,7 @@ import { Button, Icon, SensitiveCover, TranslationBar, useTranslatable } from '@
 import { languageName, type Message, type MessageKey, type VoiceTranscript as Transcript } from '@yapilapi/shared';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
-import { VOICE_AUDIO, voiceRecorder } from '@/lib/voice-recording';
+import { closeVoiceMic, openVoiceMic, playVoiceAloud, voiceRecorder } from '@/lib/voice-recording';
 
 type Attachment = Message['attachments'][number];
 
@@ -122,6 +122,7 @@ function ListenButton({ id, target }: { id: string; target: string }) {
         return;
       }
     }
+    playVoiceAloud();
     await audio.current.play().catch(() => setState('idle'));
   };
   return (
@@ -140,7 +141,7 @@ function ListenButton({ id, target }: { id: string; target: string }) {
 }
 
 function VoiceNote({ url, durationMs }: { url: string; durationMs: number | null }) {
-  const { t } = useSession();
+  const { t, toast } = useSession();
   const audio = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [pos, setPos] = useState(0);
@@ -154,8 +155,13 @@ function VoiceNote({ url, durationMs }: { url: string; durationMs: number | null
         onClick={() => {
           const a = audio.current;
           if (!a) return;
-          if (a.paused) void a.play();
-          else a.pause();
+          if (!a.paused) return a.pause();
+          playVoiceAloud();
+          // A load that failed earlier (a dropped connection) is tried again.
+          if (a.error) a.load();
+          a.play().catch((e: unknown) => {
+            if ((e as { name?: string }).name !== 'AbortError') toast(t('chat.voiceNotPlaying'));
+          });
         }}
       >
         <Icon name={playing ? 'stop' : 'play'} size={16} filled />
@@ -299,6 +305,7 @@ export function ViewOnceMessage({ message, mine, onChange }: { message: Message;
               <audio
                 src={open.src}
                 autoPlay
+                onPlay={playVoiceAloud}
                 controls
                 controlsList="nodownload noplaybackrate"
                 onEnded={() => void close()}
@@ -380,7 +387,7 @@ export function VoiceRecorder({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
-  useEffect(() => () => rec.current?.stream.getTracks().forEach((t) => t.stop()), []);
+  useEffect(() => () => closeVoiceMic(rec.current?.stream), []);
 
   const start = async () => {
     if (typeof MediaRecorder === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
@@ -388,12 +395,12 @@ export function VoiceRecorder({
       return;
     }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: VOICE_AUDIO });
+      const stream = await openVoiceMic();
       const r = voiceRecorder(stream);
       chunks.current = [];
       r.ondataavailable = (e) => e.data.size && chunks.current.push(e.data);
       r.onstop = () => {
-        stream.getTracks().forEach((t) => t.stop());
+        closeVoiceMic(stream);
         const ms = Date.now() - started.current;
         if (!keep.current || ms < 700) return;
         const mime = (r.mimeType || 'audio/webm').split(';')[0]!;

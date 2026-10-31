@@ -635,6 +635,8 @@ export const zu: Record<string, string> = {
     'I-akhawunti yakho inemikhawulo ngesikhathi ithimba lethu libuyekeza umsebenzi othile wakamuva, ngakho ungathumelela abangani kuphela imilayezo okwamanje. Lokhu kuvamise ukuthatha usuku noma ezimbili.',
   "That offer doesn't exist or isn't visible to you.": 'Leyo ntengo ayikho noma awukwazi ukuyibona.',
   "You can't answer this offer.": 'Awukwazi ukuphendula le ntengo.',
+  'That recording was empty. Check that your microphone works and try again.':
+    'Lokho okuqoshiwe bekungenalutho. Hlola ukuthi imakrofoni yakho iyasebenza bese uzama futhi.',
   'Files can be up to 50 MB.': 'Amafayela angaba kuze kube ngu-50 MB.',
   "That file type isn't supported. Photos: JPEG, PNG, HEIC, HEIF, WebP, AVIF, GIF, TIFF, BMP. Videos: MP4, MOV, WebM, MKV, AVI, 3GP, MPEG. Audio: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, AMR.":
     'Lolo hlobo lwefayela alusekelwa. Izithombe: JPEG, PNG, HEIC, HEIF, WebP, AVIF, GIF, TIFF, BMP. Amavidiyo: MP4, MOV, WebM, MKV, AVI, 3GP, MPEG. Umsindo: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, AMR.',

@@ -27,6 +27,7 @@ import { useCalls } from '@/components/Calls';
 import { MiniAppsSheet } from '@/components/MiniApps';
 import { MessageAttachments, ViewOnceMessage, VoiceRecorder, VoiceTranscript } from '@/components/ChatAttachments';
 import { ViewOnceCapture } from '@/components/ViewOnceCapture';
+import { SharedPostCard, sharedPostIn } from '@/components/SharedPostCard';
 import { TurnOnYapsPrompt, YapButton } from '@/components/Yap';
 import { StoryCardView } from '@/components/StoryStickers';
 import { NowStatusLine } from '@/components/ProfilePlus';
@@ -99,6 +100,8 @@ export default function ChatPage() {
   const [disappearingOpen, setDisappearingOpen] = useState(false);
   const [jump, setJump] = useState<string | null>(null);
   const [highlight, setHighlight] = useState<string | null>(null);
+  /** Messages sharing a post the reader can't see: their link stays as it was written. */
+  const [unseenPosts, setUnseenPosts] = useState<string[]>([]);
   const composer = useRef<HTMLTextAreaElement>(null);
   const [pollOpen, setPollOpen] = useState(false);
   const [listOpen, setListOpen] = useState(false);
@@ -863,7 +866,10 @@ export default function ChatPage() {
             // The text, with "See translation" when it's in a language the reader doesn't understand.
             // A reply to a story says so first ("Replied to your story"), in your language.
             const replied = m.storyReply ? <span className="chat-story-reply">{storyReplyLabel(m.storyReply, m.sender.id, me?.id, t)}</span> : null;
-            const said = m.body ? <TranslatableText kind="message" id={m.id} text={m.body} lang={m.lang} own={mine || !!m.pending} locale={locale} /> : null;
+            // A shared post or reel shows in the bubble, in place of its address.
+            const shared = !m.unsent && !m.attachments.length && !unseenPosts.includes(m.id) ? sharedPostIn(m.body) : null;
+            const words = shared ? shared.rest : m.body;
+            const said = words ? <TranslatableText kind="message" id={m.id} text={words} lang={m.lang} own={mine || !!m.pending} locale={locale} /> : null;
             const text = replied ? (
               <>
                 {replied}
@@ -899,6 +905,11 @@ export default function ChatPage() {
                 {m.story ? <StoryCardView card={m.story} /> : null}
                 {m.attachments.length ? <MessageAttachments items={m.attachments} /> : null}
                 {m.transcript ? <VoiceTranscript id={m.id} transcript={m.transcript} own={mine} /> : null}
+                {text}
+              </>
+            ) : shared ? (
+              <>
+                <SharedPostCard id={shared.id} href={shared.href} onMissing={() => setUnseenPosts((cur) => [...cur, m.id])} />
                 {text}
               </>
             ) : (
