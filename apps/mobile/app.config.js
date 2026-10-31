@@ -3,8 +3,8 @@
 // environment it names ("development", "preview" or "production"). See docs/operations/app-store.md
 // and docs/operations/real-device-testing.md.
 //
-//   YAPILAPI_API_URL      the API the app talks to, e.g. https://yapilapi-api.onrender.com
-//   YAPILAPI_WEB_URL      the web app, for shared links, checkout and the legal pages, e.g. https://yapilapi-web.onrender.com
+//   YAPILAPI_API_URL      the API the app talks to, e.g. https://api.yapilapi.com
+//   YAPILAPI_WEB_URL      the web app, for shared links, checkout and the legal pages, e.g. https://yapilapi.com
 //   YAPILAPI_WS_URL       optional: the realtime socket, when it isn't the API address with wss:// (…/v1/realtime)
 //   EAS_PROJECT_ID        from `eas init` (push notifications need it)
 //   GOOGLE_SERVICES_JSON  Firebase's google-services.json, for push on Android (an EAS file variable);

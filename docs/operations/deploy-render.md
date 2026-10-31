@@ -240,6 +240,15 @@ redeploy. Never set it to `true`. If you put Cloudflare in front of the site, al
 
 The same applies if a service name was taken and Render gave a different `onrender.com` address.
 
+Photos, videos and sounds keep the address they were stored with (`PUBLIC_API_URL` + `/media/<key>`,
+written into the database at upload), so files uploaded before the change still point at the old
+host until a migration moves them. Production did this once: the site moved from the Render web
+service to Vercel (`yapilapi.com`), and migration `0097_media_host_move.sql` rewrote every stored
+`https://yapilapi-web.onrender.com/media/` address to `https://yapilapi.com/media/` (all text, JSON
+and text-array columns; keys and other hosts unchanged). After that the `yapilapi-web` Render service
+serves nothing anyone links to and can be deleted; `yapilapi-web.onrender.com` stays in `WEB_ORIGIN`
+only until then.
+
 ## Live video and the calls relay
 
 Both stay off on a plain Render deploy; everything else works without them.

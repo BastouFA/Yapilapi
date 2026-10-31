@@ -13,6 +13,7 @@ import { useSession } from '@/app/providers';
  */
 const LINK = /(?:https?:\/\/[^\s/,]+,)*https?:\/\/([^\s/,]+)\/(?:reels\?start=|p\/)([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b/i;
 
+// yapilapi-web.onrender.com is the old web address: messages sent before the move still link there.
 const OUR_HOSTS = new Set(['yapilapi.com', 'www.yapilapi.com', 'yapilapi-web.onrender.com']);
 
 /**

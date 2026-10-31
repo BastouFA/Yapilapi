@@ -58,9 +58,13 @@ services:
       - key: API_PORT
         value: '10000'
       # The first is used in links (emails, checkout); the others may also call the API.
+      # yapilapi-web.onrender.com is the old Render web service (legacy): kept only so it can still
+      # call the API until it is deleted; remove it from this list then.
       - key: WEB_ORIGIN
         value: https://yapilapi.com,https://www.yapilapi.com,https://yapilapi-web.onrender.com
       # Media addresses go through the web app's /media proxy, so photos and videos are same-origin.
+      # Each address is stored as written when a file is uploaded: changing this later needs a
+      # migration like 0097, which moved uploads stored on yapilapi-web.onrender.com.
       - key: PUBLIC_API_URL
         value: https://yapilapi.com
       - key: WEBAUTHN_RP_ID
@@ -240,8 +244,9 @@ services:
   - type: web
     name: yapilapi-web
     # yapilapi.com and www are served by Vercel now (project yapilapi-web, team afriqora; free and it
-    # never sleeps). This service stays as a fallback at yapilapi-web.onrender.com; with no traffic it
-    # sleeps and uses none of the 750 free hours the always-awake API needs.
+    # never sleeps). This service is legacy: it stayed at yapilapi-web.onrender.com only for photos and
+    # videos stored with that address, which migration 0097 moved to yapilapi.com. Nothing new points
+    # here; delete it in the Dashboard and remove this block (a Blueprint sync would create it again).
     runtime: docker
     dockerfilePath: infrastructure/docker/web.Dockerfile
     dockerContext: .

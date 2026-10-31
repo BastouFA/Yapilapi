@@ -15,9 +15,11 @@
 # empty. The API refuses to start in production without the required ones, so a missing secret shows
 # up as a failed deploy with a clear message in the log, not as a half-working site.
 #
-# Hostnames assume Render gives each service https://<name>.onrender.com. If a name is taken, or when you
-# add your own domain, update WEB_ORIGIN, PUBLIC_API_URL, WEBAUTHN_* on the API and API_INTERNAL_URL,
+# Addresses are the production ones, as in render.free.yaml: the site at https://yapilapi.com (served by
+# Vercel; the yapilapi-web service below is the Render fallback) and the API at https://api.yapilapi.com.
+# On another domain, update WEB_ORIGIN, PUBLIC_API_URL, WEBAUTHN_* on the API and API_INTERNAL_URL,
 # NEXT_PUBLIC_WS_URL and SITE_URL on the web app, then redeploy the web app (those three are built into it).
+# PUBLIC_API_URL is written into every stored photo and video address, so set it before the first upload.
 
 databases:
   - name: yapilapi-db
@@ -38,6 +40,9 @@ services:
 
   - type: web
     name: yapilapi-api
+    # The API's own address (realtime sockets go here); Cloudflare's DNS points api at this service.
+    domains:
+      - api.yapilapi.com
     runtime: docker
     dockerfilePath: infrastructure/docker/api.Dockerfile
     dockerContext: .
@@ -58,15 +63,18 @@ services:
         value: 'true'
       - key: API_PORT
         value: '10000'
+      # The first is used in links (emails, checkout); the others may also call the API.
+      # yapilapi-web.onrender.com is the old Render web service (legacy): kept only so it can still
+      # call the API until it is deleted; remove it from this list then.
       - key: WEB_ORIGIN
-        value: https://yapilapi-web.onrender.com
+        value: https://yapilapi.com,https://www.yapilapi.com,https://yapilapi-web.onrender.com
       # Media addresses go through the web app's /media proxy, so photos and videos are same-origin.
       - key: PUBLIC_API_URL
-        value: https://yapilapi-web.onrender.com
+        value: https://yapilapi.com
       - key: WEBAUTHN_RP_ID
-        value: yapilapi-web.onrender.com
+        value: yapilapi.com
       - key: WEBAUTHN_ORIGIN
-        value: https://yapilapi-web.onrender.com
+        value: https://yapilapi.com
       - key: DATABASE_URL
         fromDatabase:
           name: yapilapi-db
@@ -255,9 +263,9 @@ services:
         value: https://yapilapi-api.onrender.com
       # The realtime socket, straight to the API (the page's security policy allows this origin).
       - key: NEXT_PUBLIC_WS_URL
-        value: wss://yapilapi-api.onrender.com/v1/realtime
+        value: wss://api.yapilapi.com/v1/realtime
       - key: SITE_URL
-        value: https://yapilapi-web.onrender.com
+        value: https://yapilapi.com
       # Shown on the legal pages (/legal), read when a page is requested. Set them before launch.
       - key: LEGAL_ENTITY_NAME
         sync: false

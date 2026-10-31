@@ -716,6 +716,10 @@ Speak any language, step 2 (docs/product/speech-engine.md). Flags `VOICE_TRANSCR
 
 **Not done:** automatic captions for videos without any (still asked for in the video editor), suggested replies from transcripts, transcripts of audio posts through this job (they keep their caption track), and the phone screens haven't been run on a device.
 
+## Media off the old web host (2026-10-31, migration 0097, `apps/api/test/media-host-move.test.ts`)
+
+The site is on Vercel at `yapilapi.com` (the API stays on Render at `api.yapilapi.com`). Files uploaded before the move were stored as `https://yapilapi-web.onrender.com/media/<key>`; migration 0097 rewrites that prefix to `https://yapilapi.com/media/` in every text, JSON and text-array column (media and its sizes, posters and HLS, profile photos and covers, message attachments, stories, caption tracks, shared-reel videos, speech clips, Today, notifications, jobs), leaving keys, other hosts and the audit and event logs as they are. `render.yaml` now uses the production addresses like `render.free.yaml`; the old address stays in `WEB_ORIGIN` only until the `yapilapi-web` Render service is deleted (docs/operations/deploy-render.md, "Your own domain").
+
 ## Not built yet
 
 - Mainstream music: needs a licensing deal (docs/operations/music.md). Reporting song use to a licensing partner is not built.
