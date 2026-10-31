@@ -737,6 +737,7 @@ export const ru: Record<string, string> = {
   'Add text, a photo or a video to your story.': 'Добавьте в историю текст, фото или видео.',
   "You can't reshare your own story.": 'Нельзя поделиться собственной историей повторно.',
   'Open the original story to reshare it.': 'Откройте исходную историю, чтобы поделиться ею.',
+  'Only public posts can be added to a story.': 'В историю можно добавить только публичные публикации.',
   '{author_name} turned off resharing for this story.': '{author_name} запрещает делиться этой историей.',
   'You can reshare public stories, and stories you’re mentioned in.': 'Делиться можно открытыми историями и историями, где вас упомянули.',
   'Not sent.': 'Не отправлено.',

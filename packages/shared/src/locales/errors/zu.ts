@@ -751,6 +751,7 @@ export const zu: Record<string, string> = {
   'Add text, a photo or a video to your story.': 'Engeza umbhalo, isithombe noma ividiyo endabeni yakho.',
   "You can't reshare your own story.": 'Awukwazi ukwabelana kabusha ngendaba yakho.',
   'Open the original story to reshare it.': 'Vula indaba yangempela ukuze wabelane ngayo kabusha.',
+  'Only public posts can be added to a story.': 'Okuthunyelwe komphakathi kuphela okungengezwa endabeni.',
   '{author_name} turned off resharing for this story.': 'U-{author_name} uvale ukwabelana kabusha kule ndaba.',
   'You can reshare public stories, and stories you’re mentioned in.': 'Ungabelana kabusha ngezindaba zomphakathi, nezindaba oshiwo kuzo.',
   'Not sent.': 'Akuthunyelwanga.',

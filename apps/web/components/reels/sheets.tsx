@@ -16,6 +16,7 @@ import {
 } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
+import { canAddToStory } from '@/components/AddToStory';
 import { ChainJoinField, chainableAudience, FairStartCard } from '@/components/PassTheMic';
 import type { ReelPrefs } from './prefs';
 
@@ -34,7 +35,7 @@ function SheetItem({ icon, label, onClick, danger, pressed }: { icon: IconName; 
 
 /**
  * Share: the link first (the system share sheet, or copied), then more ways to share: watch it
- * together in a chat, repost, echo it with your own video, duet side by side, remix with the
+ * together in a chat, add it to your story, repost, echo it with your own video, duet side by side, remix with the
  * sound, the reel's echoes, duets and remixes, a video to share elsewhere, a board.
  */
 export function ShareSheet({
@@ -52,6 +53,7 @@ export function ShareSheet({
   onEchoes,
   onShared,
   onSend,
+  onAddToStory,
 }: {
   post: Post | null;
   mine: boolean;
@@ -71,6 +73,8 @@ export function ShareSheet({
   onShared?: (p: Post) => void;
   /** Send it into one of your chats (the server counts that share itself). */
   onSend?: (p: Post) => void;
+  /** Add it to your own story, as a card that opens it. */
+  onAddToStory?: (p: Post) => void;
 }) {
   const { t, toast, locale } = useSession();
   if (!post) return null;
@@ -116,6 +120,7 @@ export function ShareSheet({
         {signedIn && onWatch && post.media.some((m) => m.kind === 'video') ? (
           <SheetItem icon="play" label={t('watch.start')} onClick={done(() => onWatch(post))} />
         ) : null}
+        {onAddToStory && canAddToStory(post, signedIn) ? <SheetItem icon="plus" label={t('m.stories.add')} onClick={done(() => onAddToStory(post))} /> : null}
         {!mine && publicReel && signedIn ? (
           <SheetItem
             icon="repost"

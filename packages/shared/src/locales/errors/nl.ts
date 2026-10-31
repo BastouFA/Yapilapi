@@ -746,6 +746,7 @@ export const nl: Record<string, string> = {
   'Add text, a photo or a video to your story.': 'Voeg tekst, een foto of een video toe aan je verhaal.',
   "You can't reshare your own story.": 'Je kunt je eigen verhaal niet opnieuw delen.',
   'Open the original story to reshare it.': 'Open het oorspronkelijke verhaal om het opnieuw te delen.',
+  'Only public posts can be added to a story.': 'Alleen openbare berichten kunnen aan een verhaal worden toegevoegd.',
   '{author_name} turned off resharing for this story.': '{author_name} heeft opnieuw delen uitgezet voor dit verhaal.',
   'You can reshare public stories, and stories you’re mentioned in.': 'Je kunt openbare verhalen opnieuw delen, en verhalen waarin je wordt vermeld.',
   'Not sent.': 'Niet verstuurd.',

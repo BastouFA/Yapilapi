@@ -801,6 +801,7 @@ export const ha: Record<string, string> = {
   'Add text, a photo or a video to your story.': 'Ƙara rubutu, hoto ko bidiyo a labarinku.',
   "You can't reshare your own story.": 'Ba za ku iya sake raba labarinku ba.',
   'Open the original story to reshare it.': 'Buɗe labarin na asali don sake raba shi.',
+  'Only public posts can be added to a story.': 'Rubuce-rubucen jama’a kawai za a iya ƙarawa a labari.',
   '{author_name} turned off resharing for this story.': '{author_name} ya kashe sake rabawa na wannan labarin.',
   'You can reshare public stories, and stories you’re mentioned in.': "Za ku iya sake raba labaran jama'a, da labaran da aka ambace ku a ciki.",
   'Not sent.': 'Ba a aika ba.',

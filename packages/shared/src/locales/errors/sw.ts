@@ -801,6 +801,7 @@ export const sw: Record<string, string> = {
   'Add text, a photo or a video to your story.': 'Ongeza maandishi, picha au video kwenye hadithi yako.',
   "You can't reshare your own story.": 'Huwezi kushiriki upya hadithi yako mwenyewe.',
   'Open the original story to reshare it.': 'Fungua hadithi asili ili uishiriki upya.',
+  'Only public posts can be added to a story.': 'Machapisho ya umma pekee yanaweza kuongezwa kwenye hadithi.',
   '{author_name} turned off resharing for this story.': '{author_name} amezima kushiriki upya kwa hadithi hii.',
   'You can reshare public stories, and stories you’re mentioned in.': 'Unaweza kushiriki upya hadithi za umma, na hadithi ambazo umetajwa.',
   'Not sent.': 'Haijatumwa.',

@@ -729,6 +729,7 @@ export const ig: Record<string, string> = {
   'Add text, a photo or a video to your story.': 'Tinye ederede, foto ma ọ bụ vidiyo na story gị.',
   "You can't reshare your own story.": 'Ị nweghị ike ikesaghachi story nke gị.',
   'Open the original story to reshare it.': 'Mepee story mbụ ahụ ka ị kesaghachi ya.',
+  'Only public posts can be added to a story.': 'Naanị post ọha ka a pụrụ itinye na story.',
   '{author_name} turned off resharing for this story.': '{author_name} gbanyụrụ ikesaghachi maka story a.',
   'You can reshare public stories, and stories you’re mentioned in.': 'Ị nwere ike ikesaghachi story ọha, na story a kpọtụrụ gị aha na ha.',
   'Not sent.': 'E zigaghị ya.',

@@ -744,6 +744,7 @@ export const hi: Record<string, string> = {
   'Add text, a photo or a video to your story.': 'अपनी स्टोरी में टेक्स्ट, फ़ोटो या वीडियो जोड़ें।',
   "You can't reshare your own story.": 'आप अपनी खुद की स्टोरी फिर से शेयर नहीं कर सकते।',
   'Open the original story to reshare it.': 'फिर से शेयर करने के लिए मूल स्टोरी खोलें।',
+  'Only public posts can be added to a story.': 'स्टोरी में सिर्फ़ सार्वजनिक पोस्ट जोड़ी जा सकती हैं।',
   '{author_name} turned off resharing for this story.': '{author_name} ने इस स्टोरी को फिर से शेयर करना बंद कर दिया है।',
   'You can reshare public stories, and stories you’re mentioned in.': 'आप पब्लिक स्टोरी, और वे स्टोरी जिनमें आपका ज़िक्र है, फिर से शेयर कर सकते हैं।',
   'Not sent.': 'नहीं भेजा गया।',

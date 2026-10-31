@@ -11,6 +11,7 @@ import { CommentsSheet, ReportSheet } from '@/components/PostList';
 import { SaveToSheet } from '@/components/Boards';
 import { WatchChatPicker } from '@/components/WatchTogether';
 import { SendToChatSheet } from '@/components/SendToChat';
+import { AddToStorySheet } from '@/components/AddToStory';
 import { useSession } from '@/app/providers';
 import { ReelItem, type ReelViewerApi } from './ReelItem';
 import { HighlightsSheet, OptionsSheet, ShareSheet, type ChainOptions } from './sheets';
@@ -29,6 +30,7 @@ type Sheet =
   | { kind: 'saveTo'; post: Post }
   | { kind: 'watch'; post: Post }
   | { kind: 'send'; post: Post }
+  | { kind: 'story'; post: Post }
   | { kind: 'startChain'; post: Post }
   | { kind: 'passMic'; post: Post }
   | null;
@@ -688,6 +690,7 @@ export function ReelsViewer() {
         onEchoes={(p) => router.push(`/reels/${p.id}/echoes`)}
         onShared={shared}
         onSend={(p) => setSheet({ kind: 'send', post: p })}
+        onAddToStory={(p) => setSheet({ kind: 'story', post: p })}
       />
       <WatchChatPicker post={open?.kind === 'watch' ? open.post : null} onClose={closeSheet} />
       <SendToChatSheet
@@ -695,6 +698,13 @@ export function ReelsViewer() {
         onClose={closeSheet}
         onSent={(p, n) => {
           if (p.author.id !== me?.id) bumpShares(p.id, n);
+        }}
+      />
+      <AddToStorySheet
+        post={open?.kind === 'story' ? open.post : null}
+        onClose={closeSheet}
+        onAdded={(p) => {
+          if (p.author.id !== me?.id) bumpShares(p.id, 1);
         }}
       />
       <OptionsSheet

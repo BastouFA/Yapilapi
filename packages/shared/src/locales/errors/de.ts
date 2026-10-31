@@ -757,6 +757,7 @@ export const de: Record<string, string> = {
   'Add text, a photo or a video to your story.': 'Füge deiner Story Text, ein Foto oder ein Video hinzu.',
   "You can't reshare your own story.": 'Du kannst deine eigene Story nicht weiterteilen.',
   'Open the original story to reshare it.': 'Öffne die Original-Story, um sie weiterzuteilen.',
+  'Only public posts can be added to a story.': 'Nur öffentliche Beiträge können zu einer Story hinzugefügt werden.',
   '{author_name} turned off resharing for this story.': '{author_name} hat das Weiterteilen für diese Story ausgeschaltet.',
   'You can reshare public stories, and stories you’re mentioned in.': 'Du kannst öffentliche Storys und Storys, in denen du erwähnt wirst, weiterteilen.',
   'Not sent.': 'Nicht gesendet.',

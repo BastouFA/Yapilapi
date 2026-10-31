@@ -6126,7 +6126,23 @@ button.yp-chip[aria-pressed='true'] {
   background: linear-gradient(160deg, #2a1b3d, #0b0c14);
 }
 .story__reshare .story-card {
+  /* Above the previous/next tap areas, so the card opens wherever it's tapped. */
+  position: relative;
+  z-index: 1;
   width: min(260px, 80%);
+}
+/* "Add to your story": the card the story will show. */
+.add-to-story__preview {
+  display: flex;
+  justify-content: center;
+}
+/* A post (not a reel) in a story: a square cover. */
+.story-card__preview.story-card__preview--square {
+  height: 64px;
+  align-self: center;
+}
+.story-card__preview > svg {
+  color: #ffffff;
 }
 
 /* A story inside a chat message or a reshare. */

@@ -432,12 +432,31 @@ function PostCardView({
       // The person closed the share sheet.
     }
   }
+  // Add to your story: a public post, as a card in your story that opens it (for your followers).
+  function addToStory() {
+    Alert.alert(t('m.stories.add'), t('story.post.hint', { name: post.author.displayName }), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('m.common.share'),
+        onPress: () =>
+          void (async () => {
+            try {
+              await (await client()).posts.addToStory(post.id, { visibility: 'followers' });
+              setTuneNote(t('m.stories.added'));
+            } catch (e) {
+              setTuneNote(errorMessage(e));
+            }
+          })(),
+      },
+    ]);
+  }
   function share() {
     if (!me) return void shareSheet();
     menu.show({
       title: t('m.common.share'),
       actions: [
         { label: t('post.send.action'), icon: 'chatbubbles-outline', hint: t('post.send.hint'), onPress: () => sender.open(post) },
+        ...(post.visibility === 'public' && !post.status ? [{ label: t('m.stories.add'), icon: 'add-circle-outline' as const, onPress: addToStory }] : []),
         { label: t('reel.share.link'), icon: 'share-outline', onPress: () => void shareSheet() },
       ],
     });

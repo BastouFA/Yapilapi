@@ -11,7 +11,9 @@ import { isEnabled, notify, track } from '../lib/services.ts';
 import { assertCanShare } from '../lib/squads.ts';
 import { isStoredMediaUrl } from '../lib/storage.ts';
 import { plusCol, publicUserFrom } from '../lib/users.ts';
-import { notBlockedSql } from '../lib/visibility.ts';
+import { notBlockedSql, postVisibleSql } from '../lib/visibility.ts';
+import { learnFromPost, learnQuietly } from '../lib/affinity.ts';
+import { recordShare } from './recommendations.ts';
 import {
   groupStories,
   notifyStoryMentions,
@@ -19,6 +21,7 @@ import {
   STORY_FROM,
   STORY_SELECT,
   stickerResults,
+  storyPostSql,
   storyVisibleSql,
   type StoredMusic,
   type StoredSticker,
@@ -51,7 +54,8 @@ const hoursFor = (expiresIn: string, customHours?: number) =>
  * (1h, 24h, custom or permanent) shown to your people, with views, likes and
  * replies that arrive as a direct message. Stories can carry @mentions,
  * #hashtags and interactive stickers, be sent to a chat as a story card, and be
- * reshared into your own story (public ones, or ones that mention you).
+ * reshared into your own story (public ones, or ones that mention you). A public post or reel can
+ * be added to your story too, as a card that opens it.
  */
 export default async function momentsModule(app: FastifyInstance, ctx: AppContext) {
   const db = ctx.db;
@@ -84,6 +88,8 @@ export default async function momentsModule(app: FastifyInstance, ctx: AppContex
       stickers: Parameters<typeof prepareStory>[3];
       allowReshare: boolean;
       reshareOf?: string;
+      /** A post shown in the story (checked by the caller). */
+      sharedPostId?: string;
       music?: { soundId: string | null; trackId: string | null; stored: StoredMusic } | null;
       /** A squad's story: the squad (checked by the caller). */
       squadId?: string | null;
@@ -93,8 +99,8 @@ export default async function momentsModule(app: FastifyInstance, ctx: AppContex
     const prepared = await prepareStory(db, authorId, input.body, input.stickers);
     const { rows } = await db.query(
       `INSERT INTO moments (author_id, body, media_url, media_kind, media_id, visibility, location_text, expires_at, stickers, tags, mentions, reshare_of, allow_reshare,
-                            sound_id, music, lang, music_track_id, squad_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7, CASE WHEN $8::int IS NULL THEN NULL ELSE now() + make_interval(hours => $8::int) END, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+                            sound_id, music, lang, music_track_id, squad_id, shared_post_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7, CASE WHEN $8::int IS NULL THEN NULL ELSE now() + make_interval(hours => $8::int) END, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
        RETURNING id, expires_at, created_at, tags`,
       [
         authorId,
@@ -115,6 +121,7 @@ export default async function momentsModule(app: FastifyInstance, ctx: AppContex
         langOf(input.body),
         input.music?.trackId ?? null,
         input.squadId ?? null,
+        input.sharedPostId ?? null,
       ],
     );
     const moment = rows[0] as { id: string; expires_at: Date | null; created_at: Date; tags: string[] };
@@ -247,6 +254,44 @@ export default async function momentsModule(app: FastifyInstance, ctx: AppContex
     });
     await notify(db, ctx.realtime, { userId: s.author_id, category: 'friends', type: 'story_reshare', actorId: u.id, entityType: 'moment', entityId: s.id });
     track(db, u.id, 'moment_reshared', {});
+    reply.code(201);
+    return { moment };
+  });
+
+  /**
+   * Add a post or reel to your story ("Add to your story" on a post): yours, or someone else's
+   * public post from an account that isn't private, which you can see (see storyPostSql). Your
+   * story shows it as a card credited to its author that opens the post, for people who can still
+   * see it; once the post is deleted or no longer public, the card says it isn't available. It
+   * counts as a share of the post, like sending it to a chat.
+   */
+  app.post('/v1/posts/:id/story', { preHandler: requireAuth, config: { rateLimit: { max: 30, timeWindow: '1 hour' } } }, async (req, reply) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    const input = parse(reshareMomentSchema, req.body);
+    const { rows } = await db.query(
+      `SELECT p.author_id, ${storyPostSql('$1')} AS shareable, ap.is_private
+       FROM posts p JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id
+       WHERE p.id = $2 AND ${postVisibleSql('$1')}`,
+      [u.id, id],
+    );
+    const p = rows[0] as { author_id: string; shareable: boolean; is_private: boolean } | undefined;
+    if (!p) throw notFound('That post');
+    if (!p.shareable || (p.is_private && p.author_id !== u.id)) throw new AppError(403, 'share_not_allowed', 'Only public posts can be added to a story.');
+    const moment = await createStory(u.id, {
+      body: input.body,
+      mediaUrl: null,
+      mediaKind: null,
+      mediaId: null,
+      visibility: input.visibility,
+      locationText: null,
+      hours: hoursFor(input.expiresIn),
+      stickers: input.stickers,
+      allowReshare: false,
+      sharedPostId: id,
+    });
+    if (p.author_id !== u.id && (await recordShare(db, u.id, id))) await learnQuietly(learnFromPost(db, u.id, id, 'share'), req.log);
+    track(db, u.id, 'post_added_to_story', {});
     reply.code(201);
     return { moment };
   });

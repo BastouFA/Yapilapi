@@ -379,7 +379,22 @@ function EmojiSlider({
  * A story inside something else (a message, a reshare). It opens only for people who can see the
  * story; for others it says it isn't available.
  */
-export function StoryCardView({ card, label, action, dark }: { card: StoryCard; label?: string; action?: string; dark?: boolean }) {
+export function StoryCardView({
+  card,
+  label,
+  action,
+  dark,
+  open,
+  gone,
+}: {
+  card: StoryCard;
+  label?: string;
+  action?: string;
+  dark?: boolean;
+  /** Where it opens instead of the story (a post shown in a story), and what it says once it is gone. */
+  open?: () => void;
+  gone?: string;
+}) {
   const c = useColors();
   const { t } = useT();
   const ink = dark ? '#FFFFFF' : c.ink;
@@ -388,7 +403,7 @@ export function StoryCardView({ card, label, action, dark }: { card: StoryCard; 
     return (
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], paddingVertical: space[1] }}>
         <Icon name="eye-off-outline" size={18} color={muted} />
-        <Text style={{ color: muted, fontSize: 14 }}>{t('m.stories.unavailable')}</Text>
+        <Text style={{ color: muted, fontSize: 14 }}>{gone ?? t('m.stories.unavailable')}</Text>
       </View>
     );
   const preview = card.mediaKind === 'image' ? card.mediaUrl : card.mediaKind === 'video' ? card.posterUrl : null;
@@ -396,7 +411,7 @@ export function StoryCardView({ card, label, action, dark }: { card: StoryCard; 
     <Pressable
       accessibilityRole="link"
       accessibilityLabel={`${label ?? `@${card.author.username}`}. ${action ?? t('m.stories.view')}`}
-      onPress={() => router.push(`/s/${card.id}`)}
+      onPress={open ?? (() => router.push(`/s/${card.id}`))}
       style={{ flexDirection: 'row', gap: space[2], width: 230, maxWidth: '100%' }}
     >
       <View style={{ width: 64, height: 112, borderRadius: 10, overflow: 'hidden', backgroundColor: ACCENT, alignItems: 'center', justifyContent: 'center' }}>

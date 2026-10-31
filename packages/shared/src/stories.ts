@@ -119,6 +119,26 @@ export type StoryCard =
     }
   | { id: string; available: false };
 
+/**
+ * A post or reel shown in a story ("Add to your story" on a post). It opens only while the post
+ * is still public and the viewer can see it; for everyone else it's just "not available".
+ */
+export type StoryPostCard =
+  | {
+      id: string;
+      available: true;
+      author: PublicUser;
+      /** A reel: it opens in Reels rather than on its own page. */
+      reel: boolean;
+      /** The first line of the caption. */
+      caption: string;
+      /** The cover: a photo, or a video with its poster (none when the media is marked sensitive). */
+      mediaUrl: string | null;
+      mediaKind: 'image' | 'video' | null;
+      posterUrl: string | null;
+    }
+  | { id: string; available: false };
+
 /** What the author sees in "Seen by" for each interactive sticker. */
 export type StickerResults =
   | { stickerId: string; type: 'poll'; options: [string, string]; counts: [number, number]; percents: [number, number]; votes: number }

@@ -55,6 +55,7 @@ export { ReportSheet };
 import { SuggestAltText } from './AiHelpers';
 import { hasVideo, WatchChatPicker } from './WatchTogether';
 import { SendToChatSheet } from './SendToChat';
+import { AddToStorySheet, canAddToStory } from './AddToStory';
 
 export { CommentsSheet };
 
@@ -114,8 +115,10 @@ export function PostList({
   const [historyFor, setHistoryFor] = useState<Post | null>(null);
   const [redoFor, setRedoFor] = useState<Post | null>(null);
   const [transcriptFor, setTranscriptFor] = useState<Post | null>(null);
-  // Signed in, sharing offers the link, "Send in a chat" and, for video posts, "Watch together".
+  // Signed in, sharing offers the link, "Send in a chat", "Add to your story" and Repost for public
+  // posts, and "Watch together" for video posts.
   const [shareFor, setShareFor] = useState<Post | null>(null);
+  const [storyFor, setStoryFor] = useState<Post | null>(null);
   const [watchFor, setWatchFor] = useState<Post | null>(null);
   const [sendFor, setSendFor] = useState<Post | null>(null);
   const sentinel = useRef<HTMLDivElement>(null);
@@ -561,6 +564,42 @@ export function PostList({
               </button>
             </li>
           ) : null}
+          {shareFor && canAddToStory(shareFor, !!me) ? (
+            <li>
+              <button
+                type="button"
+                className="reel-sheet__item"
+                onClick={() => {
+                  setStoryFor(shareFor);
+                  setShareFor(null);
+                }}
+              >
+                <span className="reel-sheet__icon">
+                  <Icon name="plus" size={20} />
+                </span>
+                <span>{t('m.stories.add')}</span>
+              </button>
+            </li>
+          ) : null}
+          {shareFor && me && shareFor.author.id !== me.id && !shareFor.status && shareFor.visibility === 'public' ? (
+            <li>
+              <button
+                type="button"
+                className="reel-sheet__item"
+                aria-pressed={shareFor.viewer.reposted}
+                onClick={() => {
+                  const p = shareFor;
+                  setShareFor(null);
+                  void repost(p);
+                }}
+              >
+                <span className="reel-sheet__icon">
+                  <Icon name="repost" size={20} />
+                </span>
+                <span>{shareFor.viewer.reposted ? t('reel.share.undoRepost') : t('reel.share.repost')}</span>
+              </button>
+            </li>
+          ) : null}
           {shareFor && hasVideo(shareFor) ? (
             <li>
               <button
@@ -581,6 +620,13 @@ export function PostList({
         </ul>
       </BottomSheet>
       <WatchChatPicker post={watchFor} onClose={() => setWatchFor(null)} />
+      <AddToStorySheet
+        post={storyFor}
+        onClose={() => setStoryFor(null)}
+        onAdded={(p) => {
+          if (p.author.id !== me?.id) bumpShares(p.id, 1);
+        }}
+      />
       <SendToChatSheet
         post={sendFor}
         onClose={() => setSendFor(null)}

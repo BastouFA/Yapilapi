@@ -729,6 +729,7 @@ export const ja: Record<string, string> = {
   'Add text, a photo or a video to your story.': 'ストーリーズにテキスト、写真、動画を追加してください。',
   "You can't reshare your own story.": '自分のストーリーズは再シェアできません。',
   'Open the original story to reshare it.': '再シェアするには元のストーリーズを開いてください。',
+  'Only public posts can be added to a story.': 'ストーリーズに追加できるのは公開投稿のみです。',
   '{author_name} turned off resharing for this story.': '{author_name}さんはこのストーリーズの再シェアをオフにしました。',
   'You can reshare public stories, and stories you’re mentioned in.': '再シェアできるのは、公開ストーリーズと、あなたがメンションされたストーリーズです。',
   'Not sent.': '送信されませんでした。',

@@ -714,6 +714,7 @@ export const ko: Record<string, string> = {
   'Add text, a photo or a video to your story.': '스토리에 텍스트, 사진 또는 동영상을 추가하세요.',
   "You can't reshare your own story.": '내 스토리는 다시 공유할 수 없어요.',
   'Open the original story to reshare it.': '다시 공유하려면 원본 스토리를 여세요.',
+  'Only public posts can be added to a story.': '공개 게시물만 스토리에 추가할 수 있어요.',
   '{author_name} turned off resharing for this story.': '{author_name}님이 이 스토리의 다시 공유를 껐어요.',
   'You can reshare public stories, and stories you’re mentioned in.': '공개 스토리와 내가 언급된 스토리를 다시 공유할 수 있어요.',
   'Not sent.': '전송 안 됨.',

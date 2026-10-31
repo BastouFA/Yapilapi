@@ -731,6 +731,7 @@ export const vi: Record<string, string> = {
   'Add text, a photo or a video to your story.': 'Thêm chữ, ảnh hoặc video vào tin của bạn.',
   "You can't reshare your own story.": 'Bạn không thể chia sẻ lại tin của chính mình.',
   'Open the original story to reshare it.': 'Hãy mở tin gốc để chia sẻ lại.',
+  'Only public posts can be added to a story.': 'Chỉ có thể thêm bài viết công khai vào tin.',
   '{author_name} turned off resharing for this story.': '{author_name} đã tắt tính năng chia sẻ lại cho tin này.',
   'You can reshare public stories, and stories you’re mentioned in.': 'Bạn có thể chia sẻ lại tin công khai, và tin có nhắc đến bạn.',
   'Not sent.': 'Chưa gửi.',

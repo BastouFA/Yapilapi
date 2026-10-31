@@ -696,6 +696,7 @@ export const zh: Record<string, string> = {
   'Add text, a photo or a video to your story.': '请为你的快拍添加文字、照片或视频。',
   "You can't reshare your own story.": '你不能转发你自己的快拍。',
   'Open the original story to reshare it.': '请打开原快拍来转发它。',
+  'Only public posts can be added to a story.': '只有公开帖子才能添加到快拍。',
   '{author_name} turned off resharing for this story.': '{author_name} 关闭了这个快拍的转发。',
   'You can reshare public stories, and stories you’re mentioned in.': '你可以转发公开快拍，以及提到你的快拍。',
   'Not sent.': '未发送。',

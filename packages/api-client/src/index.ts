@@ -107,6 +107,7 @@ import type {
   GameMove,
   StickerResults,
   StoryCard,
+  StoryPostCard,
   StoryMusic,
   StoryMusicInput,
   StorySticker,
@@ -596,6 +597,9 @@ export function createClient(opts: ClientOptions) {
       pin: (postId: string | null) => put<{ pinnedPostId: string | null }>('/v1/me/pinned-post', { postId }),
       repost: (id: string) => put<{ reposted: boolean; reposts: number }>(`/v1/posts/${id}/repost`),
       unrepost: (id: string) => del<{ reposted: boolean; reposts: number }>(`/v1/posts/${id}/repost`),
+      /** Add a public post or reel to your story, as a card that opens it (with a few words, if you like). */
+      addToStory: (id: string, b: { body?: string; visibility?: string; expiresIn?: '1h' | '24h' | 'permanent' } = {}) =>
+        post<{ moment: { id: string } }>(`/v1/posts/${id}/story`, b),
       /** Who reposted a post, newest first (private accounts only for their followers). */
       reposters: (id: string, cursor?: string) => get<Page<PublicUser>>(`/v1/posts/${id}/reposters${qs({ cursor })}`),
       /** Unsave; the post also comes off the boards you own. */
@@ -3093,6 +3097,8 @@ export interface Story {
   stickers: StorySticker[];
   /** A reshare: the original story, which opens only if you can see it. */
   reshareOf: StoryCard | null;
+  /** A post or reel added to the story, which opens only while it's public and you can see it (missing from older servers). */
+  sharedPost?: StoryPostCard | null;
   /** The story mentions you. */
   mentionsYou: boolean;
   /** You can add it to your own story. */

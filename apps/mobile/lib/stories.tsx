@@ -1,5 +1,6 @@
 import { useEventListener } from 'expo';
 import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -23,7 +24,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Story, StoryGroup } from '../../../packages/api-client/src/index';
-import type { StickerResults, StorySticker } from '../../../packages/shared/src/stories';
+import type { StickerResults, StoryCard, StoryPostCard, StorySticker } from '../../../packages/shared/src/stories';
 import type { PublicUser } from '../../../packages/shared/src/types';
 import { compactCount } from '../../../packages/shared/src/post-stats';
 import { SQUAD_INK, squadColor } from '../../../packages/shared/src/squads';
@@ -40,6 +41,21 @@ import { AddToChapterSheet } from './chapters';
 import { StickerLayer, StoryCardView } from './story-stickers';
 import { MusicSticker, openMusic, useMusicLoop, useMusicOn } from './music';
 import { TranslationBar, useTranslatable } from './translation';
+
+/** A post or reel shown in a story, as a story card (it opens the post instead of a story). */
+function postCard(p: StoryPostCard): StoryCard {
+  if (!p.available) return { id: p.id, available: false };
+  return {
+    id: p.id,
+    available: true,
+    author: p.author,
+    body: p.caption,
+    mediaUrl: p.mediaUrl,
+    mediaKind: p.mediaKind,
+    posterUrl: p.posterUrl,
+    expiresAt: null,
+  };
+}
 
 const PHOTO_MS = 5000;
 const WHITE = '#FFFFFF';
@@ -451,7 +467,7 @@ function Viewer({
               style={StyleSheet.absoluteFill}
               resizeMode="contain"
             />
-          ) : story.reshareOf ? (
+          ) : story.reshareOf || story.sharedPost ? (
             <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', padding: space[6], backgroundColor: '#1D1430' }]} />
           ) : (
             <LinearGradient {...gradient(c)} style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', padding: space[6] }]} />
@@ -472,7 +488,7 @@ function Viewer({
               </Pressable>
             </View>
           ) : null}
-          {!uri && !story.reshareOf && !covered ? (
+          {!uri && !story.reshareOf && !story.sharedPost && !covered ? (
             <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', padding: space[6] }]} pointerEvents="box-none">
               <RichText
                 text={translation.text}
@@ -494,7 +510,26 @@ function Viewer({
               </View>
             </View>
           ) : null}
-          {story.body && (uri || story.reshareOf) ? (
+          {story.sharedPost && !story.reshareOf && !uri ? (
+            <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]} pointerEvents="box-none">
+              <View style={{ backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: radius.lg, padding: space[3] }}>
+                <StoryCardView
+                  dark
+                  card={postCard(story.sharedPost)}
+                  action={t('story.post.open')}
+                  gone={t('m.post.unavailable.title')}
+                  open={() => {
+                    const p = story.sharedPost;
+                    if (!p?.available) return;
+                    onClose();
+                    if (p.reel) router.push({ pathname: '/reels', params: { start: p.id } });
+                    else router.push(`/p/${p.id}`);
+                  }}
+                />
+              </View>
+            </View>
+          ) : null}
+          {story.body && (uri || story.reshareOf || story.sharedPost) ? (
             <View style={{ position: 'absolute', start: space[4], end: space[4], bottom: 110 + insets.bottom }} pointerEvents="box-none">
               <View style={st.captionBox}>
                 <RichText text={translation.text} language={translation.lang} style={st.caption} />
@@ -1132,7 +1167,7 @@ function ShareSheet({
               </Pressable>
             </View>
           ) : null}
-          {mine && !story.reshareOf ? (
+          {mine && !story.reshareOf && !story.sharedPost ? (
             <SwitchRow
               label={t('m.stories.allowReshare')}
               hint={t('m.stories.allowReshareHint')}

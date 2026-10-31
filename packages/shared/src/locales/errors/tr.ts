@@ -739,6 +739,7 @@ export const tr: Record<string, string> = {
   'Add text, a photo or a video to your story.': 'Hikayene metin, fotoğraf ya da video ekle.',
   "You can't reshare your own story.": 'Kendi hikayeni yeniden paylaşamazsın.',
   'Open the original story to reshare it.': 'Yeniden paylaşmak için orijinal hikayeyi aç.',
+  'Only public posts can be added to a story.': 'Hikayeye yalnızca herkese açık gönderiler eklenebilir.',
   '{author_name} turned off resharing for this story.': '{author_name} bu hikaye için yeniden paylaşımı kapattı.',
   'You can reshare public stories, and stories you’re mentioned in.': 'Herkese açık hikayeleri ve senden bahsedilen hikayeleri yeniden paylaşabilirsin.',
   'Not sent.': 'Gönderilmedi.',

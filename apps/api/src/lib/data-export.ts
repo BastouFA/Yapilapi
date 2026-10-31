@@ -55,7 +55,7 @@ export async function exportSections(db: Q, userId: string) {
     // Stories: the photo or video address only while the story isn't deleted.
     stories: await q(
       `SELECT id, body, CASE WHEN deleted_at IS NULL THEN media_url END AS media_url, media_kind, visibility, location_text, stickers, tags, mentions,
-              reshare_of, allow_reshare, sound_id, music, lang, created_at, expires_at, deleted_at
+              reshare_of, shared_post_id, allow_reshare, sound_id, music, lang, created_at, expires_at, deleted_at
        FROM moments WHERE author_id = $1 ORDER BY created_at DESC`,
     ),
     storyResponses: await q(

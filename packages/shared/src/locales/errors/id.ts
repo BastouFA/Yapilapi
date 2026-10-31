@@ -739,6 +739,7 @@ export const id: Record<string, string> = {
   'Add text, a photo or a video to your story.': 'Tambahkan teks, foto, atau video ke cerita Anda.',
   "You can't reshare your own story.": 'Anda tidak bisa membagikan ulang cerita Anda sendiri.',
   'Open the original story to reshare it.': 'Buka cerita asli untuk membagikannya ulang.',
+  'Only public posts can be added to a story.': 'Hanya postingan publik yang bisa ditambahkan ke cerita.',
   '{author_name} turned off resharing for this story.': '{author_name} menonaktifkan berbagi ulang untuk cerita ini.',
   'You can reshare public stories, and stories you’re mentioned in.': 'Anda bisa membagikan ulang cerita publik, dan cerita yang menyebut Anda.',
   'Not sent.': 'Tidak terkirim.',

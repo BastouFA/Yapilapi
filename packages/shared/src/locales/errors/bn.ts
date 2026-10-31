@@ -730,6 +730,7 @@ export const bn: Record<string, string> = {
   'Add text, a photo or a video to your story.': 'আপনার স্টোরিতে লেখা, একটি ছবি বা একটি ভিডিও যোগ করুন।',
   "You can't reshare your own story.": 'আপনি নিজের স্টোরি আবার শেয়ার করতে পারবেন না।',
   'Open the original story to reshare it.': 'আবার শেয়ার করতে মূল স্টোরিটি খুলুন।',
+  'Only public posts can be added to a story.': 'স্টোরিতে শুধু পাবলিক পোস্ট যোগ করা যায়।',
   '{author_name} turned off resharing for this story.': '{author_name} এই স্টোরির আবার শেয়ার বন্ধ করেছেন।',
   'You can reshare public stories, and stories you’re mentioned in.': 'আপনি পাবলিক স্টোরি, আর যেসব স্টোরিতে আপনার উল্লেখ আছে সেগুলো আবার শেয়ার করতে পারবেন।',
   'Not sent.': 'পাঠানো হয়নি।',

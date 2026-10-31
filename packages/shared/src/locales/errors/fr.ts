@@ -812,6 +812,7 @@ export const fr: Record<string, string> = {
   'Add text, a photo or a video to your story.': 'Ajoute du texte, une photo ou une vidéo à ta story.',
   "You can't reshare your own story.": 'Tu ne peux pas repartager ta propre story.',
   'Open the original story to reshare it.': 'Ouvre la story d’origine pour la repartager.',
+  'Only public posts can be added to a story.': 'Seules les publications publiques peuvent être ajoutées à une story.',
   '{author_name} turned off resharing for this story.': '{author_name} a désactivé le repartage de cette story.',
   'You can reshare public stories, and stories you’re mentioned in.': 'Tu peux repartager les stories publiques et celles où tu es mentionné.',
   'Not sent.': 'Non envoyé.',

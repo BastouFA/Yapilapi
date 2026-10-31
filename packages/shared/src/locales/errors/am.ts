@@ -701,6 +701,7 @@ export const am: Record<string, string> = {
   'Add text, a photo or a video to your story.': 'ወደ ታሪክዎ ጽሑፍ፣ ፎቶ ወይም ቪዲዮ ያክሉ።',
   "You can't reshare your own story.": 'የራስዎን ታሪክ እንደገና ማጋራት አይችሉም።',
   'Open the original story to reshare it.': 'እንደገና ለማጋራት የመጀመሪያውን ታሪክ ይክፈቱ።',
+  'Only public posts can be added to a story.': 'ወደ ታሪክ ሊታከሉ የሚችሉት ይፋዊ ልጥፎች ብቻ ናቸው።',
   '{author_name} turned off resharing for this story.': '{author_name} ለዚህ ታሪክ እንደገና ማጋራትን አጥፍቷል።',
   'You can reshare public stories, and stories you’re mentioned in.': 'ይፋዊ ታሪኮችን፣ እና የተጠቀሱባቸውን ታሪኮች እንደገና ማጋራት ይችላሉ።',
   'Not sent.': 'አልተላከም።',

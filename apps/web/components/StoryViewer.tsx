@@ -35,7 +35,7 @@ import { useSession } from '@/app/providers';
 import { AddToChapter } from '@/components/Chapters';
 import { ReportSheet } from '@/components/ReportSheet';
 import { PeoplePicker } from '@/components/PeoplePicker';
-import { StickerLayer, StoryCardView, StoryText } from '@/components/StoryStickers';
+import { StickerLayer, StoryCardView, StoryPostCardView, StoryText } from '@/components/StoryStickers';
 import { MusicSticker, musicHref, useMusicLoop, useStoryMusicOn } from '@/components/StoryMusic';
 
 const PHOTO_MS = 5000;
@@ -311,6 +311,10 @@ export function StoryViewer({
                 action={t('m.stories.openOriginal')}
               />
             </div>
+          ) : story.sharedPost ? (
+            <div className="story__reshare">
+              <StoryPostCardView card={story.sharedPost} onOpen={onClose} />
+            </div>
           ) : (
             <div className="story__text">
               <p dir="auto" lang={translation.lang}>
@@ -319,7 +323,7 @@ export function StoryViewer({
               {translationBar}
             </div>
           )}
-          {story.body && (story.mediaUrl || story.reshareOf) ? (
+          {story.body && (story.mediaUrl || story.reshareOf || story.sharedPost) ? (
             <div className="story__caption">
               <p dir="auto" lang={translation.lang}>
                 <StoryText text={translation.text} />
@@ -647,7 +651,7 @@ function ShareSheet({
             </p>
           </div>
         ) : null}
-        {mine && !story.reshareOf ? (
+        {mine && !story.reshareOf && !story.sharedPost ? (
           <Checkbox
             label={t('m.stories.allowReshare')}
             description={t('m.stories.allowReshareHint')}

@@ -774,6 +774,7 @@ export const ar: Record<string, string> = {
   'Add text, a photo or a video to your story.': 'أضف نصًا أو صورة أو فيديو إلى قصتك.',
   "You can't reshare your own story.": 'لا يمكنك إعادة مشاركة قصتك.',
   'Open the original story to reshare it.': 'افتح القصة الأصلية لإعادة مشاركتها.',
+  'Only public posts can be added to a story.': 'يمكن إضافة المنشورات العامة فقط إلى القصة.',
   '{author_name} turned off resharing for this story.': 'أوقف {author_name} إعادة المشاركة لهذه القصة.',
   'You can reshare public stories, and stories you’re mentioned in.': 'يمكنك إعادة مشاركة القصص العامة والقصص التي تُذكر فيها.',
   'Not sent.': 'لم يُرسَل.',

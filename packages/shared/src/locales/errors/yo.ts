@@ -785,6 +785,7 @@ export const yo: Record<string, string> = {
   'Add text, a photo or a video to your story.': 'Fi ọ̀rọ̀, fọ́tò tàbí fídíò kún ìtàn rẹ.',
   "You can't reshare your own story.": 'O kò lè tún ìtàn tìrẹ pín.',
   'Open the original story to reshare it.': 'Ṣí ìtàn àkọ́kọ́ láti tún un pín.',
+  'Only public posts can be added to a story.': 'Àwọn ìfìwéránṣẹ́ gbangba nìkan ni a lè fi kún ìtàn.',
   '{author_name} turned off resharing for this story.': '{author_name} ti pa títún pín fún ìtàn yìí.',
   'You can reshare public stories, and stories you’re mentioned in.': 'O lè tún àwọn ìtàn gbangba pín, àti àwọn ìtàn tí wọ́n ti dárúkọ rẹ.',
   'Not sent.': 'A kò fi í ránṣẹ́.',

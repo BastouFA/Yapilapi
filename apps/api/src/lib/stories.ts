@@ -13,6 +13,7 @@ import {
   type StoryCard,
   type StoryMusic,
   type StoryMusicStyle,
+  type StoryPostCard,
   type StorySquad,
   type StorySticker,
   type StoryStickerInput,
@@ -26,7 +27,7 @@ import type { RealtimeHub } from './realtime.ts';
 import { notify } from './services.ts';
 import { soundVisibleSql } from './sounds.ts';
 import { publicUserFrom, usernameMatchSql, usersByIds } from './users.ts';
-import { notBlockedSql, squadMemberSql } from './visibility.ts';
+import { notBlockedSql, postUnlockedSql, postVisibleSql, squadMemberSql } from './visibility.ts';
 import { mentionAllowedSql, seesSensitiveSql } from './interactions.ts';
 import { mediaSizesSql, withSmallVariants } from './data-saver.ts';
 import { trackMusic, tracksByIds, viewerCountries, type TrackRow } from './music/view.ts';
@@ -69,7 +70,7 @@ export const PUBLIC_STORY = `m.visibility = 'public' AND m.moderation_status = '
 
 /** Columns for hydrateStories; the viewer is $1. Use with STORY_FROM. */
 export const STORY_SELECT = `m.id, m.author_id, m.body, m.lang, m.media_url, m.media_kind, m.location_text, m.expires_at, m.created_at, m.visibility,
-  m.stickers, m.tags, m.mentions, m.reshare_of, m.allow_reshare, m.sound_id, m.music, m.music_track_id,
+  m.stickers, m.tags, m.mentions, m.reshare_of, m.shared_post_id, m.allow_reshare, m.sound_id, m.music, m.music_track_id,
   md.poster_url, md.hls_url, md.variants, md.duration_ms, md.moderation, ${mediaSizesSql('md')} AS sizes,
   v.viewer_id IS NOT NULL AS seen, coalesce(v.liked, false) AS liked,
   CASE WHEN m.author_id = $1 THEN (SELECT count(*) FROM moment_views mv WHERE mv.moment_id = m.id AND mv.viewer_id <> $1) END AS views,
@@ -247,6 +248,52 @@ export async function storyCards(db: Q, ids: string[], viewer: string | null): P
   return out;
 }
 
+/**
+ * Posts aliased `p` (author profile `ap`, user `au`) that can be shown in a story to the viewer `v`:
+ * public and published, in no community or a public one, and visible to the viewer (blocks, private
+ * accounts, withheld countries; see postVisibleSql). A post waiting for review is shown as it is in
+ * feeds (to adults only); one restricted or removed by moderation isn't, not even its author's own.
+ */
+export function storyPostSql(v: string): string {
+  return `(p.visibility = 'public' AND p.moderation_status IN ('normal', 'review') AND ${postVisibleSql(v)} AND ${postUnlockedSql(v)}
+    AND (p.community_id IS NULL OR EXISTS (SELECT 1 FROM communities pc WHERE pc.id = p.community_id AND pc.deleted_at IS NULL AND pc.visibility = 'public')))`;
+}
+
+/** Post cards for stories that show a post: each opens only while the post can be shown to the reader (storyPostSql). */
+export async function storyPostCards(db: Q, ids: string[], viewer: string | null): Promise<Map<string, StoryPostCard>> {
+  const unique = [...new Set(ids)];
+  const out = new Map<string, StoryPostCard>(unique.map((id) => [id, { id, available: false }]));
+  if (!unique.length) return out;
+  // The cover is the first photo or video, unless it's marked sensitive or blocked (the card then shows the words only).
+  const { rows } = await db.query(
+    `SELECT p.id, p.body, p.format, cv.kind AS cv_kind, coalesce(cv.variants->>'medium', cv.url) AS cv_url, cv.poster_url AS cv_poster,
+            ap.user_id AS a_id, ap.username AS a_username, ap.display_name AS a_display_name, ap.avatar_url AS a_avatar_url, ap.mode AS a_mode
+     FROM posts p JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id
+     LEFT JOIN LATERAL (SELECT m.kind, m.url, m.variants, m.poster_url FROM post_media pm JOIN media m ON m.id = pm.media_id
+                        WHERE pm.post_id = p.id AND m.moderation NOT IN ('blocked', 'sensitive') AND m.kind IN ('image', 'video')
+                        ORDER BY pm.position LIMIT 1) cv ON true
+     WHERE p.id = ANY($2::uuid[]) AND ${storyPostSql('$1')}`,
+    [viewer, unique],
+  );
+  for (const r of rows)
+    out.set(r.id, {
+      id: r.id,
+      available: true,
+      author: publicUserFrom(r, 'a_'),
+      reel: r.format === 'reel',
+      caption:
+        ((r.body ?? '') as string)
+          .split('\n')
+          .find((l) => l.trim())
+          ?.trim()
+          .slice(0, 140) ?? '',
+      mediaUrl: r.cv_kind === 'image' ? r.cv_url : null,
+      mediaKind: r.cv_kind ?? null,
+      posterUrl: r.cv_kind === 'video' ? (r.cv_poster ?? null) : null,
+    });
+  return out;
+}
+
 /** A story as the API returns it (see Story in the API client). */
 export interface StoryOut {
   id: string;
@@ -279,6 +326,8 @@ export interface StoryOut {
   tags: string[];
   stickers: StorySticker[];
   reshareOf: StoryCard | null;
+  /** A post or reel added to the story: it opens only while it can be shown to you. */
+  sharedPost: StoryPostCard | null;
   /** You're mentioned in it. */
   mentionsYou: boolean;
   /** You can add it to your own story. */
@@ -356,7 +405,7 @@ export async function hydrateStories(db: Q, rows: Record<string, any>[], viewer:
   const interactive = all.some((s) => s.type === 'poll' || s.type === 'question' || s.type === 'slider' || s.type === 'countdown');
   const soundIds = [...new Set(rows.flatMap((r) => (r.sound_id && r.music ? [r.sound_id as string] : [])))];
   const trackIds = [...new Set(rows.flatMap((r) => (r.music_track_id && r.music ? [r.music_track_id as string] : [])))];
-  const [users, places, mine, totals, cards, sounds, tracks, countries] = await Promise.all([
+  const [users, places, mine, totals, cards, postCards, sounds, tracks, countries] = await Promise.all([
     usersByIds(db, userIds),
     placeIds.length
       ? db.query<{ id: string; name: string; city: string | null }>(`SELECT id, name, city FROM places WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL`, [
@@ -380,6 +429,11 @@ export async function hydrateStories(db: Q, rows: Record<string, any>[], viewer:
     storyCards(
       db,
       rows.flatMap((r) => (r.reshare_of ? [r.reshare_of as string] : [])),
+      viewer,
+    ),
+    storyPostCards(
+      db,
+      rows.flatMap((r) => (r.shared_post_id ? [r.shared_post_id as string] : [])),
       viewer,
     ),
     storySounds(db, soundIds, viewer),
@@ -495,9 +549,18 @@ export async function hydrateStories(db: Q, rows: Record<string, any>[], viewer:
       tags: r.tags ?? [],
       stickers,
       reshareOf: r.reshare_of ? (cards.get(r.reshare_of) ?? { id: r.reshare_of, available: false }) : null,
+      sharedPost: r.shared_post_id ? (postCards.get(r.shared_post_id) ?? { id: r.shared_post_id, available: false }) : null,
       mentionsYou,
-      // A squad's story stays in the squad: never reshared, even by someone it mentions.
-      canReshare: !!viewer && !isAuthor && r.allow_reshare && !r.reshare_of && r.visibility !== 'squad' && (r.visibility === 'public' || mentionsYou),
+      // A squad's story stays in the squad: never reshared, even by someone it mentions. A story
+      // showing a reshared story or a post isn't reshared again (the original can be).
+      canReshare:
+        !!viewer &&
+        !isAuthor &&
+        r.allow_reshare &&
+        !r.reshare_of &&
+        !r.shared_post_id &&
+        r.visibility !== 'squad' &&
+        (r.visibility === 'public' || mentionsYou),
       ...(isAuthor ? { allowReshare: !!r.allow_reshare } : {}),
       music: sound && stored ? { sound, startMs: stored.startMs, durationMs: stored.durationMs, style: stored.style, x: stored.x, y: stored.y } : null,
       // In a squad's ring, each story says whose it is.

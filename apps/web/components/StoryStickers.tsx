@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { Avatar, Icon, TaggedText } from '@yapilapi/design-system';
 import type { Story } from '@yapilapi/api-client';
-import { t as translate, type MessageKey, type StoryCard, type StorySticker } from '@yapilapi/shared';
+import { t as translate, type MessageKey, type StoryCard, type StoryPostCard, type StorySticker } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { useSession } from '@/app/providers';
@@ -390,6 +390,60 @@ export function StoryCardView({ card, label, action }: { card: StoryCard; label?
         {card.body && card.mediaUrl ? <span className="story-card__body">{card.body.slice(0, 80)}</span> : null}
         <span className="story-card__cta">{action ?? t('m.stories.view')}</span>
       </span>
+    </Link>
+  );
+}
+
+/** Where a post shown in a story opens: a reel in Reels, anything else on its own page. */
+export const storyPostHref = (card: { id: string; reel: boolean }) => (card.reel ? `/reels?start=${card.id}` : `/p/${card.id}`);
+
+/**
+ * A post or reel added to a story: its cover, author and the first line of its caption, opening
+ * the post. Once the post is gone or no longer public (or the viewer can't see it), it says the
+ * post isn't available. Without `onOpen` it's a still preview (the "Add to your story" sheet).
+ */
+export function StoryPostCardView({ card, onOpen, preview }: { card: StoryPostCard; onOpen?: () => void; preview?: boolean }) {
+  const { t } = useSession();
+  if (!card.available)
+    return (
+      <div className="story-card story-card--gone">
+        <Icon name="eye" size={18} />
+        <span>{t('m.post.unavailable.title')}</span>
+      </div>
+    );
+  const cover = card.mediaKind === 'video' ? card.posterUrl : card.mediaKind === 'image' ? card.mediaUrl : null;
+  const inside = (
+    <>
+      <span className={`story-card__preview${card.reel ? '' : ' story-card__preview--square'}`} aria-hidden>
+        {cover ? (
+          <img src={cover} alt="" loading="lazy" decoding="async" />
+        ) : (
+          <Icon name={card.mediaKind === 'video' || card.reel ? 'play' : card.mediaKind === 'image' ? 'image' : 'message'} size={24} />
+        )}
+      </span>
+      <span className="story-card__meta">
+        <span className="story-card__who">
+          <Avatar name={card.author.displayName} src={card.author.avatarUrl} size="sm" />
+          <bdi>@{card.author.username}</bdi>
+        </span>
+        {card.caption ? (
+          <span className="story-card__body" dir="auto">
+            {card.caption.slice(0, 80)}
+          </span>
+        ) : null}
+        {preview ? null : <span className="story-card__cta">{t('story.post.open')}</span>}
+      </span>
+    </>
+  );
+  if (preview) return <div className="story-card story-card--post">{inside}</div>;
+  return (
+    <Link
+      href={storyPostHref(card)}
+      className="story-card story-card--post"
+      aria-label={t('story.post.by', { name: card.author.displayName })}
+      onClick={onOpen}
+    >
+      {inside}
     </Link>
   );
 }

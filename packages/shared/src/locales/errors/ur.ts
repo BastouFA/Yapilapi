@@ -744,6 +744,7 @@ export const ur: Record<string, string> = {
   'Add text, a photo or a video to your story.': 'اپنی اسٹوری میں متن، تصویر یا ویڈیو شامل کریں۔',
   "You can't reshare your own story.": 'آپ اپنی اسٹوری دوبارہ شیئر نہیں کر سکتے۔',
   'Open the original story to reshare it.': 'دوبارہ شیئر کرنے کے لیے اصل اسٹوری کھولیں۔',
+  'Only public posts can be added to a story.': 'اسٹوری میں صرف عوامی پوسٹس شامل کی جا سکتی ہیں۔',
   '{author_name} turned off resharing for this story.': '{author_name} نے اس اسٹوری کے لیے دوبارہ شیئر کرنا بند کر دیا ہے۔',
   'You can reshare public stories, and stories you’re mentioned in.': 'آپ عوامی اسٹوریز، اور وہ اسٹوریز جن میں آپ کا ذکر ہو، دوبارہ شیئر کر سکتے ہیں۔',
   'Not sent.': 'نہیں بھیجا گیا۔',
