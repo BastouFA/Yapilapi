@@ -6,6 +6,8 @@ import { request, type APIRequestContext, type APIResponse, type FullConfig } fr
 
 export const AUTH_DIR = path.join(import.meta.dirname, '.auth');
 export const STATE = path.join(AUTH_DIR, 'state.json');
+/** The device switch for Watch together opening by itself (components/WatchTogether.tsx). */
+export const WATCH_AUTO_OPEN_KEY = 'watch-auto-open';
 /** The second user (Ben): hosts audio rooms that the tests open fresh. */
 export const FRIEND_STATE = path.join(AUTH_DIR, 'friend.json');
 /** The third user (Cleo): starts watch together sessions that the tests open fresh. */
@@ -575,6 +577,13 @@ export default async function globalSetup(config: FullConfig) {
   await friend.ctx.storageState({ path: FRIEND_STATE });
   await third.ctx.storageState({ path: THIRD_STATE });
   await admin.ctx.storageState({ path: ADMIN_STATE });
+  // Sessions other tests start would open the watch screen over the page a test is on: off here
+  // (watch-together.spec.ts turns it back on where it checks that).
+  for (const file of [STATE, FRIEND_STATE, THIRD_STATE, ADMIN_STATE]) {
+    const state = JSON.parse(await readFile(file, 'utf8'));
+    state.origins = [{ origin: new URL(baseURL).origin, localStorage: [{ name: WATCH_AUTO_OPEN_KEY, value: 'off' }] }];
+    await writeFile(file, JSON.stringify(state));
+  }
   const data: SeedData = {
     username: main.username,
     userId: main.id,

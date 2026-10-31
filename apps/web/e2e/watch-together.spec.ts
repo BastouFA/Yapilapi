@@ -128,7 +128,27 @@ test('two people watch together from a chat, and a second device of the same per
   await expect(secondPage.getByText('Watching on another device')).toBeVisible();
   await expect(page.getByText('Watching on another device')).toHaveCount(0);
 
+  // Leave on this device: Ada's second device leaves and goes back to the chat too.
+  await page.getByRole('button', { name: 'Leave' }).first().click();
+  await secondPage.waitForURL(/\/inbox\//);
+
   await second.close();
   await cleo.close();
+  await cleoApi.dispose();
+});
+
+test('when someone starts watching together, it opens by itself for the others in the chat', async ({ page, baseURL }, info) => {
+  const ada = await account(page.request, 'Abi', info.project.name);
+  const cleoApi = await request.newContext({ baseURL });
+  const cleoUser = await account(cleoApi, 'Cole', info.project.name);
+  expect((await page.request.post(`/api/v1/users/${cleoUser.id}/follow`)).ok()).toBeTruthy();
+  expect((await cleoApi.post(`/api/v1/users/${ada.id}/follow`)).ok()).toBeTruthy();
+  const chatId = (await (await cleoApi.post('/api/v1/conversations', { data: { memberIds: [ada.id] } })).json()).conversation.id as string;
+  await page.goto('/home');
+  await page.waitForLoadState('networkidle');
+  const started = await cleoApi.post('/api/v1/watch', { data: { conversationId: chatId } });
+  expect(started.ok(), await started.text()).toBe(true);
+  const { session } = await started.json();
+  await page.waitForURL(new RegExp(`/watch/${session.id}`));
   await cleoApi.dispose();
 });

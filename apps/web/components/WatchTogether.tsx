@@ -264,7 +264,8 @@ export function WatchBanner({ session }: { session: WatchSummary | null }) {
 /**
  * Someone in one of your chats starts watching together: the watch screen opens by itself and
  * plays in step (muted until a tap where the browser wants one). Not while you're making
- * something, live or in a call, and not over a watch screen you already have open.
+ * something, live or in a call, and not over a watch screen you already have open. A device can
+ * turn it off (localStorage `watch-auto-open` = 'off'; the browser tests do).
  */
 export function WatchAutoOpen() {
   const { me } = useSession();
@@ -275,6 +276,11 @@ export function WatchAutoOpen() {
     if (e.type !== 'watch.started' || !me || e.data?.startedBy === me.id) return;
     const busy = ['/watch', '/create', '/camera', '/live', '/recaps/new'].some((p) => path.startsWith(p));
     if (busy || call || typeof e.data?.sessionId !== 'string') return;
+    try {
+      if (localStorage.getItem('watch-auto-open') === 'off') return;
+    } catch {
+      /* storage off: open it */
+    }
     router.push(`/watch/${e.data.sessionId}`);
   });
   return null;
