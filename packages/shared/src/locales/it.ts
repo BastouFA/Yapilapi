@@ -2681,6 +2681,13 @@ export const it: Catalog = {
   'settings.push.label': 'Notifiche in questo browser',
   'settings.push.denied': 'Le notifiche sono bloccate nelle impostazioni del tuo browser.',
   'settings.push.unsupported': 'Questo browser o server non supporta le notifiche push.',
+  'push.prompt.title': 'Sappi quando qualcuno ti scrive',
+  'push.prompt.body': 'Ricevi una notifica su questo dispositivo per i nuovi messaggi, anche con YAPILAPI chiuso.',
+  'push.prompt.turnOn': 'Attiva le notifiche',
+  'push.prompt.notNow': 'Non ora',
+  'push.prompt.done': 'Le notifiche sono attive.',
+  'push.prompt.iosHint':
+    'Per ricevere notifiche su un iPhone, aggiungi YAPILAPI alla schermata Home (Condividi, poi Aggiungi alla schermata Home) e aprilo da lì.',
   'story.dialog': 'Storia di {name}, {index} di {total}',
   'story.previous': 'Precedente',
   'story.next': 'Successiva',

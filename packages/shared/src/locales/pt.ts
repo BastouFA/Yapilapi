@@ -2675,6 +2675,13 @@ export const pt: Catalog = {
   'settings.push.label': 'Notificações neste navegador',
   'settings.push.denied': 'As notificações estão bloqueadas nas configurações do navegador.',
   'settings.push.unsupported': 'Este navegador ou servidor não suporta notificações push.',
+  'push.prompt.title': 'Saiba quando alguém lhe envia mensagem',
+  'push.prompt.body': 'Receba uma notificação neste dispositivo quando chegarem mensagens novas, mesmo com o YAPILAPI fechado.',
+  'push.prompt.turnOn': 'Ativar notificações',
+  'push.prompt.notNow': 'Agora não',
+  'push.prompt.done': 'As notificações estão ativadas.',
+  'push.prompt.iosHint':
+    'Para receber notificações num iPhone, adicione o YAPILAPI ao ecrã principal (Partilhar e depois Adicionar ao ecrã principal) e abra-o a partir daí.',
   'story.dialog': 'Story de {name}, {index} de {total}',
   'story.previous': 'Anterior',
   'story.next': 'Próximo',

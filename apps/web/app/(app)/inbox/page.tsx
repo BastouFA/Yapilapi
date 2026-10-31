@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Avatar, AvatarGroup, BottomSheet, Button, EmptyState, Icon, List, ListItem, Skeleton, TextField } from '@yapilapi/design-system';
 import { formatRelativeTime, lastMessageText, type Conversation, type PublicUser } from '@yapilapi/shared';
+import { PushPrompt } from '@/components/PushPrompt';
 import { api, errorMessage, sharedRequest } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { useChatBase } from '@/lib/chat-base';
@@ -66,6 +67,8 @@ export default function Inbox() {
           </Button>
         </div>
       </div>
+
+      <PushPrompt />
 
       {requests.length ? (
         <section className="stack-sm">

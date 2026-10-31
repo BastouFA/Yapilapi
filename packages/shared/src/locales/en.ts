@@ -2677,6 +2677,12 @@ export const en = {
   'settings.push.label': 'Notifications on this browser',
   'settings.push.denied': 'Notifications are blocked in your browser settings.',
   'settings.push.unsupported': 'This browser or server doesn’t support push notifications.',
+  'push.prompt.title': 'Know when someone messages you',
+  'push.prompt.body': 'Get a notification on this device for new messages, even when YAPILAPI is closed.',
+  'push.prompt.turnOn': 'Turn on notifications',
+  'push.prompt.notNow': 'Not now',
+  'push.prompt.done': 'Notifications are on.',
+  'push.prompt.iosHint': 'To get notifications on an iPhone, add YAPILAPI to your Home Screen (Share, then Add to Home Screen) and open it from there.',
   // Web: stories
   'story.dialog': "{name}'s story, {index} of {total}",
   'story.previous': 'Previous',

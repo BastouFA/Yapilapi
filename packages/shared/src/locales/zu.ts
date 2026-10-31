@@ -2694,6 +2694,13 @@ export const zu: Catalog = {
   'settings.push.label': 'Izaziso kulesi siphequluli',
   'settings.push.denied': 'Izaziso zivinjiwe kuzilungiselelo zesiphequluli sakho.',
   'settings.push.unsupported': 'Lesi siphequluli noma iseva ayizisekeli izaziso eziphushwayo.',
+  'push.prompt.title': 'Yazi lapho othile ekuthumelela umlayezo',
+  'push.prompt.body': 'Thola isaziso kule divayisi ngemilayezo emisha, ngisho noma i-YAPILAPI ivaliwe.',
+  'push.prompt.turnOn': 'Vula izaziso',
+  'push.prompt.notNow': 'Hhayi manje',
+  'push.prompt.done': 'Izaziso zivuliwe.',
+  'push.prompt.iosHint':
+    'Ukuze uthole izaziso ku-iPhone, engeza i-YAPILAPI kusikrini sasekhaya (Yabelana, bese Engeza kusikrini sasekhaya) bese uyivula lapho.',
   'story.dialog': 'Indaba ka-{name}, {index} kwezingu-{total}',
   'story.previous': 'Okwedlule',
   'story.next': 'Okulandelayo',

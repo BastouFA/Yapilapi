@@ -16,12 +16,27 @@ export async function currentSubscription() {
   return (await reg?.pushManager.getSubscription()) ?? null;
 }
 
-/** Ask permission, subscribe this browser and register it with the API. */
+let config: Promise<{ webPush: boolean; vapidPublicKey: string | null }> | null = null;
+
+/** Whether the server sends browser notifications, and its key (asked once per page). */
+export function pushConfig() {
+  config ??= api.push.config().catch(() => {
+    config = null;
+    return { webPush: false, vapidPublicKey: null };
+  });
+  return config;
+}
+
+/**
+ * Ask permission, subscribe this browser and register it with the API. Call it straight from a
+ * tap: Safari on an iPhone only asks while the tap still counts, so permission is asked first.
+ */
 export async function enableBrowserPush(): Promise<'enabled' | 'denied' | 'unavailable'> {
   if (!pushSupported()) return 'unavailable';
-  const cfg = await api.push.config();
+  const asked = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
+  if (asked !== 'granted') return 'denied';
+  const cfg = await pushConfig();
   if (!cfg.webPush || !cfg.vapidPublicKey) return 'unavailable';
-  if ((await Notification.requestPermission()) !== 'granted') return 'denied';
   const reg = await navigator.serviceWorker.register('/sw.js');
   await navigator.serviceWorker.ready;
   const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(cfg.vapidPublicKey) });

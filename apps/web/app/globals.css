@@ -2465,6 +2465,22 @@ video.chat-att__media {
   object-fit: cover;
   background: #000;
 }
+/* "Know when someone messages you" at the top of the chat list. */
+.push-prompt {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+.push-prompt__title {
+  margin: 0;
+  font-size: 1rem;
+}
+.push-prompt p {
+  margin: 0;
+}
 /* Web addresses in a message. */
 .chat-link {
   color: inherit;

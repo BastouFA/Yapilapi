@@ -2679,6 +2679,13 @@ export const sw: Catalog = {
   'settings.push.label': 'Arifa kwenye kivinjari hiki',
   'settings.push.denied': 'Arifa zimezuiwa kwenye mipangilio ya kivinjari chako.',
   'settings.push.unsupported': 'Kivinjari au seva hii haitumii arifa za papo hapo.',
+  'push.prompt.title': 'Jua mtu anapokutumia ujumbe',
+  'push.prompt.body': 'Pata arifa kwenye kifaa hiki kwa ujumbe mpya, hata YAPILAPI ikiwa imefungwa.',
+  'push.prompt.turnOn': 'Washa arifa',
+  'push.prompt.notNow': 'Si sasa',
+  'push.prompt.done': 'Arifa zimewashwa.',
+  'push.prompt.iosHint':
+    'Ili kupata arifa kwenye iPhone, ongeza YAPILAPI kwenye Skrini ya Mwanzo (Shiriki, kisha Ongeza kwenye Skrini ya Mwanzo) na uifungue kutoka hapo.',
   'story.dialog': 'Hadithi ya {name}, {index} kati ya {total}',
   'story.previous': 'Iliyotangulia',
   'story.next': 'Inayofuata',
