@@ -12,6 +12,7 @@ import { useChatBase } from '@/lib/chat-base';
 import { PeoplePicker } from '@/components/PeoplePicker';
 import { useRealtime, useSession } from '../../providers';
 import { FreeStrip } from '@/components/Plans';
+import { FriendRequests } from '@/components/FriendRequests';
 
 function conversationTitle(c: Conversation, meId: string, justYou: string): string {
   if (c.title) return c.title;
@@ -24,7 +25,6 @@ export default function Inbox() {
   const router = useRouter();
   const base = useChatBase();
   const [items, setItems] = useState<Conversation[] | null>(null);
-  const [requests, setRequests] = useState<{ id: string; from: PublicUser }[]>([]);
   const [newGroup, setNewGroup] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
 
@@ -38,10 +38,6 @@ export default function Inbox() {
     );
   useEffect(() => {
     void load();
-    api.me
-      .friendRequests()
-      .then((r) => setRequests(r.items))
-      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useRealtime((e) => {
@@ -74,53 +70,7 @@ export default function Inbox() {
       {/* Who's free, and making a plan with them (docs/product/go-out-together.md). */}
       {base === '/inbox' ? <FreeStrip /> : null}
 
-      {requests.length ? (
-        <section className="stack-sm">
-          <h2 className="section-title">{t('chat.friendRequests')}</h2>
-          <List>
-            {requests.map((r) => (
-              <ListItem
-                key={r.id}
-                start={<Avatar name={r.from.displayName} src={r.from.avatarUrl} />}
-                primary={r.from.displayName}
-                secondary={`@${r.from.username}`}
-                end={
-                  <>
-                    <Button
-                      size="sm"
-                      onClick={async () => {
-                        try {
-                          await api.me.acceptFriend(r.id);
-                          setRequests((x) => x.filter((y) => y.id !== r.id));
-                          toast(t('chat.nowFriends', { name: r.from.displayName }));
-                        } catch (e) {
-                          toast(errorMessage(e));
-                        }
-                      }}
-                    >
-                      {t('m.common.accept')}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={async () => {
-                        try {
-                          await api.me.declineFriend(r.id);
-                          setRequests((x) => x.filter((y) => y.id !== r.id));
-                        } catch (e) {
-                          toast(errorMessage(e));
-                        }
-                      }}
-                    >
-                      {t('m.common.decline')}
-                    </Button>
-                  </>
-                }
-              />
-            ))}
-          </List>
-        </section>
-      ) : null}
+      <FriendRequests />
 
       {items === null && failed ? (
         <EmptyState

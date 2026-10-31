@@ -14,6 +14,7 @@ import { CatchUpCard } from '@/components/AiHelpers';
 import { TodayCard } from '@/components/Today';
 import { SuggestedPeople } from '@/components/SuggestedPeople';
 import { PulseCards } from '@/components/WeeklyWrap';
+import { FriendRequests } from '@/components/FriendRequests';
 import { FollowingDrops } from '@/components/Drops';
 import { ScreenLoading } from '@/components/Loading';
 import { PlayAsRadio } from '@/components/Radio';
@@ -88,6 +89,9 @@ export default function Home() {
           </Link>
         </div>
       </div>
+
+      {/* Someone wants to be friends: answer right here (it's in Yap too). */}
+      <FriendRequests />
 
       {/* In the morning: Yapilapi Today, a short briefing of what your people and your city are talking about. */}
       <TodayCard />
