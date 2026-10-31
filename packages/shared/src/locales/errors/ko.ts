@@ -1258,4 +1258,24 @@ export const ko: Record<string, string> = {
   'Choose who it’s for.': '누구를 위한 것인지 선택하세요.',
   'Add what goes in the stash.': '스태시에 넣을 것을 추가하세요.',
   'Choose a thank-you or write one.': '감사 인사를 고르거나 직접 쓰세요.',
+  // apps/api/src/lib/plans.ts, apps/api/src/modules/plans.ts (Go out together)
+  'This plan was cancelled.': '이 약속은 취소됐어요.',
+  'Choose a time from now to 90 days ahead.': '지금부터 90일 이내의 시간을 선택하세요.',
+  'You can invite your friends to a plan.': '약속에는 친구만 초대할 수 있어요.',
+  'A plan can have up to 30 people.': '약속 하나에 최대 30명까지 함께할 수 있어요.',
+  'You’ve made a lot of plans today. Try again tomorrow.': '오늘 약속을 많이 만들었어요. 내일 다시 시도하세요.',
+  'You made this plan. Cancel it instead.': '내가 만든 약속이에요. 대신 약속을 취소하세요.',
+  'You can’t join this plan now.': '지금은 이 약속에 참여할 수 없어요.',
+  'Answer the plan first.': '먼저 약속에 답하세요.',
+  'A plan can have up to 100 expenses.': '약속 하나에 지출은 최대 100개까지 추가할 수 있어요.',
+  'Only the person who paid back, or the person paid, can mark it.': '갚은 사람이나 받은 사람만 표시할 수 있어요.',
+  'That’s more than is owed. Check the amounts again.': '갚아야 할 금액보다 많아요. 금액을 다시 확인하세요.',
+  'Choose a time in the next 18 hours.': '앞으로 18시간 이내의 시간을 선택하세요.',
+  'Choose people who are in the plan.': '약속에 참여 중인 사람을 선택하세요.',
+  'Go out together is not enabled.': '함께 나가기 기능이 켜져 있지 않아요.',
+  // apps/api/src/modules/messaging.ts
+  'This chat belongs to a plan. Who’s in it follows the answers to the plan.': '이 채팅은 약속에 속해 있어요. 채팅 멤버는 약속에 대한 답변에 따라 정해져요.',
+  // packages/shared/src/plan-schemas.ts
+  'Choose a place or write where.': '장소를 선택하거나 어디인지 쓰세요.',
+  'Choose who to invite.': '초대할 사람을 선택하세요.',
 };

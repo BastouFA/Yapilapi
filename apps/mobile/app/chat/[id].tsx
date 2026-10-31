@@ -77,6 +77,7 @@ import { chatTheme, type AccentColors } from '../../../../packages/shared/src/ch
 import { chatTooBig, openWatch, startWatch, useChatWatch, WatchBanner, watchableChat } from '../../lib/watch';
 import { noticeText } from '../../../../packages/shared/src/server-text';
 import { storyReplyLabel } from '../../../../packages/shared/src/message-preview';
+import { PlanChatCard } from '../../lib/plans';
 
 /** Voice messages shorter than this are treated as a slip of the finger and not sent. */
 const MIN_VOICE_MS = 1000;
@@ -91,7 +92,8 @@ const HEADER_SLOP = { left: 4, right: 4 };
  * With nothing typed, the send button records a voice message instead.
  */
 export default function Chat() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  // `poll=1`: open the poll composer once the chat is there (a plan's "Vote on a time or place").
+  const { id, poll } = useLocalSearchParams<{ id: string; poll?: string }>();
   const c = useColors();
   const { t, tp, locale } = useT();
   const insets = useSafeAreaInsets();
@@ -134,6 +136,7 @@ export default function Chat() {
   const [highlight, setHighlight] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [pollOpen, setPollOpen] = useState(false);
+  const pollAsked = useRef(false);
   const [listOpen, setListOpen] = useState(false);
   // Mini Apps added to this chat (the options menu's Apps).
   const miniAppsOn = useMiniAppsOn();
@@ -199,9 +202,15 @@ export default function Chat() {
     void load();
   }, [load]);
 
+  const loaded = !!conversation;
+  // Opened to vote on a plan's time or place: the poll composer, once.
+  useEffect(() => {
+    if (!loaded || poll !== '1' || pollAsked.current) return;
+    pollAsked.current = true;
+    setPollOpen(true);
+  }, [loaded, poll]);
   // Back from a dropped connection (the phone's, or the live one to the server): fetch what came in
   // meanwhile. Messages already here stay, so history scrolled back to isn't lost.
-  const loaded = !!conversation;
   const catchUp = useCallback(async () => {
     if (!loaded) return void load();
     try {
@@ -996,6 +1005,8 @@ export default function Chat() {
         </View>
       ) : null}
       {watching ? <WatchBanner summary={watching} /> : null}
+      {/* A plan's chat: the plan, a tap away. */}
+      {conversation?.planId ? <PlanChatCard planId={conversation.planId} /> : null}
       <SharingBanner share={sharing.mine} onStop={stopSharing} here={sharing.startedHere} />
       <PinnedBar
         pins={pins}

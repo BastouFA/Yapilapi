@@ -1236,4 +1236,24 @@ export const am: Record<string, string> = {
   'Choose who it’s for.': 'ለማን እንደሆነ ይምረጡ።',
   'Add what goes in the stash.': 'በድብቅ ሀብቱ ውስጥ የሚገባውን ያክሉ።',
   'Choose a thank-you or write one.': 'የምስጋና መልዕክት ይምረጡ ወይም አንድ ይጻፉ።',
+  // apps/api/src/lib/plans.ts, apps/api/src/modules/plans.ts (Go out together)
+  'This plan was cancelled.': 'ይህ እቅድ ተሰርዟል።',
+  'Choose a time from now to 90 days ahead.': 'ከአሁን እስከ 90 ቀናት ድረስ ያለ ጊዜ ይምረጡ።',
+  'You can invite your friends to a plan.': 'ጓደኞችዎን ወደ እቅድ መጋበዝ ይችላሉ።',
+  'A plan can have up to 30 people.': 'አንድ እቅድ እስከ 30 ሰዎች ሊኖሩት ይችላል።',
+  'You’ve made a lot of plans today. Try again tomorrow.': 'ዛሬ ብዙ እቅዶችን አውጥተዋል። ነገ እንደገና ይሞክሩ።',
+  'You made this plan. Cancel it instead.': 'ይህን እቅድ ያወጡት እርስዎ ነዎት። በምትኩ ይሰርዙት።',
+  'You can’t join this plan now.': 'አሁን ይህን እቅድ መቀላቀል አይችሉም።',
+  'Answer the plan first.': 'መጀመሪያ ለእቅዱ መልስ ይስጡ።',
+  'A plan can have up to 100 expenses.': 'አንድ እቅድ እስከ 100 ወጪዎች ሊኖሩት ይችላል።',
+  'Only the person who paid back, or the person paid, can mark it.': 'ምልክት ማድረግ የሚችሉት የመለሰው ሰው ወይም የተከፈለው ሰው ብቻ ናቸው።',
+  'That’s more than is owed. Check the amounts again.': 'ይህ ከዕዳው ይበልጣል። መጠኖቹን እንደገና ያረጋግጡ።',
+  'Choose a time in the next 18 hours.': 'በሚቀጥሉት 18 ሰዓታት ውስጥ ያለ ጊዜ ይምረጡ።',
+  'Choose people who are in the plan.': 'በእቅዱ ውስጥ ያሉ ሰዎችን ይምረጡ።',
+  'Go out together is not enabled.': 'አብሮ መውጣት አልበራም።',
+  // apps/api/src/modules/messaging.ts
+  'This chat belongs to a plan. Who’s in it follows the answers to the plan.': 'ይህ ውይይት የአንድ እቅድ ነው። በውስጡ ያሉት ሰዎች ለእቅዱ የተሰጡትን መልሶች ይከተላሉ።',
+  // packages/shared/src/plan-schemas.ts
+  'Choose a place or write where.': 'ቦታ ይምረጡ ወይም የት እንደሆነ ይጻፉ።',
+  'Choose who to invite.': 'ማንን እንደሚጋብዙ ይምረጡ።',
 };

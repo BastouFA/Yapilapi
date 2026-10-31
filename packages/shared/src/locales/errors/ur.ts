@@ -1294,4 +1294,24 @@ export const ur: Record<string, string> = {
   'Choose who it’s for.': 'منتخب کریں کہ یہ کس کے لیے ہے۔',
   'Add what goes in the stash.': 'خزانے میں ڈالنے کے لیے کچھ شامل کریں۔',
   'Choose a thank-you or write one.': 'شکریے کا کوئی پیغام منتخب کریں یا خود لکھیں۔',
+  // apps/api/src/lib/plans.ts, apps/api/src/modules/plans.ts (Go out together)
+  'This plan was cancelled.': 'یہ پلان منسوخ کر دیا گیا۔',
+  'Choose a time from now to 90 days ahead.': 'ابھی سے لے کر اگلے 90 دن تک کا کوئی وقت منتخب کریں۔',
+  'You can invite your friends to a plan.': 'آپ پلان میں اپنے دوستوں کو دعوت دے سکتے ہیں۔',
+  'A plan can have up to 30 people.': 'ایک پلان میں زیادہ سے زیادہ 30 لوگ ہو سکتے ہیں۔',
+  'You’ve made a lot of plans today. Try again tomorrow.': 'آپ نے آج بہت سے پلان بنائے ہیں۔ کل دوبارہ کوشش کریں۔',
+  'You made this plan. Cancel it instead.': 'یہ پلان آپ نے بنایا ہے۔ اس کے بجائے اسے منسوخ کریں۔',
+  'You can’t join this plan now.': 'آپ اب اس پلان میں شامل نہیں ہو سکتے۔',
+  'Answer the plan first.': 'پہلے پلان کا جواب دیں۔',
+  'A plan can have up to 100 expenses.': 'ایک پلان میں زیادہ سے زیادہ 100 اخراجات ہو سکتے ہیں۔',
+  'Only the person who paid back, or the person paid, can mark it.': 'اس پر نشان صرف وہ شخص لگا سکتا ہے جس نے پیسے لوٹائے، یا جسے پیسے ملے۔',
+  'That’s more than is owed. Check the amounts again.': 'یہ واجب رقم سے زیادہ ہے۔ رقمیں دوبارہ دیکھیں۔',
+  'Choose a time in the next 18 hours.': 'اگلے 18 گھنٹوں میں کوئی وقت منتخب کریں۔',
+  'Choose people who are in the plan.': 'وہ لوگ منتخب کریں جو پلان میں شامل ہیں۔',
+  'Go out together is not enabled.': '"ساتھ باہر چلیں" فعال نہیں ہے۔',
+  // apps/api/src/modules/messaging.ts
+  'This chat belongs to a plan. Who’s in it follows the answers to the plan.': 'یہ چیٹ ایک پلان کی ہے۔ اس میں کون ہے، یہ پلان کے جوابات سے طے ہوتا ہے۔',
+  // packages/shared/src/plan-schemas.ts
+  'Choose a place or write where.': 'کوئی جگہ منتخب کریں یا لکھیں کہ کہاں۔',
+  'Choose who to invite.': 'منتخب کریں کہ کسے دعوت دینی ہے۔',
 };

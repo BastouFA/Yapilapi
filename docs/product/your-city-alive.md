@@ -25,11 +25,17 @@ city's middle counts as that city.
      (trending tags, chains, communities, events) and its search. Location is asked for only on a
      tap ("Use my location"); otherwise the profile's city, then the launch cities.
    - **The menu**: see below.
-2. **Go out together** (later): plans with your people around what Wander shows.
+2. **Go out together** (built 2026-10-31; docs/product/go-out-together.md): plans with your people
+   around what Wander shows. **I'm free** (friends see who's free, on Wander and in Chats, and tap to
+   plan with them), **plans** (what, when, a place, event or stash from Wander or words, friends or a
+   squad invited), **I'm in / Maybe / Can't**, an **automatic group chat** for each plan (the people
+   who said I'm in or Maybe), **polls** in it (chat polls), and a **cost split** that only keeps count:
+   no money moves through YAPILAPI. "Make a plan" is in Spark's menu; "Go with friends" is next to
+   places, events and stashes in what's on now.
 3. **City first** (later): ranking by your city, a new landing page and onboarding, and sponsored
    hunts (businesses hiding stashes).
 
-Steps 2 and 3 aren't built. The landing page and onboarding are unchanged until step 3; nothing on
+Step 3 isn't built. The landing page and onboarding are unchanged until step 3; nothing on
 the signed-in screens says the app is voice-first any more (the old tagline left Settings, About).
 
 ## The menu
@@ -43,8 +49,8 @@ middle button was called Create with a ＋ until the owner asked for a better na
 - **Wander** (`/discover`, the phone's `discover` tab) starts with the map and "What's on now"
   (`components/CityNow.tsx` on the web, `lib/city-now.tsx` on the phone), then its search and
   discover sections.
-- **Spark** in the middle opens the ways to create: Hide a stash (first), Post, Reel, Story, Live
-  (while lives are on) and Yap. Its icon is a bold four-point spark with a small light in its top
+- **Spark** in the middle opens the ways to create: Hide a stash (first), Make a plan, Post, Reel,
+  Story, Live (while lives are on) and Yap. Its icon is a bold four-point spark with a small light in its top
   corner, white on the raised brand-gradient button. Touched, the button squishes down; on a tap (or
   Enter or Space) it pops back with a little overshoot, the spark makes a quarter turn and flashes,
   its light circles it once, and a soft ring and six specks of coral and saffron burst out from
@@ -65,6 +71,7 @@ For one day (2026-10-24) the menu was Near · Pulse · ＋ · Chats · You, with
 | Wander, with the map and what's on now | `/discover` (`components/CityNow.tsx` at its top) | `discover` tab (`lib/city-now.tsx` at its top) |
 | Create menu | `components/CreateMenu.tsx`, from Spark | Spark in `app/(tabs)/_layout.tsx` |
 | Stash | `/stash`, `/stash/new`, `/stash/:id` | `stash`, `stash/new`, `stash/[id]` |
+| Go out together | `/plans`, `/plans/new`, `/plans/:id`; who's free on Wander and in Chats | `go`, `go/new`, `go/[id]`; the same |
 
 Links keep working: `/home` is Pulse, `/near` redirects to `/discover`, `/discover`, `/map`,
 `/stash` and every other path are unchanged. The phone's first-launch tour of the dock points at

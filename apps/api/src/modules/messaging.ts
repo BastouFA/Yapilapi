@@ -44,6 +44,7 @@ import { crossOriginCookieRequest, me, requireAuth, resolveSession, sessionToken
 import { issueTicket, readTicket } from '../lib/realtime-ticket.ts';
 import { canSeeStory, storyCards } from '../lib/stories.ts';
 import { nowStatusesFor } from '../lib/now-status.ts';
+import { planOfChat } from '../lib/plans.ts';
 import { mediaIdsOf, messagePreviews, messageVisibleSql, reactionSummaries, revokeChatMedia } from '../lib/chat.ts';
 import { langOf } from '../lib/translation.ts';
 import { listsFor, myReminders, pollsFor } from '../lib/chat-polls.ts';
@@ -221,6 +222,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
          (SELECT array_agg(user_id) FROM conversation_members WHERE conversation_id = c.id AND left_at IS NULL) AS member_ids,
          (SELECT array_agg(user_id) FROM conversation_members WHERE conversation_id = c.id AND left_at IS NULL AND role = 'admin') AS admin_ids,
          (SELECT sq.id FROM squads sq WHERE sq.conversation_id = c.id) AS squad_id,
+         (SELECT pl.id FROM plans pl WHERE pl.conversation_id = c.id AND pl.starts_at IS NOT NULL) AS plan_id,
+         (SELECT pl.status FROM plans pl WHERE pl.conversation_id = c.id AND pl.starts_at IS NOT NULL) AS plan_status,
          -- Read receipts go both ways: nobody's show while yours are off, and theirs don't while theirs are.
          CASE WHEN c.kind <> 'community' AND ${READ_RECEIPTS_ON('$1')} THEN
            (SELECT json_agg(json_build_object('userId', o.user_id, 'lastReadAt', o.last_read_at)) FROM conversation_members o
@@ -311,6 +314,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       smartReplies: smartRepliesState(r.kind, r.smart_replies ?? null, smartEverywhere, smartFlag),
       theme: chatTheme({ wallpaper: r.wallpaper, accent: r.accent }),
       ...(r.squad_id ? { squadId: r.squad_id as string } : {}),
+      ...(r.plan_id ? { planId: r.plan_id as string, planOn: r.plan_status !== 'cancelled' } : {}),
     }));
   }
 
@@ -407,6 +411,9 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
   async function assertNotSquadChat(conversationId: string) {
     const r = await db.query(`SELECT 1 FROM squads WHERE conversation_id = $1`, [conversationId]);
     if (r.rowCount) throw new AppError(409, 'squad_chat', 'This chat belongs to a squad. Change who’s in it from the squad.');
+    // A plan's chat follows its answers while the plan is on (lib/plans.ts): answering Can't leaves it.
+    const plan = await planOfChat(db, conversationId);
+    if (plan && plan.status !== 'cancelled') throw new AppError(409, 'plan_chat', 'This chat belongs to a plan. Who’s in it follows the answers to the plan.');
   }
 
   async function assertGroupAdmin(conversationId: string, userId: string, what: string) {

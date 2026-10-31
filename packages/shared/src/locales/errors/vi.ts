@@ -1282,4 +1282,25 @@ export const vi: Record<string, string> = {
   'Choose who it’s for.': 'Hãy chọn kho báu này dành cho ai.',
   'Add what goes in the stash.': 'Hãy thêm thứ sẽ đặt trong kho báu.',
   'Choose a thank-you or write one.': 'Hãy chọn một lời cảm ơn hoặc tự viết.',
+  // apps/api/src/lib/plans.ts, apps/api/src/modules/plans.ts (Go out together)
+  'This plan was cancelled.': 'Kế hoạch này đã bị hủy.',
+  'Choose a time from now to 90 days ahead.': 'Hãy chọn thời gian từ bây giờ đến 90 ngày tới.',
+  'You can invite your friends to a plan.': 'Bạn chỉ có thể mời bạn bè của mình vào kế hoạch.',
+  'A plan can have up to 30 people.': 'Một kế hoạch có thể có tối đa 30 người.',
+  'You’ve made a lot of plans today. Try again tomorrow.': 'Hôm nay bạn đã tạo nhiều kế hoạch. Hãy thử lại vào ngày mai.',
+  'You made this plan. Cancel it instead.': 'Bạn đã tạo kế hoạch này. Thay vào đó, hãy hủy kế hoạch.',
+  'You can’t join this plan now.': 'Lúc này bạn không thể tham gia kế hoạch này.',
+  'Answer the plan first.': 'Hãy trả lời kế hoạch trước.',
+  'A plan can have up to 100 expenses.': 'Một kế hoạch có thể có tối đa 100 khoản chi.',
+  'Only the person who paid back, or the person paid, can mark it.': 'Chỉ người đã trả lại hoặc người được trả mới có thể đánh dấu.',
+  'That’s more than is owed. Check the amounts again.': 'Số này nhiều hơn số tiền đang nợ. Hãy kiểm tra lại số tiền.',
+  'Choose a time in the next 18 hours.': 'Hãy chọn thời gian trong 18 giờ tới.',
+  'Choose people who are in the plan.': 'Hãy chọn những người đang ở trong kế hoạch.',
+  'Go out together is not enabled.': 'Tính năng Cùng nhau đi chơi chưa được bật.',
+  // apps/api/src/modules/messaging.ts
+  'This chat belongs to a plan. Who’s in it follows the answers to the plan.':
+    'Cuộc trò chuyện này thuộc về một kế hoạch. Ai ở trong đó tùy theo câu trả lời cho kế hoạch.',
+  // packages/shared/src/plan-schemas.ts
+  'Choose a place or write where.': 'Hãy chọn một địa điểm hoặc ghi nơi đến.',
+  'Choose who to invite.': 'Hãy chọn người để mời.',
 };

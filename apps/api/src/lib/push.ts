@@ -2,7 +2,7 @@ import webpush from 'web-push';
 import type { Pool } from 'pg';
 // Every language, loaded up front: a push is written in its recipient's.
 import { t, tp, type MessageKey } from '@yapilapi/shared/i18n';
-import { ASK_TOPIC_KEYS, messagePreviewText, milestoneNoticeText, type AskTopic, type MessagePreview } from '@yapilapi/shared';
+import { ASK_TOPIC_KEYS, messagePreviewText, milestoneNoticeText, planNoticeText, type AskTopic, type MessagePreview } from '@yapilapi/shared';
 import type { Config } from '../config.ts';
 
 export interface PushMessage {
@@ -142,6 +142,16 @@ function messageLine(p: MessagePreview, hidden: boolean, locale: string): string
 /** The stand-in at the start of a sentence ("Your listing ends in 3 days"). */
 const capitalized = (s: string, locale: string) => (s ? s[0]!.toLocaleUpperCase(locale) + s.slice(1) : s);
 
+/** Go out together: the same words as in the app (planNoticeText). */
+const plan =
+  (type: string): Text =>
+  (name, d, locale) =>
+    planNoticeText(
+      { type, actor: { displayName: name }, data: d },
+      (k, v) => t(k, locale, v),
+      (k, c, v) => tp(k, c, locale, v),
+    ) ?? '';
+
 const TEXT: Record<string, Text> = {
   follow: say('push.follow'),
   friend_request: say('push.friend_request'),
@@ -267,6 +277,11 @@ const TEXT: Record<string, Text> = {
   stash_found: say('push.stash_found'),
   stash_thanks: say('push.stash_thanks'),
   stash_nearby: (_n, d, locale) => tp('push.stash_nearby', Number(d.count ?? 1), locale),
+  // Go out together: invited to a plan, answers to yours (grouped per plan), a plan changed or was cancelled.
+  plan_invite: plan('plan_invite'),
+  plan_answer: plan('plan_answer'),
+  plan_changed: plan('plan_changed'),
+  plan_cancelled: plan('plan_cancelled'),
   drop_opened: say('push.drop_opened'),
   drop_cancelled: say('push.drop_cancelled'),
   drop_sold_out: say('push.drop_sold_out'),

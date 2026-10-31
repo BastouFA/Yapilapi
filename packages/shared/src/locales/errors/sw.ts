@@ -1393,4 +1393,24 @@ export const sw: Record<string, string> = {
   'Choose who it’s for.': 'Chagua ni kwa ajili ya nani.',
   'Add what goes in the stash.': 'Ongeza kitakachowekwa kwenye hazina.',
   'Choose a thank-you or write one.': 'Chagua shukrani au uandike moja.',
+  // apps/api/src/lib/plans.ts, apps/api/src/modules/plans.ts (Go out together)
+  'This plan was cancelled.': 'Mpango huu umeghairiwa.',
+  'Choose a time from now to 90 days ahead.': 'Chagua muda kuanzia sasa hadi siku 90 zijazo.',
+  'You can invite your friends to a plan.': 'Unaweza kuwaalika marafiki zako kwenye mpango.',
+  'A plan can have up to 30 people.': 'Mpango unaweza kuwa na watu hadi 30.',
+  'You’ve made a lot of plans today. Try again tomorrow.': 'Umepanga mipango mingi leo. Jaribu tena kesho.',
+  'You made this plan. Cancel it instead.': 'Wewe ndiye uliyepanga mpango huu. Ughairi badala yake.',
+  'You can’t join this plan now.': 'Huwezi kujiunga na mpango huu sasa.',
+  'Answer the plan first.': 'Jibu mpango kwanza.',
+  'A plan can have up to 100 expenses.': 'Mpango unaweza kuwa na gharama hadi 100.',
+  'Only the person who paid back, or the person paid, can mark it.': 'Aliyerudisha pesa, au aliyelipwa, pekee ndiye anayeweza kuweka alama.',
+  'That’s more than is owed. Check the amounts again.': 'Hicho ni zaidi ya kinachodaiwa. Angalia viasi tena.',
+  'Choose a time in the next 18 hours.': 'Chagua muda ndani ya saa 18 zijazo.',
+  'Choose people who are in the plan.': 'Chagua watu walio kwenye mpango.',
+  'Go out together is not enabled.': 'Kutoka pamoja hakujawashwa.',
+  // apps/api/src/modules/messaging.ts
+  'This chat belongs to a plan. Who’s in it follows the answers to the plan.': 'Gumzo hili ni la mpango. Walio ndani yake hufuata majibu ya mpango.',
+  // packages/shared/src/plan-schemas.ts
+  'Choose a place or write where.': 'Chagua mahali au andika ni wapi.',
+  'Choose who to invite.': 'Chagua wa kuwaalika.',
 };

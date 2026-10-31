@@ -282,7 +282,9 @@ export async function exportSections(db: Q, userId: string) {
     listItemsAdded: await q(
       `SELECT i.message_id, i.text, i.done_at, i.created_at FROM chat_list_items i JOIN chat_lists l ON l.message_id = i.message_id WHERE i.added_by = $1 AND l.created_by <> $1`,
     ),
-    plans: await q(`SELECT id, conversation_id, title, details, status, created_at FROM plans WHERE created_by = $1 ORDER BY created_at DESC`),
+    plans: await q(
+      `SELECT id, conversation_id, title, details, status, created_at FROM plans WHERE created_by = $1 AND starts_at IS NULL ORDER BY created_at DESC`,
+    ),
     gameMoves: await q(
       `SELECT game_id, number, move, created_at FROM chat_game_moves WHERE player_id = $1 ORDER BY created_at DESC LIMIT ${EXPORT_LIMITS.gameMoves}`,
     ),
@@ -618,7 +620,30 @@ export async function exportSections(db: Q, userId: string) {
     ),
   };
 
-  return { content, chats, activity, relationships, money, safety, ai, security, developer, invites, settings, market, passTheMic, squads, stash };
+  // Go out together: your "I'm free", the plans you're in with your answer, the expenses you added,
+  // paid or have a share in, and what you paid back or were paid back. Other people by username only;
+  // a place from Wander by its kind only (its name is what the maker saw).
+  const goOut = {
+    freeNow: await q(`SELECT note, until, created_at FROM free_now WHERE user_id = $1`),
+    plans: await q(
+      `SELECT p.id, p.title, p.note, p.starts_at, p.place_kind, CASE WHEN p.place_kind = 'text' THEN p.place_name END AS place, p.status,
+              p.created_by = $1 AS you_made_it, ${un('p.created_by')} AS made_by, pp.answer AS your_answer, pp.invited_at, pp.answered_at, p.conversation_id
+       FROM plan_people pp JOIN plans p ON p.id = pp.plan_id WHERE pp.user_id = $1 AND p.starts_at IS NOT NULL ORDER BY p.starts_at DESC`,
+    ),
+    expenses: await q(
+      `SELECT e.plan_id, e.title, e.amount_cents, e.currency, ${un('e.paid_by')} AS paid_by, e.paid_by = $1 AS you_paid, e.added_by = $1 AS you_added,
+              s.share_cents AS your_share_cents, e.created_at
+       FROM plan_expenses e LEFT JOIN plan_expense_shares s ON s.expense_id = e.id AND s.user_id = $1
+       WHERE e.paid_by = $1 OR e.added_by = $1 OR s.user_id = $1 ORDER BY e.created_at DESC`,
+    ),
+    paidBack: await q(
+      `SELECT plan_id, CASE WHEN from_id = $1 THEN 'you_paid_back' ELSE 'you_were_paid_back' END AS direction,
+              ${un('CASE WHEN from_id = $1 THEN to_id ELSE from_id END')} AS with, amount_cents, currency, marked_by = $1 AS you_marked_it, created_at
+       FROM plan_settlements WHERE from_id = $1 OR to_id = $1 ORDER BY created_at DESC`,
+    ),
+  };
+
+  return { content, chats, activity, relationships, money, safety, ai, security, developer, invites, settings, market, passTheMic, squads, stash, goOut };
 }
 
 /** A short guide at the top of the file: what each part holds, the limits, and what is left out. */
@@ -632,6 +657,8 @@ export const EXPORT_README = {
     passTheMic: 'Pass the Mic chains you started, your reels in chains, the people you passed the mic to (by username), and your reels’ fair starts.',
     stash:
       'Stashes you hid, with their exact points, the stashes you found (who hid them, never where exactly), who found yours and what they sent back, and the positions kept from the last hour to spot impossible jumps.',
+    goOut:
+      'Go out together: your “I’m free” while it lasts, the plans you made or were invited to with your answer, the expenses you added, paid or share in, and what you paid back or were paid back (other people by username).',
     squads: 'Squads you’re in or were invited to: their names, your role, and when you were invited and joined. What you shared with them is under content.',
     content:
       'Stories, chapters, boards, saves, memories, recaps, lives, rooms, products, drops, places, businesses, photos and videos, your Yaps, voice replies and voice intro (recordings and transcripts), your Ask the city questions and helpful answers, and more you made; your event tickets, tickets given or received, events you co-host and how many people you checked in.',

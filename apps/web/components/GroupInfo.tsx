@@ -31,7 +31,9 @@ export function GroupInfoSheet({
   const { t, me, toast } = useSession();
   // A squad's chat follows the squad: who is in it, its name and leaving are managed on the squad's page.
   const squad = conversation.squadId ?? null;
-  const admin = conversation.myRole === 'admin' && !squad;
+  // A plan's chat follows its answers while the plan is on: people join with I'm in or Maybe and leave with Can't.
+  const plan = conversation.planOn ? (conversation.planId ?? null) : null;
+  const admin = conversation.myRole === 'admin' && !squad && !plan;
   const admins = new Set(conversation.adminIds ?? []);
   const [title, setTitle] = useState(conversation.title ?? '');
   const [adding, setAdding] = useState<PublicUser[]>([]);
@@ -120,13 +122,17 @@ export function GroupInfoSheet({
               <>
                 {t('squads.chatNote')} <Link href={`/squads/${squad}`}>{t('squads.title')}</Link>
               </>
+            ) : plan ? (
+              <>
+                {t('plans.chatNote')} <Link href={`/plans/${plan}`}>{t('plans.title')}</Link>
+              </>
             ) : (
               t('chat.group.adminsNote')
             )}
           </p>
         </section>
 
-        {squad ? null : (
+        {squad || plan ? null : (
           <section className="stack-sm">
             <PeoplePicker picked={adding} onChange={setAdding} label={t('chat.group.add')} exclude={conversation.members.map((m) => m.id)} />
             <div>
@@ -151,7 +157,7 @@ export function GroupInfoSheet({
           </section>
         )}
 
-        {squad ? null : (
+        {squad || plan ? null : (
           <div>
             <Button
               variant="danger"

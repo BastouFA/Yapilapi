@@ -15,6 +15,7 @@ import './tickets.css';
 import './market.css';
 import './citymap.css';
 import './stash.css';
+import './plans.css';
 import './askcity.css';
 import { Providers } from './providers';
 import { LOCALE_SCRIPT } from '@/lib/locale-script';

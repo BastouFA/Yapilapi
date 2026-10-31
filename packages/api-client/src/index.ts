@@ -144,6 +144,16 @@ import type {
   Squad,
   SquadCard,
   SquadCreateInput,
+  FreeFriend,
+  FreeNow,
+  FreeNowInput,
+  Plan,
+  PlanAnswer,
+  PlanCard,
+  PlanCreateInput,
+  PlanEditInput,
+  PlanExpenseInput,
+  PlanSettlementInput,
   SquadEditInput,
   SquadMemory,
   StorySquad,
@@ -933,6 +943,32 @@ export function createClient(opts: ClientOptions) {
       makeOwner: (id: string, userId: string) => post<{ squad: Squad }>(`/v1/squads/${id}/owner`, { userId }),
       posts: (id: string, cursor?: string) => get<Page<Post>>(`/v1/squads/${id}/posts${qs({ cursor })}`),
       memory: (id: string, memoryId: string) => get<{ memory: SquadMemory }>(`/v1/squads/${id}/memories/${memoryId}`),
+    },
+    /**
+     * Go out together (docs/product/go-out-together.md): "I'm free", plans with friends, answers,
+     * and the cost split (a record only: no money moves through YAPILAPI). A plan's chat is an
+     * ordinary group conversation (`conversationId`), with chat polls in it.
+     */
+    free: {
+      /** Yours, and friends who said they're free. */
+      get: () => get<{ mine: FreeNow | null; friends: FreeFriend[] }>('/v1/free'),
+      set: (b: FreeNowInput) => put<{ free: FreeNow }>('/v1/me/free', b),
+      stop: () => del<{ free: null }>('/v1/me/free'),
+    },
+    plans: {
+      list: () => get<{ upcoming: PlanCard[]; past: PlanCard[] }>('/v1/plans'),
+      create: (b: PlanCreateInput) => post<{ plan: Plan }>('/v1/plans', b),
+      get: (id: string) => get<{ plan: Plan }>(`/v1/plans/${id}`),
+      edit: (id: string, b: PlanEditInput) => patch<{ plan: Plan }>(`/v1/plans/${id}`, b),
+      cancel: (id: string) => post<{ plan: Plan }>(`/v1/plans/${id}/cancel`),
+      answer: (id: string, answer: PlanAnswer) => post<{ plan: Plan }>(`/v1/plans/${id}/answer`, { answer }),
+      invite: (id: string, b: { userIds?: string[]; squadId?: string }) => post<{ invited: number; plan: Plan }>(`/v1/plans/${id}/invites`, b),
+      /** Friends you could invite, for a new plan or this one. */
+      candidates: (q?: { planId?: string; q?: string }) => get<{ items: PublicUser[] }>(`/v1/plans/candidates${qs(q ?? {})}`),
+      addExpense: (id: string, b: PlanExpenseInput) => post<{ plan: Plan }>(`/v1/plans/${id}/expenses`, b),
+      removeExpense: (id: string, expenseId: string) => del<{ plan: Plan }>(`/v1/plans/${id}/expenses/${expenseId}`),
+      paidBack: (id: string, b: PlanSettlementInput) => post<{ plan: Plan }>(`/v1/plans/${id}/paid-back`, b),
+      undoPaidBack: (id: string, settlementId: string) => del<{ plan: Plan }>(`/v1/plans/${id}/paid-back/${settlementId}`),
     },
     /**
      * Near you: what's happening in a box on the map (docs/product/city-map.md). Only the box goes to

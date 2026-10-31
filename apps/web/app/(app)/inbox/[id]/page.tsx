@@ -52,6 +52,7 @@ import { GameCard } from '@/components/ChatGames';
 import { ChatMixCard, ShareMixHereSheet } from '@/components/Mixes';
 import { LocationCard, LocationRequestLine, ShareLocationSheet, SharingBanner, useLocationSharing } from '@/components/ChatLocation';
 import { MarketListingChat, MarketOfferChat } from '@/components/MarketChat';
+import { PlanChatCard } from '@/components/Plans';
 
 // The game boards and the sheet to start a game load after the chat itself; both stay closed until asked for.
 const GameSheet = dynamic(() => import('@/components/ChatGameSheets').then((m) => m.GameSheet), { ssr: false });
@@ -105,6 +106,10 @@ export default function ChatPage() {
   const [unseenPosts, setUnseenPosts] = useState<string[]>([]);
   const composer = useRef<HTMLTextAreaElement>(null);
   const [pollOpen, setPollOpen] = useState(false);
+  // "Vote on a time or place" on a plan's page opens its chat with a new poll (?poll=1).
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('poll') === '1') setPollOpen(true);
+  }, []);
   const [listOpen, setListOpen] = useState(false);
   const [remindFor, setRemindFor] = useState<{ message: Message; scope: 'me' | 'group' } | null>(null);
   // Send later: your messages waiting here, the sheet to pick a time (or edit one), and the chat's look.
@@ -750,6 +755,7 @@ export default function ChatPage() {
       </div>
 
       <WatchBanner session={watching} />
+      {conv?.planId ? <PlanChatCard planId={conv.planId} /> : null}
       <SharingBanner share={sharing.mine} here={sharing.here} onStop={stopSharing} />
       {conv?.disappearingSeconds ? (
         <button type="button" className="chat-disappearing" onClick={() => setDisappearingOpen(true)}>

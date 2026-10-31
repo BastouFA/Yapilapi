@@ -1396,4 +1396,24 @@ export const ha: Record<string, string> = {
   'Choose who it’s for.': 'Zaɓi wanda aka nufa da ita.',
   'Add what goes in the stash.': 'Ƙara abin da zai kasance a cikin taskar.',
   'Choose a thank-you or write one.': 'Zaɓi saƙon godiya ko ku rubuta ɗaya.',
+  // apps/api/src/lib/plans.ts, apps/api/src/modules/plans.ts (Go out together)
+  'This plan was cancelled.': 'An soke wannan shirin.',
+  'Choose a time from now to 90 days ahead.': 'Zaɓi lokaci daga yanzu zuwa kwana 90 nan gaba.',
+  'You can invite your friends to a plan.': 'Za ka iya gayyatar abokanka zuwa shiri.',
+  'A plan can have up to 30 people.': 'Shiri zai iya samun mutane har 30.',
+  'You’ve made a lot of plans today. Try again tomorrow.': 'Ka yi shirye-shirye da yawa yau. Sake gwadawa gobe.',
+  'You made this plan. Cancel it instead.': 'Kai ne ka yi wannan shirin. Ka soke shi maimakon haka.',
+  'You can’t join this plan now.': 'Ba za ka iya shiga wannan shirin yanzu ba.',
+  'Answer the plan first.': 'Ka fara amsa shirin.',
+  'A plan can have up to 100 expenses.': 'Shiri zai iya samun kashe kuɗi har 100.',
+  'Only the person who paid back, or the person paid, can mark it.': 'Wanda ya mayar da kuɗin, ko wanda aka biya, kaɗai ne zai iya sa alama.',
+  'That’s more than is owed. Check the amounts again.': 'Wannan ya fi bashin da ake bi. Sake duba adadin.',
+  'Choose a time in the next 18 hours.': 'Zaɓi lokaci cikin awa 18 masu zuwa.',
+  'Choose people who are in the plan.': 'Zaɓi mutanen da ke cikin shirin.',
+  'Go out together is not enabled.': 'Ba a kunna Fita tare ba.',
+  // apps/api/src/modules/messaging.ts
+  'This chat belongs to a plan. Who’s in it follows the answers to the plan.': 'Wannan hirar ta wani shiri ce. Masu cikinta suna bin amsoshin shirin.',
+  // packages/shared/src/plan-schemas.ts
+  'Choose a place or write where.': 'Zaɓi wuri ko ka rubuta inda yake.',
+  'Choose who to invite.': 'Zaɓi wanda za ka gayyata.',
 };

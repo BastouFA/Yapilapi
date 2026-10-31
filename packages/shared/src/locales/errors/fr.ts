@@ -1413,4 +1413,25 @@ export const fr: Record<string, string> = {
   'Choose who it’s for.': 'Choisis pour qui c’est.',
   'Add what goes in the stash.': 'Ajoute ce qu’il y a dans la cachette.',
   'Choose a thank-you or write one.': 'Choisis un merci ou écris-en un.',
+  // apps/api/src/lib/plans.ts, apps/api/src/modules/plans.ts (Go out together)
+  'This plan was cancelled.': 'Cette sortie a été annulée.',
+  'Choose a time from now to 90 days ahead.': 'Choisis une heure entre maintenant et dans 90 jours.',
+  'You can invite your friends to a plan.': 'Tu ne peux inviter que tes amis à une sortie.',
+  'A plan can have up to 30 people.': 'Une sortie peut réunir jusqu’à 30 personnes.',
+  'You’ve made a lot of plans today. Try again tomorrow.': 'Tu as organisé beaucoup de sorties aujourd’hui. Réessaie demain.',
+  'You made this plan. Cancel it instead.': 'C’est toi qui as organisé cette sortie. Annule-la plutôt.',
+  'You can’t join this plan now.': 'Tu ne peux pas rejoindre cette sortie pour le moment.',
+  'Answer the plan first.': 'Réponds d’abord à l’invitation.',
+  'A plan can have up to 100 expenses.': 'Une sortie peut compter jusqu’à 100 dépenses.',
+  'Only the person who paid back, or the person paid, can mark it.': 'Seule la personne qui a remboursé, ou celle qui a été remboursée, peut le marquer.',
+  'That’s more than is owed. Check the amounts again.': 'C’est plus que ce qui est dû. Vérifie à nouveau les montants.',
+  'Choose a time in the next 18 hours.': 'Choisis une heure dans les 18 prochaines heures.',
+  'Choose people who are in the plan.': 'Choisis des personnes qui font partie de la sortie.',
+  'Go out together is not enabled.': 'La fonction « Sortir ensemble » n’est pas activée.',
+  // apps/api/src/modules/messaging.ts
+  'This chat belongs to a plan. Who’s in it follows the answers to the plan.':
+    'Cette discussion appartient à une sortie. Qui en fait partie dépend des réponses à la sortie.',
+  // packages/shared/src/plan-schemas.ts
+  'Choose a place or write where.': 'Choisis un lieu ou écris où.',
+  'Choose who to invite.': 'Choisis qui inviter.',
 };

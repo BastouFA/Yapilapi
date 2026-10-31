@@ -93,7 +93,7 @@ const tooManySquads = () => {
  * and someone under 18 who aren't friends or family-linked, or a supervised teen's family settings
  * for messages (everyone in a squad is in its chat). Null when they can.
  */
-async function clashWith(db: Q, newcomer: string, members: string[]): Promise<'blocked' | 'minor' | 'family' | null> {
+export async function clashWith(db: Q, newcomer: string, members: string[]): Promise<'blocked' | 'minor' | 'family' | null> {
   const others = members.filter((m) => m !== newcomer);
   if (!others.length) return null;
   const blocked = await db.query(
@@ -163,7 +163,7 @@ export async function assertInvitable(db: Q, inviterId: string, userIds: string[
 }
 
 /** A line in the squad's chat about who is in it (the same lines a group chat has), and everyone's chat list follows. */
-async function chatLine(c: Q, realtime: RealtimeHub, conversationId: string, senderId: string, meta: Record<string, unknown>): Promise<void> {
+export async function chatLine(c: Q, realtime: RealtimeHub, conversationId: string, senderId: string, meta: Record<string, unknown>): Promise<void> {
   await c.query(`INSERT INTO messages (conversation_id, sender_id, body, kind, meta) VALUES ($1,$2,'','system',$3)`, [
     conversationId,
     senderId,

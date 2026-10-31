@@ -11,6 +11,7 @@ import { micNoticeText } from '../../../packages/shared/src/pass-the-mic';
 import { squadNoticeText } from '../../../packages/shared/src/squads';
 import { askNoticeText } from '../../../packages/shared/src/ask-city';
 import { stashNoticeText } from '../../../packages/shared/src/stash';
+import { planNoticeText } from '../../../packages/shared/src/plans';
 import { scheduledPostFailedText } from '../../../packages/shared/src/job-failures';
 import { signInNoticeText } from '../../../packages/shared/src/server-text';
 import { fullCount, milestoneNoticeText } from '../../../packages/shared/src/post-stats';
@@ -169,6 +170,9 @@ function describe(g: Group, tr: Translator): string {
   // Stash: "Ada and 2 others found your stash", "3 new stashes near you today".
   const stashed = stashNoticeText(n, t, tp);
   if (stashed) return stashed;
+  // Go out together: "Ada invited you: Suya and a film", answers, a changed or cancelled plan.
+  const planned = planNoticeText(n, t, tp);
+  if (planned) return planned;
   // Ask the city: "New question in Yaba, Lagos: Food", "Ada found your answer helpful".
   const asked = askNoticeText(n, t);
   if (asked) return asked;

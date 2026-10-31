@@ -1291,4 +1291,25 @@ export const tr: Record<string, string> = {
   'Choose who it’s for.': 'Kimin için olduğunu seç.',
   'Add what goes in the stash.': 'Hazinenin içine ne koyacağını ekle.',
   'Choose a thank-you or write one.': 'Bir teşekkür seç ya da kendin yaz.',
+  // apps/api/src/lib/plans.ts, apps/api/src/modules/plans.ts (Go out together)
+  'This plan was cancelled.': 'Bu plan iptal edildi.',
+  'Choose a time from now to 90 days ahead.': 'Şu andan itibaren 90 gün içinde bir zaman seç.',
+  'You can invite your friends to a plan.': 'Bir plana arkadaşlarını davet edebilirsin.',
+  'A plan can have up to 30 people.': 'Bir planda en fazla 30 kişi olabilir.',
+  'You’ve made a lot of plans today. Try again tomorrow.': 'Bugün çok plan yaptın. Yarın tekrar dene.',
+  'You made this plan. Cancel it instead.': 'Bu planı sen yaptın. Bunun yerine planı iptal et.',
+  'You can’t join this plan now.': 'Bu plana şu anda katılamazsın.',
+  'Answer the plan first.': 'Önce plana yanıt ver.',
+  'A plan can have up to 100 expenses.': 'Bir planda en fazla 100 masraf olabilir.',
+  'Only the person who paid back, or the person paid, can mark it.': 'Bunu yalnızca geri ödeyen ya da ödemeyi alan kişi işaretleyebilir.',
+  'That’s more than is owed. Check the amounts again.': 'Bu, borçtan fazla. Tutarları tekrar kontrol et.',
+  'Choose a time in the next 18 hours.': 'Önümüzdeki 18 saat içinde bir zaman seç.',
+  'Choose people who are in the plan.': 'Planda olan kişileri seç.',
+  'Go out together is not enabled.': '“Birlikte dışarı çık” açık değil.',
+  // apps/api/src/modules/messaging.ts
+  'This chat belongs to a plan. Who’s in it follows the answers to the plan.':
+    'Bu sohbet bir plana ait. Sohbette kimlerin olacağı plana verilen yanıtlara göre belirlenir.',
+  // packages/shared/src/plan-schemas.ts
+  'Choose a place or write where.': 'Bir yer seç ya da nerede olduğunu yaz.',
+  'Choose who to invite.': 'Kimi davet edeceğini seç.',
 };

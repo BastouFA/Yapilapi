@@ -46,6 +46,11 @@ export const FEATURE_FLAGS = {
     default: true,
     description: 'Stash: hide a note, photo, video, song, voice note or gift at a real place; it opens only for someone who is there.',
   },
+  GO_OUT: {
+    default: true,
+    description:
+      'Go out together: I’m free, plans with friends (I’m in, Maybe, Can’t), a group chat for each plan with polls, and a cost split that only keeps count.',
+  },
   CITY_MAP: { default: true, description: 'Near you: a live map of lives, events, Market listings, busy places, chains and friends who are out.' },
   ADS: { default: false, description: 'Sponsored posts: paid campaigns shown only to adults who opted in to advertising.' },
 } as const;

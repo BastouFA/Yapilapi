@@ -652,6 +652,12 @@ export interface Conversation {
   readBy?: { userId: string; lastReadAt: string }[];
   /** A squad's chat: who is in it follows the squad, so people join and leave there, not here. */
   squadId?: string | null;
+  /**
+   * A plan's chat (docs/product/go-out-together.md): its card shows at the top. While the plan is on
+   * (`planOn`), who is in it follows the answers (I'm in and Maybe), so people join and leave there.
+   */
+  planId?: string | null;
+  planOn?: boolean;
 }
 
 /**
@@ -830,6 +836,14 @@ export type MessageSystemInfo =
   | {
       /** The sender asked the others in the chat to share where they are (they choose whether to). */
       type: 'location_request';
+    }
+  | {
+      /** The plan this chat is for changed (its time, place or title) or was cancelled. The sender is its maker. */
+      type: 'plan';
+      planId: string;
+      action: 'changed' | 'cancelled';
+      /** The plan's title when the line was written. */
+      title: string;
     }
   | {
       /**

@@ -1378,4 +1378,24 @@ export const yo: Record<string, string> = {
   'Choose who it’s for.': 'Yan ẹni tí o fi í pamọ́ fún.',
   'Add what goes in the stash.': 'Fi ohun tó máa wà nínú ìṣúra náà kún un.',
   'Choose a thank-you or write one.': 'Yan ọ̀rọ̀ ọpẹ́ kan tàbí kọ ọ̀kan.',
+  // apps/api/src/lib/plans.ts, apps/api/src/modules/plans.ts (Go out together)
+  'This plan was cancelled.': 'A ti fagilé ètò yìí.',
+  'Choose a time from now to 90 days ahead.': 'Yan àkókò láti ìsinsìnyí títí di ọjọ́ 90 síwájú.',
+  'You can invite your friends to a plan.': 'O lè pe àwọn ọ̀rẹ́ rẹ sí ètò kan.',
+  'A plan can have up to 30 people.': 'Ètò kan lè ní tó ènìyàn 30.',
+  'You’ve made a lot of plans today. Try again tomorrow.': 'O ti ṣe ọ̀pọ̀ ètò lónìí. Tún gbìyànjú lọ́la.',
+  'You made this plan. Cancel it instead.': 'Ìwọ lo ṣe ètò yìí. Fagilé e dípò bẹ́ẹ̀.',
+  'You can’t join this plan now.': 'O ò lè darapọ̀ mọ́ ètò yìí báyìí.',
+  'Answer the plan first.': 'Kọ́kọ́ dáhùn ètò náà.',
+  'A plan can have up to 100 expenses.': 'Ètò kan lè ní tó ìnáwó 100.',
+  'Only the person who paid back, or the person paid, can mark it.': 'Ẹni tó san padà, tàbí ẹni tí a san fún, nìkan ló lè sàmì sí i.',
+  'That’s more than is owed. Check the amounts again.': 'Ìyẹn ju gbèsè tó wà lọ. Tún wo àwọn iye owó náà.',
+  'Choose a time in the next 18 hours.': 'Yan àkókò láàárín wákàtí 18 tó ń bọ̀.',
+  'Choose people who are in the plan.': 'Yan àwọn ènìyàn tó wà nínú ètò náà.',
+  'Go out together is not enabled.': 'Jíjáde papọ̀ kò tíì ṣí sílẹ̀.',
+  // apps/api/src/modules/messaging.ts
+  'This chat belongs to a plan. Who’s in it follows the answers to the plan.': 'Ìjíròrò yìí jẹ́ ti ètò kan. Àwọn tó wà nínú rẹ̀ ń tẹ̀lé ìdáhùn sí ètò náà.',
+  // packages/shared/src/plan-schemas.ts
+  'Choose a place or write where.': 'Yan ibì kan tàbí kọ ibi tí ó jẹ́.',
+  'Choose who to invite.': 'Yan àwọn tí o fẹ́ pè.',
 };

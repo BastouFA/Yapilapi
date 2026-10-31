@@ -94,7 +94,7 @@ function YouAvatar({ c, focused }: { c: Palette; focused: boolean }) {
  * The floating dock: Pulse · Wander · [+] · Chats · You (docs/product/your-city-alive.md). Icons only,
  * except the current tab, whose label sits under its icon in a squircle highlight that springs from
  * tab to tab. The + in the middle is a raised, slightly tilted brand-gradient squircle: a tap opens
- * the ways to create, hiding a stash first, then a post, reel, story, live or Yap. Every tab keeps
+ * the ways to create, hiding a stash first, making a plan, then a post, reel, story, live or Yap. Every tab keeps
  * its name, hint and unread count for screen readers. Wander holds the city map and what's on now.
  */
 function FloatingTabBar({ state, descriptors, navigation }: TabBarProps) {
@@ -107,13 +107,15 @@ function FloatingTabBar({ state, descriptors, navigation }: TabBarProps) {
   const yaps = useFlag('YAPS') !== false;
   const stash = useFlag('STASH') !== false;
   const live = useFlag('LIVE') === true;
+  const goOut = useFlag('GO_OUT') !== false;
   const more = useActionSheet();
-  // The ways to create, behind Spark (a stash first).
+  // The ways to create, behind Spark (a stash first, then a plan with friends).
   const openMore = () =>
     more.show({
       title: t('create.title'),
       actions: [
         ...(stash ? [{ label: t('stash.hide'), icon: 'gift-outline' as const, onPress: () => router.push('/stash/new') }] : []),
+        ...(goOut ? [{ label: t('plans.make'), icon: 'calendar-outline' as const, onPress: () => router.push('/go/new') }] : []),
         { label: t('m.create.mode.post'), icon: 'image-outline', onPress: () => router.push('/camera') },
         { label: t('m.create.mode.reel'), icon: 'videocam-outline', onPress: () => router.push({ pathname: '/camera', params: { mode: 'reel' } }) },
         { label: t('m.create.mode.story'), icon: 'sparkles-outline', onPress: () => router.push({ pathname: '/camera', params: { mode: 'story' } }) },
@@ -221,7 +223,7 @@ function FloatingTabBar({ state, descriptors, navigation }: TabBarProps) {
                   // Spark (its screen, the composer, is titled Create).
                   accessibilityLabel={t('nav.create')}
                   accessibilityHint={hint}
-                  // The ways to create: hide a stash, a post, reel, story, live or Yap.
+                  // The ways to create: hide a stash, make a plan, a post, reel, story, live or Yap.
                   onPress={tapSpark}
                   onPressIn={() => press(1)}
                   onPressOut={() => press(0)}

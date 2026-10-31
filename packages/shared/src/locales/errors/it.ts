@@ -1294,4 +1294,25 @@ export const it: Record<string, string> = {
   'Choose who it’s for.': 'Scegli per chi è.',
   'Add what goes in the stash.': 'Aggiungi cosa c’è nel nascondiglio.',
   'Choose a thank-you or write one.': 'Scegli un ringraziamento o scrivine uno.',
+  // apps/api/src/lib/plans.ts, apps/api/src/modules/plans.ts (Go out together)
+  'This plan was cancelled.': 'Questa uscita è stata annullata.',
+  'Choose a time from now to 90 days ahead.': 'Scegli un orario tra adesso e i prossimi 90 giorni.',
+  'You can invite your friends to a plan.': 'Puoi invitare a un’uscita solo i tuoi amici.',
+  'A plan can have up to 30 people.': 'Un’uscita può avere fino a 30 persone.',
+  'You’ve made a lot of plans today. Try again tomorrow.': 'Oggi hai organizzato molte uscite. Riprova domani.',
+  'You made this plan. Cancel it instead.': 'Questa uscita l’hai organizzata tu. Annullala, piuttosto.',
+  'You can’t join this plan now.': 'Adesso non puoi unirti a questa uscita.',
+  'Answer the plan first.': 'Prima rispondi all’invito.',
+  'A plan can have up to 100 expenses.': 'Un’uscita può avere fino a 100 spese.',
+  'Only the person who paid back, or the person paid, can mark it.': 'Solo chi ha restituito i soldi, o chi li ha ricevuti, può segnarlo.',
+  'That’s more than is owed. Check the amounts again.': 'È più di quanto dovuto. Ricontrolla gli importi.',
+  'Choose a time in the next 18 hours.': 'Scegli un orario nelle prossime 18 ore.',
+  'Choose people who are in the plan.': 'Scegli persone che fanno parte dell’uscita.',
+  'Go out together is not enabled.': 'Uscire insieme non è attivo.',
+  // apps/api/src/modules/messaging.ts
+  'This chat belongs to a plan. Who’s in it follows the answers to the plan.':
+    'Questa chat appartiene a un’uscita. Chi ne fa parte dipende dalle risposte all’uscita.',
+  // packages/shared/src/plan-schemas.ts
+  'Choose a place or write where.': 'Scegli un posto o scrivi dove.',
+  'Choose who to invite.': 'Scegli chi invitare.',
 };

@@ -19,6 +19,7 @@ import { api, ApiError, errorMessage } from '@/lib/api';
 import { useApproxHere } from '@/components/Market';
 import { LAYER_ICONS, MapItemRow, TileMap, type MapView } from '@/components/CityMap';
 import { useSession } from '@/app/providers';
+import { FreeStrip, planFromHref } from '@/components/Plans';
 
 /** "What's on now", in this order, a few of each (the nearest first). */
 const SECTIONS: MapLayer[] = ['stashes', 'live', 'today', 'places', 'questions', 'market'];
@@ -48,6 +49,7 @@ export function CityNow() {
   const [problem, setProblem] = useState<string | null>(null);
   const seq = useRef(0);
   const stash = flags.STASH !== false;
+  const goOut = !!me && flags.GO_OUT !== false;
 
   const layers = MAP_LAYERS.filter(
     (l) =>
@@ -113,6 +115,7 @@ export function CityNow() {
         ) : null}
       </div>
       <p className="muted city-now__intro">{t('near.intro')}</p>
+      <FreeStrip />
 
       <div className="city-now__picks">
         <Button variant="secondary" size="sm" icon="map-pin" loading={place.busy} onClick={() => void toHere()} aria-describedby="city-now-why">
@@ -141,11 +144,25 @@ export function CityNow() {
                 <Icon name={LAYER_ICONS[s.layer]} size={18} /> {t(MAP_LAYER_KEYS[s.layer])}
               </h3>
               <ul className="citymap__list">
-                {s.items.map((i) => (
-                  <li key={i.key}>
-                    <MapItemRow item={i} from={from ?? i.point} />
-                  </li>
-                ))}
+                {s.items.map((i) => {
+                  // "Go with friends": a plan around a place, an event or a stash (docs/product/go-out-together.md).
+                  const target = i.target.kind === 'place' || i.target.kind === 'event' || i.target.kind === 'stash' ? i.target : null;
+                  return (
+                    <li key={i.key} className={goOut && target ? 'city-now__item' : undefined}>
+                      <MapItemRow item={i} from={from ?? i.point} />
+                      {goOut && target ? (
+                        <Link
+                          href={planFromHref(target.kind, target.id, i.title || null)}
+                          className="city-now__plan"
+                          aria-label={`${t('plans.goWith')}: ${i.title || t(MAP_LAYER_KEYS[i.layer])}`}
+                          title={t('plans.goWith')}
+                        >
+                          <Icon name="users" size={20} />
+                        </Link>
+                      ) : null}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           ))}

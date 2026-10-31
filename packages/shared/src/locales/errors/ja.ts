@@ -1280,4 +1280,24 @@ export const ja: Record<string, string> = {
   'Choose who it’s for.': '誰に向けたものか選んでください。',
   'Add what goes in the stash.': 'スタッシュの中身を追加してください。',
   'Choose a thank-you or write one.': 'お礼を選ぶか、書いてください。',
+  // apps/api/src/lib/plans.ts, apps/api/src/modules/plans.ts (Go out together)
+  'This plan was cancelled.': 'この予定はキャンセルされました。',
+  'Choose a time from now to 90 days ahead.': '今から90日以内の日時を選んでください。',
+  'You can invite your friends to a plan.': '予定に招待できるのは友達だけです。',
+  'A plan can have up to 30 people.': '1つの予定に参加できるのは30人までです。',
+  'You’ve made a lot of plans today. Try again tomorrow.': '今日はたくさんの予定を作成しました。明日もう一度お試しください。',
+  'You made this plan. Cancel it instead.': 'この予定はあなたが作成したものです。代わりにキャンセルしてください。',
+  'You can’t join this plan now.': '今はこの予定に参加できません。',
+  'Answer the plan first.': '先に予定に返事をしてください。',
+  'A plan can have up to 100 expenses.': '1つの予定に登録できる支出は100件までです。',
+  'Only the person who paid back, or the person paid, can mark it.': '返した人か、受け取った人だけがマークできます。',
+  'That’s more than is owed. Check the amounts again.': '借りている金額より多くなっています。金額をもう一度確認してください。',
+  'Choose a time in the next 18 hours.': '今から18時間以内の時間を選んでください。',
+  'Choose people who are in the plan.': 'この予定に参加している人を選んでください。',
+  'Go out together is not enabled.': '「一緒に出かける」は有効になっていません。',
+  // apps/api/src/modules/messaging.ts
+  'This chat belongs to a plan. Who’s in it follows the answers to the plan.': 'このチャットは予定のものです。メンバーは予定への返事に合わせて決まります。',
+  // packages/shared/src/plan-schemas.ts
+  'Choose a place or write where.': '場所を選ぶか、場所を書いてください。',
+  'Choose who to invite.': '招待する人を選んでください。',
 };

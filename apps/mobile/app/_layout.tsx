@@ -44,7 +44,7 @@ function useWelcomeAfterSignOut() {
 
 /**
  * Tabs live in (tabs); detail screens (chat, post, community, event, place, settings, Real, Reels, memories,
- * Together, Live, Studio, post insights, plans, a shop item, purchases, drops, tips and gifts) push on top.
+ * Together, Live, Studio, post insights, plans, plans with friends (go/), a shop item, purchases, drops, tips and gifts) push on top.
  * Links from outside (yapilapi://…, web paths) are mapped in +native-intent.tsx; push taps in useNotificationLinks.
  */
 function Screens() {
@@ -156,6 +156,9 @@ function Screens() {
         <Stack.Screen name="stash/index" options={{ title: t('stash.title') }} />
         <Stack.Screen name="stash/new" options={{ title: t('stash.hide') }} />
         <Stack.Screen name="stash/[id]" options={{ title: t('stash.title') }} />
+        <Stack.Screen name="go/index" options={{ title: t('plans.title') }} />
+        <Stack.Screen name="go/new" options={{ title: t('plans.make') }} />
+        <Stack.Screen name="go/[id]" options={{ title: t('plans.title') }} />
         <Stack.Screen name="radio" options={{ title: t('radio.title') }} />
         <Stack.Screen name="market/index" options={{ title: t('m.market.title') }} />
         <Stack.Screen name="market/[id]" options={{ title: t('m.market.listing') }} />

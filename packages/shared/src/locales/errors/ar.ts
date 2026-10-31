@@ -1362,4 +1362,24 @@ export const ar: Record<string, string> = {
   'Choose who it’s for.': 'اختر لمن هي.',
   'Add what goes in the stash.': 'أضف ما سيكون داخل الخبيئة.',
   'Choose a thank-you or write one.': 'اختر كلمة شكر أو اكتب واحدة.',
+  // apps/api/src/lib/plans.ts, apps/api/src/modules/plans.ts (Go out together)
+  'This plan was cancelled.': 'أُلغيت هذه الخطة.',
+  'Choose a time from now to 90 days ahead.': 'اختر وقتًا من الآن وحتى 90 يومًا قادمة.',
+  'You can invite your friends to a plan.': 'يمكنك دعوة أصدقائك إلى الخطة.',
+  'A plan can have up to 30 people.': 'يمكن أن تضم الخطة حتى 30 شخصًا.',
+  'You’ve made a lot of plans today. Try again tomorrow.': 'وضعت خططًا كثيرة اليوم. حاول مجددًا غدًا.',
+  'You made this plan. Cancel it instead.': 'أنت من وضع هذه الخطة. يمكنك إلغاؤها بدلًا من ذلك.',
+  'You can’t join this plan now.': 'لا يمكنك الانضمام إلى هذه الخطة الآن.',
+  'Answer the plan first.': 'أجب على الخطة أولًا.',
+  'A plan can have up to 100 expenses.': 'يمكن أن تضم الخطة حتى 100 مصروف.',
+  'Only the person who paid back, or the person paid, can mark it.': 'لا يمكن تعليم ذلك إلا لمن سدّد المبلغ أو لمن استلمه.',
+  'That’s more than is owed. Check the amounts again.': 'هذا أكثر من المبلغ المستحق. راجع المبالغ مرة أخرى.',
+  'Choose a time in the next 18 hours.': 'اختر وقتًا خلال الساعات الـ18 القادمة.',
+  'Choose people who are in the plan.': 'اختر أشخاصًا موجودين في الخطة.',
+  'Go out together is not enabled.': 'ميزة «اخرجوا معًا» غير مفعّلة.',
+  // apps/api/src/modules/messaging.ts
+  'This chat belongs to a plan. Who’s in it follows the answers to the plan.': 'هذه الدردشة تابعة لخطة. يتحدد من فيها حسب الأجوبة على الخطة.',
+  // packages/shared/src/plan-schemas.ts
+  'Choose a place or write where.': 'اختر مكانًا أو اكتب أين.',
+  'Choose who to invite.': 'اختر من تدعو.',
 };

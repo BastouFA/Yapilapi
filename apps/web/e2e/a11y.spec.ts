@@ -30,6 +30,8 @@ const PUBLIC_PAGES: [string, string][] = [
 const APP_PAGES: [string, (d: SeedData) => string][] = [
   ['stash', () => '/stash'],
   ['hide a stash', () => '/stash/new'],
+  ['plans', () => '/plans'],
+  ['make a plan', () => '/plans/new'],
   ['home', () => '/home'],
   ['discover', () => '/discover'],
   ['create', () => '/create'],

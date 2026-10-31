@@ -187,6 +187,16 @@ export function SystemLine({
         </Link>
       </p>
     );
+  // A plan's chat: its maker changed the plan or cancelled it, with a way to the plan.
+  if (s?.type === 'plan')
+    return (
+      <p className="chat-system" role="note">
+        <Icon name="calendar" size={14} /> <bdi>{t(s.action === 'cancelled' ? 'plans.line.cancelled' : 'plans.line.changed', { name: who })}</bdi>{' '}
+        <Link href={`/plans/${s.planId}`} className="chat-system__join">
+          {t('plans.open')}
+        </Link>
+      </p>
+    );
   if (s?.type === 'together') {
     // "Ada started a shared album: Lagos weekend", with a way in (people not in it see that it's not for them).
     const text =

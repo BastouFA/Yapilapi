@@ -1290,4 +1290,25 @@ export const id: Record<string, string> = {
   'Choose who it’s for.': 'Pilih untuk siapa stash ini.',
   'Add what goes in the stash.': 'Tambahkan isi stash.',
   'Choose a thank-you or write one.': 'Pilih ucapan terima kasih atau tulis sendiri.',
+  // apps/api/src/lib/plans.ts, apps/api/src/modules/plans.ts (Go out together)
+  'This plan was cancelled.': 'Rencana ini sudah dibatalkan.',
+  'Choose a time from now to 90 days ahead.': 'Pilih waktu dari sekarang hingga 90 hari ke depan.',
+  'You can invite your friends to a plan.': 'Anda hanya bisa mengundang teman Anda ke rencana.',
+  'A plan can have up to 30 people.': 'Satu rencana bisa berisi hingga 30 orang.',
+  'You’ve made a lot of plans today. Try again tomorrow.': 'Anda sudah membuat banyak rencana hari ini. Coba lagi besok.',
+  'You made this plan. Cancel it instead.': 'Anda yang membuat rencana ini. Batalkan saja rencananya.',
+  'You can’t join this plan now.': 'Anda tidak bisa bergabung ke rencana ini sekarang.',
+  'Answer the plan first.': 'Jawab rencananya dulu.',
+  'A plan can have up to 100 expenses.': 'Satu rencana bisa berisi hingga 100 pengeluaran.',
+  'Only the person who paid back, or the person paid, can mark it.': 'Hanya orang yang membayar kembali, atau orang yang dibayar, yang bisa menandainya.',
+  'That’s more than is owed. Check the amounts again.': 'Itu lebih dari jumlah utangnya. Periksa lagi jumlahnya.',
+  'Choose a time in the next 18 hours.': 'Pilih waktu dalam 18 jam ke depan.',
+  'Choose people who are in the plan.': 'Pilih orang yang ada di rencana ini.',
+  'Go out together is not enabled.': 'Fitur Pergi bersama belum diaktifkan.',
+  // apps/api/src/modules/messaging.ts
+  'This chat belongs to a plan. Who’s in it follows the answers to the plan.':
+    'Obrolan ini milik sebuah rencana. Siapa yang ada di dalamnya mengikuti jawaban untuk rencana itu.',
+  // packages/shared/src/plan-schemas.ts
+  'Choose a place or write where.': 'Pilih tempat atau tulis lokasinya.',
+  'Choose who to invite.': 'Pilih siapa yang akan diundang.',
 };

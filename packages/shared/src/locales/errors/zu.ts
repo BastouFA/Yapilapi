@@ -1307,4 +1307,24 @@ export const zu: Record<string, string> = {
   'Choose who it’s for.': 'Khetha ukuthi uwenzela bani.',
   'Add what goes in the stash.': 'Engeza okuzofakwa emcebweni.',
   'Choose a thank-you or write one.': 'Khetha ukubonga noma ubhale okwakho.',
+  // apps/api/src/lib/plans.ts, apps/api/src/modules/plans.ts (Go out together)
+  'This plan was cancelled.': 'Lolu hlelo lukhanseliwe.',
+  'Choose a time from now to 90 days ahead.': 'Khetha isikhathi kusukela manje kuya ezinsukwini ezingu-90 ezizayo.',
+  'You can invite your friends to a plan.': 'Ungamema abangani bakho ohlelweni.',
+  'A plan can have up to 30 people.': 'Uhlelo lungaba nabantu abafika ku-30.',
+  'You’ve made a lot of plans today. Try again tomorrow.': 'Wenze izinhlelo eziningi namuhla. Zama futhi kusasa.',
+  'You made this plan. Cancel it instead.': 'Nguwe owenze lolu hlelo. Lukhansele kunalokho.',
+  'You can’t join this plan now.': 'Awukwazi ukujoyina lolu hlelo manje.',
+  'Answer the plan first.': 'Phendula uhlelo kuqala.',
+  'A plan can have up to 100 expenses.': 'Uhlelo lungaba nezindleko ezifika ku-100.',
+  'Only the person who paid back, or the person paid, can mark it.': 'Kungumuntu obuyisele imali, noma okhokhelwe, kuphela ongakuphawula.',
+  'That’s more than is owed. Check the amounts again.': 'Lokho kungaphezu kwalokho okukweletwayo. Hlola amanani futhi.',
+  'Choose a time in the next 18 hours.': 'Khetha isikhathi emahoreni angu-18 azayo.',
+  'Choose people who are in the plan.': 'Khetha abantu abasohlelweni.',
+  'Go out together is not enabled.': 'Ukuphuma ndawonye akuvuliwe.',
+  // apps/api/src/modules/messaging.ts
+  'This chat belongs to a plan. Who’s in it follows the answers to the plan.': 'Le ngxoxo ingeyohlelo. Abakuyo balandela izimpendulo zohlelo.',
+  // packages/shared/src/plan-schemas.ts
+  'Choose a place or write where.': 'Khetha indawo noma ubhale ukuthi kuphi.',
+  'Choose who to invite.': 'Khetha ozobamema.',
 };

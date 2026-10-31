@@ -5,6 +5,7 @@ import { askNoticePost } from '../../../packages/shared/src/ask-city';
 import { stashNoticeTarget } from '../../../packages/shared/src/stash';
 import { micNoticeHref } from '../../../packages/shared/src/pass-the-mic';
 import { squadNoticeHref } from '../../../packages/shared/src/squads';
+import { planNoticeHref } from '../../../packages/shared/src/plans';
 import { useSession } from './session';
 
 /** What a notification (from the list, or the data of a push) says about where it leads. */
@@ -32,6 +33,9 @@ export function notificationHref(n: NotificationTarget): string | null {
   // Stash: someone found your stash or thanked you for it (the stash), new stashes near you (the Stash screen).
   const stash = stashNoticeTarget({ type: n.type, entityId: n.entityId });
   if (stash !== null) return stash ? `/stash/${encodeURIComponent(stash)}` : '/stash';
+  // Go out together: an invite, answers, a changed or cancelled plan open the plan.
+  const plan = planNoticeHref({ type: n.type, entityId: n.entityId });
+  if (plan) return `/go/${encodeURIComponent(plan)}`;
   // Ask the city: a new question near you, or your answer marked helpful, opens the question with its answers.
   const question = askNoticePost({ type: n.type, entityId: n.entityId });
   if (question) return `/p/${encodeURIComponent(question)}`;
@@ -226,7 +230,8 @@ export function appPath(link: string): string {
   if (first === 'join' && second) return `/signup?invite=${encodeURIComponent(second)}`;
   // Creators and money: Studio, a creator's plans, one thing from a shop, boosting and a post's insights.
   if (first === 'studio') return '/studio';
-  if (first === 'plans' && second) return `/plans?username=${encodeURIComponent(second)}`;
+  // Go out together: the web's /plans pages are /go in the app (its /plans screen is a creator's plans).
+  if (first === 'plans') return second === 'new' ? `/go/new${q}` : second ? `/go/${encodeURIComponent(second)}` : '/go';
   const params = queryParams(query);
   const profileName = first.startsWith('@') ? first.slice(1) : (first === 'u' || first === 'profile') && second ? second : null;
   if (profileName && params.subscribe !== undefined) return `/plans?username=${encodeURIComponent(profileName)}`;

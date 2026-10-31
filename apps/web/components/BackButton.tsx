@@ -43,6 +43,7 @@ const LISTS = [
   '/memories',
   '/mixes',
   '/notifications',
+  '/plans',
   '/questions',
   '/recaps',
   '/saved',

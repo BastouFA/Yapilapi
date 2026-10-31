@@ -7,10 +7,11 @@ import { useSession } from '@/app/providers';
 
 /**
  * The ways to create, behind the + in the middle of the navigation (docs/product/your-city-alive.md):
- * hide a stash first, then a post, a reel, a story, a live (while lives are on) or a Yap.
+ * hide a stash first, make a plan with friends, then a post, a reel, a story, a live (while lives are on) or a Yap.
  */
 const WAYS: { href: string; icon: IconName; label: MessageKey; show?: (flags: Record<string, boolean>) => boolean }[] = [
   { href: '/stash/new', icon: 'map-pin', label: 'stash.hide', show: (f) => f.STASH !== false },
+  { href: '/plans/new', icon: 'calendar', label: 'plans.make', show: (f) => f.GO_OUT !== false },
   { href: '/camera', icon: 'image', label: 'm.create.mode.post' },
   { href: '/camera?mode=reel', icon: 'video', label: 'm.create.mode.reel' },
   { href: '/camera?mode=story', icon: 'sparkle', label: 'm.create.mode.story' },

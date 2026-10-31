@@ -1318,4 +1318,26 @@ export const de: Record<string, string> = {
   'Choose who it’s for.': 'Wähle aus, für wen es ist.',
   'Add what goes in the stash.': 'Füge hinzu, was ins Versteck kommt.',
   'Choose a thank-you or write one.': 'Wähle ein Dankeschön oder schreib eins.',
+  // apps/api/src/lib/plans.ts, apps/api/src/modules/plans.ts (Go out together)
+  'This plan was cancelled.': 'Dieser Plan wurde abgesagt.',
+  'Choose a time from now to 90 days ahead.': 'Wähle eine Zeit zwischen jetzt und in 90 Tagen.',
+  'You can invite your friends to a plan.': 'Du kannst nur deine Freunde zu einem Plan einladen.',
+  'A plan can have up to 30 people.': 'Bei einem Plan können bis zu 30 Leute dabei sein.',
+  'You’ve made a lot of plans today. Try again tomorrow.': 'Du hast heute schon viele Pläne gemacht. Versuch es morgen noch einmal.',
+  'You made this plan. Cancel it instead.': 'Du hast diesen Plan gemacht. Sag ihn stattdessen ab.',
+  'You can’t join this plan now.': 'Du kannst diesem Plan gerade nicht beitreten.',
+  'Answer the plan first.': 'Antworte zuerst auf den Plan.',
+  'A plan can have up to 100 expenses.': 'Ein Plan kann bis zu 100 Ausgaben haben.',
+  'Only the person who paid back, or the person paid, can mark it.':
+    'Nur die Person, die zurückgezahlt hat, oder die Person, die das Geld bekommen hat, kann das markieren.',
+  'That’s more than is owed. Check the amounts again.': 'Das ist mehr als geschuldet. Prüf die Beträge noch einmal.',
+  'Choose a time in the next 18 hours.': 'Wähle eine Zeit in den nächsten 18 Stunden.',
+  'Choose people who are in the plan.': 'Wähle Leute, die beim Plan dabei sind.',
+  'Go out together is not enabled.': 'Zusammen ausgehen ist nicht aktiviert.',
+  // apps/api/src/modules/messaging.ts
+  'This chat belongs to a plan. Who’s in it follows the answers to the plan.':
+    'Dieser Chat gehört zu einem Plan. Wer drin ist, richtet sich nach den Antworten auf den Plan.',
+  // packages/shared/src/plan-schemas.ts
+  'Choose a place or write where.': 'Wähle einen Ort oder schreib, wo.',
+  'Choose who to invite.': 'Wähle aus, wen du einladen möchtest.',
 };

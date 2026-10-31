@@ -79,6 +79,7 @@ import voiceModule from './modules/voice.ts';
 import cityMapModule from './modules/city-map.ts';
 import askCityModule from './modules/ask-city.ts';
 import stashModule from './modules/stash.ts';
+import plansModule from './modules/plans.ts';
 import todayModule from './modules/today.ts';
 import radioModule from './modules/radio.ts';
 import tagsModule from './modules/tags.ts';
@@ -126,6 +127,7 @@ import { sweepMarket } from './lib/market.ts';
 import { sweepFairStarts } from './lib/fair-start.ts';
 import { sweepPresence } from './lib/city-map.ts';
 import { sweepStashNearby, sweepStashSamples } from './lib/stash.ts';
+import { sweepFreeNow } from './lib/plans.ts';
 import { sweepToday } from './lib/today.ts';
 import Stripe from 'stripe';
 import { adminEmails, promoteListedAdmins } from './lib/admin-bootstrap.ts';
@@ -525,6 +527,7 @@ export async function buildApp(
     cityMapModule,
     askCityModule,
     stashModule,
+    plansModule,
     todayModule,
     radioModule,
     plusModule,
@@ -626,6 +629,8 @@ export async function buildApp(
         // Stash: positions kept to spot impossible jumps go after an hour; "new stashes near you", at most once a day each (lib/stash.ts).
         await sweepStashSamples(db).catch((e) => app.log.warn({ err: e.message }, 'stash samples sweep'));
         await sweepStashNearby({ db, realtime: ctx.realtime }).catch((e) => app.log.warn({ err: e.message }, 'stash nearby'));
+        // Go out together: "I'm free" past its time goes (lib/plans.ts).
+        await sweepFreeNow(db).catch((e) => app.log.warn({ err: e.message }, 'free now sweep'));
         // Yapilapi Today for people whose morning hour has come (lib/today.ts). Not awaited: each is a model call and a few clips.
         if (!todaySweeping) {
           todaySweeping = true;

@@ -1231,4 +1231,24 @@ export const zh: Record<string, string> = {
   'Choose who it’s for.': '请选择要给谁。',
   'Add what goes in the stash.': '请添加宝藏里要放的东西。',
   'Choose a thank-you or write one.': '请选择一句感谢，或者自己写一句。',
+  // apps/api/src/lib/plans.ts, apps/api/src/modules/plans.ts (Go out together)
+  'This plan was cancelled.': '这个计划已取消。',
+  'Choose a time from now to 90 days ahead.': '请选择从现在起 90 天内的时间。',
+  'You can invite your friends to a plan.': '计划只能邀请你的好友。',
+  'A plan can have up to 30 people.': '一个计划最多 30 人。',
+  'You’ve made a lot of plans today. Try again tomorrow.': '你今天已经创建了很多计划。请明天再试。',
+  'You made this plan. Cancel it instead.': '这个计划是你发起的，请改为取消它。',
+  'You can’t join this plan now.': '你现在无法加入这个计划。',
+  'Answer the plan first.': '请先回复这个计划。',
+  'A plan can have up to 100 expenses.': '一个计划最多可以有 100 笔支出。',
+  'Only the person who paid back, or the person paid, can mark it.': '只有还钱的人或收钱的人可以标记。',
+  'That’s more than is owed. Check the amounts again.': '这超过了欠款金额。请再核对一下金额。',
+  'Choose a time in the next 18 hours.': '请选择接下来 18 小时内的时间。',
+  'Choose people who are in the plan.': '请选择在这个计划里的人。',
+  'Go out together is not enabled.': '“一起出去”功能未开启。',
+  // apps/api/src/modules/messaging.ts
+  'This chat belongs to a plan. Who’s in it follows the answers to the plan.': '这个聊天属于一个计划。谁在聊天里取决于大家对计划的回复。',
+  // packages/shared/src/plan-schemas.ts
+  'Choose a place or write where.': '请选择一个地点，或者写下在哪里。',
+  'Choose who to invite.': '请选择要邀请谁。',
 };

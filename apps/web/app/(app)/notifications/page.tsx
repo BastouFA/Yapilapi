@@ -21,6 +21,8 @@ import {
   signInNoticeText,
   squadNoticeHref,
   squadNoticeText,
+  planNoticeHref,
+  planNoticeText,
   togetherNoticeText,
   type MessageKey,
   type NotificationItem,
@@ -126,6 +128,9 @@ function hrefFor(n: NotificationItem, meUsername?: string): string | undefined {
   // Squads: the squad's page (its feed, story, chat and weekly memory).
   const squad = squadNoticeHref(n);
   if (squad) return `/squads/${squad}`;
+  // Go out together: the plan.
+  const plan = planNoticeHref(n);
+  if (plan) return `/plans/${plan}`;
   // Stash: the stash someone found or thanked you for; "new stashes near you" opens the Stash page.
   const stash = stashNoticeTarget(n);
   if (stash !== null) return stash ? `/stash/${stash}` : '/stash';
@@ -217,6 +222,9 @@ function batchedText(n: NotificationItem, t: Session['t'], tp: Session['tp']): s
   // "Ada invited you to join Crew", "Ada and 2 others shared in Crew", "Your week in Crew is ready".
   const squad = squadNoticeText(n, t, tp);
   if (squad) return squad;
+  // "Ada invited you: Suya and a film", "Ada is in: …", "Ada cancelled: …".
+  const planned = planNoticeText(n, t, tp);
+  if (planned) return planned;
   // Stash: "Ada and 2 others found your stash", "3 new stashes near you today".
   const stashed = stashNoticeText(n, t, tp);
   if (stashed) return stashed;

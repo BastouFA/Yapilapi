@@ -1278,4 +1278,25 @@ export const bn: Record<string, string> = {
   'Choose who it’s for.': 'এটি কার জন্য, তা বেছে নিন।',
   'Add what goes in the stash.': 'গুপ্তধনে কী থাকবে তা যোগ করুন।',
   'Choose a thank-you or write one.': 'একটি ধন্যবাদ বেছে নিন বা নিজে লিখুন।',
+  // apps/api/src/lib/plans.ts, apps/api/src/modules/plans.ts (Go out together)
+  'This plan was cancelled.': 'এই প্ল্যান বাতিল করা হয়েছে।',
+  'Choose a time from now to 90 days ahead.': 'এখন থেকে আগামী ৯০ দিনের মধ্যে একটি সময় বেছে নিন।',
+  'You can invite your friends to a plan.': 'আপনি একটি প্ল্যানে আপনার বন্ধুদের আমন্ত্রণ জানাতে পারেন।',
+  'A plan can have up to 30 people.': 'একটি প্ল্যানে সর্বোচ্চ ৩০ জন থাকতে পারেন।',
+  'You’ve made a lot of plans today. Try again tomorrow.': 'আজ আপনি অনেক প্ল্যান করেছেন। কাল আবার চেষ্টা করুন।',
+  'You made this plan. Cancel it instead.': 'এই প্ল্যানটি আপনিই করেছেন। তার বদলে এটি বাতিল করুন।',
+  'You can’t join this plan now.': 'আপনি এখন এই প্ল্যানে যোগ দিতে পারবেন না।',
+  'Answer the plan first.': 'আগে প্ল্যানের উত্তর দিন।',
+  'A plan can have up to 100 expenses.': 'একটি প্ল্যানে সর্বোচ্চ ১০০টি খরচ থাকতে পারে।',
+  'Only the person who paid back, or the person paid, can mark it.': 'যিনি টাকা ফেরত দিয়েছেন, অথবা যিনি টাকা পেয়েছেন, শুধু তিনিই এটি চিহ্নিত করতে পারেন।',
+  'That’s more than is owed. Check the amounts again.': 'এটি পাওনার চেয়ে বেশি। পরিমাণগুলো আবার দেখে নিন।',
+  'Choose a time in the next 18 hours.': 'আগামী ১৮ ঘণ্টার মধ্যে একটি সময় বেছে নিন।',
+  'Choose people who are in the plan.': 'যাঁরা প্ল্যানে আছেন, তাঁদের মধ্য থেকে বেছে নিন।',
+  'Go out together is not enabled.': '"একসঙ্গে বেরোনো" চালু নেই।',
+  // apps/api/src/modules/messaging.ts
+  'This chat belongs to a plan. Who’s in it follows the answers to the plan.':
+    'এই চ্যাটটি একটি প্ল্যানের। এতে কারা থাকবেন, তা প্ল্যানের উত্তর অনুযায়ী ঠিক হয়।',
+  // packages/shared/src/plan-schemas.ts
+  'Choose a place or write where.': 'একটি জায়গা বেছে নিন বা কোথায় তা লিখুন।',
+  'Choose who to invite.': 'কাকে আমন্ত্রণ জানাবেন, বেছে নিন।',
 };

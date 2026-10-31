@@ -1286,4 +1286,24 @@ export const ru: Record<string, string> = {
   'Choose who it’s for.': 'Выберите, для кого он.',
   'Add what goes in the stash.': 'Добавьте то, что будет в тайнике.',
   'Choose a thank-you or write one.': 'Выберите благодарность или напишите свою.',
+  // apps/api/src/lib/plans.ts, apps/api/src/modules/plans.ts (Go out together)
+  'This plan was cancelled.': 'Этот план отменён.',
+  'Choose a time from now to 90 days ahead.': 'Выберите время в пределах 90 дней от сегодняшнего.',
+  'You can invite your friends to a plan.': 'В план можно приглашать своих друзей.',
+  'A plan can have up to 30 people.': 'В плане может быть до 30 человек.',
+  'You’ve made a lot of plans today. Try again tomorrow.': 'Сегодня вы создали много планов. Попробуйте завтра.',
+  'You made this plan. Cancel it instead.': 'Это ваш план. Вместо этого его можно отменить.',
+  'You can’t join this plan now.': 'Сейчас к этому плану присоединиться нельзя.',
+  'Answer the plan first.': 'Сначала ответьте на план.',
+  'A plan can have up to 100 expenses.': 'В плане может быть до 100 расходов.',
+  'Only the person who paid back, or the person paid, can mark it.': 'Отметить это может только тот, кто вернул деньги, или тот, кому их вернули.',
+  'That’s more than is owed. Check the amounts again.': 'Это больше суммы долга. Проверьте суммы ещё раз.',
+  'Choose a time in the next 18 hours.': 'Выберите время в ближайшие 18 часов.',
+  'Choose people who are in the plan.': 'Выберите тех, кто участвует в плане.',
+  'Go out together is not enabled.': 'Функция «Выбраться вместе» не включена.',
+  // apps/api/src/modules/messaging.ts
+  'This chat belongs to a plan. Who’s in it follows the answers to the plan.': 'Этот чат относится к плану. Кто в нём состоит, зависит от ответов на план.',
+  // packages/shared/src/plan-schemas.ts
+  'Choose a place or write where.': 'Выберите место или напишите, где.',
+  'Choose who to invite.': 'Выберите, кого пригласить.',
 };

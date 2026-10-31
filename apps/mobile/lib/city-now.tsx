@@ -15,9 +15,10 @@ import {
 import type { LatLng } from '../../../packages/shared/src/location';
 import { LAUNCH_CITIES } from '../../../packages/shared/src/stash';
 import { client, errorMessage } from './api';
-import { CityMapView, LAYER_ICONS, MapItemRow, PinCard, readHere } from './city-map';
+import { CityMapView, LAYER_ICONS, MapItemRow, PinCard, readHere, useItemTitle } from './city-map';
 import { useFlag } from './flags';
 import { useT } from './i18n';
+import { FreeStrip, goWith } from './plans';
 import { useSession } from './session';
 import { radius, space } from './theme';
 import { Button, Icon, Notice, SkeletonList, useColors } from './ui';
@@ -41,7 +42,8 @@ const timeZone = () => {
  * busy places, open questions and Market nearby). Where you are is read only when allowed before
  * or after a tap on "Use my location", and stays on the phone; without it, your profile's city, or
  * a launch city. Only the part of the map on screen goes to the server. A new `refreshKey` (pull
- * to refresh) asks again.
+ * to refresh) asks again. "Who's free" sits under the intro, and places, events and stashes each
+ * have a "Go with friends" button that starts a plan there.
  */
 export function CityNow({ refreshKey = 0 }: { refreshKey?: number }) {
   const c = useColors();
@@ -52,6 +54,8 @@ export function CityNow({ refreshKey = 0 }: { refreshKey?: number }) {
   const live = useFlag('LIVE') === true;
   const ask = useFlag('ASK_CITY') !== false;
   const stash = useFlag('STASH') !== false;
+  const goOut = useFlag('GO_OUT') !== false && !!me;
+  const itemTitle = useItemTitle();
   const [here, setHere] = useState<LatLng | null>(null);
   const [center, setCenter] = useState<LatLng | null>(null);
   const [zoom, setZoom] = useState(MAP_DEFAULT_ZOOM);
@@ -135,6 +139,7 @@ export function CityNow({ refreshKey = 0 }: { refreshKey?: number }) {
         {me && stash ? <Button label={t('stash.hide')} icon="gift-outline" size="sm" onPress={() => router.push('/stash/new')} /> : null}
       </View>
       <Text style={{ color: c.inkMuted, fontSize: 15, lineHeight: 22 }}>{t('near.intro')}</Text>
+      <FreeStrip />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space[2] }}>
         {here ? null : (
           <Button
@@ -201,9 +206,33 @@ export function CityNow({ refreshKey = 0 }: { refreshKey?: number }) {
               {t(MAP_LAYER_KEYS[s.layer])}
             </Text>
           </View>
-          {s.items.map((i) => (
-            <MapItemRow key={i.key} item={i} from={from ?? i.point} />
-          ))}
+          {s.items.map((i) => {
+            // "Go with friends": a plan around a place, an event or a stash (docs/product/go-out-together.md).
+            const target = i.target.kind === 'place' || i.target.kind === 'event' || i.target.kind === 'stash' ? i.target : null;
+            if (!goOut || !target) return <MapItemRow key={i.key} item={i} from={from ?? i.point} />;
+            return (
+              <View key={i.key} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={{ flex: 1 }}>
+                  <MapItemRow item={i} from={from ?? i.point} />
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`${t('plans.goWith')}: ${itemTitle(i)}`}
+                  onPress={() => goWith(target, i.title || null)}
+                  style={({ pressed }) => ({
+                    width: 44,
+                    height: 44,
+                    borderRadius: 22,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: pressed ? c.yapiSoft : 'transparent',
+                  })}
+                >
+                  <Icon name="people-outline" size={22} color={c.yapi} />
+                </Pressable>
+              </View>
+            );
+          })}
         </View>
       ))}
       {stash && me ? (

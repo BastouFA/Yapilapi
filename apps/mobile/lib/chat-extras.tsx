@@ -179,6 +179,25 @@ export function SystemLine({
       </View>
     );
   }
+  // A plan's chat: its maker changed the plan or cancelled it, with a way to the plan.
+  if (s?.type === 'plan')
+    return (
+      <View style={{ alignSelf: 'center', alignItems: 'center', gap: space[1], maxWidth: '90%', paddingVertical: space[1] }}>
+        <View style={{ flexDirection: 'row', gap: space[1], alignItems: 'center' }}>
+          <Icon name="calendar-outline" size={14} color={c.inkMuted} />
+          <Text style={[{ color: c.inkMuted, fontSize: 13, textAlign: 'center', lineHeight: 18 }, userText]}>
+            {t(s.action === 'cancelled' ? 'plans.line.cancelled' : 'plans.line.changed', { name })}
+          </Text>
+        </View>
+        <Button
+          label={t('plans.open')}
+          size="sm"
+          variant="secondary"
+          icon="calendar-outline"
+          onPress={() => router.push({ pathname: '/go/[id]', params: { id: s.planId } })}
+        />
+      </View>
+    );
   if (s?.type === 'watch') {
     // "Ada started watching together" with Join while it runs; "Watched together · 12 minutes" once it ended.
     const text = watchLineText(s, message.sender.id, message.sender.displayName, { t, tp, locale, meId });

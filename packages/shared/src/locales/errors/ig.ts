@@ -1276,4 +1276,24 @@ export const ig: Record<string, string> = {
   'Choose who it’s for.': 'Họrọ onye ọ bụ maka ya.',
   'Add what goes in the stash.': 'Tinye ihe ga-adị n’ime akụ nzuzo ahụ.',
   'Choose a thank-you or write one.': 'Họrọ ekele ma ọ bụ dee otu.',
+  // apps/api/src/lib/plans.ts, apps/api/src/modules/plans.ts (Go out together)
+  'This plan was cancelled.': 'A kagburu atụmatụ a.',
+  'Choose a time from now to 90 days ahead.': 'Họrọ oge site ugbu a ruo ụbọchị 90 n’ihu.',
+  'You can invite your friends to a plan.': 'Ị nwere ike ịkpọ ndị enyi gị òkù n’atụmatụ.',
+  'A plan can have up to 30 people.': 'Atụmatụ nwere ike inwe ruo mmadụ 30.',
+  'You’ve made a lot of plans today. Try again tomorrow.': 'Ị meela ọtụtụ atụmatụ taa. Nwaa ọzọ echi.',
+  'You made this plan. Cancel it instead.': 'Ọ bụ gị mere atụmatụ a. Kagbuo ya kama.',
+  'You can’t join this plan now.': 'Ị nweghị ike isonye n’atụmatụ a ugbu a.',
+  'Answer the plan first.': 'Buru ụzọ zaa atụmatụ ahụ.',
+  'A plan can have up to 100 expenses.': 'Atụmatụ nwere ike inwe ruo mmefu 100.',
+  'Only the person who paid back, or the person paid, can mark it.': 'Naanị onye kwụghachiri, ma ọ bụ onye a kwụrụ, nwere ike ịka ya akara.',
+  'That’s more than is owed. Check the amounts again.': 'Nke ahụ karịrị ihe a ji. Lelee ego ndị ahụ ọzọ.',
+  'Choose a time in the next 18 hours.': 'Họrọ oge n’ime awa 18 na-abịa.',
+  'Choose people who are in the plan.': 'Họrọ ndị nọ n’atụmatụ ahụ.',
+  'Go out together is not enabled.': 'Ịpụ ọnụ agbanyebeghị.',
+  // apps/api/src/modules/messaging.ts
+  'This chat belongs to a plan. Who’s in it follows the answers to the plan.': 'Nkata a bụ nke atụmatụ. Ndị nọ n’ime ya na-eso azịza e nyere atụmatụ ahụ.',
+  // packages/shared/src/plan-schemas.ts
+  'Choose a place or write where.': 'Họrọ ebe ma ọ bụ dee ebe ọ bụ.',
+  'Choose who to invite.': 'Họrọ ndị ị ga-akpọ òkù.',
 };

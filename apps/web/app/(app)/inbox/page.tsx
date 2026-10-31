@@ -11,6 +11,7 @@ import { NextLink } from '@/lib/link';
 import { useChatBase } from '@/lib/chat-base';
 import { PeoplePicker } from '@/components/PeoplePicker';
 import { useRealtime, useSession } from '../../providers';
+import { FreeStrip } from '@/components/Plans';
 
 function conversationTitle(c: Conversation, meId: string, justYou: string): string {
   if (c.title) return c.title;
@@ -69,6 +70,9 @@ export default function Inbox() {
       </div>
 
       <PushPrompt />
+
+      {/* Who's free, and making a plan with them (docs/product/go-out-together.md). */}
+      {base === '/inbox' ? <FreeStrip /> : null}
 
       {requests.length ? (
         <section className="stack-sm">

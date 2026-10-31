@@ -1298,4 +1298,25 @@ export const nl: Record<string, string> = {
   'Choose who it’s for.': 'Kies voor wie het is.',
   'Add what goes in the stash.': 'Voeg toe wat er in de verstopplek zit.',
   'Choose a thank-you or write one.': 'Kies een bedankje of schrijf er zelf een.',
+  // apps/api/src/lib/plans.ts, apps/api/src/modules/plans.ts (Go out together)
+  'This plan was cancelled.': 'Dit plan is afgezegd.',
+  'Choose a time from now to 90 days ahead.': 'Kies een tijd tussen nu en 90 dagen vanaf nu.',
+  'You can invite your friends to a plan.': 'Je kunt alleen je vrienden uitnodigen voor een plan.',
+  'A plan can have up to 30 people.': 'Er kunnen maximaal 30 mensen meedoen aan een plan.',
+  'You’ve made a lot of plans today. Try again tomorrow.': 'Je hebt vandaag veel plannen gemaakt. Probeer het morgen opnieuw.',
+  'You made this plan. Cancel it instead.': 'Jij hebt dit plan gemaakt. Zeg het liever af.',
+  'You can’t join this plan now.': 'Je kunt nu niet meedoen aan dit plan.',
+  'Answer the plan first.': 'Geef eerst antwoord op het plan.',
+  'A plan can have up to 100 expenses.': 'Een plan kan maximaal 100 uitgaven hebben.',
+  'Only the person who paid back, or the person paid, can mark it.': 'Alleen degene die heeft terugbetaald, of degene die het geld kreeg, kan dit markeren.',
+  'That’s more than is owed. Check the amounts again.': 'Dat is meer dan er verschuldigd is. Controleer de bedragen nog eens.',
+  'Choose a time in the next 18 hours.': 'Kies een tijd in de komende 18 uur.',
+  'Choose people who are in the plan.': 'Kies mensen die in het plan zitten.',
+  'Go out together is not enabled.': 'Samen uitgaan is niet ingeschakeld.',
+  // apps/api/src/modules/messaging.ts
+  'This chat belongs to a plan. Who’s in it follows the answers to the plan.':
+    'Deze chat hoort bij een plan. Wie erin zit, hangt af van de antwoorden op het plan.',
+  // packages/shared/src/plan-schemas.ts
+  'Choose a place or write where.': 'Kies een plek of schrijf waar.',
+  'Choose who to invite.': 'Kies wie je wilt uitnodigen.',
 };

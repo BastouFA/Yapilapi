@@ -7,6 +7,7 @@ import { client, errorMessage } from '../../lib/api';
 import { YapEmpty } from '../../lib/empty';
 import { onBackOnline } from '../../lib/network';
 import { useT } from '../../lib/i18n';
+import { FreeStrip } from '../../lib/plans';
 import { conversationTitle } from '../../lib/post';
 import { useRealtime, useSession } from '../../lib/session';
 import { radius, space } from '../../lib/theme';
@@ -143,6 +144,8 @@ export default function Inbox() {
               }
               onPress={() => router.push('/notifications')}
             />
+            {/* Who's free, each a tap from a plan with them (Go out together). */}
+            <FreeStrip />
             {error ? <ErrorState message={error} onRetry={fetchList} /> : null}
             {note ? (
               <Text accessibilityLiveRegion="polite" style={{ color: c.inkMuted, fontSize: 13 }}>

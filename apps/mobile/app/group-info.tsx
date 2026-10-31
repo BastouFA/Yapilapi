@@ -13,7 +13,8 @@ type Suggestion = { user: PublicUser; relation: 'friend' | 'following' | null; c
 
 /**
  * A group's name and the people in it. Admins rename it, remove people and choose admins; anyone
- * in it adds people and can leave. Each change writes a line in the chat.
+ * in it adds people and can leave. Each change writes a line in the chat. A squad's or a plan's
+ * chat follows the squad or the plan instead.
  */
 export default function GroupInfo() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -85,10 +86,14 @@ export default function GroupInfo() {
 
   // A squad's chat follows the squad: who is in it, its name and leaving are managed there.
   const squad = !!conv.squadId;
-  const admin = conv.myRole === 'admin' && !squad;
+  // A plan's chat follows its answers while the plan is on: people join with I'm in or Maybe and leave with Can't.
+  const plan = conv.planOn ? (conv.planId ?? null) : null;
+  // Either way, nobody is added, removed or renamed here, and leaving happens there.
+  const followed = squad || !!plan;
+  const admin = conv.myRole === 'admin' && !followed;
   const admins = new Set(conv.adminIds ?? []);
   const inGroup = new Set(conv.members.map((m) => m.id));
-  const shown = squad ? [] : (items ?? []).filter((s) => !inGroup.has(s.user.id));
+  const shown = followed ? [] : (items ?? []).filter((s) => !inGroup.has(s.user.id));
   const people = [...conv.members].sort((a, b) => (a.id === me?.id ? -1 : b.id === me?.id ? 1 : Number(admins.has(b.id)) - Number(admins.has(a.id))));
 
   const personOptions = (p: PublicUser) =>
@@ -187,8 +192,21 @@ export default function GroupInfo() {
               );
             })}
             {squad ? <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('squads.chatNote')}</Text> : null}
-            {squad ? null : <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('chat.group.adminsNote')}</Text>}
-            {squad ? null : (
+            {plan ? (
+              <>
+                <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('plans.chatNote')}</Text>
+                <Button
+                  label={t('plans.open')}
+                  icon="calendar-outline"
+                  size="sm"
+                  variant="secondary"
+                  onPress={() => router.push({ pathname: '/go/[id]', params: { id: plan } })}
+                  style={{ alignSelf: 'flex-start' }}
+                />
+              </>
+            ) : null}
+            {followed ? null : <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('chat.group.adminsNote')}</Text>}
+            {followed ? null : (
               <Field
                 label={t('chat.group.add')}
                 placeholder={t('m.group.placeholder')}
@@ -199,7 +217,7 @@ export default function GroupInfo() {
                 returnKeyType="search"
               />
             )}
-            {!squad && items !== null && !shown.length && q.trim() ? (
+            {!followed && items !== null && !shown.length && q.trim() ? (
               <Text accessibilityLiveRegion="polite" style={{ color: c.inkMuted }}>
                 {t('m.group.noMatch', { query: q.trim() })}
               </Text>
@@ -237,7 +255,7 @@ export default function GroupInfo() {
           </Pressable>
         )}
         ListFooterComponent={
-          squad ? null : (
+          followed ? null : (
             <View style={{ marginTop: space[4] }}>
               <Button label={t('chat.group.leave')} variant="danger" disabled={busy} onPress={leave} />
             </View>

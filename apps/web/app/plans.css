@@ -1,0 +1,340 @@
+/* ── Go out together: who's free, plans, the plan's chat card and the cost split (components/Plans.tsx) ── */
+
+.free-strip {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.free-strip__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.free-strip__head .section-title {
+  margin: 0;
+}
+.free-strip__mine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--success-soft);
+  color: var(--ink);
+}
+.free-strip__hint,
+.free-strip__empty {
+  margin: 0;
+  font-size: 14px;
+}
+.free-strip__list {
+  display: flex;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 2px 0;
+  list-style: none;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.free-chip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 48px;
+  max-width: 220px;
+  padding: 4px var(--space-3) 4px 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--ink);
+  text-decoration: none;
+}
+.free-chip:hover {
+  background: var(--surface-sunken);
+}
+.free-chip:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.free-chip__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.free-chip__name,
+.free-chip__meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.free-chip__name {
+  font-weight: 700;
+  font-size: 14px;
+}
+.free-chip__meta {
+  color: var(--ink-muted);
+  font-size: 13px;
+}
+
+.plan-list,
+.plan-people,
+.plan-costs__list,
+.plan-costs__debts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.plan-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 64px;
+  padding: 6px var(--space-2);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  text-decoration: none;
+}
+.plan-row:hover {
+  background: var(--surface-sunken);
+}
+.plan-row:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.plan-row__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: var(--yapi-soft);
+  color: var(--yapi-strong);
+}
+.plan-row__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.plan-row__title {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.plan-row__meta {
+  color: var(--ink-muted);
+  font-size: 14px;
+}
+
+.plan-page__title {
+  margin: 0;
+  font-size: 22px;
+  line-height: 28px;
+  overflow-wrap: anywhere;
+}
+.plan-page__facts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.plan-page__cancelled {
+  align-self: flex-start;
+  margin: 0;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--danger-soft);
+  color: var(--ink);
+  font-weight: 700;
+}
+.plan-page__note {
+  margin: var(--space-1) 0 0;
+  white-space: pre-wrap;
+}
+.plan-page__hint {
+  margin: 0;
+  font-size: 14px;
+}
+.plan-place {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.plan-answers {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+}
+.plan-answer {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 48px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.plan-answer:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.plan-answer[aria-pressed='true'] {
+  border-color: var(--yapi);
+  background: var(--yapi);
+  color: var(--on-yapi);
+}
+.plan-answer:disabled {
+  cursor: progress;
+}
+
+.plan-person {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+}
+.plan-person__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.plan-person__answer {
+  flex: none;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  color: var(--ink);
+  font-size: 13px;
+}
+.plan-person__answer--in {
+  background: var(--success-soft);
+}
+.plan-person__answer--maybe {
+  background: var(--saffron-soft);
+}
+
+.plan-costs__note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  color: var(--ink);
+  font-size: 14px;
+}
+.plan-costs__note svg {
+  flex: none;
+  margin-top: 2px;
+}
+.plan-costs__debt,
+.plan-costs__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 44px;
+}
+.plan-costs__debt {
+  font-weight: 700;
+}
+.plan-costs__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.plan-costs__title {
+  font-weight: 700;
+}
+.plan-costs__amount {
+  display: grid;
+  grid-template-columns: 1fr 7rem;
+  gap: var(--space-2);
+}
+.plan-costs__form {
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.plan-chat-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 48px;
+  margin: 0 0 var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--yapi-soft);
+  color: var(--ink);
+  text-decoration: none;
+}
+.plan-chat-card:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.plan-chat-card__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+.plan-chat-card__title {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.plan-chat-card__meta {
+  color: var(--ink-muted);
+  font-size: 13px;
+}
+
+/* "Go with friends" next to a place, event or stash in Wander's what's on now. */
+.city-now__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.city-now__item > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+.city-now__plan {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-full);
+  color: var(--yapi-strong);
+}
+.city-now__plan:hover {
+  background: var(--surface-sunken);
+}
+.city-now__plan:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
