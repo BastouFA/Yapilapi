@@ -1335,6 +1335,8 @@ export const ig: Catalog = {
   'm.chat.systemOn': '{name} gbanyere ozi na-apụ n’anya. Ozi ọhụrụ ga-apụ n’anya {time} mgbe e zigachara ha.',
   'm.chat.systemOff': '{name} gbanyụrụ ozi na-apụ n’anya.',
   'm.chat.cancel': 'Kagbuo',
+  'verifyBanner.title': 'Kwado email gị',
+  'verifyBanner.body': 'Anyị zigara njikọ na {email}. Pịa ya iji biputa ma zigara onye ọ bụla ozi. Ịhụghị ya? Lelee na folda spam.',
   'm.verify.title': 'Email na ekwentị',
   'm.verify.required': 'Kwado adreesị email gị ma ọ bụ nọmba ekwentị ka ị bipụta n’ihu ọha, zie ndị unu na ha abụbeghị ndị enyi ozi, ma gaa Live.',
   'm.verify.optional': 'Ịkwado email gị ma ọ bụ nọmba ekwentị na-enyere aka ichekwa akaụntụ gị na YAPILAPI.',

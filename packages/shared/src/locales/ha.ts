@@ -1337,6 +1337,8 @@ export const ha: Catalog = {
   'm.chat.systemOn': '{name} ya kunna saƙonnin da ke ɓacewa. Sababbin saƙonni za su ɓace {time} bayan an aika su.',
   'm.chat.systemOff': '{name} ya kashe saƙonnin da ke ɓacewa.',
   'm.chat.cancel': 'Soke',
+  'verifyBanner.title': 'Tabbatar da imel ɗinka',
+  'verifyBanner.body': 'Mun aika hanyar haɗi zuwa {email}. Taɓa ta don yin rubutu da aika saƙo ga kowa. Ba ka gani ba? Duba babban fayil ɗin spam.',
   'm.verify.title': 'Imel da waya',
   'm.verify.required': 'Tabbatar da imel ɗinka ko lambar waya don yin wallafa ga kowa, aika saƙo ga mutanen da ba abokanka ba tukuna, da yin kai tsaye.',
   'm.verify.optional': 'Tabbatar da imel ɗinka ko lambar waya yana taimakawa wajen kare asusunka da YAPILAPI.',

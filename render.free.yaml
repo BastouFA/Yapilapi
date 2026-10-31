@@ -35,12 +35,13 @@ services:
     runtime: docker
     dockerfilePath: infrastructure/docker/api.Dockerfile
     dockerContext: .
-    plan: free
+    # Starter ($7/month, 0.5 CPU) since 2026-10-31: it never sleeps, so the first visit isn't a minute's wait.
+    plan: starter
     region: frankfurt
     branch: main
-    # Free services have no pre-deploy step: the API applies migrations when it starts (MIGRATE_ON_START in the image).
-    # Answers 200 only once the database answers, so a new version gets traffic only when it can serve it.
-    healthCheckPath: /health/ready
+    # The API applies migrations when it starts (MIGRATE_ON_START in the image).
+    # The live check doesn't touch the database, so Render's frequent checks don't keep Neon's free database awake.
+    healthCheckPath: /health/live
     envVars:
       - key: NODE_ENV
         value: production

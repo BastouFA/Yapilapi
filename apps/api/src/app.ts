@@ -173,8 +173,11 @@ export async function buildApp(
     bodyLimit: 1_000_000,
   });
   if (opts.onRoute) app.addHook('onRoute', opts.onRoute);
+  // When the app was last used (health checks and metrics don't count): see `quietRounds` below.
+  let lastActivity = Date.now();
   // The country a trusted CDN reports for this request; regional rules use it, including for people who aren't signed in.
   app.addHook('onRequest', (req, _reply, done) => {
+    if (!req.url.startsWith('/health') && !req.url.startsWith('/metrics')) lastActivity = Date.now();
     const header = config.TRUSTED_COUNTRY_HEADER;
     runInRequest(header ? String(req.headers[header.toLowerCase()] ?? '').toUpperCase() : null, done);
   });
@@ -546,11 +549,28 @@ export async function buildApp(
   const mailer = securityMailer(ctx, app.log);
   setSecurityMailer(mailer);
 
+  // Nobody has used the app for 5 minutes: the background workers run every 15 minutes instead of every
+  // few seconds, so a database that sleeps when idle (Neon's free plan) can sleep. Anything due then
+  // (a message sent later, a reminder) runs at the next round or as soon as someone opens the app.
+  // Each worker gets its own: true means skip this round.
+  const quietRounds = () => {
+    let last = 0;
+    return () => {
+      if (config.APP_ENV === 'test' || Date.now() - lastActivity < 5 * 60_000) return false;
+      if (Date.now() - last < 15 * 60_000) return true;
+      last = Date.now();
+      return false;
+    };
+  };
   // Webhook delivery worker. Tests drive processWebhooks directly instead.
   let webhookTimer: NodeJS.Timeout | undefined;
   if (opts.webhookWorker ?? config.JOB_WORKER) {
     const allowLocal = config.APP_ENV === 'development';
-    webhookTimer = setInterval(() => void processWebhooks(db, { allowLocal }).catch((e) => app.log.warn({ err: e.message }, 'webhook worker')), 5_000);
+    const skip = quietRounds();
+    webhookTimer = setInterval(() => {
+      if (skip()) return;
+      void processWebhooks(db, { allowLocal }).catch((e) => app.log.warn({ err: e.message }, 'webhook worker'));
+    }, 5_000);
     webhookTimer.unref();
   }
   // Background jobs (media processing). Tests drive processJobs directly.
@@ -584,8 +604,9 @@ export async function buildApp(
   };
   if (opts.webhookWorker ?? config.JOB_WORKER) {
     let busy = false;
+    const skip = quietRounds();
     jobTimer = setInterval(async () => {
-      if (busy) return;
+      if (busy || skip()) return;
       busy = true;
       await processJobs(db, jobHandlers).catch((e) => app.log.warn({ err: e.message }, 'job worker'));
       // Campaigns and boosts past their end date stop, and their unspent budget is refunded.

@@ -1334,6 +1334,8 @@ export const ko: Catalog = {
   'm.chat.systemOn': '{name}님이 사라지는 메시지를 켰어요. 새 메시지는 보낸 지 {time} 후에 사라져요.',
   'm.chat.systemOff': '{name}님이 사라지는 메시지를 껐어요.',
   'm.chat.cancel': '취소',
+  'verifyBanner.title': '이메일을 확인해 주세요',
+  'verifyBanner.body': '{email}(으)로 링크를 보냈어요. 링크를 누르면 게시하고 누구에게나 메시지를 보낼 수 있어요. 안 보이면 스팸함을 확인해 주세요.',
   'm.verify.title': '이메일 및 전화번호',
   'm.verify.required': '공개 게시, 아직 친구가 아닌 사람에게 메시지 보내기, 라이브 방송을 하려면 이메일 주소나 전화번호를 인증하세요.',
   'm.verify.optional': '이메일이나 전화번호를 인증하면 내 계정과 YAPILAPI를 안전하게 지키는 데 도움이 돼요.',

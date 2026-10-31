@@ -1339,6 +1339,8 @@ export const id: Catalog = {
   'm.chat.systemOn': '{name} mengaktifkan pesan sementara. Pesan baru akan hilang {time} setelah dikirim.',
   'm.chat.systemOff': '{name} menonaktifkan pesan sementara.',
   'm.chat.cancel': 'Batal',
+  'verifyBanner.title': 'Konfirmasi email kamu',
+  'verifyBanner.body': 'Kami mengirim tautan ke {email}. Ketuk untuk memposting dan mengirim pesan ke semua orang. Tidak ada? Periksa folder spam.',
   'm.verify.title': 'Email dan telepon',
   'm.verify.required':
     'Konfirmasi alamat email atau nomor telepon Anda untuk memposting secara publik, mengirim pesan ke orang yang belum menjadi teman Anda, dan siaran langsung.',

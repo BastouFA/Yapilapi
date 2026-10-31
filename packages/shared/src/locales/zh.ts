@@ -1329,6 +1329,8 @@ export const zh: Catalog = {
   'm.chat.systemOn': '{name} 开启了阅后即焚消息。新消息会在发送 {time}后消失。',
   'm.chat.systemOff': '{name} 关闭了阅后即焚消息。',
   'm.chat.cancel': '取消',
+  'verifyBanner.title': '请确认你的邮箱',
+  'verifyBanner.body': '我们已向 {email} 发送了一个链接。点击它即可发帖并给所有人发消息。没收到？请查看垃圾邮件文件夹。',
   'm.verify.title': '邮箱和手机',
   'm.verify.required': '验证你的电子邮箱地址或电话号码后，才能公开发帖、给还不是好友的人发消息以及直播。',
   'm.verify.optional': '验证你的电子邮箱或电话号码，有助于保护你的账号和 YAPILAPI 的安全。',

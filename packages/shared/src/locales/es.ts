@@ -1338,6 +1338,8 @@ export const es: Catalog = {
   'm.chat.systemOn': '{name} activó los mensajes temporales. Los mensajes nuevos desaparecerán {time} después de enviarse.',
   'm.chat.systemOff': '{name} desactivó los mensajes temporales.',
   'm.chat.cancel': 'Cancelar',
+  'verifyBanner.title': 'Confirma tu correo',
+  'verifyBanner.body': 'Te enviamos un enlace a {email}. Tócalo para publicar y escribir a todo el mundo. ¿No lo ves? Mira en la carpeta de spam.',
   'm.verify.title': 'Correo y teléfono',
   'm.verify.required': 'Confirma tu correo o un número de teléfono para publicar para todos, escribir a personas que aún no son tus amigos y hacer directos.',
   'm.verify.optional': 'Confirmar tu correo o un número de teléfono ayuda a proteger tu cuenta y YAPILAPI.',

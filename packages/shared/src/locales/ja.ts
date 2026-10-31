@@ -1334,6 +1334,9 @@ export const ja: Catalog = {
   'm.chat.systemOn': '{name}さんが消えるメッセージをオンにしました。新しいメッセージは送信から{time}後に消えます。',
   'm.chat.systemOff': '{name}さんが消えるメッセージをオフにしました。',
   'm.chat.cancel': 'キャンセル',
+  'verifyBanner.title': 'メールアドレスを確認してください',
+  'verifyBanner.body':
+    '{email} にリンクを送りました。タップすると、投稿やだれとでもメッセージができるようになります。見つからない場合は迷惑メールフォルダを確認してください。',
   'm.verify.title': 'メールアドレスと電話番号',
   'm.verify.required': '全員に公開する投稿、まだ友達ではない人へのメッセージ、ライブ配信には、メールアドレスか電話番号の確認が必要です。',
   'm.verify.optional': 'メールアドレスか電話番号を確認すると、あなたのアカウントとYAPILAPIの安全を守ることにつながります。',

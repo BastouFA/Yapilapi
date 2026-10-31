@@ -1343,6 +1343,8 @@ export const fr: Catalog = {
   'm.chat.systemOn': '{name} a activé les messages éphémères. Les nouveaux messages disparaîtront {time} après leur envoi.',
   'm.chat.systemOff': '{name} a désactivé les messages éphémères.',
   'm.chat.cancel': 'Annuler',
+  'verifyBanner.title': 'Confirme ton email',
+  'verifyBanner.body': 'On t’a envoyé un lien à {email}. Touche-le pour publier et écrire à tout le monde. Pas reçu ? Regarde dans tes spams.',
   'm.verify.title': 'E-mail et téléphone',
   'm.verify.required':
     'Confirme ton adresse e-mail ou un numéro de téléphone pour publier pour tout le monde, écrire à des personnes qui ne sont pas encore tes amis et passer en direct.',

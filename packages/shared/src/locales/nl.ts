@@ -1340,6 +1340,8 @@ export const nl: Catalog = {
   'm.chat.systemOn': '{name} heeft verdwijnende berichten aangezet. Nieuwe berichten verdwijnen {time} nadat ze zijn verstuurd.',
   'm.chat.systemOff': '{name} heeft verdwijnende berichten uitgezet.',
   'm.chat.cancel': 'Annuleren',
+  'verifyBanner.title': 'Bevestig je e-mail',
+  'verifyBanner.body': 'We hebben een link gestuurd naar {email}. Tik erop om te posten en iedereen te berichten. Niet gezien? Kijk in je spammap.',
   'm.verify.title': 'E-mail en telefoon',
   'm.verify.required':
     'Bevestig je e-mailadres of een telefoonnummer om openbaar te plaatsen, berichten te sturen aan mensen met wie je nog geen vrienden bent en live te gaan.',

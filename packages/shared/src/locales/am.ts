@@ -1329,6 +1329,8 @@ export const am: Catalog = {
   'm.chat.systemOn': '{name} የሚጠፉ መልዕክቶችን አብርቷል። አዳዲስ መልዕክቶች ከተላኩ ከ{time} በኋላ ይጠፋሉ።',
   'm.chat.systemOff': '{name} የሚጠፉ መልዕክቶችን አጥፍቷል።',
   'm.chat.cancel': 'ይቅር',
+  'verifyBanner.title': 'ኢሜይልዎን ያረጋግጡ',
+  'verifyBanner.body': 'ወደ {email} ሊንክ ልከናል። ለመለጠፍ እና ለሁሉም መልዕክት ለመላክ ይጫኑት። አላገኙትም? የአይፈለጌ መልዕክት አቃፊን ይመልከቱ።',
   'm.verify.title': 'ኢሜይል እና ስልክ',
   'm.verify.required': 'በይፋ ለመለጠፍ፣ ገና ጓደኛ ላልሆኗቸው ሰዎች መልዕክት ለመላክ እና በቀጥታ ለመውጣት የኢሜይል አድራሻዎን ወይም ስልክ ቁጥርዎን ያረጋግጡ።',
   'm.verify.optional': 'ኢሜይልዎን ወይም ስልክ ቁጥርዎን ማረጋገጥ መለያዎን እና YAPILAPIን ደህንነቱ የተጠበቀ ለማድረግ ይረዳል።',

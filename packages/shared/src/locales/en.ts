@@ -1338,6 +1338,8 @@ export const en = {
   'm.chat.systemOn': '{name} turned on disappearing messages. New messages will disappear {time} after they’re sent.',
   'm.chat.systemOff': '{name} turned off disappearing messages.',
   'm.chat.cancel': 'Cancel',
+  'verifyBanner.title': 'Confirm your email',
+  'verifyBanner.body': 'We sent a link to {email}. Tap it to post and message everyone. Not there? Look in your spam folder.',
   'm.verify.title': 'Email and phone',
   'm.verify.required': 'Confirm your email address or a phone number to post publicly, message people you aren’t friends with yet, and go live.',
   'm.verify.optional': 'Confirming your email or a phone number helps keep your account and YAPILAPI safe.',

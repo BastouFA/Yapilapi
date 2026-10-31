@@ -1343,6 +1343,8 @@ export const zu: Catalog = {
   'm.chat.systemOn': 'U-{name} uvule imilayezo enyamalalayo. Imilayezo emisha izonyamalala ngemuva kuka-{time} ithunyelwe.',
   'm.chat.systemOff': 'U-{name} uvale imilayezo enyamalalayo.',
   'm.chat.cancel': 'Khansela',
+  'verifyBanner.title': 'Qinisekisa i-imeyili yakho',
+  'verifyBanner.body': 'Sithumele isixhumanisi ku-{email}. Sithinte ukuze uthumele okuthunyelwe futhi ubhalele wonke umuntu. Awusiboni? Bheka kufolda ye-spam.',
   'm.verify.title': 'I-imeyili nefoni',
   'm.verify.required':
     'Qinisekisa ikheli lakho le-imeyili noma inombolo yefoni ukuze uthumele emphakathini, uthumele imilayezo kubantu ongakabi ngabangani babo, futhi usakaze bukhoma.',

@@ -1336,6 +1336,8 @@ export const sw: Catalog = {
   'm.chat.systemOn': '{name} amewasha ujumbe unaopotea. Ujumbe mpya utapotea {time} baada ya kutumwa.',
   'm.chat.systemOff': '{name} amezima ujumbe unaopotea.',
   'm.chat.cancel': 'Ghairi',
+  'verifyBanner.title': 'Thibitisha barua pepe yako',
+  'verifyBanner.body': 'Tumetuma kiungo kwa {email}. Kibonyeze ili uchapishe na kumtumia kila mtu ujumbe. Hukioni? Angalia kwenye folda ya taka.',
   'm.verify.title': 'Barua pepe na simu',
   'm.verify.required':
     'Thibitisha barua pepe yako au nambari ya simu ili uchapishe kwa kila mtu, utumie ujumbe watu ambao bado si marafiki zako, na urushe moja kwa moja.',

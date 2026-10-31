@@ -1336,6 +1336,8 @@ export const yo: Catalog = {
   'm.chat.systemOn': '{name} tan àwọn ọ̀rọ̀ tó ń pòórá. Àwọn ọ̀rọ̀ tuntun yóò pòórá ní {time} lẹ́yìn tí a fi wọ́n ránṣẹ́.',
   'm.chat.systemOff': '{name} pa àwọn ọ̀rọ̀ tó ń pòórá.',
   'm.chat.cancel': 'Fagilé',
+  'verifyBanner.title': 'Jẹ́rìí sí ímeèlì rẹ',
+  'verifyBanner.body': 'A ti fi ìjápọ̀ ránṣẹ́ sí {email}. Tẹ̀ ẹ́ láti fi ránṣẹ́ àti láti kọ̀wé sí gbogbo ènìyàn. Kò sí níbẹ̀? Wo inú fódà spam.',
   'm.verify.title': 'Ímeèlì àti fóònù',
   'm.verify.required': 'Jẹ́rìí ímeèlì rẹ tàbí nọ́mbà fóònù kan láti fi ránṣẹ́ sí gbogbo ènìyàn, kọ̀wé sí àwọn tí kì í ṣe ọ̀rẹ́ rẹ síbẹ̀, àti láti ṣe àfihàn lááàyè.',
   'm.verify.optional': 'Jíjẹ́rìí ímeèlì rẹ tàbí nọ́mbà fóònù ń ṣèrànwọ́ láti dáàbò bo àkáǹtì rẹ àti YAPILAPI.',

@@ -1338,6 +1338,8 @@ export const tr: Catalog = {
   'm.chat.systemOn': '{name} süreli mesajları açtı. Yeni mesajlar gönderildikten {time} sonra kaybolacak.',
   'm.chat.systemOff': '{name} süreli mesajları kapattı.',
   'm.chat.cancel': 'İptal',
+  'verifyBanner.title': 'E-postanı onayla',
+  'verifyBanner.body': '{email} adresine bir bağlantı gönderdik. Paylaşım yapmak ve herkese mesaj atmak için ona dokun. Göremiyor musun? Spam klasörüne bak.',
   'm.verify.title': 'E-posta ve telefon',
   'm.verify.required':
     'Herkese açık paylaşım yapmak, henüz arkadaş olmadığın kişilere mesaj göndermek ve canlı yayın yapmak için e-posta adresini ya da bir telefon numarasını doğrula.',

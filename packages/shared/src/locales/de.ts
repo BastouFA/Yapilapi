@@ -1340,6 +1340,8 @@ export const de: Catalog = {
   'm.chat.systemOn': '{name} hat selbstlöschende Nachrichten eingeschaltet. Neue Nachrichten verschwinden {time} nach dem Senden.',
   'm.chat.systemOff': '{name} hat selbstlöschende Nachrichten ausgeschaltet.',
   'm.chat.cancel': 'Abbrechen',
+  'verifyBanner.title': 'Bestätige deine E-Mail',
+  'verifyBanner.body': 'Wir haben einen Link an {email} geschickt. Tippe darauf, um zu posten und allen zu schreiben. Nicht da? Schau im Spam-Ordner nach.',
   'm.verify.title': 'E-Mail und Telefon',
   'm.verify.required':
     'Bestätige deine E-Mail-Adresse oder eine Telefonnummer, um öffentlich zu posten, Leuten zu schreiben, mit denen du noch nicht befreundet bist, und live zu gehen.',

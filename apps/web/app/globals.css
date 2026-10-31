@@ -3972,6 +3972,9 @@ video.chat-att__media {
   font-size: 14px;
   line-height: 21px;
 }
+.confirm-email .row {
+  margin-top: var(--space-2);
+}
 .announcement > svg {
   width: 20px;
   height: 20px;

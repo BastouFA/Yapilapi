@@ -7,6 +7,7 @@ import { NextLink } from '@/lib/link';
 import { RailAccountButton } from '@/components/AccountMenu';
 import { AnnouncementBanner } from '@/components/AnnouncementBanner';
 import { BirthDateGate } from '@/components/BirthDateGate';
+import { ConfirmEmailBanner } from '@/components/ConfirmEmailBanner';
 import { CallsProvider } from '@/components/Calls';
 import { CheckoutProvider } from '@/components/Checkout';
 import { CreateMenu } from '@/components/CreateMenu';
@@ -136,6 +137,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <main className="yp-shell__main" id="main">
                 {/* A note from the team to everyone, until it ends or you close it. */}
                 <AnnouncementBanner />
+                {/* Until the email is confirmed: check your inbox (and spam), or send the link again. */}
+                <ConfirmEmailBanner />
                 <PageBack />
                 {children}
               </main>

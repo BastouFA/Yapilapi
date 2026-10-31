@@ -1335,6 +1335,8 @@ export const vi: Catalog = {
   'm.chat.systemOn': '{name} đã bật tin nhắn tự hủy. Tin nhắn mới sẽ biến mất {time} sau khi gửi.',
   'm.chat.systemOff': '{name} đã tắt tin nhắn tự hủy.',
   'm.chat.cancel': 'Hủy',
+  'verifyBanner.title': 'Xác nhận email của bạn',
+  'verifyBanner.body': 'Chúng tôi đã gửi một liên kết đến {email}. Nhấn vào đó để đăng bài và nhắn tin cho mọi người. Không thấy? Hãy xem thư mục spam.',
   'm.verify.title': 'Email và điện thoại',
   'm.verify.required': 'Xác nhận địa chỉ email hoặc số điện thoại để đăng bài công khai, nhắn tin cho những người chưa là bạn bè, và phát trực tiếp.',
   'm.verify.optional': 'Xác nhận email hoặc số điện thoại giúp giữ an toàn cho tài khoản của bạn và cho YAPILAPI.',

@@ -1337,6 +1337,8 @@ export const it: Catalog = {
   'm.chat.systemOn': '{name} ha attivato i messaggi effimeri. I nuovi messaggi spariranno {time} dopo l’invio.',
   'm.chat.systemOff': '{name} ha disattivato i messaggi effimeri.',
   'm.chat.cancel': 'Annulla',
+  'verifyBanner.title': 'Conferma la tua email',
+  'verifyBanner.body': 'Ti abbiamo inviato un link a {email}. Toccalo per pubblicare e scrivere a tutti. Non c’è? Guarda nella cartella spam.',
   'm.verify.title': 'Email e telefono',
   'm.verify.required':
     'Conferma il tuo indirizzo email o un numero di telefono per pubblicare in modo pubblico, scrivere a persone che non sono ancora tuoi amici e andare in diretta.',
