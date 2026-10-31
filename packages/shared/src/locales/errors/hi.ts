@@ -628,6 +628,8 @@ export const hi: Record<string, string> = {
     'हमारी टीम कुछ हाल की गतिविधि की समीक्षा कर रही है, तब तक आपका अकाउंट सीमित है, इसलिए फ़िलहाल आप सिर्फ़ दोस्तों को मैसेज कर सकते हैं। इसमें आम तौर पर एक-दो दिन लगते हैं।',
   "That offer doesn't exist or isn't visible to you.": 'वह ऑफ़र मौजूद नहीं है या आपको नहीं दिखता।',
   "You can't answer this offer.": 'आप इस ऑफ़र का जवाब नहीं दे सकते।',
+  'That recording was empty. Check that your microphone works and try again.':
+    'यह रिकॉर्डिंग खाली थी। देखें कि आपका माइक्रोफ़ोन काम कर रहा है और फिर से कोशिश करें।',
   'Files can be up to 50 MB.': 'फ़ाइलें 50 MB तक की हो सकती हैं।',
   "That file type isn't supported. Photos: JPEG, PNG, HEIC, HEIF, WebP, AVIF, GIF, TIFF, BMP. Videos: MP4, MOV, WebM, MKV, AVI, 3GP, MPEG. Audio: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, AMR.":
     'यह फ़ाइल प्रकार सपोर्ट नहीं है। फ़ोटो: JPEG, PNG, HEIC, HEIF, WebP, AVIF, GIF, TIFF, BMP। वीडियो: MP4, MOV, WebM, MKV, AVI, 3GP, MPEG। ऑडियो: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, AMR।',

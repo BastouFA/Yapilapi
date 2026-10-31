@@ -606,6 +606,7 @@ export const ko: Record<string, string> = {
     '팀에서 최근 활동을 검토하는 동안 계정이 제한되어 지금은 친구에게만 메시지를 보낼 수 있어요. 보통 하루나 이틀 걸려요.',
   "That offer doesn't exist or isn't visible to you.": '그 제안이 존재하지 않거나 볼 수 없어요.',
   "You can't answer this offer.": '이 제안에는 응답할 수 없어요.',
+  'That recording was empty. Check that your microphone works and try again.': '녹음된 내용이 없어요. 마이크가 작동하는지 확인하고 다시 시도해 주세요.',
   'Files can be up to 50 MB.': '파일은 최대 50MB까지 가능해요.',
   "That file type isn't supported. Photos: JPEG, PNG, HEIC, HEIF, WebP, AVIF, GIF, TIFF, BMP. Videos: MP4, MOV, WebM, MKV, AVI, 3GP, MPEG. Audio: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, AMR.":
     '지원하지 않는 파일 형식이에요. 사진: JPEG, PNG, HEIC, HEIF, WebP, AVIF, GIF, TIFF, BMP. 동영상: MP4, MOV, WebM, MKV, AVI, 3GP, MPEG. 오디오: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, AMR.',

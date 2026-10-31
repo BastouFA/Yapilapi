@@ -622,6 +622,7 @@ export const vi: Record<string, string> = {
     'Tài khoản của bạn đang bị giới hạn trong khi đội ngũ của chúng tôi xem xét một số hoạt động gần đây, nên tạm thời bạn chỉ nhắn tin được cho bạn bè. Việc này thường mất một đến hai ngày.',
   "That offer doesn't exist or isn't visible to you.": 'Lời trả giá đó không tồn tại hoặc bạn không xem được.',
   "You can't answer this offer.": 'Bạn không thể trả lời lời trả giá này.',
+  'That recording was empty. Check that your microphone works and try again.': 'Bản ghi âm này trống. Hãy kiểm tra micrô rồi thử lại.',
   'Files can be up to 50 MB.': 'Tệp có thể tối đa 50 MB.',
   "That file type isn't supported. Photos: JPEG, PNG, HEIC, HEIF, WebP, AVIF, GIF, TIFF, BMP. Videos: MP4, MOV, WebM, MKV, AVI, 3GP, MPEG. Audio: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, AMR.":
     'Loại tệp đó không được hỗ trợ. Ảnh: JPEG, PNG, HEIC, HEIF, WebP, AVIF, GIF, TIFF, BMP. Video: MP4, MOV, WebM, MKV, AVI, 3GP, MPEG. Âm thanh: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, AMR.',

@@ -684,6 +684,8 @@ export const pt: Record<string, string> = {
   "That offer doesn't exist or isn't visible to you.": 'Essa oferta não existe ou não está visível para você.',
   "You can't answer this offer.": 'Você não pode responder a esta oferta.',
   // apps/api/src/modules/media.ts
+  'That recording was empty. Check that your microphone works and try again.':
+    'Essa gravação estava vazia. Verifique se o seu microfone funciona e tente novamente.',
   'Files can be up to 50 MB.': 'Os arquivos podem ter até 50 MB.',
   "That file type isn't supported. Photos: JPEG, PNG, HEIC, HEIF, WebP, AVIF, GIF, TIFF, BMP. Videos: MP4, MOV, WebM, MKV, AVI, 3GP, MPEG. Audio: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, AMR.":
     'Esse tipo de arquivo não é compatível. Fotos: JPEG, PNG, HEIC, HEIF, WebP, AVIF, GIF, TIFF, BMP. Vídeos: MP4, MOV, WebM, MKV, AVI, 3GP, MPEG. Áudio: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, AMR.',

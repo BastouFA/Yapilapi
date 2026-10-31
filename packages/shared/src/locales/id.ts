@@ -1995,6 +1995,10 @@ export const id: Catalog = {
   'chat.viewOnce.webNote':
     'Setelah Anda menutupnya, isinya hilang. Browser tidak bisa memblokir tangkapan layar, jadi pengirim tidak diberi tahu tentangnya di web.',
   'chat.noRecording': 'Browser ini tidak bisa merekam audio.',
+  'chat.sharedReel': 'Reel yang dibagikan',
+  'chat.watchReel': 'Tonton di Reels',
+  'chat.openPost': 'Buka postingan',
+  'chat.voiceNotPlaying': 'Pesan suara ini tidak terputar. Periksa koneksimu lalu coba lagi.',
   'chat.micOffVoice': 'Akses mikrofon nonaktif. Izinkan di browser Anda untuk mengirim pesan suara.',
   'chat.recordingVoice': 'Merekam pesan suara',
   'chat.friendRequests': 'Permintaan pertemanan',

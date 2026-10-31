@@ -2000,6 +2000,10 @@ export const fr: Catalog = {
   'chat.viewOnce.webNote':
     'Quand tu la fermes, elle disparaît. Les navigateurs ne peuvent pas bloquer les captures d’écran, donc sur le web l’expéditeur n’en est pas prévenu.',
   'chat.noRecording': 'Ce navigateur ne peut pas enregistrer de son.',
+  'chat.sharedReel': 'Reel partagé',
+  'chat.watchReel': 'Voir dans Reels',
+  'chat.openPost': 'Ouvrir la publication',
+  'chat.voiceNotPlaying': 'Ce message vocal ne s’est pas lancé. Vérifie ta connexion et réessaie.',
   'chat.micOffVoice': 'L’accès au micro est désactivé. Autorise-le dans ton navigateur pour envoyer des messages vocaux.',
   'chat.recordingVoice': 'Enregistrement d’un message vocal',
   'chat.friendRequests': 'Demandes d’ami',

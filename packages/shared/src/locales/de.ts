@@ -1995,6 +1995,10 @@ export const de: Catalog = {
   'chat.viewOnce.webNote':
     'Wenn du es schließt, ist es weg. Browser können Screenshots nicht verhindern, daher erfährt die sendende Person im Web nichts davon.',
   'chat.noRecording': 'Dieser Browser kann kein Audio aufnehmen.',
+  'chat.sharedReel': 'Geteiltes Reel',
+  'chat.watchReel': 'In Reels ansehen',
+  'chat.openPost': 'Beitrag öffnen',
+  'chat.voiceNotPlaying': 'Diese Sprachnachricht wurde nicht abgespielt. Prüfe deine Verbindung und versuche es noch einmal.',
   'chat.micOffVoice': 'Der Mikrofonzugriff ist aus. Erlaube ihn in deinem Browser, um Sprachnachrichten zu senden.',
   'chat.recordingVoice': 'Sprachnachricht wird aufgenommen',
   'chat.friendRequests': 'Freundschaftsanfragen',

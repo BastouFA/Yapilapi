@@ -638,6 +638,8 @@ export const de: Record<string, string> = {
     'Dein Konto ist eingeschränkt, während unser Team einige neuere Aktivitäten prüft, daher kannst du vorerst nur Freunden schreiben. Das dauert meist ein bis zwei Tage.',
   "That offer doesn't exist or isn't visible to you.": 'Dieses Angebot existiert nicht oder ist für dich nicht sichtbar.',
   "You can't answer this offer.": 'Du kannst auf dieses Angebot nicht antworten.',
+  'That recording was empty. Check that your microphone works and try again.':
+    'Diese Aufnahme war leer. Prüfe, ob dein Mikrofon funktioniert, und versuche es noch einmal.',
   'Files can be up to 50 MB.': 'Dateien dürfen bis zu 50 MB groß sein.',
   "That file type isn't supported. Photos: JPEG, PNG, HEIC, HEIF, WebP, AVIF, GIF, TIFF, BMP. Videos: MP4, MOV, WebM, MKV, AVI, 3GP, MPEG. Audio: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, AMR.":
     'Dieser Dateityp wird nicht unterstützt. Fotos: JPEG, PNG, HEIC, HEIF, WebP, AVIF, GIF, TIFF, BMP. Videos: MP4, MOV, WebM, MKV, AVI, 3GP, MPEG. Audio: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, AMR.',

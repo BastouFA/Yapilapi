@@ -589,6 +589,7 @@ export const zh: Record<string, string> = {
     '我们的团队正在审核一些近期活动，在此期间你的账号受到限制，所以你暂时只能给好友发消息。这通常需要一两天。',
   "That offer doesn't exist or isn't visible to you.": '这个出价不存在，或者你无法查看。',
   "You can't answer this offer.": '你无法回复这个出价。',
+  'That recording was empty. Check that your microphone works and try again.': '这段录音是空的。请确认麦克风正常工作后再试一次。',
   'Files can be up to 50 MB.': '文件最大为 50 MB。',
   "That file type isn't supported. Photos: JPEG, PNG, HEIC, HEIF, WebP, AVIF, GIF, TIFF, BMP. Videos: MP4, MOV, WebM, MKV, AVI, 3GP, MPEG. Audio: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, AMR.":
     '不支持这种文件类型。照片：JPEG、PNG、HEIC、HEIF、WebP、AVIF、GIF、TIFF、BMP。视频：MP4、MOV、WebM、MKV、AVI、3GP、MPEG。音频：MP3、M4A、AAC、WAV、OGG、Opus、FLAC、AMR。',

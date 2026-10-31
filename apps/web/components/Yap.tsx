@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import { Button, Icon } from '@yapilapi/design-system';
 import type { Message, YapEvent } from '@yapilapi/shared';
 import { useRealtime, useSession } from '@/app/providers';
-import { VOICE_AUDIO, voiceRecorder } from '@/lib/voice-recording';
+import { closeVoiceMic, openVoiceMic, playVoiceAloud, voiceRecorder } from '@/lib/voice-recording';
 
 /** A yap is up to 60 seconds; recording stops there and sends. */
 export const YAP_MAX_MS = 60_000;
@@ -114,7 +114,7 @@ export function YapButton({
     }
     let stream: MediaStream;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: VOICE_AUDIO });
+      stream = await openVoiceMic();
     } catch {
       holding.current = false;
       onError(t('yap.micOff'));
@@ -122,14 +122,14 @@ export function YapButton({
     }
     // Let go while the browser was still asking for the microphone.
     if (!holding.current) {
-      stream.getTracks().forEach((t) => t.stop());
+      closeVoiceMic(stream);
       return;
     }
     const r = voiceRecorder(stream);
     const chunks: Blob[] = [];
     r.ondataavailable = (e) => e.data.size && chunks.push(e.data);
     r.onstop = () => {
-      stream.getTracks().forEach((t) => t.stop());
+      closeVoiceMic(stream);
       const ms = Math.min(YAP_MAX_MS, Date.now() - started.current);
       if (ms < YAP_MIN_MS) return;
       const mime = (r.mimeType || 'audio/webm').split(';')[0]!;
@@ -270,6 +270,7 @@ export function YapPlayer() {
       return;
     }
     busy.current = true;
+    playVoiceAloud();
     const done = () => {
       busy.current = false;
       setNow(null);

@@ -685,6 +685,8 @@ export const sw: Record<string, string> = {
   "That offer doesn't exist or isn't visible to you.": 'Ofa hiyo haipo au huwezi kuiona.',
   "You can't answer this offer.": 'Huwezi kujibu ofa hii.',
   // apps/api/src/modules/media.ts
+  'That recording was empty. Check that your microphone works and try again.':
+    'Rekodi hiyo ilikuwa tupu. Hakikisha maikrofoni yako inafanya kazi kisha ujaribu tena.',
   'Files can be up to 50 MB.': 'Faili zinaweza kuwa hadi 50 MB.',
   "That file type isn't supported. Photos: JPEG, PNG, HEIC, HEIF, WebP, AVIF, GIF, TIFF, BMP. Videos: MP4, MOV, WebM, MKV, AVI, 3GP, MPEG. Audio: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, AMR.":
     'Aina hiyo ya faili haitumiki. Picha: JPEG, PNG, HEIC, HEIF, WebP, AVIF, GIF, TIFF, BMP. Video: MP4, MOV, WebM, MKV, AVI, 3GP, MPEG. Sauti: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, AMR.',

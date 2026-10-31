@@ -1989,6 +1989,10 @@ export const es: Catalog = {
   'chat.viewOnce.webNote':
     'Cuando lo cierres, desaparece. Los navegadores no pueden bloquear las capturas de pantalla, así que en la web no se avisa a quien lo envió.',
   'chat.noRecording': 'Este navegador no puede grabar audio.',
+  'chat.sharedReel': 'Reel compartido',
+  'chat.watchReel': 'Ver en Reels',
+  'chat.openPost': 'Abrir publicación',
+  'chat.voiceNotPlaying': 'Este mensaje de voz no se reprodujo. Revisa tu conexión e inténtalo de nuevo.',
   'chat.micOffVoice': 'El acceso al micrófono está desactivado. Permítelo en tu navegador para enviar mensajes de voz.',
   'chat.recordingVoice': 'Grabando un mensaje de voz',
   'chat.friendRequests': 'Solicitudes de amistad',

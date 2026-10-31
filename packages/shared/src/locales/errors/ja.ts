@@ -616,6 +616,7 @@ export const ja: Record<string, string> = {
     '最近のアクティビティをチームが確認しているため、あなたのアカウントは制限されています。今は友達にのみメッセージを送れます。通常1〜2日かかります。',
   "That offer doesn't exist or isn't visible to you.": 'そのオファーは存在しないか、あなたには表示されません。',
   "You can't answer this offer.": 'このオファーには返答できません。',
+  'That recording was empty. Check that your microphone works and try again.': '録音が空でした。マイクが使えるか確認して、もう一度お試しください。',
   'Files can be up to 50 MB.': 'ファイルは50MBまでです。',
   "That file type isn't supported. Photos: JPEG, PNG, HEIC, HEIF, WebP, AVIF, GIF, TIFF, BMP. Videos: MP4, MOV, WebM, MKV, AVI, 3GP, MPEG. Audio: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, AMR.":
     'そのファイル形式には対応していません。写真: JPEG、PNG、HEIC、HEIF、WebP、AVIF、GIF、TIFF、BMP。動画: MP4、MOV、WebM、MKV、AVI、3GP、MPEG。音声: MP3、M4A、AAC、WAV、OGG、Opus、FLAC、AMR。',

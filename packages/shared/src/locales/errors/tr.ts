@@ -626,6 +626,7 @@ export const tr: Record<string, string> = {
     'Ekibimiz bazı son etkinlikleri incelerken hesabın kısıtlandı, bu yüzden şimdilik yalnızca arkadaşlarına mesaj gönderebilirsin. Bu genellikle bir iki gün sürer.',
   "That offer doesn't exist or isn't visible to you.": 'Bu teklif yok ya da sana görünmüyor.',
   "You can't answer this offer.": 'Bu teklifi yanıtlayamazsın.',
+  'That recording was empty. Check that your microphone works and try again.': 'Bu kayıt boştu. Mikrofonunun çalıştığından emin olup tekrar dene.',
   'Files can be up to 50 MB.': 'Dosyalar en fazla 50 MB olabilir.',
   "That file type isn't supported. Photos: JPEG, PNG, HEIC, HEIF, WebP, AVIF, GIF, TIFF, BMP. Videos: MP4, MOV, WebM, MKV, AVI, 3GP, MPEG. Audio: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, AMR.":
     'Bu dosya türü desteklenmiyor. Fotoğraflar: JPEG, PNG, HEIC, HEIF, WebP, AVIF, GIF, TIFF, BMP. Videolar: MP4, MOV, WebM, MKV, AVI, 3GP, MPEG. Ses: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, AMR.',

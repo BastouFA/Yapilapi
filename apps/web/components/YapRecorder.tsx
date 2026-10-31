@@ -5,7 +5,7 @@ import { Button, Icon, VoicePlayer } from '@yapilapi/design-system';
 import { peaksFromSamples, VOICE_MIN_MS, type MessageKey, type VoiceClip, type VoicePurpose } from '@yapilapi/shared';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
-import { VOICE_AUDIO, voiceRecorder } from '@/lib/voice-recording';
+import { closeVoiceMic, openVoiceMic, voiceRecorder } from '@/lib/voice-recording';
 
 /**
  * Recording a Yap, a voice reply or a voice intro (docs/product/yaps.md). The big round button:
@@ -68,7 +68,7 @@ export function YapRecorder({
   const wanted = useRef(false);
 
   const cleanup = useCallback(() => {
-    rec.current?.stream.getTracks().forEach((tr) => tr.stop());
+    closeVoiceMic(rec.current?.stream);
     rec.current = null;
     void ctx.current?.close().catch(() => {});
     ctx.current = null;
@@ -99,7 +99,7 @@ export function YapRecorder({
     setState('asking');
     let stream: MediaStream;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: VOICE_AUDIO });
+      stream = await openVoiceMic();
     } catch {
       wanted.current = false;
       setState('idle');
@@ -107,7 +107,7 @@ export function YapRecorder({
       return;
     }
     if (!wanted.current) {
-      stream.getTracks().forEach((tr) => tr.stop());
+      closeVoiceMic(stream);
       setState('idle');
       return;
     }

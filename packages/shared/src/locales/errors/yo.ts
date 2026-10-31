@@ -674,6 +674,8 @@ export const yo: Record<string, string> = {
   "That offer doesn't exist or isn't visible to you.": 'Ìfilọ̀ owó yẹn kò sí, tàbí o kò lè rí i.',
   "You can't answer this offer.": 'O kò lè dáhùn ìfilọ̀ owó yìí.',
   // apps/api/src/modules/media.ts
+  'That recording was empty. Check that your microphone works and try again.':
+    'Ohùn tí o gbà sílẹ̀ yẹn ṣófo. Ṣàyẹ̀wò bóyá máíkírófóònù rẹ ń ṣiṣẹ́ kí o sì tún gbìyànjú.',
   'Files can be up to 50 MB.': 'Fáìlì kò gbọ́dọ̀ ju 50 MB lọ.',
   "That file type isn't supported. Photos: JPEG, PNG, HEIC, HEIF, WebP, AVIF, GIF, TIFF, BMP. Videos: MP4, MOV, WebM, MKV, AVI, 3GP, MPEG. Audio: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, AMR.":
     'A kò ṣe àtìlẹ́yìn fún irú fáìlì yẹn. Fọ́tò: JPEG, PNG, HEIC, HEIF, WebP, AVIF, GIF, TIFF, BMP. Fídíò: MP4, MOV, WebM, MKV, AVI, 3GP, MPEG. Ohùn: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, AMR.',

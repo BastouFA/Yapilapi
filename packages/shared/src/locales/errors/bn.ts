@@ -620,6 +620,7 @@ export const bn: Record<string, string> = {
     'আমাদের টিম সাম্প্রতিক কিছু কার্যকলাপ পর্যালোচনা করছে, ততক্ষণ আপনার অ্যাকাউন্ট সীমিত, তাই আপাতত শুধু বন্ধুদের বার্তা পাঠাতে পারবেন। সাধারণত এক-দুই দিন লাগে।',
   "That offer doesn't exist or isn't visible to you.": 'ওই প্রস্তাবটি নেই বা আপনি এটি দেখতে পারবেন না।',
   "You can't answer this offer.": 'আপনি এই প্রস্তাবের উত্তর দিতে পারবেন না।',
+  'That recording was empty. Check that your microphone works and try again.': 'রেকর্ডিংটি খালি ছিল। আপনার মাইক্রোফোন কাজ করছে কি না দেখে আবার চেষ্টা করুন।',
   'Files can be up to 50 MB.': 'ফাইল সর্বোচ্চ 50 MB হতে পারে।',
   "That file type isn't supported. Photos: JPEG, PNG, HEIC, HEIF, WebP, AVIF, GIF, TIFF, BMP. Videos: MP4, MOV, WebM, MKV, AVI, 3GP, MPEG. Audio: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, AMR.":
     'ওই ধরনের ফাইল সমর্থিত নয়। ছবি: JPEG, PNG, HEIC, HEIF, WebP, AVIF, GIF, TIFF, BMP। ভিডিও: MP4, MOV, WebM, MKV, AVI, 3GP, MPEG। অডিও: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, AMR।',

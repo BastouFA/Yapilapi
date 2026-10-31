@@ -685,6 +685,8 @@ export const ha: Record<string, string> = {
   "That offer doesn't exist or isn't visible to you.": 'Ba a sami wannan tayin ba, ko kuma ba za ku iya ganinsa ba.',
   "You can't answer this offer.": 'Ba za ku iya amsa wannan tayin ba.',
   // apps/api/src/modules/media.ts
+  'That recording was empty. Check that your microphone works and try again.':
+    'Wannan rikodin babu komai a ciki. Duba ko makirufo ɗinka yana aiki ka sake gwadawa.',
   'Files can be up to 50 MB.': 'Fayiloli na iya kaiwa 50 MB.',
   "That file type isn't supported. Photos: JPEG, PNG, HEIC, HEIF, WebP, AVIF, GIF, TIFF, BMP. Videos: MP4, MOV, WebM, MKV, AVI, 3GP, MPEG. Audio: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, AMR.":
     'Ba a goyon bayan irin wannan fayil ba. Hotuna: JPEG, PNG, HEIC, HEIF, WebP, AVIF, GIF, TIFF, BMP. Bidiyo: MP4, MOV, WebM, MKV, AVI, 3GP, MPEG. Sauti: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, AMR.',

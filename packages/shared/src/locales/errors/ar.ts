@@ -665,6 +665,7 @@ export const ar: Record<string, string> = {
   "That offer doesn't exist or isn't visible to you.": 'هذا العرض غير موجود أو لا يمكنك رؤيته.',
   "You can't answer this offer.": 'لا يمكنك الرد على هذا العرض.',
   // apps/api/src/modules/media.ts
+  'That recording was empty. Check that your microphone works and try again.': 'كان هذا التسجيل فارغًا. تأكّد من أن الميكروفون يعمل وحاول مرة أخرى.',
   'Files can be up to 50 MB.': 'يمكن أن يصل حجم الملفات إلى 50 MB.',
   "That file type isn't supported. Photos: JPEG, PNG, HEIC, HEIF, WebP, AVIF, GIF, TIFF, BMP. Videos: MP4, MOV, WebM, MKV, AVI, 3GP, MPEG. Audio: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, AMR.":
     'نوع الملف هذا غير مدعوم. الصور: JPEG وPNG وHEIC وHEIF وWebP وAVIF وGIF وTIFF وBMP. الفيديوهات: MP4 وMOV وWebM وMKV وAVI و3GP وMPEG. الصوت: MP3 وM4A وAAC وWAV وOGG وOpus وFLAC وAMR.',
