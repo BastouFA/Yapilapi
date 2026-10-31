@@ -1,4 +1,6 @@
-import type { ZodType, ZodTypeDef } from 'zod';
+import type { z } from 'zod';
+// zod's own messages in the words the translation tables know (packages/shared/src/zod-messages.ts).
+import '@yapilapi/shared';
 
 export class AppError extends Error {
   constructor(
@@ -19,7 +21,7 @@ export const conflict = (message: string) => new AppError(409, 'conflict', messa
 export const featureDisabled = (flag: string) => new AppError(404, 'feature_disabled', `${flag} is not enabled.`);
 
 /** Validate input against a zod schema, throwing a 400 with field errors. */
-export function parse<Out, In = Out>(schema: ZodType<Out, ZodTypeDef, In>, data: unknown): Out {
+export function parse<S extends z.ZodType>(schema: S, data: unknown): z.output<S> {
   const r = schema.safeParse(data ?? {});
   if (!r.success) {
     const fields: Record<string, string> = {};

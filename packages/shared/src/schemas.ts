@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import './zod-messages.ts';
 import { DATA_SAVER_MODES } from './data-saver.ts';
 import { CHAT_ACCENTS, CHAT_WALLPAPERS } from './chat-theme.ts';
 import { GAME_KINDS, GAME_PLAYERS } from './games/types.ts';
@@ -109,7 +110,7 @@ export const passwordSchema = z.string().min(10, 'Use at least 10 characters.').
 
 /** A real calendar date (YYYY-MM-DD) in the past, at most 120 years ago. */
 export const birthDateSchema = z
-  .string({ required_error: 'Enter your date of birth.' })
+  .string({ error: 'Enter your date of birth.' })
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Enter your date of birth.')
   .refine((s) => {
     const d = new Date(`${s}T00:00:00Z`);
