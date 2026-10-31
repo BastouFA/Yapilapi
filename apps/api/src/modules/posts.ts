@@ -63,6 +63,7 @@ import { checkEchoSong } from '../lib/echoes.ts';
 import { checkMilestones } from '../lib/milestones.ts';
 import { messageFailureCode, messageFailureEnglish } from '../lib/failures.ts';
 import { asSameUser } from './moments.ts';
+import { linkOrigin } from '../lib/email.ts';
 import { recordShare } from './recommendations.ts';
 import { assertYapPace, claimVoice, forgetListening, forgetVoice, startTranscript } from '../lib/voice.ts';
 import { mixInQuestions } from '../lib/ask-city.ts';
@@ -532,7 +533,8 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     const p = (await db.query<{ author_id: string; format: string; status: string }>(`SELECT author_id, format, status FROM posts WHERE id = $1`, [id]))
       .rows[0]!;
     if (p.status !== 'published') throw notFound('That post');
-    const origin = ctx.config.WEB_ORIGIN.replace(/\/+$/, '');
+    // WEB_ORIGIN can list several sites (for CORS); links use the first.
+    const origin = linkOrigin(ctx.config.WEB_ORIGIN);
     const link = `${origin}${p.format === 'reel' ? `/reels?start=${id}` : `/p/${id}`}`;
     const body = input.body ? `${input.body}\n${link}` : link;
     const asSender = asSameUser(req);

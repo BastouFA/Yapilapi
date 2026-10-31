@@ -5,7 +5,7 @@ import { Button, Icon, VoicePlayer } from '@yapilapi/design-system';
 import { peaksFromSamples, VOICE_MIN_MS, type MessageKey, type VoiceClip, type VoicePurpose } from '@yapilapi/shared';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
-import { closeVoiceMic, openVoiceMic, voiceRecorder } from '@/lib/voice-recording';
+import { closeVoiceMic, openVoiceMic, startVoiceRecorder, voiceRecorder } from '@/lib/voice-recording';
 
 /**
  * Recording a Yap, a voice reply or a voice intro (docs/product/yaps.md). The big round button:
@@ -166,7 +166,7 @@ export function YapRecorder({
     rec.current = r;
     startedAt.current = Date.now();
     setElapsed(0);
-    r.start(250);
+    startVoiceRecorder(r);
     setState('recording');
   }, [disabled, state, maxMs, cleanup, onDone]);
 

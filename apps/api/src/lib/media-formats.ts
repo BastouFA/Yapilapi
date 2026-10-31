@@ -114,7 +114,9 @@ export async function toWebFormat(buf: Buffer, d: Detected): Promise<{ buf: Buff
   if (d.kind === 'image') return { buf: await stripImageMetadata(buf, d.mime), mime: d.mime, ext: d.ext };
   if (d.kind === 'audio') {
     const toM4a = () => ffmpegConvert(buf, d.ext, 'm4a', ['-vn', '-c:a', 'aac', '-b:a', '96k', ...NO_METADATA, '-movflags', '+faststart']);
-    let converted = !WEB_AUDIO.has(d.mime);
+    // A browser's recording in pieces (fragmented MP4 from Safari) can say it lasts no time at all,
+    // and an iPhone won't play it: it's rebuilt from its sound, like WebM is.
+    let converted = !WEB_AUDIO.has(d.mime) || isFragmentedMp4(buf);
     let out: Buffer;
     if (converted) out = await toM4a();
     else {
@@ -132,7 +134,16 @@ export async function toWebFormat(buf: Buffer, d: Detected): Promise<{ buf: Buff
         converted = true;
       }
     }
-    const durationMs = await audioDurationMs(out, converted ? 'm4a' : d.ext).catch(() => undefined);
+    const ext = () => (converted ? 'm4a' : d.ext);
+    let durationMs = await audioDurationMs(out, ext()).catch(() => undefined);
+    // A copied file whose header says it lasts no time: rebuilt too.
+    if (!durationMs && !converted) {
+      out = await toM4a();
+      converted = true;
+      durationMs = await audioDurationMs(out, 'm4a').catch(() => undefined);
+    }
+    // Still no length in the header: measured by playing it through.
+    if (!durationMs) durationMs = await decodedDurationMs(out, ext()).catch(() => undefined);
     return converted ? { buf: out, mime: 'audio/mp4', ext: 'm4a', durationMs } : { buf: out, mime: d.mime, ext: d.ext, durationMs };
   }
   return stripVideoMetadata(buf, d);
@@ -210,6 +221,26 @@ async function ffmpegConvert(buf: Buffer, inExt: string, outExt: string, args: s
     await writeFile(input, buf);
     await ffmpeg(['-loglevel', 'error', '-y', '-i', input, ...args, output]);
     return await readFile(output);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+/** Fragmented MP4 (a recorder's output, written piece by piece): it has movie fragments. */
+function isFragmentedMp4(buf: Buffer): boolean {
+  return buf.includes('moof', 0, 'latin1');
+}
+
+/** How long a file's sound really lasts, from decoding all of it (for files whose header doesn't say). */
+async function decodedDurationMs(buf: Buffer, ext: string): Promise<number | undefined> {
+  const dir = await mkdtemp(path.join(tmpdir(), 'ypl-dur-'));
+  try {
+    const input = path.join(dir, `in.${ext}`);
+    await writeFile(input, buf);
+    const info = await ffmpeg(['-i', input, '-map', '0:a', '-f', 'null', '-']);
+    const times = [...info.matchAll(/time=(\d+):(\d+):(\d+(?:\.\d+)?)/g)];
+    const m = times.at(-1);
+    return m ? Math.round((Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3])) * 1000) : undefined;
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

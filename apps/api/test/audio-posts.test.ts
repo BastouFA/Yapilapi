@@ -22,8 +22,8 @@ afterAll(async () => {
 
 const db = () => t.ctx.db;
 
-/** A tone of the given length, as an M4A file. */
-function tone(seconds: number): Buffer {
+/** A tone of the given length, as an M4A file (written in pieces, like Safari's recorder, when `fragmented`). */
+function tone(seconds: number, fragmented = false): Buffer {
   const dir = mkdtempSync(path.join(tmpdir(), 'ypl-audio-post-'));
   try {
     const out = path.join(dir, 'tone.m4a');
@@ -39,6 +39,7 @@ function tone(seconds: number): Buffer {
       'aac',
       '-b:a',
       '32k',
+      ...(fragmented ? ['-movflags', 'frag_keyframe+empty_moov+default_base_moof', '-frag_duration', '250000'] : []),
       out,
     ]);
     return readFileSync(out);
@@ -86,6 +87,17 @@ describe('empty recordings', () => {
     expect(empty.statusCode).toBe(422);
     expect(empty.json().error.code).toBe('empty_audio');
     expect((await send(u, 'voice.m4a', 'audio/mp4', tone(1))).statusCode).toBe(201);
+  });
+
+  it('rebuilds a recording made in pieces (Safari), so it has its real length and plays everywhere', async () => {
+    const u = await signUp(t.app);
+    const res = await send(u, 'voice.m4a', 'audio/mp4', tone(3, true));
+    expect(res.statusCode).toBe(201);
+    const { rows } = await db().query(`SELECT duration_ms, storage_key FROM media WHERE id = $1`, [res.json().media.id]);
+    expect(rows[0].duration_ms).toBeGreaterThan(2800);
+    expect(rows[0].duration_ms).toBeLessThan(3300);
+    const stored = await t.ctx.storage.read(rows[0].storage_key);
+    expect(stored.includes('moof', 0, 'latin1')).toBe(false);
   });
 });
 

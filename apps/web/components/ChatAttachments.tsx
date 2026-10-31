@@ -5,7 +5,7 @@ import { Button, Icon, SensitiveCover, TranslationBar, useTranslatable } from '@
 import { languageName, type Message, type MessageKey, type VoiceTranscript as Transcript } from '@yapilapi/shared';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
-import { closeVoiceMic, openVoiceMic, playVoiceAloud, voiceRecorder } from '@/lib/voice-recording';
+import { closeVoiceMic, openVoiceMic, playVoiceAloud, startVoiceRecorder, voiceRecorder } from '@/lib/voice-recording';
 
 type Attachment = Message['attachments'][number];
 
@@ -177,6 +177,7 @@ function VoiceNote({ url, durationMs }: { url: string; durationMs: number | null
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
         onEnded={() => (setPlaying(false), setPos(0))}
+        onError={() => setPlaying(false)}
         onLoadedMetadata={(e) => {
           const a = e.currentTarget;
           if (Number.isFinite(a.duration)) setLen(a.duration * 1000);
@@ -410,7 +411,7 @@ export function VoiceRecorder({
       rec.current = r;
       started.current = Date.now();
       setElapsed(0);
-      r.start(250);
+      startVoiceRecorder(r);
       setState('recording');
     } catch {
       onError(t('chat.micOffVoice'));

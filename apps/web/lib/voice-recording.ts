@@ -29,6 +29,15 @@ export function voiceRecorder(stream: MediaStream): MediaRecorder {
   return new MediaRecorder(stream, { ...(mimeType ? { mimeType } : {}), audioBitsPerSecond: VOICE_BITS_PER_SECOND });
 }
 
+/**
+ * Starts recording. Other browsers hand over the sound every quarter second; Safari keeps it until
+ * the end, so it writes one whole file instead of pieces whose length can come out as nothing.
+ */
+export function startVoiceRecorder(r: MediaRecorder) {
+  if (webKit()) r.start();
+  else r.start(250);
+}
+
 // ── Where the sound goes (Safari 17 and later) ──────────────────────────
 // After the microphone has been used, an iPhone can keep sending sound to the earpiece, so a voice
 // message seems not to play; with the ring switch on silent it may not play at all. Safari's

@@ -7,10 +7,13 @@ import { videoPoster, videoSrc, type Post } from '@yapilapi/shared';
 import { api } from '@/lib/api';
 import { useSession } from '@/app/providers';
 
-/** "Send to chat" writes the post's address in the message (POST /v1/posts/:id/send). */
-const LINK = /https?:\/\/([^\s/]+)\/(?:reels\?start=|p\/)([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b/i;
+/**
+ * "Send to chat" writes the post's address in the message (POST /v1/posts/:id/send). Until
+ * 2026-10-31 it wrote every site the server allowed, joined by commas, in front of it.
+ */
+const LINK = /(?:https?:\/\/[^\s/,]+,)*https?:\/\/([^\s/,]+)\/(?:reels\?start=|p\/)([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b/i;
 
-const OUR_HOSTS = new Set(['yapilapi.com', 'www.yapilapi.com']);
+const OUR_HOSTS = new Set(['yapilapi.com', 'www.yapilapi.com', 'yapilapi-web.onrender.com']);
 
 /**
  * The post or reel a message shares, when its text has one of our post addresses: its id, the
@@ -22,7 +25,7 @@ export function sharedPostIn(body: string | null | undefined): { id: string; hre
   if (!m) return null;
   const host = m[1]!.toLowerCase();
   if (!OUR_HOSTS.has(host) && (typeof window === 'undefined' || host !== window.location.host)) return null;
-  const url = new URL(m[0]);
+  const url = new URL(m[0].slice(m[0].lastIndexOf('http')));
   return { id: m[2]!.toLowerCase(), href: url.pathname + url.search, rest: body.replace(m[0], '').trim() };
 }
 

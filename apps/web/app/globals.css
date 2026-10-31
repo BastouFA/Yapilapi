@@ -2465,6 +2465,12 @@ video.chat-att__media {
   object-fit: cover;
   background: #000;
 }
+/* Web addresses in a message. */
+.chat-link {
+  color: inherit;
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+}
 /* A post or reel sent to a chat: watched right in the bubble. */
 .shared-post {
   display: grid;

@@ -186,6 +186,22 @@ describe('shares', () => {
     const hidden = await publish(author, 'Only me', { visibility: 'private' });
     expect((await as(t.app, fan).post(`/v1/posts/${hidden}/send`, { userIds: [friend.id] })).status).toBe(404);
   });
+
+  it('link the first site when WEB_ORIGIN lists several', async () => {
+    const author = await adult();
+    const friend = await adult();
+    const id = await publish(author, 'Several sites');
+    const before = t.ctx.config.WEB_ORIGIN;
+    t.ctx.config.WEB_ORIGIN = 'https://yapilapi.com,https://www.yapilapi.com,https://old.example.com';
+    try {
+      const r = await as(t.app, author).post(`/v1/posts/${id}/send`, { userIds: [friend.id] });
+      expect(r.status).toBe(201);
+      const messages = (await as(t.app, friend).get(`/v1/conversations/${r.body.conversationIds[0]}/messages`)).body.items;
+      expect(messages.map((m: any) => m.body)).toContain(`https://yapilapi.com/p/${id}`);
+    } finally {
+      t.ctx.config.WEB_ORIGIN = before;
+    }
+  });
 });
 
 describe('Rising', () => {

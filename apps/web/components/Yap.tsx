@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import { Button, Icon } from '@yapilapi/design-system';
 import type { Message, YapEvent } from '@yapilapi/shared';
 import { useRealtime, useSession } from '@/app/providers';
-import { closeVoiceMic, openVoiceMic, playVoiceAloud, voiceRecorder } from '@/lib/voice-recording';
+import { closeVoiceMic, openVoiceMic, playVoiceAloud, startVoiceRecorder, voiceRecorder } from '@/lib/voice-recording';
 
 /** A yap is up to 60 seconds; recording stops there and sends. */
 export const YAP_MAX_MS = 60_000;
@@ -138,7 +138,7 @@ export function YapButton({
     rec.current = r;
     started.current = Date.now();
     setElapsed(0);
-    r.start(250);
+    startVoiceRecorder(r);
     setTalking(true);
   }, [disabled, onError, onRecorded, t]);
 

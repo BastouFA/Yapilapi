@@ -28,6 +28,7 @@ import { MiniAppsSheet } from '@/components/MiniApps';
 import { MessageAttachments, ViewOnceMessage, VoiceRecorder, VoiceTranscript } from '@/components/ChatAttachments';
 import { ViewOnceCapture } from '@/components/ViewOnceCapture';
 import { SharedPostCard, sharedPostIn } from '@/components/SharedPostCard';
+import { linkify } from '@/lib/linkify';
 import { TurnOnYapsPrompt, YapButton } from '@/components/Yap';
 import { StoryCardView } from '@/components/StoryStickers';
 import { NowStatusLine } from '@/components/ProfilePlus';
@@ -869,7 +870,9 @@ export default function ChatPage() {
             // A shared post or reel shows in the bubble, in place of its address.
             const shared = !m.unsent && !m.attachments.length && !unseenPosts.includes(m.id) ? sharedPostIn(m.body) : null;
             const words = shared ? shared.rest : m.body;
-            const said = words ? <TranslatableText kind="message" id={m.id} text={words} lang={m.lang} own={mine || !!m.pending} locale={locale} /> : null;
+            const said = words ? (
+              <TranslatableText kind="message" id={m.id} text={words} lang={m.lang} own={mine || !!m.pending} locale={locale} render={linkify} />
+            ) : null;
             const text = replied ? (
               <>
                 {replied}
