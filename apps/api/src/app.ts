@@ -345,7 +345,16 @@ export async function buildApp(
       if (!/^[\w/.-]+$/.test(key) || key.includes('..') || key.startsWith('private/')) return reply.code(404).send();
       const obj = await storage.get!(key, req.headers.range);
       if (!obj) return reply.code(404).send({ error: { code: 'not_found', message: 'Media not found.' } });
-      reply.code(obj.status).header('cache-control', 'public, max-age=31536000, immutable').header('accept-ranges', 'bytes').header('timing-allow-origin', '*');
+      // Browsers keep media for a year; shared caches never do. The web app proxies /media (Vercel), and a
+      // cache there stored the first answer it saw (often the 2-byte range a player asks for first) and
+      // gave it to everyone after, so voice messages and videos wouldn't play.
+      reply
+        .code(obj.status)
+        .header('cache-control', 'private, max-age=31536000, immutable')
+        .header('cdn-cache-control', 'no-store')
+        .header('vercel-cdn-cache-control', 'no-store')
+        .header('accept-ranges', 'bytes')
+        .header('timing-allow-origin', '*');
       if (obj.contentType) reply.type(obj.contentType);
       if (obj.contentLength !== undefined) reply.header('content-length', obj.contentLength);
       if (obj.contentRange) reply.header('content-range', obj.contentRange);

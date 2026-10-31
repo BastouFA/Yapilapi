@@ -102,6 +102,12 @@ describe('S3 storage', () => {
       const part = await s3app.app.inject({ url: `/media/${stored.key}`, headers: { range: 'bytes=0-7' } });
       expect(part.statusCode).toBe(206);
       expect(part.rawPayload.equals(PNG.subarray(0, 8))).toBe(true);
+      // Only browsers keep media: a shared cache (the web app's host) once stored a part and served it as the whole file.
+      for (const r of [full, part]) {
+        expect(r.headers['cache-control']).toMatch(/^private,/);
+        expect(r.headers['vercel-cdn-cache-control']).toBe('no-store');
+        expect(r.headers['cdn-cache-control']).toBe('no-store');
+      }
       expect((await s3app.app.inject({ url: '/media/2026/01/missing.png' })).statusCode).toBe(404);
       expect((await s3app.app.inject({ url: '/media/../etc/passwd' })).statusCode).toBe(404);
       // Streamed uploads (how processed videos are stored) must work against S3-compatible stores too.
