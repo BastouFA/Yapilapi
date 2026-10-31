@@ -7,8 +7,9 @@
 # What free means here, and when to move to render.yaml:
 # - The API and web app sleep after 15 minutes without visits; the next visit wakes them in about a
 #   minute. While asleep, background jobs (video processing, scheduled posts) wait.
-# - Free Postgres is deleted 30 days after it is created, with no backups. Move to render.yaml (paid
-#   database) before anyone you don't want to lose signs up.
+# - Free Render Postgres is deleted 30 days after it is created, with no backups, so the database is
+#   Neon's free plan instead (no expiry, 1 GB): paste its direct (unpooled) connection string into
+#   DATABASE_URL. Move to render.yaml (paid database) when more room or backups are needed.
 # - Free services can't use the pre-deploy step or the Shell tab: the API applies migrations when it
 #   starts (MIGRATE_ON_START, set in the image), and the launch check runs from your own computer.
 # - Free services can't send email on ports 25, 465 or 587: use port 2465 (Resend supports it).
@@ -16,14 +17,6 @@
 #
 # Settings marked `sync: false` are the ones you paste into the Dashboard the first time you apply this
 # file. The API refuses to start in production without the required ones, with a clear message in the log.
-
-databases:
-  - name: yapilapi-db
-    databaseName: yapilapi
-    user: yapilapi
-    plan: free
-    postgresMajorVersion: '16'
-    region: frankfurt
 
 services:
   - type: keyvalue
@@ -71,10 +64,9 @@ services:
         value: yapilapi.com
       - key: WEBAUTHN_ORIGIN
         value: https://yapilapi.com
+      # Neon (free, Frankfurt): the direct connection string, not the pooled one (migrations hold session locks).
       - key: DATABASE_URL
-        fromDatabase:
-          name: yapilapi-db
-          property: connectionString
+        sync: false
       - key: REDIS_URL
         fromService:
           name: yapilapi-cache
