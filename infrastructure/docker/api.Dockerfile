@@ -23,6 +23,8 @@ COPY packages/auth packages/auth
 COPY packages/database packages/database
 COPY apps/api apps/api
 WORKDIR /app/apps/api
+# Folders the API writes to: big uploads arrive here in parts (UPLOAD_DIR/.chunks) before going to storage.
+RUN mkdir -p uploads uploads-private && chown ypl:ypl uploads uploads-private
 USER ypl
 EXPOSE 4000
 HEALTHCHECK --interval=15s --timeout=3s CMD wget -qO- "http://127.0.0.1:${API_PORT:-4000}/health/live" || exit 1
