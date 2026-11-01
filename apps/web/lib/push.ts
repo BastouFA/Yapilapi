@@ -37,15 +37,59 @@ export async function enableBrowserPush(): Promise<'enabled' | 'denied' | 'unava
   if (asked !== 'granted') return 'denied';
   const cfg = await pushConfig();
   if (!cfg.webPush || !cfg.vapidPublicKey) return 'unavailable';
-  const reg = await navigator.serviceWorker.register('/sw.js');
-  await navigator.serviceWorker.ready;
-  const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(cfg.vapidPublicKey) });
-  const json = sub.toJSON() as { endpoint: string; keys: { p256dh: string; auth: string } };
-  await api.push.subscribe({ kind: 'webpush', endpoint: json.endpoint, keys: json.keys });
+  await registerHere(cfg.vapidPublicKey);
+  setTurnedOff(false);
   return 'enabled';
 }
 
-export async function disableBrowserPush() {
+/** This browser's subscription (made if it has none, or made again if it was for another key), told to the API. */
+async function registerHere(vapidPublicKey: string) {
+  const reg = await navigator.serviceWorker.register('/sw.js');
+  await navigator.serviceWorker.ready;
+  const key = urlBase64ToUint8Array(vapidPublicKey);
+  let sub = await reg.pushManager.getSubscription();
+  const had = sub?.options.applicationServerKey;
+  if (sub && had && !new Uint8Array(had).every((b, i) => b === key[i])) {
+    await sub.unsubscribe();
+    sub = null;
+  }
+  sub ??= await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+  const json = sub.toJSON() as { endpoint: string; keys: { p256dh: string; auth: string } };
+  await api.push.subscribe({ kind: 'webpush', endpoint: json.endpoint, keys: json.keys });
+}
+
+const OFF_KEY = 'ypl.push.off';
+function setTurnedOff(off: boolean) {
+  try {
+    if (off) localStorage.setItem(OFF_KEY, '1');
+    else localStorage.removeItem(OFF_KEY);
+  } catch {
+    /* storage off: nothing to remember */
+  }
+}
+function turnedOff() {
+  try {
+    return localStorage.getItem(OFF_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * On opening the app: notifications are allowed here, so the API must know this browser, for the
+ * account signed in now. A phone can say "on" while the API has nothing for it (the request to
+ * register failed, the address changed, another account was signed in), and then nothing ever
+ * arrives. Not when the person turned them off in Settings, and it never asks for permission.
+ */
+export async function keepBrowserPush() {
+  if (!pushSupported() || Notification.permission !== 'granted' || turnedOff()) return;
+  const cfg = await pushConfig();
+  if (cfg.webPush && cfg.vapidPublicKey) await registerHere(cfg.vapidPublicKey);
+}
+
+/** `turnOff`: the person's own choice (Settings), which keepBrowserPush respects; signing out isn't. */
+export async function disableBrowserPush(turnOff = false) {
+  if (turnOff) setTurnedOff(true);
   const sub = await currentSubscription();
   if (!sub) return;
   await api.push.unsubscribe(sub.endpoint).catch(() => {});

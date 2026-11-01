@@ -3,6 +3,8 @@
 import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { useCalls } from '@/components/Calls';
+import { keepBrowserPush } from '@/lib/push';
+import { useSession } from '@/app/providers';
 
 const BUILD = process.env.NEXT_PUBLIC_BUILD_ID ?? 'dev';
 
@@ -15,6 +17,12 @@ const BUILD = process.env.NEXT_PUBLIC_BUILD_ID ?? 'dev';
 export function UpdateWhenBack() {
   const path = usePathname();
   const { current: call } = useCalls();
+  const { me } = useSession();
+  // Each time the app opens, and for whichever account is signed in: notifications reach this phone.
+  const accountId = me?.id;
+  useEffect(() => {
+    if (accountId) void keepBrowserPush().catch(() => {});
+  }, [accountId]);
   useEffect(() => {
     if (BUILD === 'dev') return;
     let hiddenAt = 0;

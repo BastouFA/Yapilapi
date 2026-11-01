@@ -70,7 +70,7 @@ export function BrowserPushCard() {
           checked={on}
           onChange={async (v) => {
             if (!v) {
-              await disableBrowserPush();
+              await disableBrowserPush(true);
               setOn(false);
               return;
             }
