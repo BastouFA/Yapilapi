@@ -18,7 +18,7 @@ import {
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AIPanel, BottomSheet, Button, ChatBubble, EmptyState, Icon, Menu, Skeleton, Switch, TranslatableText, type MenuAction } from '@yapilapi/design-system';
 import type { ChatGame, Conversation, Message, ScheduledMessage } from '@yapilapi/shared';
 import { patiently } from '@yapilapi/api-client';
@@ -32,6 +32,7 @@ import { useRealtime, useSession } from '../../../providers';
 import { useCalls } from '@/components/Calls';
 import { clearCopiedVoice, copyVoice, useCopiedVoice } from '@/lib/chat-clipboard';
 import { copyImage, copyText } from '@/lib/clipboard';
+import { EmojiPicker, noteEmoji } from '@/components/EmojiPicker';
 import { MiniAppsSheet } from '@/components/MiniApps';
 import { MessageAttachments, ViewOnceMessage, VoiceRecorder, VoiceTranscript } from '@/components/ChatAttachments';
 import { ViewOnceCapture } from '@/components/ViewOnceCapture';
@@ -120,6 +121,14 @@ export default function ChatPage() {
   /** Messages sharing a post the reader can't see: their link stays as it was written. */
   const [unseenPosts, setUnseenPosts] = useState<string[]>([]);
   const composer = useRef<HTMLTextAreaElement>(null);
+  // The emoji panel, where a phone's keyboard would be. Where the caret goes after an emoji goes in.
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const caret = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    if (caret.current === null) return;
+    composer.current?.setSelectionRange(caret.current, caret.current);
+    caret.current = null;
+  }, [body]);
   const [forwarding, setForwarding] = useState<Message | null>(null);
   const copied = useCopiedVoice();
   const [pasting, setPasting] = useState(false);
@@ -506,6 +515,37 @@ export default function ChatPage() {
   function addForwarded(sent: Message[]) {
     const here = sent.filter((m) => m.conversationId === id);
     setMessages((cur) => (cur ? [...cur, ...here.filter((m) => !cur.some((x) => x.id === m.id))] : cur));
+  }
+
+  /** Puts an emoji where the caret is, in place of anything selected. */
+  function insertEmoji(emoji: string, byPointer: boolean) {
+    const box = composer.current;
+    const start = box?.selectionStart ?? body.length;
+    const end = box?.selectionEnd ?? body.length;
+    const next = body.slice(0, start) + emoji + body.slice(end);
+    if (next.length > 4000) return;
+    caret.current = start + emoji.length;
+    setBody(next);
+    noteEmoji(emoji);
+    if (!editing) saidTyping();
+    // With a mouse, typing carries on. On a touch screen that would bring the keyboard up over the panel.
+    if (byPointer && matchMedia('(hover: hover)').matches) box?.focus();
+  }
+
+  /** Takes back what's just before the caret, a whole emoji at a time. */
+  function backspaceEmoji() {
+    const box = composer.current;
+    const start = box?.selectionStart ?? body.length;
+    const end = box?.selectionEnd ?? body.length;
+    if (start !== end) {
+      caret.current = start;
+      return setBody(body.slice(0, start) + body.slice(end));
+    }
+    const pieces = [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(body.slice(0, start))];
+    const last = pieces.at(-1);
+    if (!last) return;
+    caret.current = last.index;
+    setBody(body.slice(0, last.index) + body.slice(start));
   }
 
   async function saveEdit(m: Message) {
@@ -1318,6 +1358,20 @@ export default function ChatPage() {
         <label htmlFor="msg" className="yp-visually-hidden">
           {t('inbox.placeholder')}
         </label>
+        <button
+          type="button"
+          className="yp-action"
+          aria-label={emojiOpen ? t('emoji.keyboard') : t('emoji.button')}
+          title={emojiOpen ? t('emoji.keyboard') : t('emoji.button')}
+          aria-expanded={emojiOpen}
+          onClick={() => {
+            // Back to the keyboard goes back to writing.
+            if (emojiOpen) composer.current?.focus();
+            setEmojiOpen(!emojiOpen);
+          }}
+        >
+          <Icon name={emojiOpen ? 'keyboard' : 'smile'} />
+        </button>
         <textarea
           ref={composer}
           id="msg"
@@ -1326,6 +1380,10 @@ export default function ChatPage() {
           aria-describedby={replyTo || editing ? 'compose-context' : undefined}
           value={body}
           maxLength={4000}
+          onFocus={() => {
+            // A touch screen's keyboard is coming up: it takes the panel's place.
+            if (matchMedia('(hover: none)').matches) setEmojiOpen(false);
+          }}
           onPaste={(e) => {
             // Nothing else on the clipboard: Paste means the voice message you copied.
             if (!copied || e.clipboardData.getData('text') || e.clipboardData.files.length) return;
@@ -1365,6 +1423,19 @@ export default function ChatPage() {
           <span className="chat-send__label">{editing ? t('common.save') : t('inbox.send')}</span>
         </Button>
       </form>
+      {emojiOpen ? (
+        <div
+          className="emoji-dock"
+          onKeyDown={(e) => {
+            if (e.key !== 'Escape') return;
+            e.stopPropagation();
+            setEmojiOpen(false);
+            composer.current?.focus();
+          }}
+        >
+          <EmojiPicker onPick={(emoji, _from, byPointer) => insertEmoji(emoji, byPointer)} onBackspace={backspaceEmoji} />
+        </div>
+      ) : null}
       {/* The end of the page, under the Yap button and suggested replies: following the newest
           message scrolls here, so they stay on screen above the message box in a long chat. */}
       <div ref={endRef} aria-hidden />

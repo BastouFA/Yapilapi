@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Animated, FlatList, I18nManager, Modal, PanResponder, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Conversation, Message, MessagePreview, PinnedMessage } from '../../../packages/shared/src/types';
@@ -13,6 +13,7 @@ import { client, errorMessage } from './api';
 import { useT } from './i18n';
 import { useSession } from './session';
 import { radius, space } from './theme';
+import { EMOJI_GROUPS, searchEmojis, type EmojiGroupId } from '../../../packages/shared/src/emoji-data';
 import { conversationTitle } from './post';
 import { ActionSheet, Avatar, BottomSheet, Button, Icon, useColors, userText, useScreenFocused } from './ui';
 import { openWatch } from './watch';
@@ -28,7 +29,6 @@ import {
   favouriteReactions,
   inTone,
   QUICK_REACTIONS,
-  REACTION_GROUPS,
   readTone,
   rememberReaction,
   SKIN_TONES,
@@ -414,7 +414,7 @@ function loadRecent() {
     })
     .catch(() => {});
 }
-function noteReaction(emoji: string) {
+export function noteReaction(emoji: string) {
   recent = rememberReaction(recent, emoji);
   recentListeners.forEach((l) => l(recent));
   void SecureStore.setItemAsync(RECENT_KEY, JSON.stringify(recent)).catch(() => {});
@@ -573,6 +573,164 @@ export function ForwardSheet({ message, onClose, onForwarded }: { message: Messa
   );
 }
 
+/** Each kind's tab. */
+const TAB_GLYPH: Record<EmojiGroupId, string> = {
+  smileys: '😀',
+  animals: '🐻',
+  food: '🍔',
+  activity: '⚽',
+  travel: '🚗',
+  objects: '💡',
+  symbols: '🔣',
+  flags: '🏳️',
+};
+/** A row of emojis in the grid. */
+const EMOJI_ROW = 7;
+
+/** Every emoji: search, a tab for each kind (the ones you used lately first), and your skin colour, which stays chosen. */
+export function EmojiPicker({ lit = [], onPick, onBackspace }: { lit?: string[]; onPick: (emoji: string) => void; onBackspace?: () => void }) {
+  const c = useColors();
+  const { t } = useT();
+  const recentOnes = useRecentReactions();
+  const skinTone = useSkinTone();
+  const [query, setQuery] = useState('');
+  const [tonesOpen, setTonesOpen] = useState(false);
+  const [tab, setTab] = useState<string>(recentOnes.length ? 'recent' : 'smileys');
+  const tabs = [...(recentOnes.length ? ['recent'] : []), ...EMOJI_GROUPS.map((g) => g.id as string)];
+  const shown = useMemo(() => {
+    if (query.trim())
+      return inTone(
+        searchEmojis(query).map((e) => e.emoji),
+        skinTone,
+      );
+    if (tab === 'recent') return inTone(recentOnes, skinTone);
+    return inTone(
+      (EMOJI_GROUPS.find((g) => g.id === tab) ?? EMOJI_GROUPS[0]!).entries.map((e) => e.emoji),
+      skinTone,
+    );
+  }, [query, tab, recentOnes, skinTone]);
+  return (
+    <View style={{ gap: space[2] }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[1] }}>
+        <TextInput
+          accessibilityLabel={t('emoji.search')}
+          placeholder={t('emoji.search')}
+          placeholderTextColor={c.inkMuted}
+          value={query}
+          onChangeText={setQuery}
+          style={{ flex: 1, minHeight: 44, paddingHorizontal: space[3], borderRadius: radius.md, backgroundColor: c.surfaceSunken, color: c.ink }}
+        />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('emoji.skinTone')}
+          accessibilityState={{ expanded: tonesOpen }}
+          onPress={() => setTonesOpen((v) => !v)}
+          style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+        >
+          <Text style={{ fontSize: 24 }}>{withTone('👋', skinTone)}</Text>
+        </Pressable>
+        {onBackspace ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('emoji.backspace')}
+            onPress={onBackspace}
+            style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Icon name="backspace-outline" size={22} color={c.inkMuted} />
+          </Pressable>
+        ) : null}
+      </View>
+      {tonesOpen ? (
+        <View accessibilityRole="radiogroup" accessibilityLabel={t('emoji.skinTone')} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+          {SKIN_TONES.map((option, i) => (
+            <Pressable
+              key={option || 'yellow'}
+              accessibilityRole="radio"
+              accessibilityLabel={t(`emoji.tone${i}` as MessageKey)}
+              accessibilityState={{ selected: skinTone === option }}
+              onPress={() => {
+                chooseSkinTone(option);
+                setTonesOpen(false);
+              }}
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 22,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: skinTone === option ? c.surfaceSunken : 'transparent',
+                borderWidth: skinTone === option ? 2 : 0,
+                borderColor: c.yapi,
+              }}
+            >
+              <Text style={{ fontSize: 24 }}>{withTone('👋', option)}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+      {!query.trim() ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, justifyContent: 'space-between' }}>
+          {tabs.map((id) => (
+            <Pressable
+              key={id}
+              accessibilityRole="tab"
+              accessibilityLabel={t(`emoji.${id}` as MessageKey)}
+              accessibilityState={{ selected: tab === id }}
+              onPress={() => setTab(id)}
+              style={{
+                width: 44,
+                height: 44,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderBottomWidth: 2,
+                borderBottomColor: tab === id ? c.yapi : 'transparent',
+              }}
+            >
+              {id === 'recent' ? (
+                <Icon name="time-outline" size={20} color={c.inkMuted} />
+              ) : (
+                <Text style={{ fontSize: 20 }}>{TAB_GLYPH[id as EmojiGroupId]}</Text>
+              )}
+            </Pressable>
+          ))}
+        </ScrollView>
+      ) : null}
+      {/* A list that draws only what's on screen: a kind can have hundreds. */}
+      <FlatList
+        key={query.trim() ? 'found' : tab}
+        data={shown}
+        keyExtractor={(e) => e}
+        numColumns={EMOJI_ROW}
+        nestedScrollEnabled
+        keyboardShouldPersistTaps="handled"
+        initialNumToRender={49}
+        style={{ height: 300 }}
+        ListEmptyComponent={<Text style={{ color: c.inkMuted, textAlign: 'center', padding: space[4] }}>{t('emoji.none')}</Text>}
+        renderItem={({ item }) => (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('m.chat.reactWith', { emoji: item })}
+            accessibilityState={{ selected: lit.includes(item) }}
+            onPress={() => onPick(item)}
+            style={({ pressed }) => ({
+              flex: 1 / EMOJI_ROW,
+              height: 46,
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 12,
+              backgroundColor: lit.includes(item) || pressed ? c.surfaceSunken : 'transparent',
+              borderWidth: lit.includes(item) ? 2 : 0,
+              borderColor: c.yapi,
+            })}
+          >
+            <Text style={{ fontSize: 26 }}>{item}</Text>
+          </Pressable>
+        )}
+      />
+    </View>
+  );
+}
+
 /**
  * Reactions for one message, from the heart beside it: a row of your favourites (the emojis you
  * used lately, then the usual six) and +, which opens every emoji by kind with tabs, Recent first.
@@ -626,10 +784,6 @@ export function ReactionSheet({
       <Text style={{ fontSize: 26 }}>{e}</Text>
     </Pressable>
   );
-  const groups = [...(recentOnes.length ? [{ id: 'recent', emojis: recentOnes }] : []), ...REACTION_GROUPS].map((g) => ({
-    id: g.id,
-    emojis: inTone(g.emojis, skinTone),
-  }));
   const header = (
     <View style={{ marginBottom: space[2], gap: space[2] }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
@@ -644,70 +798,7 @@ export function ReactionSheet({
           <Icon name={all ? 'chevron-up' : 'add'} size={24} color={c.inkMuted} />
         </Pressable>
       </View>
-      {all ? (
-        <>
-          <View accessibilityRole="radiogroup" accessibilityLabel={t('emoji.skinTone')}>
-            <Text style={{ color: c.inkMuted, fontSize: 13, fontWeight: '600', marginBottom: space[1] }}>{t('emoji.skinTone')}</Text>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              {SKIN_TONES.map((option, i) => (
-                <Pressable
-                  key={option || 'yellow'}
-                  accessibilityRole="radio"
-                  accessibilityLabel={t(`emoji.tone${i}` as MessageKey)}
-                  accessibilityState={{ selected: skinTone === option }}
-                  onPress={() => chooseSkinTone(option)}
-                  style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 22,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: skinTone === option ? c.surfaceSunken : 'transparent',
-                    borderWidth: skinTone === option ? 2 : 0,
-                    borderColor: c.yapi,
-                  }}
-                >
-                  <Text style={{ fontSize: 24 }}>{withTone('👋', option)}</Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 4 }}>
-            {groups.map((g) => (
-              <Pressable
-                key={g.id}
-                accessibilityRole="tab"
-                accessibilityLabel={t(`emoji.${g.id}` as MessageKey)}
-                accessibilityState={{ selected: tab === g.id }}
-                onPress={() => {
-                  setTab(g.id);
-                  scroll.current?.scrollTo({ y: offsets.current[g.id] ?? 0, animated: true });
-                }}
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 22,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: tab === g.id ? c.surfaceSunken : 'transparent',
-                }}
-              >
-                {g.id === 'recent' ? <Icon name="time-outline" size={20} color={c.inkMuted} /> : <Text style={{ fontSize: 20 }}>{g.emojis[0]}</Text>}
-              </Pressable>
-            ))}
-          </ScrollView>
-          <ScrollView ref={scroll} style={{ maxHeight: 340 }} nestedScrollEnabled>
-            {groups.map((g) => (
-              <View key={g.id} onLayout={(e) => (offsets.current[g.id] = e.nativeEvent.layout.y)}>
-                <Text style={{ color: c.inkMuted, fontSize: 13, fontWeight: '600', marginTop: space[2], marginBottom: space[1] }}>
-                  {t(`emoji.${g.id}` as MessageKey)}
-                </Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>{g.emojis.map(cell)}</View>
-              </View>
-            ))}
-          </ScrollView>
-        </>
-      ) : null}
+      {all ? <EmojiPicker lit={[...mine]} onPick={toggle} /> : null}
     </View>
   );
   return (

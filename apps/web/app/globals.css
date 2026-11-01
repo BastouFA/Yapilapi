@@ -3693,17 +3693,32 @@ video.chat-att__media {
   border-color: var(--yapi);
   background: var(--surface-sunken);
 }
+.emoji-panel__top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.emoji-panel__search {
+  flex: 1;
+  min-width: 0;
+}
 .emoji-panel__tabs {
   display: flex;
-  justify-content: space-between;
+  overflow-x: auto;
   border-bottom: 1px solid var(--line);
-  padding-bottom: var(--space-1);
+  scrollbar-width: none;
+}
+.emoji-panel__tabs::-webkit-scrollbar {
+  display: none;
+}
+.emoji-panel__tab[aria-current='true'] {
+  box-shadow: inset 0 -2px 0 var(--yapi);
 }
 .emoji-panel__tab {
-  width: 44px;
+  flex: 1 0 44px;
   height: 44px;
   border: 0;
-  border-radius: 50%;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
   background: transparent;
   font-size: 22px;
   cursor: pointer;
@@ -3727,11 +3742,41 @@ video.chat-att__media {
   grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
   gap: 2px;
 }
-.emoji-panel__grid .chat-picker__item {
+.emoji-panel__emoji {
+  display: grid;
+  place-items: center;
   width: 100%;
   aspect-ratio: 1;
-  height: auto;
-  font-size: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+}
+.emoji-panel__emoji:hover,
+.emoji-panel__emoji:focus-visible {
+  background: var(--surface-sunken);
+}
+.emoji-panel__emoji[aria-pressed='true'] {
+  background: var(--surface-sunken);
+  box-shadow: inset 0 0 0 2px var(--yapi);
+}
+.emoji-panel__none {
+  padding: var(--space-4);
+  text-align: center;
+}
+/* Where a phone's keyboard would be, under the message box. */
+.emoji-dock {
+  margin-top: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.emoji-dock .emoji-panel__body {
+  height: min(34dvh, 280px);
 }
 .chat-picker__item {
   display: grid;
@@ -12462,6 +12507,30 @@ button.profile-song__play::after {
   .yp-composer textarea {
     flex: 1 1 12rem;
     min-width: min(100%, 12rem);
+  }
+}
+/* A narrower column on a computer: the buttons tighten up and Send shows only its icon (it keeps
+   its accessible name), so everything stays on one row. 40px and 4px between: a 44px target each. */
+@media (min-width: 521px) and (max-width: 1360px) {
+  .yp-composer {
+    gap: 4px;
+  }
+  .yp-composer > .yp-action,
+  .yp-composer > .yp-menu > .yp-action {
+    width: 40px;
+    min-width: 40px;
+    padding-inline: 0;
+    justify-content: center;
+  }
+  .yp-composer > .yp-btn {
+    padding-inline: 12px;
+  }
+  .yp-composer .chat-send__label {
+    display: none;
+  }
+  .yp-composer textarea {
+    flex-basis: 8rem;
+    min-width: min(100%, 8rem);
   }
 }
 .yp-composer textarea::placeholder {

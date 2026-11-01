@@ -8,6 +8,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./i18n": "./src/i18n.ts",
+    "./emoji-data": "./src/emoji-data.ts",
     "./error-messages": "./src/locales/errors/index.ts"
   },
   "scripts": {

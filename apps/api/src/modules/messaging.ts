@@ -1195,7 +1195,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
   // ── Reactions ─────────────────────────────────────────────────────────
   // One emoji (with its skin tone, joiners or keycap): never words.
   const REACTION =
-    /^(?=.*[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}])[\p{Extended_Pictographic}\p{Emoji_Modifier}\u{1F1E6}-\u{1F1FF}\u200d\ufe0f\u20e3#*0-9]+$/u;
+    /^(?=.*[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}])[\p{Extended_Pictographic}\p{Emoji_Modifier}\u{1F1E6}-\u{1F1FF}\u{E0020}-\u{E007F}\u200d\ufe0f\u20e3#*0-9]+$/u;
   const reactionParams = z.object({ id: z.string().uuid(), emoji: z.string().min(1).max(16) });
 
   app.put('/v1/messages/:id/reactions/:emoji', { preHandler: requireAuth }, async (req) => {

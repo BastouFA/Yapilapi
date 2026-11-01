@@ -56,7 +56,9 @@ import {
   DisappearingSheet,
   clearCopiedVoice,
   copyVoice,
+  EmojiPicker,
   ForwardSheet,
+  noteReaction,
   MessageActions,
   useCopiedVoice,
   PinnedBar,
@@ -141,6 +143,7 @@ export default function Chat() {
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [editing, setEditing] = useState<Message | null>(null);
   const [actionsFor, setActionsFor] = useState<Message | null>(null);
+  const [emojiOpen, setEmojiOpen] = useState(false);
   const [forwarding, setForwarding] = useState<Message | null>(null);
   const copied = useCopiedVoice();
   const [pasting, setPasting] = useState(false);
@@ -1427,6 +1430,14 @@ export default function Chat() {
             >
               <Icon name="eye-outline" size={24} color={c.inkMuted} />
             </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('emoji.button')}
+              onPress={() => setEmojiOpen(true)}
+              style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Icon name="happy-outline" size={24} color={c.inkMuted} />
+            </Pressable>
             <TextInput
               ref={input}
               accessibilityLabel={t('inbox.placeholder')}
@@ -1548,6 +1559,22 @@ export default function Chat() {
           if (m) void react(m, emoji, on);
         }}
       />
+      <BottomSheet visible={emojiOpen} title={t('emoji.button')} onClose={() => setEmojiOpen(false)} scroll={false} gap={2}>
+        <EmojiPicker
+          onPick={(emoji) => {
+            noteReaction(emoji);
+            setBody((cur) => (cur + emoji).slice(0, 4000));
+          }}
+          onBackspace={() =>
+            setBody((cur) =>
+              [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(cur)]
+                .slice(0, -1)
+                .map((x) => x.segment)
+                .join(''),
+            )
+          }
+        />
+      </BottomSheet>
       <ForwardSheet message={forwarding} onClose={() => setForwarding(null)} onForwarded={addForwarded} />
       <MessageActions
         open={!!actionsFor}

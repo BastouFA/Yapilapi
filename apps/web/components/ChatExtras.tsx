@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { patiently } from '@yapilapi/api-client';
 import { Avatar, BottomSheet, Button, Icon } from '@yapilapi/design-system';
 import {
@@ -14,13 +14,6 @@ import {
   messagePreviewText,
   favouriteReactions,
   FORWARD_MAX_CHATS,
-  inTone,
-  REACTION_GROUPS,
-  readTone,
-  rememberReaction,
-  SKIN_TONES,
-  type SkinTone,
-  withTone,
   type Conversation,
   type Message,
   type MessageReceipt,
@@ -28,6 +21,7 @@ import {
   type MessagePreview,
   type PinnedMessage,
 } from '@yapilapi/shared';
+import { EmojiPicker, noteEmoji, useRecentEmojis, useSkinTone } from '@/components/EmojiPicker';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
 
@@ -95,68 +89,6 @@ export function ReactionRow({ message, mine, onToggle }: { message: Message; min
   );
 }
 
-// ── Your emojis: the ones you used lately, kept on this device ──
-const RECENT_KEY = 'ypl.reactions.recent';
-const NO_RECENT: string[] = [];
-let recent: string[] | null = null;
-const recentListeners = new Set<() => void>();
-function readRecent(): string[] {
-  if (recent) return recent;
-  try {
-    const v: unknown = JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]');
-    recent = Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
-  } catch {
-    recent = [];
-  }
-  return recent;
-}
-function noteReaction(emoji: string) {
-  recent = rememberReaction(readRecent(), emoji);
-  try {
-    localStorage.setItem(RECENT_KEY, JSON.stringify(recent));
-  } catch {
-    /* storage off: remembered for this visit */
-  }
-  recentListeners.forEach((l) => l());
-}
-function useRecentReactions(): string[] {
-  return useSyncExternalStore(
-    (l) => (recentListeners.add(l), () => void recentListeners.delete(l)),
-    readRecent,
-    () => NO_RECENT,
-  );
-}
-
-// ── Your skin colour for emojis, kept on this device ──
-const TONE_KEY = 'ypl.reactions.tone';
-let tone: SkinTone | null = null;
-const toneListeners = new Set<() => void>();
-function readSkinTone(): SkinTone {
-  if (tone !== null) return tone;
-  try {
-    tone = readTone(localStorage.getItem(TONE_KEY));
-  } catch {
-    tone = '';
-  }
-  return tone;
-}
-function chooseSkinTone(next: SkinTone) {
-  tone = next;
-  try {
-    localStorage.setItem(TONE_KEY, next);
-  } catch {
-    /* storage off: remembered for this visit */
-  }
-  toneListeners.forEach((l) => l());
-}
-function useSkinTone(): SkinTone {
-  return useSyncExternalStore(
-    (l) => (toneListeners.add(l), () => void toneListeners.delete(l)),
-    readSkinTone,
-    () => '',
-  );
-}
-
 /** The emoji you picked pops up out of its button and fades, so you see it land. */
 function burst(from: HTMLElement, emoji: string) {
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -175,7 +107,7 @@ function burst(from: HTMLElement, emoji: string) {
 function pickWith(onPick: (emoji: string) => void, mine: string[]) {
   return (e: string, button: HTMLElement) => {
     if (!mine.includes(e)) {
-      noteReaction(e);
+      noteEmoji(e);
       burst(button, e);
     }
     onPick(e);
@@ -202,7 +134,7 @@ export function ReactionPicker({
 }) {
   const { t } = useSession();
   // Your favourites: the emojis you used lately first, then the usual six.
-  const favourites = favouriteReactions(useRecentReactions(), useSkinTone());
+  const favourites = favouriteReactions(useRecentEmojis(), useSkinTone());
   const pick = pickWith(onPick, mine);
   const ref = useRef<HTMLDivElement>(null);
   const opener = useRef<HTMLElement | null>(null);
@@ -266,85 +198,13 @@ export function ReactionPicker({
   );
 }
 
-/**
- * Every emoji, by kind (the ones you used lately, faces, hearts, hands and people, celebrate, food
- * and drink, signs), from + in the reactions bar. The tabs jump to a kind. It stays open so you can
- * add several; one you already gave is lit, and picking it again takes it back. The row on top
- * chooses the skin colour of every hand and person, and stays chosen.
- */
+/** Every emoji (EmojiPicker), from + in the reactions bar. It stays open so you can add several; one you already gave is lit, and picking it again takes it back. */
 export function EmojiPanel({ open, mine = [], onPick, onClose }: { open: boolean; mine?: string[]; onPick: (emoji: string) => void; onClose: () => void }) {
   const { t } = useSession();
-  const body = useRef<HTMLDivElement>(null);
-  const recentOnes = useRecentReactions();
-  const skinTone = useSkinTone();
   const pick = pickWith(onPick, mine);
-  const groups: { id: string; emojis: readonly string[] }[] = [...(recentOnes.length ? [{ id: 'recent', emojis: recentOnes }] : []), ...REACTION_GROUPS].map(
-    (g) => ({
-      id: g.id,
-      emojis: inTone(g.emojis, skinTone),
-    }),
-  );
   return (
     <BottomSheet open={open} onClose={onClose} title={t('chat.react')}>
-      <div className="emoji-panel">
-        <div className="emoji-panel__tones" role="group" aria-labelledby="emoji-tones-h">
-          <span className="emoji-panel__heading" id="emoji-tones-h">
-            {t('emoji.skinTone')}
-          </span>
-          <div className="emoji-panel__tone-row">
-            {SKIN_TONES.map((option, i) => (
-              <button
-                key={option || 'yellow'}
-                type="button"
-                className="emoji-panel__tone"
-                aria-label={t(`emoji.tone${i}` as MessageKey)}
-                title={t(`emoji.tone${i}` as MessageKey)}
-                aria-pressed={skinTone === option}
-                onClick={() => chooseSkinTone(option)}
-              >
-                {withTone('👋', option)}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="emoji-panel__tabs" role="group" aria-label={t('chat.reactMore')}>
-          {groups.map((g) => (
-            <button
-              key={g.id}
-              type="button"
-              className="emoji-panel__tab"
-              aria-label={t(`emoji.${g.id}` as MessageKey)}
-              title={t(`emoji.${g.id}` as MessageKey)}
-              onClick={() => body.current?.querySelector(`#emoji-${g.id}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' })}
-            >
-              {g.id === 'recent' ? <Icon name="clock" size={20} /> : g.emojis[0]}
-            </button>
-          ))}
-        </div>
-        <div className="emoji-panel__body" ref={body}>
-          {groups.map((g) => (
-            <section key={g.id} id={`emoji-${g.id}`} aria-labelledby={`emoji-${g.id}-h`}>
-              <h3 className="emoji-panel__heading" id={`emoji-${g.id}-h`}>
-                {t(`emoji.${g.id}` as MessageKey)}
-              </h3>
-              <div className="emoji-panel__grid">
-                {g.emojis.map((e) => (
-                  <button
-                    key={e}
-                    type="button"
-                    className="chat-picker__item"
-                    aria-label={t('m.chat.reactWith', { emoji: e })}
-                    aria-pressed={mine.includes(e)}
-                    onClick={(ev) => pick(e, ev.currentTarget)}
-                  >
-                    {e}
-                  </button>
-                ))}
-              </div>
-            </section>
-          ))}
-        </div>
-      </div>
+      <EmojiPicker lit={mine} onPick={(emoji, from) => pick(emoji, from)} />
     </BottomSheet>
   );
 }

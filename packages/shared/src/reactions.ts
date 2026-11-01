@@ -1,220 +1,8 @@
 /**
- * Reactions on chat messages: six favourites always in reach, and every emoji people reach for in
- * a panel grouped by kind. Each person can add several to a message.
+ * Reactions on chat messages: six favourites always in reach, and every emoji (emoji-data.ts) in a
+ * panel. Each person can add several to a message.
  */
 export const QUICK_REACTIONS = ['❤️', '😂', '😮', '😢', '👍', '🙏'] as const;
-
-export type ReactionGroup = 'faces' | 'hearts' | 'people' | 'celebrate' | 'food' | 'signs';
-
-/** The panel's groups, in order, each with its emojis. */
-export const REACTION_GROUPS: { id: ReactionGroup; emojis: string[] }[] = [
-  {
-    id: 'faces',
-    emojis: [
-      '😀',
-      '😃',
-      '😄',
-      '😁',
-      '😆',
-      '😅',
-      '🤣',
-      '😂',
-      '🙂',
-      '🙃',
-      '😉',
-      '😊',
-      '😇',
-      '🥰',
-      '😍',
-      '🤩',
-      '😘',
-      '😗',
-      '😚',
-      '😋',
-      '😛',
-      '😜',
-      '🤪',
-      '😝',
-      '🤑',
-      '🤗',
-      '🤭',
-      '🫢',
-      '🤫',
-      '🤔',
-      '🫡',
-      '🤐',
-      '🤨',
-      '😐',
-      '😑',
-      '😶',
-      '🫠',
-      '😏',
-      '😒',
-      '🙄',
-      '😬',
-      '😌',
-      '😔',
-      '😪',
-      '🤤',
-      '😴',
-      '😷',
-      '🤒',
-      '🤕',
-      '🤢',
-      '🤮',
-      '🥵',
-      '🥶',
-      '🥴',
-      '😵',
-      '🤯',
-      '🤠',
-      '🥳',
-      '🥸',
-      '😎',
-      '🤓',
-      '🧐',
-      '😕',
-      '🫤',
-      '😟',
-      '🙁',
-      '😮',
-      '😯',
-      '😲',
-      '😳',
-      '🥺',
-      '🥹',
-      '😦',
-      '😧',
-      '😨',
-      '😰',
-      '😥',
-      '😢',
-      '😭',
-      '😱',
-      '😖',
-      '😣',
-      '😞',
-      '😓',
-      '😩',
-      '😫',
-      '🥱',
-      '😤',
-      '😡',
-      '😠',
-      '🤬',
-      '😈',
-      '💀',
-      '💩',
-      '🤡',
-      '👻',
-      '👽',
-      '🤖',
-      '😺',
-      '😹',
-      '😻',
-      '🙈',
-      '🙉',
-      '🙊',
-    ],
-  },
-  {
-    id: 'hearts',
-    emojis: ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❤️‍🔥', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💯', '💢', '💥', '💫'],
-  },
-  {
-    id: 'people',
-    emojis: [
-      '👋',
-      '🤚',
-      '✋',
-      '🖖',
-      '👌',
-      '🤌',
-      '🤏',
-      '✌️',
-      '🤞',
-      '🫰',
-      '🤟',
-      '🤘',
-      '🤙',
-      '👈',
-      '👉',
-      '👆',
-      '👇',
-      '☝️',
-      '👍',
-      '👎',
-      '✊',
-      '👊',
-      '🤛',
-      '🤜',
-      '👏',
-      '🙌',
-      '🫶',
-      '👐',
-      '🤲',
-      '🤝',
-      '🙏',
-      '✍️',
-      '💪',
-      '🦾',
-      '👀',
-      '🧠',
-      '🫂',
-      '💃',
-      '🕺',
-      '🏃',
-      '🤷',
-      '🤦',
-    ],
-  },
-  {
-    id: 'celebrate',
-    emojis: [
-      '🔥',
-      '✨',
-      '⭐',
-      '🌟',
-      '⚡',
-      '🌈',
-      '☀️',
-      '🌙',
-      '❄️',
-      '🌸',
-      '🌹',
-      '🌻',
-      '🍀',
-      '🌍',
-      '🎉',
-      '🎊',
-      '🎈',
-      '🎁',
-      '🏆',
-      '🥇',
-      '⚽',
-      '🏀',
-      '🎶',
-      '🎵',
-      '🎤',
-      '🎧',
-      '🎬',
-      '📸',
-      '💡',
-      '💰',
-      '💸',
-      '📍',
-      '🚀',
-      '✈️',
-      '🚗',
-      '🏠',
-      '⏰',
-      '📚',
-      '💻',
-    ],
-  },
-  { id: 'food', emojis: ['🍕', '🍔', '🍟', '🌮', '🍜', '🍣', '🍫', '🍩', '🍰', '🎂', '🍿', '☕', '🍺', '🥂', '🍷', '🍉', '🍌', '🥑', '🌶️', '🍗'] },
-  { id: 'signs', emojis: ['✅', '❌', '❓', '❗', '‼️', '⁉️', '💬', '💭', '👑', '💎', '🎯', '🔔', '🆗', '🆒', '🔝', '♻️', '🇳🇬', '🇹🇬', '🇫🇷'] },
-];
 
 /** How many emojis you used lately are kept, most recent first. */
 export const RECENT_REACTIONS_MAX = 18;
@@ -223,8 +11,12 @@ export const RECENT_REACTIONS_MAX = 18;
 export const SKIN_TONES = ['', '🏻', '🏼', '🏽', '🏾', '🏿'] as const;
 export type SkinTone = (typeof SKIN_TONES)[number];
 
-/** Hands and people that come in every skin colour. */
-const TAKES_TONE = new Set([...'👋🤚✋🖖👌🤌🤏✌🤞🫰🤟🤘🤙👈👉👆👇☝👍👎✊👊🤛🤜👏🙌🫶👐🤲🤝🙏✍💪💃🕺🏃🤷🤦']);
+/** Everything that comes in every skin colour (generated with emoji-data.ts, from the same list). */
+const TAKES_TONE = new Set(
+  '☝ ⛹ ⛹‍♀ ⛹‍♂ ✊ ✋ ✌ ✍ 🎅 🏂 🏃 🏃‍♀ 🏃‍♂ 🏄 🏄‍♀ 🏄‍♂ 🏇 🏊 🏊‍♀ 🏊‍♂ 🏋 🏋‍♀ 🏋‍♂ 🏌 🏌‍♀ 🏌‍♂ 👂 👃 👆 👇 👈 👉 👊 👋 👌 👍 👎 👏 👐 👦 👧 👨 👨‍⚕ 👨‍⚖ 👨‍✈ 👨‍🌾 👨‍🍳 👨‍🍼 👨‍🎓 👨‍🎤 👨‍🎨 👨‍🏫 👨‍🏭 👨‍💻 👨‍💼 👨‍🔧 👨‍🔬 👨‍🚀 👨‍🚒 👨‍🦯 👨‍🦰 👨‍🦱 👨‍🦲 👨‍🦳 👨‍🦼 👨‍🦽 👩 👩‍⚕ 👩‍⚖ 👩‍✈ 👩‍🌾 👩‍🍳 👩‍🍼 👩‍🎓 👩‍🎤 👩‍🎨 👩‍🏫 👩‍🏭 👩‍💻 👩‍💼 👩‍🔧 👩‍🔬 👩‍🚀 👩‍🚒 👩‍🦯 👩‍🦰 👩‍🦱 👩‍🦲 👩‍🦳 👩‍🦼 👩‍🦽 👫 👬 👭 👮 👮‍♀ 👮‍♂ 👰 👰‍♀ 👰‍♂ 👱 👱‍♀ 👱‍♂ 👲 👳 👳‍♀ 👳‍♂ 👴 👵 👶 👷 👷‍♀ 👷‍♂ 👸 👼 💁 💁‍♀ 💁‍♂ 💂 💂‍♀ 💂‍♂ 💃 💅 💆 💆‍♀ 💆‍♂ 💇 💇‍♀ 💇‍♂ 💏 💑 💪 🕴 🕵 🕵‍♀ 🕵‍♂ 🕺 🖐 🖕 🖖 🙅 🙅‍♀ 🙅‍♂ 🙆 🙆‍♀ 🙆‍♂ 🙇 🙇‍♀ 🙇‍♂ 🙋 🙋‍♀ 🙋‍♂ 🙌 🙍 🙍‍♀ 🙍‍♂ 🙎 🙎‍♀ 🙎‍♂ 🙏 🚣 🚣‍♀ 🚣‍♂ 🚴 🚴‍♀ 🚴‍♂ 🚵 🚵‍♀ 🚵‍♂ 🚶 🚶‍♀ 🚶‍♂ 🛀 🛌 🤌 🤏 🤘 🤙 🤚 🤛 🤜 🤝 🤞 🤟 🤦 🤦‍♀ 🤦‍♂ 🤰 🤱 🤲 🤳 🤴 🤵 🤵‍♀ 🤵‍♂ 🤶 🤷 🤷‍♀ 🤷‍♂ 🤸 🤸‍♀ 🤸‍♂ 🤹 🤹‍♀ 🤹‍♂ 🤽 🤽‍♀ 🤽‍♂ 🤾 🤾‍♀ 🤾‍♂ 🥷 🦵 🦶 🦸 🦸‍♀ 🦸‍♂ 🦹 🦹‍♀ 🦹‍♂ 🦻 🧍 🧍‍♀ 🧍‍♂ 🧎 🧎‍♀ 🧎‍♂ 🧏 🧏‍♀ 🧏‍♂ 🧑 🧑‍⚕ 🧑‍⚖ 🧑‍✈ 🧑‍🌾 🧑‍🍳 🧑‍🍼 🧑‍🎄 🧑‍🎓 🧑‍🎤 🧑‍🎨 🧑‍🏫 🧑‍🏭 🧑‍💻 🧑‍💼 🧑‍🔧 🧑‍🔬 🧑‍🚀 🧑‍🚒 🧑‍🦯 🧑‍🦰 🧑‍🦱 🧑‍🦲 🧑‍🦳 🧑‍🦼 🧑‍🦽 🧒 🧓 🧔 🧔‍♀ 🧔‍♂ 🧕 🧖 🧖‍♀ 🧖‍♂ 🧗 🧗‍♀ 🧗‍♂ 🧘 🧘‍♀ 🧘‍♂ 🧙 🧙‍♀ 🧙‍♂ 🧚 🧚‍♀ 🧚‍♂ 🧛 🧛‍♀ 🧛‍♂ 🧜 🧜‍♀ 🧜‍♂ 🧝 🧝‍♀ 🧝‍♂ 🫃 🫄 🫅 🫰 🫱 🫲 🫳 🫴 🫵 🫶'.split(
+    ' ',
+  ),
+);
 
 const withoutTone = (emoji: string) => emoji.replace(/[\u{1F3FB}-\u{1F3FF}]/gu, '');
 
@@ -233,9 +25,12 @@ const sameEmoji = (emoji: string) => withoutTone(emoji).replace(/\ufe0f/g, '');
 
 /** An emoji in your skin colour, when it comes in colours. */
 export function withTone(emoji: string, tone: SkinTone): string {
-  const base = sameEmoji(emoji);
-  if (!TAKES_TONE.has(base)) return emoji;
-  return tone ? base + tone : withoutTone(emoji);
+  if (!TAKES_TONE.has(sameEmoji(emoji))) return emoji;
+  const plain = withoutTone(emoji);
+  if (!tone) return plain;
+  // The colour goes right after the first character: a doctor is person + colour + joined staff.
+  const [first, ...rest] = [...plain];
+  return first + tone + (rest[0] === '\ufe0f' ? rest.slice(1) : rest).join('');
 }
 
 /** Emojis in your skin colour, once each. */
