@@ -7118,6 +7118,7 @@ export const pt: Catalog = {
   'admin.mic.chains': 'Correntes: {active} ativas esta semana, {links} reels em correntes',
   'admin.mic.fairStart': 'Impulso inicial: {active} em andamento, {slowed} mais lentos, {done} terminados',
   'map.title': 'Perto de você',
+  'map.live': 'Ao vivo · atualiza sozinho',
   'map.hint': 'Lives, eventos, coisas à venda e amigos na rua ao seu redor, agora mesmo.',
   'map.layer.places': 'Lugares movimentados',
   'map.layer.chains': 'Correntes perto de você',

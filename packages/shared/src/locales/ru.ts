@@ -7494,6 +7494,7 @@ export const ru: Catalog = {
   'push.message.count.few': '{count} новых сообщения',
   'push.message.count.many': '{count} новых сообщений',
   'map.title': 'Рядом с вами',
+  'map.live': 'В эфире · обновляется сама',
   'map.hint': 'Эфиры, события, вещи на продажу и друзья, которые гуляют рядом с вами, прямо сейчас.',
   'map.layer.places': 'Оживлённые места',
   'map.layer.chains': 'Цепочки рядом',

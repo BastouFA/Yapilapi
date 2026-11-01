@@ -7152,6 +7152,7 @@ export const zu: Catalog = {
   'push.message.count.one': 'Umlayezo omusha',
   'push.message.count.other': 'Imilayezo emisha engu-{count}',
   'map.title': 'Eduze nawe',
+  'map.live': 'Bukhoma · iyazibuyekeza',
   'map.hint': 'Okubukhoma, imicimbi, izinto ezidayiswayo nabangane abaphumile eduze kwakho, manje.',
   'map.layer.places': 'Izindawo eziphithizelayo',
   'map.layer.chains': 'Izinchungechunge eduze kwakho',

@@ -407,3 +407,33 @@
   font-weight: 500;
   color: var(--ink-muted);
 }
+
+/* "Live · updates by itself" beside the title, with a pulsing dot. */
+.citymap-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  background: color-mix(in oklab, var(--yapi) 14%, transparent);
+  color: var(--ink);
+  font: 600 13px/18px var(--font-sans);
+}
+.citymap-live__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--yapi);
+  box-shadow: 0 0 0 0 color-mix(in oklab, var(--yapi) 60%, transparent);
+  animation: citymap-live 1.6s ease-out infinite;
+}
+@keyframes citymap-live {
+  100% {
+    box-shadow: 0 0 0 8px transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .citymap-live__dot {
+    animation: none;
+  }
+}

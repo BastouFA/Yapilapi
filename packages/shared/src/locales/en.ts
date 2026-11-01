@@ -7099,6 +7099,7 @@ export const en = {
   'admin.mic.chains': 'Chains: {active} active this week, {links} reels in chains',
   'admin.mic.fairStart': 'Fair start: {active} running, {slowed} slowed, {done} finished',
   'map.title': 'Near you',
+  'map.live': 'Live · updates by itself',
   'map.hint': 'Lives, events, things for sale and friends out around you, right now.',
   'map.layer.places': 'Places buzzing',
   'map.layer.chains': 'Chains near you',

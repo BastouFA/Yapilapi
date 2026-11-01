@@ -7114,6 +7114,7 @@ export const vi: Catalog = {
   'push.message.count.one': 'Tin nhắn mới',
   'push.message.count.other': '{count} tin nhắn mới',
   'map.title': 'Gần bạn',
+  'map.live': 'Trực tiếp · tự cập nhật',
   'map.hint': 'Phát trực tiếp, sự kiện, đồ đang bán và bạn bè đang ra ngoài quanh bạn, ngay lúc này.',
   'map.layer.places': 'Địa điểm sôi động',
   'map.layer.chains': 'Chuỗi gần bạn',

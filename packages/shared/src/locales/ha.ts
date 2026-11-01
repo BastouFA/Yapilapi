@@ -7123,6 +7123,7 @@ export const ha: Catalog = {
   'admin.mic.chains': 'Sarƙoƙi: {active} suna aiki a wannan makon, reels {links} a cikin sarƙoƙi',
   'admin.mic.fairStart': 'Farawa mai adalci: {active} suna gudana, {slowed} an rage su, {done} sun ƙare',
   'map.title': 'Kusa da kai',
+  'map.live': 'Kai tsaye · yana sabunta kansa',
   'map.hint': 'Kai tsaye, taruka, kayan sayarwa da abokai da ke waje a kusa da kai, yanzu.',
   'map.layer.places': 'Wurare masu hada-hada',
   'map.layer.chains': 'Sarƙoƙi kusa da kai',

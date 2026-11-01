@@ -7149,6 +7149,7 @@ export const de: Catalog = {
   'push.message.count.one': 'Neue Nachricht',
   'push.message.count.other': '{count} neue Nachrichten',
   'map.title': 'In deiner Nähe',
+  'map.live': 'Live · aktualisiert sich selbst',
   'map.hint': 'Lives, Events, Dinge zu verkaufen und Freunde unterwegs in deiner Nähe, jetzt gerade.',
   'map.layer.places': 'Belebte Orte',
   'map.layer.chains': 'Ketten in deiner Nähe',

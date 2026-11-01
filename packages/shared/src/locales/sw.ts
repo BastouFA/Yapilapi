@@ -7122,6 +7122,7 @@ export const sw: Catalog = {
   'admin.mic.chains': 'Minyororo: {active} hai wiki hii, reel {links} kwenye minyororo',
   'admin.mic.fairStart': 'Mwanzo wa haki: {active} zinaendelea, {slowed} zimepunguzwa kasi, {done} zimekamilika',
   'map.title': 'Karibu nawe',
+  'map.live': 'Moja kwa moja · hujisasisha yenyewe',
   'map.hint': 'Matangazo ya moja kwa moja, matukio, vitu vya kuuza na marafiki walio nje karibu nawe, sasa hivi.',
   'map.layer.places': 'Maeneo yenye shughuli',
   'map.layer.chains': 'Minyororo karibu nawe',

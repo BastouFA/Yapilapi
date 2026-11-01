@@ -23,7 +23,7 @@ import { api, ApiError, errorMessage } from '@/lib/api';
 import { FeatureOff } from '@/components/FeatureOff';
 import { useApproxHere } from '@/components/Market';
 import { MapItemRow, TileMap, type MapView } from '@/components/CityMap';
-import { useSession } from '../../providers';
+import { useRealtime, useSession } from '../../providers';
 
 const zone = () => {
   try {
@@ -69,6 +69,21 @@ export default function MapPage() {
   const [duration, setDuration] = useState<MapPresenceDuration>('1h');
   const [presenceBusy, setPresenceBusy] = useState(false);
   const seq = useRef(0);
+  // Live: the map asks again every 20 seconds while it's on screen, at once when you come back to it,
+  // and when a friend's shared location moves or a live starts or ends.
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const again = () => document.visibilityState === 'visible' && setTick((n) => n + 1);
+    const timer = setInterval(again, 20_000);
+    document.addEventListener('visibilitychange', again);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', again);
+    };
+  }, []);
+  useRealtime((e) => {
+    if (e.type === 'location.updated' || e.type === 'live.status') setTick((n) => n + 1);
+  });
 
   // Where to start: the browser (when already allowed), the profile's city, or a search.
   useEffect(() => {
@@ -135,7 +150,7 @@ export default function MapPage() {
         });
     }, 350);
     return () => clearTimeout(timer);
-  }, [view, size, layers]);
+  }, [view, size, layers, tick]);
 
   const toHere = useCallback(async () => {
     const p = await place.locate();
@@ -185,6 +200,10 @@ export default function MapPage() {
     <div className="yp-shell__inner yp-shell__inner--wide stack">
       <div className="yp-topbar">
         <h1>{t('map.title')}</h1>
+        <span className="citymap-live">
+          <span className="citymap-live__dot" aria-hidden="true" />
+          {t('map.live')}
+        </span>
       </div>
       <p className="muted citymap-page__intro">{t('map.hint')}</p>
 

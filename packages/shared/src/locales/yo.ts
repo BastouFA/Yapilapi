@@ -7099,6 +7099,7 @@ export const yo: Catalog = {
   'admin.mic.chains': 'Àwọn ẹ̀wọ̀n: {active} ló ń ṣiṣẹ́ ní ọ̀sẹ̀ yìí, reel {links} wà nínú ẹ̀wọ̀n',
   'admin.mic.fairStart': 'Ìbẹ̀rẹ̀ dọ́gba: {active} ń lọ lọ́wọ́, {slowed} ti dín kù, {done} ti parí',
   'map.title': 'Nítòsí rẹ',
+  'map.live': 'Láàyè · ó ń ṣe àtúnṣe ara rẹ̀',
   'map.hint': 'Àwọn ìgbóhùnsáfẹ́fẹ́ tààrà, ìṣẹ̀lẹ̀, ọjà tí wọ́n ń tà àti àwọn ọ̀rẹ́ tó jáde ní àyíká rẹ, báyìí.',
   'map.layer.places': 'Àwọn ibi tó ń dùn',
   'map.layer.chains': 'Àwọn ẹ̀wọ̀n nítòsí rẹ',

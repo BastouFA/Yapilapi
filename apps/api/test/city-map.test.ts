@@ -412,6 +412,28 @@ describe('Near you: the box', () => {
     expect((await as(t.app, u).get('/v1/map/center')).body.center.city).toBe('Port Harcourt');
   });
 
+  it('opens on a city with no place pages yet, from the map service', async () => {
+    const asked: string[] = [];
+    const g = await testApp(
+      {},
+      {
+        geocoder: {
+          enabled: true,
+          reverse: async () => null,
+          city: async (name) => (asked.push(name), name.toLowerCase().startsWith('lom') ? { city: 'Lomé', lat: 6.13, lng: 1.22 } : null),
+        },
+      },
+    );
+    try {
+      const u = await signUp(g.app, { birthDate: '1990-04-02' });
+      expect((await as(g.app, u).get('/v1/map/center?city=Lome')).body.center).toEqual({ center: { lat: 6.13, lng: 1.22 }, city: 'Lomé' });
+      expect((await as(g.app, u).get('/v1/map/center?city=Atlantis')).body.center).toBeNull();
+      expect(asked).toEqual(['Lome', 'Atlantis']);
+    } finally {
+      await g.close();
+    }
+  });
+
   it('puts "Show me on the map" in the data export without the place', async () => {
     const at = spot(16);
     const u = await adult();

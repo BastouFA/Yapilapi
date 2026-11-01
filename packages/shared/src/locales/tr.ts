@@ -7109,6 +7109,7 @@ export const tr: Catalog = {
   'push.message.count.one': 'Yeni mesaj',
   'push.message.count.other': '{count} yeni mesaj',
   'map.title': 'Yakınında',
+  'map.live': 'Canlı · kendiliğinden güncellenir',
   'map.hint': 'Şu anda çevrendeki canlı yayınlar, etkinlikler, satılık eşyalar ve dışarıdaki arkadaşlar.',
   'map.layer.places': 'Hareketli yerler',
   'map.layer.chains': 'Yakınındaki zincirler',

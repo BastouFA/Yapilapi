@@ -7102,6 +7102,7 @@ export const hi: Catalog = {
   'push.message.count.one': 'नया मैसेज',
   'push.message.count.other': '{count} नए मैसेज',
   'map.title': 'आपके आस-पास',
+  'map.live': 'लाइव · अपने आप अपडेट होता है',
   'map.hint': 'अभी आपके आस-पास की लाइव, इवेंट, बिकने वाली चीज़ें और बाहर निकले दोस्त।',
   'map.layer.places': 'चहल-पहल वाली जगहें',
   'map.layer.chains': 'आपके आस-पास की चेन',

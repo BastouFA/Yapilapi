@@ -7087,6 +7087,7 @@ export const ja: Catalog = {
   'push.message.count.one': '新着メッセージ',
   'push.message.count.other': '{count}件の新着メッセージ',
   'map.title': 'あなたの近く',
+  'map.live': 'ライブ · 自動で更新',
   'map.hint': '周りで今起きているライブ、イベント、売り物、出かけている友達。',
   'map.layer.places': 'にぎわう場所',
   'map.layer.chains': '近くのリレー',

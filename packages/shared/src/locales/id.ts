@@ -7144,6 +7144,7 @@ export const id: Catalog = {
   'push.message.count.one': 'Pesan baru',
   'push.message.count.other': '{count} pesan baru',
   'map.title': 'Di dekat Anda',
+  'map.live': 'Langsung · diperbarui sendiri',
   'map.hint': 'Siaran langsung, acara, barang dijual, dan teman yang sedang keluar di sekitar Anda, saat ini.',
   'map.layer.places': 'Tempat ramai',
   'map.layer.chains': 'Rantai di dekat Anda',

@@ -7107,6 +7107,7 @@ export const ig: Catalog = {
   'push.message.count.one': 'Ozi ọhụrụ',
   'push.message.count.other': 'Ozi ọhụrụ {count}',
   'map.title': 'Nso gị',
+  'map.live': 'Ndụ · na-emelite onwe ya',
   'map.hint': 'Live, mmemme, ihe a na-ere na ndị enyi pụrụ apụ gburugburu gị, ugbu a.',
   'map.layer.places': 'Ebe ndị na-ewu ewu',
   'map.layer.chains': 'Agbụ dị nso gị',

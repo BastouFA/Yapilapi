@@ -7047,6 +7047,7 @@ export const zh: Catalog = {
   'push.message.count.one': '新消息',
   'push.message.count.other': '{count} 条新消息',
   'map.title': '你附近',
+  'map.live': '实时 · 自动更新',
   'map.hint': '你周围此刻的直播、活动、在售物品和外出的朋友。',
   'map.layer.places': '热闹的地点',
   'map.layer.chains': '你附近的接力',

@@ -7127,6 +7127,7 @@ export const es: Catalog = {
   'admin.mic.chains': 'Cadenas: {active} activas esta semana, {links} reels en cadenas',
   'admin.mic.fairStart': 'Impulso inicial: {active} en curso, {slowed} más lentos, {done} terminados',
   'map.title': 'Cerca de ti',
+  'map.live': 'En vivo · se actualiza solo',
   'map.hint': 'Directos, eventos, cosas en venta y amigos que han salido a tu alrededor, ahora mismo.',
   'map.layer.places': 'Lugares con ambiente',
   'map.layer.chains': 'Cadenas cerca de ti',

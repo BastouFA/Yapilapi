@@ -7067,6 +7067,7 @@ export const ko: Catalog = {
   'push.message.count.one': '새 메시지',
   'push.message.count.other': '새 메시지 {count}개',
   'map.title': '내 주변',
+  'map.live': '라이브 · 자동으로 업데이트',
   'map.hint': '지금 내 주변의 라이브, 이벤트, 판매 중인 물건, 외출 중인 친구.',
   'map.layer.places': '북적이는 장소',
   'map.layer.chains': '내 주변 릴레이',

@@ -7410,6 +7410,7 @@ export const ar: Catalog = {
   'admin.mic.chains': 'السلاسل: {active} نشطة هذا الأسبوع، و{links} مقطع في السلاسل',
   'admin.mic.fairStart': 'البداية العادلة: {active} قيد التشغيل، و{slowed} أبطأ، و{done} منتهية',
   'map.title': 'بالقرب منك',
+  'map.live': 'مباشر · يتحدّث تلقائيًا',
   'map.hint': 'بثوث مباشرة وفعاليات وأشياء للبيع وأصدقاء في الخارج من حولك، الآن.',
   'map.layer.places': 'أماكن نشطة',
   'map.layer.chains': 'سلاسل بالقرب منك',

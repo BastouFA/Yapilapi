@@ -7,6 +7,7 @@ import { createMapCache, mapItems, presenceOf, safeZone, setPresence, stopPresen
 import { seesSensitiveMedia } from '../lib/interactions.ts';
 import { isEnabled } from '../lib/services.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
+import { requestLocale } from '../lib/error-language.ts';
 
 /**
  * Near you (docs/product/city-map.md, lib/city-map.ts): what's happening in a box on the map, and
@@ -64,7 +65,10 @@ export default async function cityMapModule(app: FastifyInstance, ctx: AppContex
       [like, city],
     );
     const r = rows[0];
-    const center: MapCenter | null = r ? { center: { lat: Number(r.lat), lng: Number(r.lng) }, city: r.city } : null;
+    if (r) return { center: { center: { lat: Number(r.lat), lng: Number(r.lng) }, city: r.city } satisfies MapCenter };
+    // No place pages there yet: the city itself, from the map service, so the map still opens on it.
+    const found = await ctx.geocoder.city?.(city, requestLocale(req)).catch(() => null);
+    const center: MapCenter | null = found ? { center: { lat: found.lat, lng: found.lng }, city: found.city } : null;
     return { center };
   });
 

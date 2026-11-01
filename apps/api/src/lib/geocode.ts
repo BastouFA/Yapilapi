@@ -17,6 +17,8 @@ export interface Geocoder {
   enabled: boolean;
   /** The area at this point, named in `locale` where the map has it; null when it can't be told. */
   reverse(p: LatLng, locale: string): Promise<PlaceArea | null>;
+  /** Where a city is (its middle), for the map's "Search a city" when it has no place pages yet. */
+  city?(name: string, locale: string): Promise<{ city: string; lat: number; lng: number } | null>;
 }
 
 const USER_AGENT = 'YAPILAPI/1.0 (+https://yapilapi.com)';
@@ -50,6 +52,7 @@ export function nominatimGeocoder(opts: { baseUrl: string; fetch?: typeof fetch;
   const doFetch = opts.fetch ?? fetch;
   const now = opts.now ?? Date.now;
   const cache = new Map<string, { area: PlaceArea | null; until: number }>();
+  const cities = new Map<string, { found: { city: string; lat: number; lng: number } | null; until: number }>();
   let lastSent = -Infinity;
 
   function remember(key: string, area: PlaceArea | null) {
@@ -86,6 +89,33 @@ export function nominatimGeocoder(opts: { baseUrl: string; fetch?: typeof fetch;
         return area;
       } catch (e) {
         opts.log?.('Reverse geocoding failed', e);
+        return null;
+      }
+    },
+    async city(name, locale) {
+      const q = name.trim().replace(/\s+/g, ' ').slice(0, 60);
+      if (!base || !q) return null;
+      const lang = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/.test(locale) ? locale : 'en';
+      const key = `city:${q.toLowerCase()},${lang}`;
+      const kept = cities.get(key);
+      if (kept && kept.until > now()) return kept.found;
+      if (now() - lastSent < MIN_GAP_MS) return null;
+      lastSent = now();
+      const url = new URL(`${base}/search`);
+      for (const [k, v] of Object.entries({ format: 'jsonv2', q, limit: '1', featureType: 'settlement', 'accept-language': lang })) url.searchParams.set(k, v);
+      try {
+        const res = await doFetch(url, { headers: { accept: 'application/json', 'user-agent': USER_AGENT }, signal: AbortSignal.timeout(TIMEOUT_MS) });
+        if (!res.ok) return null;
+        const hit = ((await res.json()) as { lat?: string; lon?: string; name?: string }[])[0];
+        const lat = Number(hit?.lat);
+        const lng = Number(hit?.lon);
+        const found = hit && Number.isFinite(lat) && Number.isFinite(lng) ? { city: (hit.name || q).slice(0, 100), lat, lng } : null;
+        cities.delete(key);
+        cities.set(key, { found, until: now() + CACHE_TTL_MS });
+        while (cities.size > CACHE_MAX) cities.delete(cities.keys().next().value!);
+        return found;
+      } catch (e) {
+        opts.log?.('City search failed', e);
         return null;
       }
     },

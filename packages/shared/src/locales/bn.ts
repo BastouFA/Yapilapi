@@ -7095,6 +7095,7 @@ export const bn: Catalog = {
   'push.message.count.one': 'নতুন মেসেজ',
   'push.message.count.other': '{count}টি নতুন মেসেজ',
   'map.title': 'আপনার কাছাকাছি',
+  'map.live': 'লাইভ · নিজে থেকেই আপডেট হয়',
   'map.hint': 'এই মুহূর্তে আপনার আশেপাশের লাইভ, ইভেন্ট, বিক্রির জিনিস আর বাইরে থাকা বন্ধুরা।',
   'map.layer.places': 'জমজমাট জায়গা',
   'map.layer.chains': 'আপনার কাছাকাছি চেইন',

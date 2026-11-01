@@ -7048,6 +7048,7 @@ export const am: Catalog = {
   'push.message.count.one': 'አዲስ መልዕክት',
   'push.message.count.other': '{count} አዲስ መልዕክቶች',
   'map.title': 'በአቅራቢያዎ',
+  'map.live': 'በቀጥታ · ራሱ ይዘምናል',
   'map.hint': 'አሁን በአካባቢዎ ያሉ የቀጥታ ስርጭቶች፣ ዝግጅቶች፣ የሚሸጡ ዕቃዎች እና ወጥተው ያሉ ጓደኞች።',
   'map.layer.places': 'የተጨናነቁ ቦታዎች',
   'map.layer.chains': 'በአቅራቢያዎ ያሉ ሰንሰለቶች',

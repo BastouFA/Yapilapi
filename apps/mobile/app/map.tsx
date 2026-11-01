@@ -21,9 +21,9 @@ import { client, errorMessage } from '../lib/api';
 import { CityMapView, LayerChip, MapItemRow, PinCard, readHere } from '../lib/city-map';
 import { useFlag } from '../lib/flags';
 import { useT } from '../lib/i18n';
-import { useSession } from '../lib/session';
+import { useRealtime, useSession } from '../lib/session';
 import { radius, space } from '../lib/theme';
-import { BottomSheet, Button, EmptyState, ErrorState, Icon, Loading, Notice, Segmented, useColors, userText } from '../lib/ui';
+import { BottomSheet, Button, EmptyState, ErrorState, Icon, Loading, Notice, Segmented, useColors, userText, useScreenFocused } from '../lib/ui';
 
 /**
  * Near you (docs/product/city-map.md): what's on around here right now, on a map or as a list,
@@ -61,6 +61,18 @@ export default function MapScreen() {
   const [fetching, setFetching] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
+  // Live: the map asks again every 20 seconds while it's on screen, and when a friend's shared
+  // location moves or a live starts or ends.
+  const [tick, setTick] = useState(0);
+  const focused = useScreenFocused();
+  useEffect(() => {
+    if (!focused) return;
+    const timer = setInterval(() => setTick((n) => n + 1), 20_000);
+    return () => clearInterval(timer);
+  }, [focused]);
+  useRealtime((e) => {
+    if (e.type === 'location.updated' || e.type === 'live.status' || e.type === 'app.foreground') setTick((n) => n + 1);
+  });
   const [selected, setSelected] = useState<MapCluster | null>(null);
   const [city, setCity] = useState('');
   const [cityError, setCityError] = useState<string | null>(null);
@@ -137,7 +149,7 @@ export default function MapScreen() {
       })();
     }, 400);
     return () => clearTimeout(timer);
-  }, [center, zoom, size.width, size.height, layersKey, off, retry]);
+  }, [center, zoom, size.width, size.height, layersKey, off, retry, tick]);
 
   // "Show me on the map to friends": yours, and moved to where you are when the map opens with location allowed.
   const [presence, setPresence] = useState<MapPresence | null | undefined>(undefined);
@@ -325,6 +337,10 @@ export default function MapScreen() {
         contentContainerStyle={{ padding: space[4], gap: space[4] }}
         keyboardShouldPersistTaps="handled"
       >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start' }}>
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.yapi }} />
+          <Text style={{ color: c.ink, fontSize: 13, fontWeight: '600' }}>{t('map.live')}</Text>
+        </View>
         <Text style={{ color: c.inkMuted, fontSize: 15, lineHeight: 22 }}>{t('map.hint')}</Text>
         {search}
         {useLocation}

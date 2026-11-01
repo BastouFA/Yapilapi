@@ -7106,6 +7106,7 @@ export const ur: Catalog = {
   'push.message.count.one': 'نیا پیغام',
   'push.message.count.other': '{count} نئے پیغامات',
   'map.title': 'آپ کے آس پاس',
+  'map.live': 'لائیو · خود بخود اپ ڈیٹ ہوتا ہے',
   'map.hint': 'ابھی آپ کے آس پاس لائیو، ایونٹس، بکنے والی چیزیں اور باہر نکلے دوست۔',
   'map.layer.places': 'رونق والی جگہیں',
   'map.layer.chains': 'آپ کے آس پاس کے سلسلے',

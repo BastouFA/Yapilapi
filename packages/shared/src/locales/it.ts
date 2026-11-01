@@ -7136,6 +7136,7 @@ export const it: Catalog = {
   'push.message.count.one': 'Nuovo messaggio',
   'push.message.count.other': '{count} nuovi messaggi',
   'map.title': 'Vicino a te',
+  'map.live': 'Dal vivo · si aggiorna da solo',
   'map.hint': 'Live, eventi, cose in vendita e amici in giro intorno a te, proprio ora.',
   'map.layer.places': 'Luoghi animati',
   'map.layer.chains': 'Catene vicino a te',

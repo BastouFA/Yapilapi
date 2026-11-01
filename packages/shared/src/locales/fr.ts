@@ -7152,6 +7152,7 @@ export const fr: Catalog = {
   'admin.mic.chains': 'Chaînes : {active} actives cette semaine, {links} reels dans des chaînes',
   'admin.mic.fairStart': 'Coup de pouce : {active} en cours, {slowed} ralentis, {done} terminés',
   'map.title': 'Près de toi',
+  'map.live': 'En direct · se met à jour tout seul',
   'map.hint': 'Lives, événements, objets à vendre et amis de sortie autour de toi, en ce moment.',
   'map.layer.places': 'Lieux animés',
   'map.layer.chains': 'Chaînes près de toi',

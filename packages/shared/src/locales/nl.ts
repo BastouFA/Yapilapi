@@ -7133,6 +7133,7 @@ export const nl: Catalog = {
   'admin.mic.chains': 'Ketens: {active} actief deze week, {links} reels in ketens',
   'admin.mic.fairStart': 'Eerlijke start: {active} bezig, {slowed} vertraagd, {done} afgerond',
   'map.title': 'In je buurt',
+  'map.live': 'Live · werkt zichzelf bij',
   'map.hint': 'Lives, evenementen, spullen te koop en vrienden die op pad zijn om je heen, nu.',
   'map.layer.places': 'Drukke plekken',
   'map.layer.chains': 'Ketens in je buurt',
