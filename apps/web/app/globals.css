@@ -3769,8 +3769,7 @@ video.chat-att__media {
 }
 /* Where a phone's keyboard would be, under the message box. */
 .emoji-dock {
-  /* Clear of the bottom bar when it's scrolled into view. */
-  scroll-margin-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  scroll-margin-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
   margin-top: var(--space-2);
   padding: var(--space-2);
   border: 1px solid var(--line);
@@ -3778,7 +3777,14 @@ video.chat-att__media {
   background: var(--surface);
 }
 .emoji-dock .emoji-panel__body {
-  height: min(34dvh, 280px);
+  height: min(26dvh, 240px);
+}
+/* On a phone the panel takes the keyboard's place, and the messages stay in sight above it: the
+   bottom bar makes way. */
+@media (pointer: coarse) and (max-width: 819px) {
+  body:has(.emoji-dock) .yp-nav {
+    display: none;
+  }
 }
 .chat-picker__item {
   display: grid;

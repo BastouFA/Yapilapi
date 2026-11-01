@@ -126,7 +126,7 @@ export default function ChatPage() {
   const emojiDock = useRef<HTMLDivElement>(null);
   // It opens under the message box, which can be the bottom of the screen.
   useEffect(() => {
-    if (emojiOpen) emojiDock.current?.scrollIntoView({ block: 'nearest' });
+    if (emojiOpen) emojiDock.current?.scrollIntoView({ block: 'end' });
   }, [emojiOpen]);
   const caret = useRef<number | null>(null);
   useLayoutEffect(() => {
@@ -553,8 +553,7 @@ export default function ChatPage() {
     setMessages((cur) => (cur ? [...cur, ...here.filter((m) => !cur.some((x) => x.id === m.id))] : cur));
   }
 
-  /** Puts an emoji where the caret is, in place of anything selected. */
-  /** Puts words or an emoji at the caret, unless that would be too long to send. */
+  /** Puts words or an emoji where the caret is, in place of anything selected, unless that would be too long to send. */
   function insertAtCaret(text: string): boolean {
     const box = composer.current;
     const start = box?.selectionStart ?? body.length;
