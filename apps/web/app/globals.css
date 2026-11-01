@@ -3549,23 +3549,25 @@ video.chat-att__media {
 .chat-reaction__count {
   font-variant-numeric: tabular-nums;
 }
-/* Sent, delivered, read: small checks after the time on your messages. */
+/* Sent, delivered, read, after the time on your messages. Bubbles come in every colour, so the
+   checks are the message's own text colour, and read is white on a small dark pill: clear on all of them. */
 .chat-receipt {
   display: inline-flex;
-  vertical-align: -2px;
-  margin-inline-start: 4px;
-  opacity: 0.7;
+  align-items: center;
+  vertical-align: -3px;
+  margin-inline-start: 5px;
+}
+.chat-receipt svg {
+  stroke-width: 2.6;
 }
 .chat-receipt svg + svg {
   margin-inline-start: -9px;
 }
 .chat-receipt--read {
-  opacity: 1;
-  color: #ffd24d;
-  filter: drop-shadow(0 0 1px rgb(0 0 0 / 0.45));
-}
-.chat-receipt--read svg {
-  stroke-width: 3;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: #0b0c14;
+  color: #fff;
 }
 .chat-picker {
   display: flex;

@@ -2074,7 +2074,7 @@ export function ChatBubble({
       <span dir="auto">{body}</span>
       {time ? (
         <span className="yp-bubble__time">
-          {pending ? t('ds.sending', locale) : time}
+          <span className="yp-bubble__clock">{pending ? t('ds.sending', locale) : time}</span>
           {pending ? null : receipt}
         </span>
       ) : null}

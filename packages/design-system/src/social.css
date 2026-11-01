@@ -1964,8 +1964,10 @@ button.yp-list__item {
   display: block;
   margin-top: 2px;
   font: 500 11px/14px var(--font-sans);
-  opacity: 0.75;
   text-align: end;
+}
+.yp-bubble__clock {
+  opacity: 0.75;
 }
 .yp-chat__day {
   align-self: center;

@@ -1757,9 +1757,13 @@ const MessageRow = memo(function MessageRow({
     <View
       accessible
       accessibilityLabel={t(receipt === 'read' ? 'chat.seen' : receipt === 'delivered' ? 'chat.delivered' : 'chat.sent')}
-      style={{ alignSelf: 'flex-end', opacity: receipt === 'read' ? 1 : 0.7 }}
+      // Read: white on a small dark pill, clear on a bubble of any colour.
+      style={[
+        { alignSelf: 'flex-end' },
+        receipt === 'read' ? { backgroundColor: '#0B0C14', borderRadius: 999, paddingHorizontal: 5, paddingVertical: 1 } : null,
+      ]}
     >
-      <Icon name={receipt === 'sent' ? 'checkmark' : 'checkmark-done'} size={15} color={receipt === 'read' ? '#FFBE3D' : tint} />
+      <Icon name={receipt === 'sent' ? 'checkmark' : 'checkmark-done'} size={15} color={receipt === 'read' ? '#FFFFFF' : tint} />
     </View>
   ) : null;
   const edited = item.editedAt && !item.unsent ? <Text style={{ color: tint, fontSize: 11, opacity: 0.75 }}>{t('m.chat.edited')}</Text> : null;
