@@ -31,7 +31,7 @@ import { ReportSheet } from '@/components/PostList';
 import { useRealtime, useSession } from '../../../providers';
 import { useCalls } from '@/components/Calls';
 import { clearCopiedVoice, copyVoice, useCopiedVoice } from '@/lib/chat-clipboard';
-import { copyImage, copyText } from '@/lib/clipboard';
+import { copyImage, copyText, mediaToSend, readClipboard } from '@/lib/clipboard';
 import { EmojiPicker, noteEmoji } from '@/components/EmojiPicker';
 import { MiniAppsSheet } from '@/components/MiniApps';
 import { MessageAttachments, ViewOnceMessage, VoiceRecorder, VoiceTranscript } from '@/components/ChatAttachments';
@@ -132,6 +132,17 @@ export default function ChatPage() {
   const [forwarding, setForwarding] = useState<Message | null>(null);
   const copied = useCopiedVoice();
   const [pasting, setPasting] = useState(false);
+  // Photos and videos pasted from anywhere, waiting for a look and a tap: a paste can be the wrong thing.
+  const [pasted, setPasted] = useState<File[]>([]);
+  const [pastedThumb, setPastedThumb] = useState<string | null>(null);
+  useEffect(() => setPasted([]), [id]);
+  useEffect(() => {
+    const f = pasted[0];
+    if (!f || isVideoFile(f)) return setPastedThumb(null);
+    const url = URL.createObjectURL(f);
+    setPastedThumb(url);
+    return () => URL.revokeObjectURL(url);
+  }, [pasted]);
   const [pollOpen, setPollOpen] = useState(false);
   // "Vote on a time or place" on a plan's page opens its chat with a new poll (?poll=1).
   useEffect(() => {
@@ -511,6 +522,26 @@ export default function ChatPage() {
     }
   }
 
+  async function sendPasted() {
+    const files = pasted;
+    setPasted([]);
+    for (const [i, f] of files.entries()) {
+      const sent = await sendFile(f, isVideoFile(f) ? t('chat.sendingVideo') : t('chat.sendingPhoto'));
+      if (!sent) return setPasted(files.slice(i));
+    }
+  }
+
+  /** The Paste in the + menu: phones only offer their own Paste here for words, not for a copied photo. */
+  async function pasteFromClipboard() {
+    const got = await readClipboard();
+    if (!got) return toast(t('chat.pasteRefused'));
+    const media = mediaToSend(got.files, got.text);
+    if (media.length) setPasted(media);
+    else if (got.text) insertAtCaret(got.text);
+    else if (copied) void pasteVoice();
+    else toast(t('chat.nothingToPaste'));
+  }
+
   /** What was just forwarded, if some of it landed in this chat. */
   function addForwarded(sent: Message[]) {
     const here = sent.filter((m) => m.conversationId === id);
@@ -518,16 +549,23 @@ export default function ChatPage() {
   }
 
   /** Puts an emoji where the caret is, in place of anything selected. */
-  function insertEmoji(emoji: string, byPointer: boolean) {
+  /** Puts words or an emoji at the caret, unless that would be too long to send. */
+  function insertAtCaret(text: string): boolean {
     const box = composer.current;
     const start = box?.selectionStart ?? body.length;
     const end = box?.selectionEnd ?? body.length;
-    const next = body.slice(0, start) + emoji + body.slice(end);
-    if (next.length > 4000) return;
-    caret.current = start + emoji.length;
+    const next = body.slice(0, start) + text + body.slice(end);
+    if (next.length > 4000) return false;
+    caret.current = start + text.length;
     setBody(next);
-    noteEmoji(emoji);
     if (!editing) saidTyping();
+    return true;
+  }
+
+  function insertEmoji(emoji: string, byPointer: boolean) {
+    const box = composer.current;
+    if (!insertAtCaret(emoji)) return;
+    noteEmoji(emoji);
     // With a mouse, typing carries on. On a touch screen that would bring the keyboard up over the panel.
     if (byPointer && matchMedia('(hover: hover)').matches) box?.focus();
   }
@@ -1245,6 +1283,18 @@ export default function ChatPage() {
       {/* Following the newest message scrolls to here, so the Yap row and suggested replies under the
           messages are in sight too, not under the message box that stays at the bottom. */}
       <div ref={endRef} className="chat-end" />
+      {pasted.length && !editing ? (
+        <div className="chat-paste">
+          <button type="button" className="chat-paste__send" disabled={!!uploading} onClick={() => void sendPasted()}>
+            {pastedThumb ? <img className="chat-paste__thumb" src={pastedThumb} alt="" /> : <Icon name="play" size={18} />}
+            <span>{t('chat.sendPasted')}</span>
+            {pasted.length > 1 ? <span className="chat-paste__time">{pasted.length}</span> : null}
+          </button>
+          <button type="button" className="yp-action" aria-label={t('common.cancel')} title={t('common.cancel')} onClick={() => setPasted([])}>
+            <Icon name="x" size={18} />
+          </button>
+        </div>
+      ) : null}
       {copied && !editing ? (
         <div className="chat-paste">
           <button type="button" className="chat-paste__send" disabled={pasting} onClick={() => void pasteVoice()}>
@@ -1323,6 +1373,7 @@ export default function ChatPage() {
           label={t('m.chat.addMenu')}
           icon="plus"
           actions={[
+            { label: t('chat.paste'), icon: 'copy', onSelect: () => void pasteFromClipboard() },
             { label: t('m.chat.poll.new'), icon: 'poll', onSelect: () => setPollOpen(true) },
             { label: t('m.chat.list.new'), icon: 'check-circle', onSelect: () => setListOpen(true) },
             ...(watchable ? [{ label: t('watch.start'), icon: 'play' as const, onSelect: () => void watchTogether() }] : []),
@@ -1385,6 +1436,12 @@ export default function ChatPage() {
             if (matchMedia('(hover: none)').matches) setEmojiOpen(false);
           }}
           onPaste={(e) => {
+            const media = editing ? [] : mediaToSend([...e.clipboardData.files], e.clipboardData.getData('text/plain'));
+            if (media.length) {
+              e.preventDefault();
+              setPasted(media);
+              return;
+            }
             // Nothing else on the clipboard: Paste means the voice message you copied.
             if (!copied || e.clipboardData.getData('text') || e.clipboardData.files.length) return;
             e.preventDefault();
@@ -1399,8 +1456,10 @@ export default function ChatPage() {
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
-              void send();
+              if (pasted.length && !body.trim() && !editing) void sendPasted();
+              else void send();
             }
+            if (e.key === 'Escape' && pasted.length) setPasted([]);
             if (e.key === 'Escape' && (replyTo || editing)) cancelCompose();
           }}
         />

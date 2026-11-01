@@ -34,3 +34,40 @@ export async function copyImage(url: string): Promise<boolean> {
     return false;
   }
 }
+
+const isMedia = (f: File) => f.type.startsWith('image/') || f.type.startsWith('video/') || /\.(heic|heif)$/i.test(f.name);
+
+/**
+ * Which of what was copied goes in a chat as a photo or video. Words with a picture of them (a
+ * spreadsheet, a document) stay words; a picture copied from a page often brings its link, which
+ * doesn't count.
+ */
+export function mediaToSend(files: File[], text: string): File[] {
+  const media = files.filter(isMedia);
+  return media.length && !/\s/.test(text.trim()) ? media : [];
+}
+
+/**
+ * What's on the clipboard, for a Paste button: phones only offer Paste in a message box for words,
+ * so a copied photo has to come this way. The phone may ask first, inside the tap. Null when the
+ * browser can't or you said no.
+ */
+export async function readClipboard(): Promise<{ files: File[]; text: string } | null> {
+  try {
+    if (!navigator.clipboard?.read) return { files: [], text: await navigator.clipboard.readText() };
+    const files: File[] = [];
+    let text = '';
+    for (const item of await navigator.clipboard.read()) {
+      for (const type of item.types) {
+        if (type === 'text/plain') text = await (await item.getType(type)).text();
+        else if (type.startsWith('image/') || type.startsWith('video/')) {
+          files.push(new File([await item.getType(type)], `pasted.${type.split('/')[1]}`, { type }));
+          break;
+        }
+      }
+    }
+    return { files, text };
+  } catch {
+    return null;
+  }
+}
