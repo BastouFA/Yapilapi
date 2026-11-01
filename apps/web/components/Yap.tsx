@@ -6,7 +6,7 @@ import type { Message, YapEvent } from '@yapilapi/shared';
 import { useRealtime, useSession } from '@/app/providers';
 import { closeVoiceMic, openVoiceMic, playVoiceAloud, startVoiceRecorder, voiceRecorder } from '@/lib/voice-recording';
 
-/** A yap is up to 60 seconds; recording stops there and sends. */
+/** A yap is up to 60 seconds; recording stops there. */
 export const YAP_MAX_MS = 60_000;
 /** Shorter than this is a slip of the finger: not sent. */
 const YAP_MIN_MS = 400;
@@ -75,8 +75,8 @@ function sameOrigin(url: string): string {
 // ── Recording ─────────────────────────────────────────────────────────────
 
 /**
- * The big Yap button: hold it (or hold the Space bar when you aren't typing) to talk,
- * let go to send. Uses the browser's recorder; the server turns it into M4A.
+ * The big Yap button: hold it (or hold the Space bar when you aren't typing) to talk, let go,
+ * then listen back and Send it or Cancel it. Uses the browser's recorder; the server turns it into M4A.
  */
 export function YapButton({
   onRecorded,
@@ -93,6 +93,10 @@ export function YapButton({
   const rec = useRef<MediaRecorder | null>(null);
   const started = useRef(0);
   const holding = useRef(false);
+  // The recording waiting for Send or Cancel.
+  const [review, setReview] = useState<{ file: File; ms: number; url: string } | null>(null);
+  const reviewing = useRef(false);
+  reviewing.current = !!review;
 
   const stop = useCallback(() => {
     holding.current = false;
@@ -103,7 +107,7 @@ export function YapButton({
   }, []);
 
   const start = useCallback(async () => {
-    if (disabled || holding.current) return;
+    if (disabled || holding.current || reviewing.current) return;
     holding.current = true;
     // Holding the button is a user gesture: a good moment to unlock sound for incoming yaps too.
     if (readOn()) void context()?.resume();
@@ -133,14 +137,15 @@ export function YapButton({
       const ms = Math.min(YAP_MAX_MS, Date.now() - started.current);
       if (ms < YAP_MIN_MS) return;
       const mime = (r.mimeType || 'audio/webm').split(';')[0]!;
-      onRecorded(new File(chunks, `yap.${mime === 'audio/mp4' ? 'm4a' : 'weba'}`, { type: mime }), ms);
+      const file = new File(chunks, `yap.${mime === 'audio/mp4' ? 'm4a' : 'weba'}`, { type: mime });
+      setReview({ file, ms, url: URL.createObjectURL(file) });
     };
     rec.current = r;
     started.current = Date.now();
     setElapsed(0);
     startVoiceRecorder(r);
     setTalking(true);
-  }, [disabled, onError, onRecorded, t]);
+  }, [disabled, onError, t]);
 
   // The clock, and the 60-second limit.
   useEffect(() => {
@@ -178,6 +183,20 @@ export function YapButton({
   }, [start, stop]);
 
   useEffect(() => () => stop(), [stop]);
+  // The preview's address goes with it.
+  useEffect(() => (review ? () => URL.revokeObjectURL(review.url) : undefined), [review]);
+
+  if (review)
+    return (
+      <YapReview
+        review={review}
+        onSend={() => {
+          onRecorded(review.file, review.ms);
+          setReview(null);
+        }}
+        onCancel={() => setReview(null)}
+      />
+    );
 
   const secs = Math.floor(elapsed / 1000);
   return (
@@ -215,6 +234,50 @@ export function YapButton({
 }
 
 /** Shown in a chat the first time: sound can only start by itself after one click. */
+/** 0:07, 1:00. */
+const yapClock = (ms: number) => {
+  const s = Math.round(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};
+
+/** The Yap you just recorded: listen back, then Send it or Cancel it (nothing is sent until Send). */
+function YapReview({ review, onSend, onCancel }: { review: { url: string; ms: number }; onSend: () => void; onCancel: () => void }) {
+  const { t } = useSession();
+  const player = useRef<HTMLAudioElement>(null);
+  const send = useRef<HTMLButtonElement>(null);
+  const [playing, setPlaying] = useState(false);
+  // Keyboard and screen reader users land on Send, the next thing to do.
+  useEffect(() => send.current?.focus(), []);
+  return (
+    <div className="yap-review" role="group" aria-label={t('yap.review', { time: yapClock(review.ms) })}>
+      <audio ref={player} src={review.url} preload="auto" onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)} />
+      <button
+        type="button"
+        className="yap-review__play"
+        aria-label={playing ? t('m.common.pause') : t('m.common.play')}
+        onClick={() => {
+          const a = player.current;
+          if (!a) return;
+          if (a.paused) void a.play().catch(() => {});
+          else a.pause();
+        }}
+      >
+        <Icon name={playing ? 'pause' : 'play'} size={20} />
+      </button>
+      <span className="yap-review__time" aria-hidden>
+        {t('yap.review', { time: yapClock(review.ms) })}
+      </span>
+      <Button variant="ghost" icon="trash" onClick={onCancel}>
+        {t('common.cancel')}
+      </Button>
+      <button type="button" ref={send} className="yap-review__send" onClick={onSend}>
+        <Icon name="send" size={20} />
+        <span>{t('inbox.send')}</span>
+      </button>
+    </div>
+  );
+}
+
 export function TurnOnYapsPrompt() {
   const { t } = useSession();
   const state = useYapAudio();

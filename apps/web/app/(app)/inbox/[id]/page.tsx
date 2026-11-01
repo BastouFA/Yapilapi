@@ -525,9 +525,13 @@ export default function ChatPage() {
   const canManage = conv?.kind === 'direct' || conv?.myRole === 'admin';
   const pinnedIds = new Set(pins.map((p) => p.message.id));
 
+  // Replying: the message gives a little bounce toward the message box, and its words rise into it.
+  const [echo, setEcho] = useState<string | null>(null);
   function startReply(m: Message) {
     setEditing(null);
     setReplyTo(m);
+    setEcho(m.id);
+    setTimeout(() => setEcho((x) => (x === m.id ? null : x)), 600);
     composer.current?.focus();
   }
 
@@ -945,7 +949,7 @@ export default function ChatPage() {
                 {showDay ? <div className="yp-chat__day">{day}</div> : null}
                 <div
                   id={`msg-${m.id}`}
-                  className={`chat-msg${mine ? ' chat-msg--mine' : ''}${highlight === m.id ? ' chat-msg--highlight' : ''}`}
+                  className={`chat-msg${mine ? ' chat-msg--mine' : ''}${highlight === m.id ? ' chat-msg--highlight' : ''}${echo === m.id ? ' chat-msg--echo' : ''}`}
                   onContextMenu={(e) => {
                     if (mine || m.unsent) return;
                     e.preventDefault();
@@ -972,7 +976,7 @@ export default function ChatPage() {
                           <>
                             <button
                               type="button"
-                              className="yp-action chat-msg__quick"
+                              className="yp-action chat-msg__quick chat-msg__reply"
                               aria-label={t('m.chat.reply')}
                               title={t('m.chat.reply')}
                               onClick={() => startReply(m)}
@@ -1062,7 +1066,7 @@ export default function ChatPage() {
         }}
       >
         {replyTo || editing ? (
-          <div className="chat-compose-context">
+          <div className="chat-compose-context" key={editing ? 'edit' : replyTo?.id}>
             {/* The message box is described by this, so "Replying to …" is read when it gets focus. */}
             <div style={{ minWidth: 0 }} id="compose-context">
               <span className="chat-compose-context__label">

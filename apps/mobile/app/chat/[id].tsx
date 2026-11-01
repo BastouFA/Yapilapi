@@ -502,12 +502,13 @@ export default function Chat() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recordingOn, recording.durationMillis]);
 
-  // ── Yap: hold to talk, let go to send ──
+  // ── Yap: hold to talk, let go, then listen back and Send or Cancel ──
   const [yapping, setYapping] = useState(false);
   const yapHeld = useRef(false);
+  const [yapDraft, setYapDraft] = useState<{ uri: string; ms: number } | null>(null);
 
   async function startYap() {
-    if (sending || recordingOn || yapHeld.current) return;
+    if (sending || recordingOn || yapHeld.current || yapDraft) return;
     yapHeld.current = true;
     setError(null);
     try {
@@ -554,9 +555,16 @@ export default function Chat() {
     await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch(() => {});
     const uri = recorder.uri;
     if (!uri || ms < YAP_MIN_MS) return;
+    setYapDraft({ uri, ms });
+  }
+
+  async function sendYap() {
+    const draft = yapDraft;
+    if (!draft) return;
+    setYapDraft(null);
     setSending(true);
     try {
-      const media = await uploadFile(uri, `yap-${Date.now()}.m4a`, VOICE_MIME);
+      const media = await uploadFile(draft.uri, `yap-${Date.now()}.m4a`, VOICE_MIME);
       const clientId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const { message, notice, noticeCode } = await (await client()).conversations.send(id, '', clientId, [{ mediaId: media.id }], { kind: 'yap' });
       setHeld(noticeText({ code: noticeCode, message: notice }, t) ?? null);
@@ -1112,7 +1120,11 @@ export default function Chat() {
           windowSize={11}
         />
       </View>
-      {yaps?.available && !recordingOn && !typing ? (
+      {yaps?.available && !recordingOn && !typing && yapDraft ? (
+        <View style={{ paddingHorizontal: space[3], paddingTop: space[2] }}>
+          <YapDraftRow draft={yapDraft} onSend={() => void sendYap()} onCancel={() => setYapDraft(null)} />
+        </View>
+      ) : yaps?.available && !recordingOn && !typing ? (
         <View style={{ paddingHorizontal: space[3], paddingTop: space[2] }}>
           <Pressable
             accessibilityRole="button"
@@ -1691,44 +1703,71 @@ const MessageRow = memo(function MessageRow({
   );
   // Your messages sit at the end edge (the right in English, the left in Arabic), with the
   // tail corner on that side.
+  // Reply, one tap away beside every message: a small speech bubble facing the message it answers.
+  const replyTab = item.unsent ? null : (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={t('m.chat.reply')}
+      onPress={() => h.startReply(item)}
+      hitSlop={4}
+      style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', opacity: 0.8 }}
+    >
+      <View style={mine ? { transform: [{ scaleX: -1 }] } : undefined}>
+        <Icon name="chatbubble-outline" size={20} color={c.yapi} />
+      </View>
+    </Pressable>
+  );
   const bubbleView = mine ? (
-    <View style={{ alignSelf: 'flex-end', maxWidth: '80%', gap: 2 }}>
-      <Pressable onLongPress={openActions} accessibilityHint={t('m.chat.messageOptions')}>
-        <LinearGradient
-          colors={[accent.from, accent.to]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[bubble, { maxWidth: '100%', alignSelf: 'flex-end', borderBottomEndRadius: 6 }]}
-        >
-          {quote}
-          {media}
-          {text ? <Text style={[{ color: accent.on, fontSize: 15, lineHeight: 21 }, userText, textStyle]}>{text}</Text> : null}
-          {meta}
-        </LinearGradient>
-      </Pressable>
+    <View style={{ alignSelf: 'flex-end', maxWidth: '88%', gap: 2 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' }}>
+        {replyTab}
+        <Pressable onLongPress={openActions} accessibilityHint={t('m.chat.messageOptions')} style={{ flexShrink: 1 }}>
+          <LinearGradient
+            colors={[accent.from, accent.to]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[bubble, { maxWidth: '100%', alignSelf: 'flex-end', borderBottomEndRadius: 6 }]}
+          >
+            {quote}
+            {media}
+            {text ? <Text style={[{ color: accent.on, fontSize: 15, lineHeight: 21 }, userText, textStyle]}>{text}</Text> : null}
+            {meta}
+          </LinearGradient>
+        </Pressable>
+      </View>
       <ReactionRow message={item} mine onToggle={(emoji, on) => h.react(item, emoji, on)} />
       {item.moderation === 'review' ? <Text style={{ color: c.inkMuted, fontSize: 12, alignSelf: 'flex-end' }}>{t('m.chat.held')}</Text> : null}
       {seen ? <Text style={{ color: c.inkMuted, fontSize: 12, alignSelf: 'flex-end' }}>{seen}</Text> : null}
       {item.reminder && !item.unsent ? <ReminderNote at={item.reminder.remindAt} alignEnd /> : null}
     </View>
   ) : (
-    <View style={{ alignSelf: 'flex-start', maxWidth: '80%', gap: 2 }}>
-      <Pressable
-        onLongPress={openActions}
-        accessibilityHint={t('m.chat.messageOptions')}
-        style={[bubble, { maxWidth: '100%', backgroundColor: c.surface, borderBottomStartRadius: 6 }, elevation(c)]}
-      >
-        {showSender ? <Text style={[{ color: c.yapi, fontSize: 12, fontWeight: '700' }, userText]}>{item.sender.displayName}</Text> : null}
-        {quote}
-        {media}
-        {item.body && !item.unsent && !rich ? (
-          // Their text, with "See translation" when it's in a language you don't understand. (A poll, list or game shows its own.)
-          <TranslatableText kind="message" id={item.id} text={item.body} lang={item.lang} rich={false} style={{ color: c.ink, fontSize: 15, lineHeight: 21 }} />
-        ) : text ? (
-          <Text style={[{ color: c.ink, fontSize: 15, lineHeight: 21 }, userText, textStyle]}>{text}</Text>
-        ) : null}
-        {meta}
-      </Pressable>
+    <View style={{ alignSelf: 'flex-start', maxWidth: '88%', gap: 2 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <Pressable
+          onLongPress={openActions}
+          accessibilityHint={t('m.chat.messageOptions')}
+          style={[bubble, { maxWidth: '100%', flexShrink: 1, backgroundColor: c.surface, borderBottomStartRadius: 6 }, elevation(c)]}
+        >
+          {showSender ? <Text style={[{ color: c.yapi, fontSize: 12, fontWeight: '700' }, userText]}>{item.sender.displayName}</Text> : null}
+          {quote}
+          {media}
+          {item.body && !item.unsent && !rich ? (
+            // Their text, with "See translation" when it's in a language you don't understand. (A poll, list or game shows its own.)
+            <TranslatableText
+              kind="message"
+              id={item.id}
+              text={item.body}
+              lang={item.lang}
+              rich={false}
+              style={{ color: c.ink, fontSize: 15, lineHeight: 21 }}
+            />
+          ) : text ? (
+            <Text style={[{ color: c.ink, fontSize: 15, lineHeight: 21 }, userText, textStyle]}>{text}</Text>
+          ) : null}
+          {meta}
+        </Pressable>
+        {replyTab}
+      </View>
       <ReactionRow message={item} mine={false} onToggle={(emoji, on) => h.react(item, emoji, on)} />
       {item.reminder && !item.unsent ? <ReminderNote at={item.reminder.remindAt} alignEnd={false} /> : null}
     </View>
@@ -1807,6 +1846,73 @@ function Attachments({ items, tint }: { items: Message['attachments']; tint: str
           </Pressable>
         ),
       )}
+    </View>
+  );
+}
+
+/** The Yap you just recorded: listen back, then Send it or Cancel it (nothing is sent until Send). */
+function YapDraftRow({ draft, onSend, onCancel }: { draft: { uri: string; ms: number }; onSend: () => void; onCancel: () => void }) {
+  const { t } = useT();
+  const c = useColors();
+  const player = useAudioPlayer({ uri: draft.uri }, { updateInterval: 250 });
+  const status = useAudioPlayerStatus(player);
+  useEffect(() => {
+    if (status.didJustFinish) {
+      player.pause();
+      void player.seekTo(0);
+    }
+  }, [status.didJustFinish, player]);
+  const label = t('yap.review', { time: clock(draft.ms / 1000) });
+  return (
+    <View
+      accessibilityLabel={label}
+      style={{
+        minHeight: 56,
+        borderRadius: 28,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: space[2],
+        paddingHorizontal: 6,
+        backgroundColor: c.surface,
+      }}
+    >
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={status.playing ? t('m.common.pause') : t('m.common.play')}
+        onPress={() => {
+          if (status.playing) return player.pause();
+          void setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false }).catch(() => {});
+          player.play();
+        }}
+        style={{ width: 44, height: 44, borderRadius: 22, overflow: 'hidden' }}
+      >
+        <LinearGradient {...gradient(c)} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name={status.playing ? 'pause' : 'play'} size={20} color={c.onYapi} />
+        </LinearGradient>
+      </Pressable>
+      <Text style={{ flex: 1, color: c.ink, fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'] }} numberOfLines={1}>
+        {label}
+      </Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t('common.cancel')}
+        onPress={onCancel}
+        style={{ minHeight: 44, minWidth: 44, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: space[2] }}
+      >
+        <Icon name="trash-outline" size={18} color={c.danger} />
+        <Text style={{ color: c.danger, fontWeight: '700' }}>{t('common.cancel')}</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t('inbox.send')}
+        onPress={onSend}
+        style={{ minHeight: 44, borderRadius: 22, overflow: 'hidden' }}
+      >
+        <LinearGradient {...gradient(c)} style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: space[4] }}>
+          <Icon name="arrow-up" size={18} color={c.onYapi} />
+          <Text style={{ color: c.onYapi, fontWeight: '800' }}>{t('inbox.send')}</Text>
+        </LinearGradient>
+      </Pressable>
     </View>
   );
 }

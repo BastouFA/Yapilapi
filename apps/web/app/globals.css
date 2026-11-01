@@ -3416,13 +3416,52 @@ video.chat-att__media {
     opacity: 0.7;
   }
 }
-/* On small screens the message menu has Reply and React too; keep the bubble wide. */
+/* On small screens React lives in the message menu; Reply stays beside every message, one tap away. */
 @media (max-width: 600px) {
-  .chat-msg__quick {
+  .chat-msg__quick:not(.chat-msg__reply) {
     display: none;
   }
   .chat-msg__line .yp-bubble {
-    max-width: calc(100% - 48px);
+    max-width: calc(100% - 92px);
+  }
+}
+/* The reply bubble faces the message it answers. */
+.chat-msg__reply {
+  color: var(--yapi);
+}
+.chat-msg--mine .chat-msg__reply svg {
+  transform: scaleX(-1);
+}
+/* Reply: the message dips toward the message box with a ring of the chat colour, and its words
+   rise into the "Replying to" strip. */
+.chat-msg--echo .yp-bubble {
+  animation: reply-echo 520ms var(--ease-out);
+}
+@keyframes reply-echo {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--yapi) 55%, transparent);
+  }
+  35% {
+    transform: translateY(4px) scale(0.98);
+  }
+  100% {
+    transform: none;
+    box-shadow: 0 0 0 12px transparent;
+  }
+}
+.chat-compose-context {
+  animation: reply-rise 260ms var(--ease-out);
+}
+@keyframes reply-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-msg--echo .yp-bubble,
+  .chat-compose-context {
+    animation: none;
   }
 }
 .chat-quote {
@@ -5936,6 +5975,57 @@ button.yp-chip[aria-pressed='true'] {
   gap: var(--space-2);
   padding: var(--space-2) 0 0;
 }
+.yap-review {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 56px;
+  padding: 6px;
+  padding-inline-start: 8px;
+  border-radius: 28px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.yap-review__play {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border: 0;
+  border-radius: 50%;
+  background: var(--grad);
+  color: var(--on-yapi);
+  cursor: pointer;
+}
+.yap-review__time {
+  flex: 1;
+  min-width: 0;
+  font: 700 15px/20px var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.yap-review__send {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 22px;
+  background: var(--grad);
+  color: var(--on-yapi);
+  font: 700 15px/20px var(--font-sans);
+  cursor: pointer;
+}
+.yap-review__play:focus-visible,
+.yap-review__send:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 .yap-btn {
   display: flex;
   align-items: center;
