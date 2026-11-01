@@ -8,6 +8,7 @@ import {
   MEDIA_ACCEPT,
   MESSAGE_EDIT_MINUTES,
   messagePreviewOf,
+  messageReceipt,
   storyReplyLabel,
   WATCH_MAX_MEMBERS,
   type PinnedMessage,
@@ -45,6 +46,7 @@ import {
   previewText,
   EmojiPanel,
   ReactionPicker,
+  ReceiptMark,
   ReactionRow,
   SystemLine,
 } from '@/components/ChatExtras';
@@ -376,6 +378,19 @@ export default function ChatPage() {
       setGroupOpen(false);
       setLoadError({ gone: true, text: t('chat.group.gone') });
     }
+    // Someone's device got the messages: "Delivered" on yours follows.
+    if (e.type === 'conversation.delivered' && e.data.conversationId === id)
+      setConv((c) =>
+        c
+          ? {
+              ...c,
+              deliveredTo: [
+                ...(c.deliveredTo ?? []).filter((d) => d.userId !== e.data.userId),
+                { userId: e.data.userId, lastDeliveredAt: e.data.lastDeliveredAt },
+              ],
+            }
+          : c,
+      );
     // Someone read up to here: "Seen" under your messages follows.
     if (e.type === 'conversation.read' && e.data.conversationId === id)
       setConv((c) =>
@@ -671,6 +686,9 @@ export default function ChatPage() {
   // Read receipts: under your newest message, "Seen" (one-to-one) or who of the group has read it.
   const lastMine = messages?.filter((m) => m.sender.id === me?.id && !m.pending && m.kind !== 'system' && !m.unsent && !m.moderation).at(-1);
   const readers = lastMine ? (conv?.readBy ?? []).filter((r) => r.lastReadAt >= lastMine.createdAt).length : 0;
+  // Each message of yours: sent, delivered or read (messageReceipt says what counts in a group).
+  const otherCount = conv ? conv.members.filter((x) => x.id !== me?.id).length : 0;
+  const receiptOf = (m: Pending) => messageReceipt(m.createdAt, otherCount, conv?.readBy, conv?.deliveredTo);
   const seenLabel = !readers
     ? null
     : conv?.kind === 'direct'
@@ -995,6 +1013,7 @@ export default function ChatPage() {
                       }
                       pending={m.pending}
                       time={m.editedAt && !m.unsent ? t('chat.editedAt', { time }) : time}
+                      receipt={mine && !m.unsent && conv?.kind !== 'community' ? <ReceiptMark state={receiptOf(m)} /> : undefined}
                     />
                     {!m.pending ? (
                       <div className="chat-msg__tools">
@@ -1037,7 +1056,9 @@ export default function ChatPage() {
                   ) : null}
                   <ReactionRow message={m} mine={mine} onToggle={(emoji, on) => void react(m, emoji, on)} />
                   {m.moderation === 'review' ? <span className="chat-held">{t('m.chat.held')}</span> : null}
-                  {seenLabel && m.id === lastMine?.id ? <span className="chat-seen">{seenLabel}</span> : null}
+                  {m.id === lastMine?.id && (seenLabel || receiptOf(m) === 'delivered') ? (
+                    <span className="chat-seen">{seenLabel ?? t('chat.delivered')}</span>
+                  ) : null}
                   {m.reminder && !m.unsent ? <ReminderNote at={m.reminder.remindAt} /> : null}
                 </div>
               </div>

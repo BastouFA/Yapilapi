@@ -230,6 +230,12 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
             WHERE o.conversation_id = c.id AND o.user_id <> $1 AND o.left_at IS NULL AND ${READ_RECEIPTS_ON('o.user_id')}
               AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = $1 AND b.blocked_id = o.user_id) OR (b.blocker_id = o.user_id AND b.blocked_id = $1)))
          END AS read_by,
+         -- Delivered: their device got it. Only that, so it shows even with read receipts off; never across a block.
+         CASE WHEN c.kind <> 'community' THEN
+           (SELECT json_agg(json_build_object('userId', o.user_id, 'lastDeliveredAt', o.last_delivered_at)) FROM conversation_members o
+            WHERE o.conversation_id = c.id AND o.user_id <> $1 AND o.left_at IS NULL AND o.last_delivered_at IS NOT NULL
+              AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = $1 AND b.blocked_id = o.user_id) OR (b.blocker_id = o.user_id AND b.blocked_id = $1)))
+         END AS delivered_to,
          lm.id AS lm_id, lm.body AS lm_body, lm.created_at AS lm_created_at, lm.sender_id AS lm_sender, lm.attachments AS lm_attachments, lm.story_id,
          lm.meta->'storyReply' AS lm_story_reply, lm.kind AS lm_kind, CASE WHEN lm.kind = 'system' THEN lm.meta END AS lm_system
        FROM conversation_members cm JOIN conversations c ON c.id = cm.conversation_id
@@ -308,6 +314,10 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
             readBy: ((r.read_by ?? []) as { userId: string; lastReadAt: string }[]).map((x) => ({
               userId: x.userId,
               lastReadAt: new Date(x.lastReadAt).toISOString(),
+            })),
+            deliveredTo: ((r.delivered_to ?? []) as { userId: string; lastDeliveredAt: string }[]).map((x) => ({
+              userId: x.userId,
+              lastDeliveredAt: new Date(x.lastDeliveredAt).toISOString(),
             })),
           }
         : {}),
@@ -895,6 +905,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
         { type: 'message.created', data: forOthers },
       );
     }
+    // Whoever has the app connected just got it.
+    if (row.inserted) for (const m of readers) if (m !== u.id && ctx.realtime.isOnline(m)) await markDelivered(m, id).catch(() => {});
     if (yap && row.inserted) await deliverYap(u.id, id, members, (userId) => (adults.has(userId) ? forAdults! : forOthers!));
     // Everyone here who isn't connected gets a push (a Yap pushes as itself, above; a voice note being transcribed, from its job).
     else if (row.inserted && !transcribing) await pushNewMessage({ db, realtime: ctx.realtime }, row.id);
@@ -934,6 +946,34 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     const { id } = parse(idParam, req.params);
     await assertMember(id, me(req).id);
     await markRead(id, me(req).id);
+    return { ok: true };
+  });
+
+  /**
+   * This person's device has the messages so far (in one chat, or all of theirs): the others see
+   * "Delivered". Only chats with something new, so opening the app says nothing when nothing came.
+   */
+  async function markDelivered(userId: string, conversationId?: string) {
+    const { rows } = await db.query<{ conversation_id: string; last_delivered_at: Date }>(
+      `UPDATE conversation_members cm SET last_delivered_at = clock_timestamp() FROM conversations c
+       WHERE cm.user_id = $1 AND cm.left_at IS NULL AND c.id = cm.conversation_id AND c.kind <> 'community'
+         AND ($2::uuid IS NULL OR cm.conversation_id = $2)
+         AND c.last_message_at > coalesce(cm.last_delivered_at, '-infinity')
+       RETURNING cm.conversation_id, cm.last_delivered_at`,
+      [userId, conversationId ?? null],
+    );
+    for (const r of rows) {
+      const others = (await memberIds(r.conversation_id)).filter((x) => x !== userId);
+      await ctx.realtime.publish(await notBlocking(userId, others), {
+        type: 'conversation.delivered',
+        data: { conversationId: r.conversation_id, userId, lastDeliveredAt: r.last_delivered_at.toISOString() },
+      });
+    }
+  }
+
+  /** The browser got a notification while the app was closed (public/sw.js). */
+  app.post('/v1/me/delivered', { preHandler: requireAuth, config: { rateLimit: { max: 120, timeWindow: '1 minute' } } }, async (req) => {
+    await markDelivered(me(req).id);
     return { ok: true };
   });
 
@@ -1481,6 +1521,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     }
     const remove = ctx.realtime.add(user.id, socket);
     socket.send(JSON.stringify({ type: 'ready', data: { userId: user.id } }));
+    // Connected: everything sent while away has reached this device.
+    void markDelivered(user.id).catch(() => {});
     socket.on('message', async (raw: Buffer) => {
       try {
         const msg = JSON.parse(raw.toString()) as { type: string; conversationId?: string };

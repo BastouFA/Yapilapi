@@ -6783,6 +6783,8 @@ export const zh: Catalog = {
   'chat.group.gone': '你已不在这个聊天中了。',
   'chat.group.adminsNote': '管理员可以重命名群组、移除成员和指定管理员。这里的任何人都可以添加成员。',
   'chat.group.optionsFor': '{name} 的选项',
+  'chat.sent': '已发送',
+  'chat.delivered': '已送达',
   'chat.seen': '已读',
   'chat.seenBy.one': '{count} 人已读',
   'chat.seenBy.other': '{count} 人已读',

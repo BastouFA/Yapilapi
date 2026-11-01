@@ -6838,6 +6838,8 @@ export const ur: Catalog = {
   'chat.group.gone': 'آپ اب اس چیٹ میں نہیں ہیں۔',
   'chat.group.adminsNote': 'ایڈمنز گروپ کا نام بدل سکتے ہیں، لوگوں کو ہٹا سکتے ہیں اور ایڈمنز چن سکتے ہیں۔ یہاں کوئی بھی لوگوں کو شامل کر سکتا ہے۔',
   'chat.group.optionsFor': '{name} کے اختیارات',
+  'chat.sent': 'بھیج دیا',
+  'chat.delivered': 'پہنچ گیا',
   'chat.seen': 'دیکھ لیا',
   'chat.seenBy.one': '{count} نے دیکھا',
   'chat.seenBy.other': '{count} نے دیکھا',

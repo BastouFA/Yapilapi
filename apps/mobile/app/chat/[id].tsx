@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { ChatGame, Conversation, Message, PinnedMessage } from '../../../../packages/shared/src/types';
 import { MESSAGE_EDIT_MINUTES } from '../../../../packages/shared/src/constants';
 import { replaceFinalEmoticon } from '../../../../packages/shared/src/emoticons';
+import { messageReceipt, type MessageReceipt } from '../../../../packages/shared/src/receipts';
 import { useCalls } from '../../lib/calls';
 import { client, errorMessage, mediaUrl } from '../../lib/api';
 import { swapEmoticon } from '../../lib/emoticons';
@@ -339,6 +340,18 @@ export default function Chat() {
       setError(t('chat.group.gone'));
     }
     // Someone read up to here: "Seen" under your messages follows.
+    if (e.type === 'conversation.delivered' && e.data?.conversationId === id)
+      setConversation((cur) =>
+        cur
+          ? {
+              ...cur,
+              deliveredTo: [
+                ...(cur.deliveredTo ?? []).filter((d) => d.userId !== e.data.userId),
+                { userId: e.data.userId, lastDeliveredAt: e.data.lastDeliveredAt },
+              ],
+            }
+          : cur,
+      );
     if (e.type === 'conversation.read' && e.data?.conversationId === id)
       setConversation((cur) =>
         cur
@@ -975,6 +988,9 @@ export default function Chat() {
   // Read receipts: under your newest message, "Seen" (one-to-one) or who of the group has read it.
   const lastMine = messages.filter((m) => m.sender.id === meId && m.kind !== 'system' && !m.unsent && !m.moderation).at(-1);
   const readers = lastMine ? (conversation?.readBy ?? []).filter((r) => r.lastReadAt >= lastMine.createdAt).length : 0;
+  // Each message of yours: sent, delivered or read (messageReceipt says what counts in a group).
+  const otherCount = conversation ? conversation.members.filter((x) => x.id !== me?.id).length : 0;
+  const receiptOf = (m: Message) => messageReceipt(m.createdAt, otherCount, conversation?.readBy, conversation?.deliveredTo);
   const seenLabel = !readers
     ? null
     : conversation?.kind === 'direct'
@@ -994,11 +1010,27 @@ export default function Chat() {
         accent={accent}
         watchLive={!!watchingId && item.system?.type === 'watch' && item.system.sessionId === watchingId}
         viewer={item.location ? viewer : null}
-        seen={item.id === lastMineId ? seenLabel : null}
+        seen={item.id === lastMineId ? (seenLabel ?? (receiptOf(item) === 'delivered' ? t('chat.delivered') : null)) : null}
+        receipt={item.sender.id === me?.id && !item.unsent && conversation?.kind !== 'community' ? receiptOf(item) : undefined}
         h={rowHandlers}
       />
     ),
-    [meId, showSender, highlight, accent, watchingId, viewer, rowHandlers, lastMineId, seenLabel],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      meId,
+      showSender,
+      highlight,
+      accent,
+      watchingId,
+      viewer,
+      rowHandlers,
+      lastMineId,
+      seenLabel,
+      otherCount,
+      conversation?.readBy,
+      conversation?.deliveredTo,
+      conversation?.kind,
+    ],
   );
 
   // Follow the newest message, not when earlier ones are loaded above it.
@@ -1685,6 +1717,7 @@ const MessageRow = memo(function MessageRow({
   watchLive,
   viewer,
   seen,
+  receipt,
   h,
 }: {
   item: Message;
@@ -1699,6 +1732,7 @@ const MessageRow = memo(function MessageRow({
   viewer: LatLng | null;
   /** Read receipt under your newest message ("Seen", "Seen by 2"), or null. */
   seen: string | null;
+  receipt?: MessageReceipt;
   h: RowHandlers;
 }) {
   const c = useColors();
@@ -1718,7 +1752,24 @@ const MessageRow = memo(function MessageRow({
   const tint = mine ? accent.on : c.ink;
   const quote = item.replyTo && !item.unsent ? <Quote preview={item.replyTo} tint={tint} meId={meId} onJump={h.jumpTo} /> : null;
   const textStyle = item.unsent ? { fontStyle: 'italic' as const, opacity: 0.8 } : null;
-  const meta = item.editedAt && !item.unsent ? <Text style={{ color: tint, fontSize: 11, opacity: 0.75 }}>{t('m.chat.edited')}</Text> : null;
+  // On your messages: one check when sent, two when delivered, two in colour when read.
+  const mark = receipt ? (
+    <View
+      accessible
+      accessibilityLabel={t(receipt === 'read' ? 'chat.seen' : receipt === 'delivered' ? 'chat.delivered' : 'chat.sent')}
+      style={{ alignSelf: 'flex-end', opacity: receipt === 'read' ? 1 : 0.7 }}
+    >
+      <Icon name={receipt === 'sent' ? 'checkmark' : 'checkmark-done'} size={15} color={receipt === 'read' ? '#FFBE3D' : tint} />
+    </View>
+  ) : null;
+  const edited = item.editedAt && !item.unsent ? <Text style={{ color: tint, fontSize: 11, opacity: 0.75 }}>{t('m.chat.edited')}</Text> : null;
+  const meta =
+    edited || mark ? (
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+        {edited}
+        {mark}
+      </View>
+    ) : null;
   const openActions = () => h.openActions(item);
   const media = item.unsent ? null : item.poll ? (
     <PollCard message={item} meId={meId} tint={tint} onPoll={(poll) => h.patchMessage(item.id, (x) => ({ ...x, poll }))} />

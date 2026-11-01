@@ -6827,6 +6827,8 @@ export const bn: Catalog = {
   'chat.group.gone': 'আপনি আর এই চ্যাটে নেই।',
   'chat.group.adminsNote': 'অ্যাডমিনরা গ্রুপের নাম বদলাতে, মানুষ সরাতে আর অ্যাডমিন বেছে নিতে পারেন। এখানকার যে কেউ মানুষ যোগ করতে পারেন।',
   'chat.group.optionsFor': '{name}-এর বিকল্প',
+  'chat.sent': 'পাঠানো হয়েছে',
+  'chat.delivered': 'পৌঁছেছে',
   'chat.seen': 'দেখেছেন',
   'chat.seenBy.one': '{count} জন দেখেছেন',
   'chat.seenBy.other': '{count} জন দেখেছেন',

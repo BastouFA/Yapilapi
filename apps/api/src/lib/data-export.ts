@@ -245,7 +245,7 @@ export async function exportSections(db: Q, userId: string) {
   const chats = {
     // Chats you are or were in. Other people's messages are never included.
     conversations: await q(
-      `SELECT c.id, c.kind, c.title, c.created_by = $1 AS you_started_it, m.role, m.joined_at, m.left_at, m.last_read_at, m.yaps_out_loud, m.smart_replies
+      `SELECT c.id, c.kind, c.title, c.created_by = $1 AS you_started_it, m.role, m.joined_at, m.left_at, m.last_read_at, m.last_delivered_at, m.yaps_out_loud, m.smart_replies
        FROM conversation_members m JOIN conversations c ON c.id = m.conversation_id WHERE m.user_id = $1 ORDER BY m.joined_at DESC`,
     ),
     // Earlier versions of messages you edited.

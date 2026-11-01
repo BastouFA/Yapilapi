@@ -6834,6 +6834,8 @@ export const en = {
   'chat.group.gone': 'You’re no longer in this chat.',
   'chat.group.adminsNote': 'Admins can rename the group, remove people and choose admins. Anyone here can add people.',
   'chat.group.optionsFor': 'Options for {name}',
+  'chat.sent': 'Sent',
+  'chat.delivered': 'Delivered',
   'chat.seen': 'Seen',
   'chat.seenBy.one': 'Seen by {count}',
   'chat.seenBy.other': 'Seen by {count}',

@@ -15,6 +15,7 @@ import {
   REACTION_GROUPS,
   rememberReaction,
   type Message,
+  type MessageReceipt,
   type MessageKey,
   type MessagePreview,
   type PinnedMessage,
@@ -280,6 +281,18 @@ export function EmojiPanel({ open, mine = [], onPick, onClose }: { open: boolean
         </div>
       </div>
     </BottomSheet>
+  );
+}
+
+/** After the time on your message: one check when sent, two when delivered, two in colour when read. */
+export function ReceiptMark({ state }: { state: MessageReceipt }) {
+  const { t } = useSession();
+  const label = t(state === 'read' ? 'chat.seen' : state === 'delivered' ? 'chat.delivered' : 'chat.sent');
+  return (
+    <span className={`chat-receipt chat-receipt--${state}`} role="img" aria-label={label} title={label}>
+      <Icon name="check" size={14} />
+      {state === 'sent' ? null : <Icon name="check" size={14} />}
+    </span>
   );
 }
 

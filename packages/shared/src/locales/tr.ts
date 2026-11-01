@@ -6840,6 +6840,8 @@ export const tr: Catalog = {
   'chat.group.gone': 'Artık bu sohbette değilsin.',
   'chat.group.adminsNote': 'Yöneticiler grubu yeniden adlandırabilir, kişileri çıkarabilir ve yönetici seçebilir. Buradaki herkes kişi ekleyebilir.',
   'chat.group.optionsFor': '{name} için seçenekler',
+  'chat.sent': 'Gönderildi',
+  'chat.delivered': 'İletildi',
   'chat.seen': 'Görüldü',
   'chat.seenBy.one': '{count} kişi gördü',
   'chat.seenBy.other': '{count} kişi gördü',

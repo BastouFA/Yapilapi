@@ -650,6 +650,8 @@ export interface Conversation {
    * your messages. People who blocked you, or whom you blocked, aren't listed.
    */
   readBy?: { userId: string; lastReadAt: string }[];
+  /** Up to when the others' devices have received this chat's messages (not community chats). */
+  deliveredTo?: { userId: string; lastDeliveredAt: string }[];
   /** A squad's chat: who is in it follows the squad, so people join and leave there, not here. */
   squadId?: string | null;
   /**

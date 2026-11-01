@@ -7125,6 +7125,8 @@ export const ar: Catalog = {
   'chat.group.gone': 'لم تعد في هذه الدردشة.',
   'chat.group.adminsNote': 'يستطيع المشرفون تغيير اسم المجموعة وإزالة الأشخاص واختيار المشرفين. ويستطيع أي شخص هنا إضافة أشخاص.',
   'chat.group.optionsFor': 'خيارات {name}',
+  'chat.sent': 'تم الإرسال',
+  'chat.delivered': 'تم التسليم',
   'chat.seen': 'تمت المشاهدة',
   'chat.seenBy.one': 'شاهدها {count}',
   'chat.seenBy.other': 'شاهدها {count}',

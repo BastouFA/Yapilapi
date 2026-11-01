@@ -6875,6 +6875,8 @@ export const id: Catalog = {
   'chat.group.gone': 'Anda sudah tidak ada di obrolan ini.',
   'chat.group.adminsNote': 'Admin bisa mengganti nama grup, mengeluarkan orang, dan memilih admin. Siapa pun di sini bisa menambahkan orang.',
   'chat.group.optionsFor': 'Opsi untuk {name}',
+  'chat.sent': 'Terkirim',
+  'chat.delivered': 'Diterima',
   'chat.seen': 'Dilihat',
   'chat.seenBy.one': 'Dilihat oleh {count}',
   'chat.seenBy.other': 'Dilihat oleh {count}',

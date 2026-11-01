@@ -6785,6 +6785,8 @@ export const am: Catalog = {
   'chat.group.gone': 'ከእንግዲህ በዚህ ውይይት ውስጥ አይደሉም።',
   'chat.group.adminsNote': 'አስተዳዳሪዎች የቡድኑን ስም መቀየር፣ ሰዎችን ማስወገድ እና አስተዳዳሪዎችን መምረጥ ይችላሉ። እዚህ ያለ ማንኛውም ሰው ሰዎችን ማከል ይችላል።',
   'chat.group.optionsFor': 'የ{name} አማራጮች',
+  'chat.sent': 'ተልኳል',
+  'chat.delivered': 'ደርሷል',
   'chat.seen': 'ታይቷል',
   'chat.seenBy.one': 'በ{count} ታይቷል',
   'chat.seenBy.other': 'በ{count} ታይቷል',

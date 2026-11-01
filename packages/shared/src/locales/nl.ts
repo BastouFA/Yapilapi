@@ -6869,6 +6869,8 @@ export const nl: Catalog = {
   'chat.group.gone': 'Je zit niet meer in deze chat.',
   'chat.group.adminsNote': 'Beheerders kunnen de groep hernoemen, mensen verwijderen en beheerders kiezen. Iedereen hier kan mensen toevoegen.',
   'chat.group.optionsFor': 'Opties voor {name}',
+  'chat.sent': 'Verzonden',
+  'chat.delivered': 'Afgeleverd',
   'chat.seen': 'Gezien',
   'chat.seenBy.one': 'Gezien door {count}',
   'chat.seenBy.other': 'Gezien door {count}',

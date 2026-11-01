@@ -7171,6 +7171,8 @@ export const ru: Catalog = {
   'chat.group.gone': 'Вы больше не в этом чате.',
   'chat.group.adminsNote': 'Администраторы могут переименовывать группу, удалять людей и назначать администраторов. Добавлять людей может любой участник.',
   'chat.group.optionsFor': 'Действия для {name}',
+  'chat.sent': 'Отправлено',
+  'chat.delivered': 'Доставлено',
   'chat.seen': 'Просмотрено',
   'chat.seenBy.one': 'Просмотрено: {count}',
   'chat.seenBy.few': 'Просмотрено: {count}',

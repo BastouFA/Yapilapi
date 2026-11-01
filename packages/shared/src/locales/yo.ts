@@ -6836,6 +6836,8 @@ export const yo: Catalog = {
   'chat.group.gone': 'O kò sí nínú ìjíròrò yìí mọ́.',
   'chat.group.adminsNote': 'Àwọn alábòójútó lè yí orúkọ ẹgbẹ́ padà, yọ ènìyàn kúrò, kí wọ́n sì yan alábòójútó. Ẹnikẹ́ni níbí lè fi ènìyàn kún un.',
   'chat.group.optionsFor': 'Àwọn àṣàyàn fún {name}',
+  'chat.sent': 'A ti firánṣẹ́',
+  'chat.delivered': 'Ó ti dé',
   'chat.seen': 'Ti rí i',
   'chat.seenBy.one': '{count} ti rí i',
   'chat.seenBy.other': '{count} ti rí i',

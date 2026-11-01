@@ -6858,6 +6858,8 @@ export const ha: Catalog = {
   'chat.group.gone': 'Ba ka cikin wannan hira kuma.',
   'chat.group.adminsNote': 'Masu kula na iya canza sunan rukuni, cire mutane da zaɓar masu kula. Kowa a nan na iya ƙara mutane.',
   'chat.group.optionsFor': 'Zaɓuɓɓuka don {name}',
+  'chat.sent': 'An aika',
+  'chat.delivered': 'Ya isa',
   'chat.seen': 'An gani',
   'chat.seenBy.one': '{count} sun gani',
   'chat.seenBy.other': '{count} sun gani',

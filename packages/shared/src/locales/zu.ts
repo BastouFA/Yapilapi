@@ -6884,6 +6884,8 @@ export const zu: Catalog = {
   'chat.group.gone': 'Awusekho kule ngxoxo.',
   'chat.group.adminsNote': 'Abaphathi bangaqamba kabusha iqembu, basuse abantu futhi bakhethe abaphathi. Noma ubani olapha angengeza abantu.',
   'chat.group.optionsFor': 'Izinketho zika-{name}',
+  'chat.sent': 'Kuthunyelwe',
+  'chat.delivered': 'Kufikile',
   'chat.seen': 'Kubonwe',
   'chat.seenBy.one': 'Kubonwe ngu-{count}',
   'chat.seenBy.other': 'Kubonwe ngabangu-{count}',

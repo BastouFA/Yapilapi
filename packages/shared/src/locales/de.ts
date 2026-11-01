@@ -6879,6 +6879,8 @@ export const de: Catalog = {
   'chat.group.gone': 'Du bist nicht mehr in diesem Chat.',
   'chat.group.adminsNote': 'Admins können die Gruppe umbenennen, Leute entfernen und Admins wählen. Alle hier können Leute hinzufügen.',
   'chat.group.optionsFor': 'Optionen für {name}',
+  'chat.sent': 'Gesendet',
+  'chat.delivered': 'Zugestellt',
   'chat.seen': 'Gesehen',
   'chat.seenBy.one': 'Gesehen von {count}',
   'chat.seenBy.other': 'Gesehen von {count}',

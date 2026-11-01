@@ -6834,6 +6834,8 @@ export const hi: Catalog = {
   'chat.group.gone': 'अब आप इस चैट में नहीं हैं।',
   'chat.group.adminsNote': 'एडमिन ग्रुप का नाम बदल सकते हैं, लोगों को हटा सकते हैं और एडमिन चुन सकते हैं। यहाँ कोई भी लोगों को जोड़ सकता है।',
   'chat.group.optionsFor': '{name} के विकल्प',
+  'chat.sent': 'भेजा गया',
+  'chat.delivered': 'पहुँच गया',
   'chat.seen': 'देखा गया',
   'chat.seenBy.one': '{count} ने देखा',
   'chat.seenBy.other': '{count} ने देखा',

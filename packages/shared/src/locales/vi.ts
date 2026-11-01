@@ -6845,6 +6845,8 @@ export const vi: Catalog = {
   'chat.group.gone': 'Bạn không còn trong cuộc trò chuyện này.',
   'chat.group.adminsNote': 'Quản trị viên có thể đổi tên nhóm, mời người ra khỏi nhóm và chọn quản trị viên. Ai ở đây cũng có thể thêm người.',
   'chat.group.optionsFor': 'Tùy chọn cho {name}',
+  'chat.sent': 'Đã gửi',
+  'chat.delivered': 'Đã nhận',
   'chat.seen': 'Đã xem',
   'chat.seenBy.one': '{count} người đã xem',
   'chat.seenBy.other': '{count} người đã xem',

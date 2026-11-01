@@ -6820,6 +6820,8 @@ export const ja: Catalog = {
   'chat.group.gone': 'あなたはもうこのチャットに参加していません。',
   'chat.group.adminsNote': '管理者はグループ名の変更、メンバーの削除、管理者の指名ができます。メンバーは誰でも人を追加できます。',
   'chat.group.optionsFor': '{name}さんのオプション',
+  'chat.sent': '送信済み',
+  'chat.delivered': '配信済み',
   'chat.seen': '既読',
   'chat.seenBy.one': '既読 {count}',
   'chat.seenBy.other': '既読 {count}',

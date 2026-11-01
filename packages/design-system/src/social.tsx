@@ -2056,6 +2056,7 @@ export function ChatBubble({
   body,
   time,
   pending,
+  receipt,
   locale = 'en',
 }: {
   mine: boolean;
@@ -2063,13 +2064,20 @@ export function ChatBubble({
   body: ReactNode;
   time?: string;
   pending?: boolean;
+  /** On your own messages, after the time: sent, delivered or read. */
+  receipt?: ReactNode;
   locale?: string;
 }) {
   return (
     <div className={cx('yp-bubble', mine ? 'yp-bubble--me' : 'yp-bubble--them', pending && 'yp-bubble--pending')}>
       {sender && !mine ? <bdi className="yp-bubble__sender">{sender}</bdi> : null}
       <span dir="auto">{body}</span>
-      {time ? <span className="yp-bubble__time">{pending ? t('ds.sending', locale) : time}</span> : null}
+      {time ? (
+        <span className="yp-bubble__time">
+          {pending ? t('ds.sending', locale) : time}
+          {pending ? null : receipt}
+        </span>
+      ) : null}
     </div>
   );
 }

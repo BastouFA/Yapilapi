@@ -6867,6 +6867,8 @@ export const it: Catalog = {
   'chat.group.adminsNote':
     'Gli amministratori possono rinominare il gruppo, rimuovere persone e scegliere altri amministratori. Chiunque qui può aggiungere persone.',
   'chat.group.optionsFor': 'Opzioni per {name}',
+  'chat.sent': 'Inviato',
+  'chat.delivered': 'Consegnato',
   'chat.seen': 'Visto',
   'chat.seenBy.one': 'Visto da {count}',
   'chat.seenBy.other': 'Visto da {count}',

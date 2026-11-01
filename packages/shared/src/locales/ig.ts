@@ -6839,6 +6839,8 @@ export const ig: Catalog = {
   'chat.group.gone': 'Ị nọghịzi na mkparịta ụka a.',
   'chat.group.adminsNote': 'Ndị nchịkwa nwere ike ịgbanwe aha otu, wepụ ndị mmadụ ma họrọ ndị nchịkwa. Onye ọ bụla nọ ebe a nwere ike ịtinye ndị mmadụ.',
   'chat.group.optionsFor': 'Nhọrọ maka {name}',
+  'chat.sent': 'E zigara',
+  'chat.delivered': 'Eruola',
   'chat.seen': 'Ahụla ya',
   'chat.seenBy.one': 'Mmadụ {count} hụrụ ya',
   'chat.seenBy.other': 'Mmadụ {count} hụrụ ya',

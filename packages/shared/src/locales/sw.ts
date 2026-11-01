@@ -6856,6 +6856,8 @@ export const sw: Catalog = {
   'chat.group.gone': 'Haupo tena kwenye gumzo hili.',
   'chat.group.adminsNote': 'Wasimamizi wanaweza kubadilisha jina la kikundi, kuondoa watu na kuchagua wasimamizi. Yeyote hapa anaweza kuongeza watu.',
   'chat.group.optionsFor': 'Chaguo za {name}',
+  'chat.sent': 'Imetumwa',
+  'chat.delivered': 'Imefika',
   'chat.seen': 'Imeonekana',
   'chat.seenBy.one': 'Imeonwa na {count}',
   'chat.seenBy.other': 'Imeonwa na {count}',

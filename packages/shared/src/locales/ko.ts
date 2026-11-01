@@ -6803,6 +6803,8 @@ export const ko: Catalog = {
   'chat.group.gone': '더 이상 이 채팅에 참여하고 있지 않아요.',
   'chat.group.adminsNote': '관리자는 그룹 이름을 바꾸고, 사람을 내보내고, 관리자를 정할 수 있어요. 사람 추가는 누구나 할 수 있어요.',
   'chat.group.optionsFor': '{name}님 옵션',
+  'chat.sent': '보냄',
+  'chat.delivered': '전달됨',
   'chat.seen': '읽음',
   'chat.seenBy.one': '{count}명 읽음',
   'chat.seenBy.other': '{count}명 읽음',
