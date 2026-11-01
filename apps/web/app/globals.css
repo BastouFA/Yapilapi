@@ -8044,6 +8044,20 @@ button.yp-chip[aria-pressed='true'] {
   gap: 6px;
   transition: opacity 400ms ease;
 }
+/* "New" on a recent reel, "Watch again" past the new ones. */
+.reel__tag {
+  flex: none;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  background: rgb(0 0 0 / 0.55);
+  color: #fff;
+  font: 700 12px/16px var(--font-sans);
+  white-space: nowrap;
+}
+.reel__tag--new {
+  background: #fff;
+  color: #0b0c14;
+}
 .reel__top-title {
   flex: 1;
   min-width: 0;

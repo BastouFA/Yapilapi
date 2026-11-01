@@ -73,6 +73,8 @@ export function createPushSender(db: Pool, config: Config, fetchImpl: typeof fet
       } catch (e) {
         const code = (e as { statusCode?: number }).statusCode;
         if (code === 404 || code === 410) await db.query(`DELETE FROM push_subscriptions WHERE id = $1`, [s.id]);
+        // Otherwise it would fail unseen, for ever. Only the service's name: an endpoint identifies a device.
+        else console.warn(`Push failed: ${code ?? (e as Error).message} (${s.kind === 'webpush' ? new URL(s.endpoint).host : 'expo'})`);
       }
     }
   };

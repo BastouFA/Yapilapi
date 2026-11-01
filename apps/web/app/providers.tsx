@@ -256,6 +256,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
     let hiddenAt = 0;
     // Only the newest connect() opens a socket (one may still be waiting for its ticket).
     let generation = 0;
+    // Whether this page is on screen: in the background, new messages come as notifications.
+    const sayPresence = () => {
+      if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'presence', onScreen: document.visibilityState === 'visible' }));
+    };
     // Shared with the inbox and notifications pages, which ask for the same lists as they open.
     const loadCounts = () => {
       sharedRequest('notifications', () => api.notifications.list())
@@ -285,6 +289,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       sock.onopen = () => {
         attempt = 0;
         heard = Date.now();
+        sayPresence();
         ping = setInterval(() => {
           if (sock.readyState !== WebSocket.OPEN) return;
           if (Date.now() - heard > 60_000) return sock.close();
@@ -347,6 +352,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       if (!ws || ws.readyState !== WebSocket.OPEN || away > 15_000) reconnectNow();
     };
     const onVisibility = () => {
+      sayPresence();
       if (document.visibilityState === 'hidden') hiddenAt = Date.now();
       else back();
     };

@@ -86,6 +86,8 @@ import { chainBarText, type Chain, type ChainRef } from '../../../packages/share
 const reelSource = (m: MediaItem, saver: boolean) =>
   mediaUrl(saver ? (m.variants?.mp4_360 ?? hls360(m) ?? m.variants?.mp4 ?? m.url) : (m.variants?.mp4 ?? m.url));
 
+/** A reel this recent, not seen yet, says New. */
+const NEW_REEL_MS = 48 * 3600_000;
 const WHITE = '#FFFFFF';
 const SCRIM = 'rgba(5,6,11,0.42)';
 const ACCENT = '#FF5C7A';
@@ -153,6 +155,9 @@ export default function Reels() {
   const { start, at } = useLocalSearchParams<{ start?: string; at?: string }>();
   const [items, setItems] = useState<Post[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
+  // Reels from past the new ones: everything else, newest first, marked "Watch again".
+  const [rewatch, setRewatch] = useState<ReadonlySet<string>>(() => new Set());
+  const shown = useRef(new Set<string>());
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const { me } = useSession();
@@ -230,8 +235,15 @@ export default function Reels() {
     if (loading.current) return;
     loading.current = true;
     try {
-      const page = await (await client()).reels(next ?? undefined);
+      const api = await client();
+      let page = await api.reels(next ?? undefined);
+      // Past the new ones the list comes round to reels already here: a page of only those isn't the end.
+      for (let i = 0; i < 10 && page.nextCursor && page.items.every((x) => shown.current.has(x.id)); i++) page = await api.reels(page.nextCursor);
       setItems((cur) => [...(cur ?? []), ...page.items.filter((x) => !cur?.some((y) => y.id === x.id))]);
+      // A reel already shown as new stays as it was when the list comes round to it.
+      const back = page.rewatch?.filter((id) => !shown.current.has(id)) ?? [];
+      page.items.forEach((x) => shown.current.add(x.id));
+      if (back.length) setRewatch((cur) => new Set([...cur, ...back]));
       setCursor(page.nextCursor);
       setError(null);
     } catch (e) {
@@ -648,6 +660,7 @@ export default function Reels() {
         moments={moments[item.id] ?? NO_MOMENTS}
         startAt={index === 0 && item.id === start && at ? Number(at) : undefined}
         showSoundHint={soundHint}
+        rewatch={rewatch.has(item.id)}
         following={!!followed[item.author.id]}
         mine={item.author.id === me?.id}
         signedIn={signedIn}
@@ -655,7 +668,7 @@ export default function Reels() {
         actions={actions}
       />
     ),
-    [height, active, focused, muted, clear, speed, big, captions, holdId, moments, start, at, soundHint, followed, me?.id, signedIn, micOn],
+    [height, active, focused, muted, clear, speed, big, captions, holdId, moments, start, at, soundHint, followed, me?.id, signedIn, micOn, rewatch],
   );
 
   const back = (color: string) => (
@@ -713,6 +726,9 @@ export default function Reels() {
             !cursor ? (
               <View style={{ height, alignItems: 'center', justifyContent: 'center', padding: space[6], gap: space[3] }}>
                 <Text style={{ color: WHITE, fontSize: 17, fontWeight: '700', textAlign: 'center' }}>{t('m.reels.caughtUp')}</Text>
+                {(items?.length ?? 0) > 1 ? (
+                  <Button label={t('reel.backToNewest')} variant="secondary" onPress={() => list.current?.scrollToOffset({ offset: 0, animated: true })} />
+                ) : null}
                 <Button label={t('m.reels.make')} icon="videocam-outline" onPress={() => router.navigate({ pathname: '/create', params: { mode: 'reel' } })} />
               </View>
             ) : null
@@ -932,6 +948,7 @@ function Reel({
   moments,
   startAt,
   showSoundHint,
+  rewatch,
   following,
   mine,
   onToggleMute,
@@ -975,6 +992,8 @@ function Reel({
   /** Open at this moment (a moment comment tapped in the comments). */
   startAt?: number;
   showSoundHint: boolean;
+  /** Past the new ones: seen before, or not new. */
+  rewatch: boolean;
   following: boolean;
   mine: boolean;
   onToggleMute: () => void;
@@ -1435,6 +1454,11 @@ function Reel({
         <Text style={s.title} accessibilityRole="header" numberOfLines={1}>
           {t('m.title.reels')}
         </Text>
+        {rewatch || Date.now() - new Date(post.createdAt).getTime() < NEW_REEL_MS ? (
+          <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: rewatch ? 'rgba(0,0,0,0.55)' : WHITE }}>
+            <Text style={{ color: rewatch ? WHITE : '#0B0C14', fontSize: 12, fontWeight: '700' }}>{t(rewatch ? 'reel.watchAgain' : 'reel.new')}</Text>
+          </View>
+        ) : null}
         <TopButton icon={muted ? 'volume-mute' : 'volume-high'} label={t('m.reels.sound')} selected={!muted} onPress={onToggleMute} />
         <TopButton icon={clear ? 'eye-off-outline' : 'scan-outline'} label={t('reel.clearView')} selected={clear} onPress={onToggleClear} />
       </Animated.View>

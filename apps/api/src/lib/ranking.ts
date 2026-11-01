@@ -762,6 +762,31 @@ export async function rankedPage(
 }
 
 /** The posts of a kept page that the viewer may still see, in order. */
+/**
+ * Reels once the new ones run out: every reel this person may see, newest posted first, yours
+ * included, so Reels never runs dry however few there are or however many they've watched. `before`
+ * is where the last page stopped; `not` the reels on this page already.
+ */
+export async function rewatchReels(
+  db: Q,
+  o: Pick<RankOptions, 'userId' | 'personal' | 'sensitiveOk'>,
+  before: { at: string; id: string } | null,
+  limit: number,
+  not: string[],
+): Promise<{ ids: string[]; next: { at: string; id: string } | null }> {
+  const { rows } = await db.query<{ id: string; at: Date }>(
+    `SELECT p.id, p.created_at AS at FROM posts p JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id
+     WHERE p.format = 'reel' AND p.moderation_status = 'normal' AND ${postVisibleSql('$1')} ${o.personal}
+       AND ($2 OR NOT EXISTS (SELECT 1 FROM post_media pm JOIN media m ON m.id = pm.media_id WHERE pm.post_id = p.id AND m.moderation = 'sensitive'))
+       AND NOT (p.id = ANY($3::uuid[]))
+       AND ($4::timestamptz IS NULL OR (p.created_at, p.id) < ($4::timestamptz, $5::uuid))
+     ORDER BY p.created_at DESC, p.id DESC LIMIT $6`,
+    [o.userId, !!o.sensitiveOk, not, before?.at ?? null, before?.id ?? null, limit],
+  );
+  const last = rows.at(-1);
+  return { ids: rows.map((r) => r.id), next: rows.length === limit && last ? { at: last.at.toISOString(), id: last.id } : null };
+}
+
 async function stillShown(db: Q, o: Omit<RankOptions, 'asOf'>, items: Arranged[]): Promise<Arranged[]> {
   if (!items.length) return items;
   const reels = o.surface === 'reels';

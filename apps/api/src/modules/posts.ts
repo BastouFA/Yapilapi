@@ -32,7 +32,7 @@ import type { AppContext } from '../lib/context.ts';
 import { decodeCursor, keyCursorOf, type KeyCursor } from '../lib/cursor.ts';
 import { analyzeText, statusForRisk } from '../lib/moderation.ts';
 import { ENGLISH_REASONS, hydratePosts, type FeedReason } from '../lib/posts.ts';
-import { RANKING, rankedPage } from '../lib/ranking.ts';
+import { RANKING, rankedPage, rewatchReels } from '../lib/ranking.ts';
 import { fadedScoreSql, learn, learnFromPost, learnQuietly } from '../lib/affinity.ts';
 import { bumpStats, trendSql, TREND } from '../lib/post-stats.ts';
 import { attachSaveNotes, savedFilterSql } from '../lib/saves.ts';
@@ -113,25 +113,39 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     const u = me(req);
     const q = parse(z.object({ cursor: z.string().max(200).optional(), limit: z.coerce.number().int().min(1).max(20).default(8) }), req.query);
     // A reel is its video: people under 18 don't get reels whose video is marked sensitive.
-    const ranked = await rankedPage(
-      db,
-      {
-        userId: u.id,
-        surface: 'reels',
-        personalized: await personalizationAllowed(db, u.id),
-        personal: PERSONAL_FILTERS,
-        sensitiveOk: await seesSensitiveMedia(db, u.id),
-        reader: await readerLanguages(db, u.id, ctx.ai.machineTranslation),
-      },
-      q.cursor,
-      q.limit,
-    );
-    const items = await hydratePosts(
+    const options = {
+      userId: u.id,
+      surface: 'reels' as const,
+      personalized: await personalizationAllowed(db, u.id),
+      personal: PERSONAL_FILTERS,
+      sensitiveOk: await seesSensitiveMedia(db, u.id),
+      reader: await readerLanguages(db, u.id, ctx.ai.machineTranslation),
+    };
+    // First what they haven't seen, newest posted first in each page. When that runs out, it carries on
+    // with everything else, newest first, marked `rewatch`: Reels always has something to scroll.
+    const again = /^again:(.+)\|([0-9a-f-]{36})$/.exec(q.cursor ?? '');
+    const ranked = q.cursor?.startsWith('again:') ? { items: [], nextCursor: null } : await rankedPage(db, options, q.cursor, q.limit);
+    const fresh = await hydratePosts(
       db,
       ranked.items.map((r) => r.id),
       u.id,
       new Map(ranked.items.map((r) => [r.id, r.reason])),
     );
+    fresh.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    const room = ranked.nextCursor ? 0 : q.limit - fresh.length;
+    const more =
+      room > 0
+        ? await rewatchReels(
+            db,
+            options,
+            again ? { at: again[1]!, id: again[2]! } : null,
+            room,
+            ranked.items.map((r) => r.id),
+          )
+        : { ids: [], next: null };
+    const rewatch = await hydratePosts(db, more.ids, u.id);
+    const items = [...fresh, ...rewatch];
+    const nextCursor = ranked.nextCursor ?? (more.next ? `again:${more.next.at}|${more.next.id}` : null);
     // Each author's follower count, and whether you follow them, for the follow button on the reel.
     const stats = await db.query(
       `SELECT pr.user_id, (SELECT count(*) FROM follows f WHERE f.followee_id = pr.user_id)::int AS followers,
@@ -142,7 +156,8 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     return {
       items,
       authors: Object.fromEntries(stats.rows.map((r) => [r.user_id, { followers: r.followers, following: r.following }])),
-      nextCursor: ranked.nextCursor,
+      rewatch: rewatch.map((p) => p.id),
+      nextCursor,
     };
   });
 

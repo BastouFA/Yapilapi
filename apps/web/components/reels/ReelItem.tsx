@@ -56,6 +56,8 @@ export interface ReelViewerApi {
 
 type AuthorStat = { followers: number; following: boolean } | undefined;
 
+/** A reel this recent, not seen yet, says New. */
+const NEW_REEL_MS = 48 * 3600_000;
 const TAP_MS = 260;
 const HOLD_MS = 380;
 /** The UI fades to a faint state after this much playback without a touch, a hover or a pause. */
@@ -92,6 +94,7 @@ export function ReelItem({
   active,
   near,
   muted,
+  rewatch,
   clear,
   prefs,
   saver,
@@ -109,6 +112,8 @@ export function ReelItem({
   /** The next reel: its video loads ahead. */
   near: boolean;
   muted: boolean;
+  /** Past the new ones: seen before, or not new. */
+  rewatch?: boolean;
   clear: boolean;
   prefs: ReelPrefs;
   /** Play the small file and wait for a tap (Data saver or the "Data saver" quality). */
@@ -656,6 +661,11 @@ export function ReelItem({
           <span className="reel__top-title" aria-hidden>
             {t('m.title.reels')}
           </span>
+          {rewatch ? (
+            <span className="reel__tag">{t('reel.watchAgain')}</span>
+          ) : Date.now() - new Date(post.createdAt).getTime() < NEW_REEL_MS ? (
+            <span className="reel__tag reel__tag--new">{t('reel.new')}</span>
+          ) : null}
           <button type="button" className="reel__icon-btn" onClick={viewer.toggleMute} aria-pressed={!muted} aria-label={t('m.reels.sound')}>
             <Icon name={muted ? 'volume-off' : 'volume'} size={20} />
           </button>

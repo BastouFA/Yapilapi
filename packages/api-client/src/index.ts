@@ -1143,7 +1143,8 @@ export function createClient(opts: ClientOptions) {
       reply: (id: string, body: string) => post<{ conversationId: string }>(`/v1/moments/${id}/reply`, { body }),
       remove: (id: string) => del(`/v1/moments/${id}`),
     },
-    reels: (cursor?: string) => get<Page<Post> & { authors: Record<string, { followers: number; following: boolean }> }>(`/v1/reels${qs({ cursor })}`),
+    reels: (cursor?: string) =>
+      get<Page<Post> & { authors: Record<string, { followers: number; following: boolean }>; rewatch?: string[] }>(`/v1/reels${qs({ cursor })}`),
     conversations: {
       list: () => get<{ items: Conversation[] }>('/v1/conversations'),
       get: (id: string) => get<{ conversation: Conversation }>(`/v1/conversations/${id}`),

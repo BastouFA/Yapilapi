@@ -55,6 +55,9 @@ export function ReelsViewer() {
   itemsRef.current = items;
   const [authors, setAuthors] = useState<AuthorStats>({});
   const [cursor, setCursor] = useState<string | null>(null);
+  // Reels from past the new ones: everything else, newest first, marked "Watch again".
+  const [rewatch, setRewatch] = useState<ReadonlySet<string>>(() => new Set());
+  const shown = useRef(new Set<string>());
   const [active, setActive] = useState(0);
   const [muted, setMuted] = useState(true);
   const [clear, setClear] = useState(false);
@@ -85,9 +88,15 @@ export function ReelsViewer() {
       if (loading.current) return;
       loading.current = true;
       try {
-        const r = await api.reels(c ?? undefined);
+        let r = await api.reels(c ?? undefined);
+        // Past the new ones the list comes round to reels already here: a page of only those isn't the end.
+        for (let i = 0; i < 10 && r.nextCursor && r.items.every((x) => shown.current.has(x.id)); i++) r = await api.reels(r.nextCursor);
         setItems((cur) => [...(cur ?? []), ...r.items.filter((x) => !cur?.some((y) => y.id === x.id))]);
         setAuthors((a) => ({ ...a, ...r.authors }));
+        // A reel already shown as new stays as it was when the list comes round to it.
+        const back = r.rewatch?.filter((id) => !shown.current.has(id)) ?? [];
+        r.items.forEach((x) => shown.current.add(x.id));
+        if (back.length) setRewatch((cur) => new Set([...cur, ...back]));
         setCursor(r.nextCursor);
       } catch (e) {
         setItems((cur) => cur ?? []);
@@ -638,6 +647,7 @@ export function ReelsViewer() {
             active={i === active}
             near={i === active + 1 || i === active - 1}
             muted={muted}
+            rewatch={rewatch.has(p.id)}
             clear={clear}
             prefs={prefs}
             saver={saver}
@@ -652,6 +662,11 @@ export function ReelsViewer() {
         {!cursor ? (
           <div className="reels__end" data-index={items.length}>
             <p>{t('m.reels.caughtUp')}</p>
+            {items.length > 1 ? (
+              <button type="button" className="yp-btn yp-btn--secondary yp-btn--sm" onClick={() => list.current?.scrollTo({ top: 0, behavior: 'smooth' })}>
+                {t('reel.backToNewest')}
+              </button>
+            ) : null}
             <Link href="/create?mode=reel" className="yp-btn yp-btn--primary yp-btn--sm">
               {t('m.reels.make')}
             </Link>

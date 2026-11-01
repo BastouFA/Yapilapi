@@ -1525,7 +1525,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     void markDelivered(user.id).catch(() => {});
     socket.on('message', async (raw: Buffer) => {
       try {
-        const msg = JSON.parse(raw.toString()) as { type: string; conversationId?: string };
+        const msg = JSON.parse(raw.toString()) as { type: string; conversationId?: string; onScreen?: unknown };
+        ctx.realtime.heard(socket, msg.type === 'presence' && typeof msg.onScreen === 'boolean' ? msg.onScreen : undefined);
         if (msg.type === 'ping') socket.send(JSON.stringify({ type: 'pong' }));
         if (msg.type === 'typing' && msg.conversationId) {
           if (!z.string().uuid().safeParse(msg.conversationId).success) return;
