@@ -114,6 +114,9 @@ function Feed() {
 
   // Answers for a mode you've already left (or a first page asked for again) are dropped.
   const seq = useRef(0);
+  const shownPosts = useRef(posts);
+  shownPosts.current = posts;
+  const loadRef = useRef<(next?: string) => Promise<void>>(async () => {});
   const load = useCallback(
     async (next?: string) => {
       const run = next ? seq.current : ++seq.current;
@@ -124,6 +127,8 @@ function Feed() {
         setPosts((cur) => (next && cur ? [...cur, ...page.items.filter((x) => !cur.some((y) => y.id === x.id))] : page.items));
         setCursor(page.nextCursor);
         setError(null);
+        // For you comes round to reels already here: a page of only those isn't the end.
+        if (next && page.nextCursor && page.items.every((x) => shownPosts.current?.some((y) => y.id === x.id))) void loadRef.current(page.nextCursor);
       } catch (e) {
         if (run !== seq.current) return;
         setError(errorMessage(e));
@@ -132,6 +137,7 @@ function Feed() {
     },
     [mode],
   );
+  loadRef.current = load;
 
   useEffect(() => {
     setPosts(null);

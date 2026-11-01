@@ -168,7 +168,9 @@ export function PostList({
     if (!cursor || loadingMore) return;
     setLoadingMore(true);
     try {
-      const p = await load(cursor);
+      let p = await load(cursor);
+      // For you comes round to reels already here: a page of only those isn't the end.
+      for (let i = 0; i < 10 && p.nextCursor && p.items.every((x) => posts?.some((c) => c.id === x.id)); i++) p = await load(p.nextCursor);
       setPosts((cur) => [...(cur ?? []), ...p.items.filter((x) => !cur?.some((c) => c.id === x.id))]);
       setCursor(p.nextCursor);
     } catch (e) {
@@ -176,7 +178,7 @@ export function PostList({
     } finally {
       setLoadingMore(false);
     }
-  }, [cursor, loadingMore, load, toast]);
+  }, [cursor, loadingMore, load, toast, posts]);
 
   // A link asked to boost one of these posts: open the sheet once, when it's your own post.
   const boostOpened = useRef(false);

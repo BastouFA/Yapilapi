@@ -792,19 +792,36 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     surface: 'for_you' | 'yaps' = 'for_you',
   ) {
     const reader = await readerLanguages(db, userId, ctx.ai.machineTranslation);
-    const ranked = await rankedPage(db, { userId, surface, personalized, personal, reduced, reader }, cursor, limit);
+    const again = /^again:(.+)\|([0-9a-f-]{36})$/.exec(cursor ?? '');
+    const ranked = cursor?.startsWith('again:')
+      ? { items: [], nextCursor: null }
+      : await rankedPage(db, { userId, surface, personalized, personal, reduced, reader }, cursor, limit);
     // Ask the city: now and then, an open question in your city (lib/ask-city.ts).
-    const offset = decodeCursor<{ o?: number }>(cursor)?.o;
+    const offset = cursor?.startsWith('again:') ? 0 : decodeCursor<{ o?: number }>(cursor)?.o;
     const items = await mixInQuestions(db, userId, surface, typeof offset === 'number' ? offset : 0, ranked.items, personal);
+    const posts = await hydratePosts(
+      db,
+      items.map((r) => r.id),
+      userId,
+      new Map(items.map((r) => [r.id, r.reason])),
+    );
+    // Past what's new, For you carries on with every reel, newest first, so none of them gets lost
+    // once it's been seen (not for people who asked for fewer recommendations).
+    const room = surface === 'for_you' && !reduced && !ranked.nextCursor ? limit - posts.length : 0;
+    const more =
+      room > 0
+        ? await rewatchReels(
+            db,
+            { userId, personal, sensitiveOk: await seesSensitiveMedia(db, userId) },
+            again ? { at: again[1]!, id: again[2]! } : null,
+            room,
+            items.map((r) => r.id),
+          )
+        : { ids: [], next: null };
     return {
       mode: surface,
-      items: await hydratePosts(
-        db,
-        items.map((r) => r.id),
-        userId,
-        new Map(items.map((r) => [r.id, r.reason])),
-      ),
-      nextCursor: ranked.nextCursor,
+      items: [...posts, ...(await hydratePosts(db, more.ids, userId))],
+      nextCursor: ranked.nextCursor ?? (more.next ? `again:${more.next.at}|${more.next.id}` : null),
     };
   }
 

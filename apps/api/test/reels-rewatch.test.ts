@@ -70,6 +70,19 @@ describe('Reels never run dry', () => {
     expect([...new Set(mine(own.ids))].sort()).toEqual([...reels].sort());
   });
 
+  it('For you carries on with every reel once the new posts run out, seen ones included', async () => {
+    const seen = new Set<string>();
+    let cursor: string | null = null;
+    for (let i = 0; i < 200; i++) {
+      const res = await as(t.app, bo).get(`/v1/feed?mode=for_you&limit=20${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
+      expect(res.status).toBe(200);
+      for (const p of res.body.items as { id: string }[]) seen.add(p.id);
+      cursor = res.body.nextCursor;
+      if (!cursor) break;
+    }
+    for (const id of reels) expect(seen.has(id)).toBe(true);
+  });
+
   it('the part past the new ones pages through without repeating itself', async () => {
     const { ids, rewatch } = await everything(bo);
     expect(new Set(rewatch).size).toBe(rewatch.length);
