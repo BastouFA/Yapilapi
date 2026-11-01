@@ -1966,7 +1966,6 @@ export const it: Catalog = {
   'chat.ai.planSaved': 'Piano salvato in questa conversazione',
   'chat.fileTooBig': 'I file nelle chat possono arrivare a 50 MB.',
   'chat.react': 'Reagisci',
-  'chat.reactMore': 'Altre emoji',
   'chat.messages': 'Messaggi',
   'chat.loadEarlier': 'Carica messaggi precedenti',
   'chat.editedAt': 'Modificato · {time}',
@@ -2009,6 +2008,8 @@ export const it: Catalog = {
   'yap.micOff': 'L’accesso al microfono è disattivato. Consentilo nel tuo browser per inviare Yap.',
   'yap.a11y': 'Yap: tieni premuto per parlare, rilascia, poi invia o annulla. Puoi anche tenere premuta la barra spaziatrice.',
   'yap.review': 'Il tuo Yap · {time}',
+  'yap.swipeUp': 'Scorri in alto per il vivavoce',
+  'yap.locked': 'Mani libere · {time} · Tocca per fermare',
   'yap.prompt':
     'Gli Yap sono clip vocali che si riproducono appena arrivano, come un walkie-talkie. Il tuo browser ha bisogno di un clic per consentire l’audio.',
   'yap.turnOn': 'Attiva gli Yap',

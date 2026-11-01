@@ -3536,7 +3536,7 @@ video.chat-att__media {
 }
 .chat-picker {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   max-width: min(100%, 420px);
   gap: 2px;
   margin-block: 4px;
@@ -3555,8 +3555,27 @@ video.chat-att__media {
   font-size: 22px;
   cursor: pointer;
 }
-.chat-picker:has(.chat-picker__item:nth-child(10)) {
-  border-radius: var(--radius-lg);
+/* Every emoji in one row: swipe (or scroll) it sideways; Done stays at the end. */
+.chat-picker__row {
+  display: flex;
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+}
+.chat-picker__row::-webkit-scrollbar {
+  display: none;
+}
+.chat-picker__row .chat-picker__item {
+  flex: none;
+  scroll-snap-align: start;
+}
+.chat-picker__done {
+  flex: none;
 }
 .chat-picker__item {
   display: grid;
@@ -5996,6 +6015,39 @@ button.yp-chip[aria-pressed='true'] {
   gap: var(--space-2);
   padding: var(--space-2) 0 0;
 }
+/* While holding: "Swipe up for hands-free" floats just above the button. */
+.yap-btn {
+  position: relative;
+}
+.yap-btn__swipe {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  translate: -50% 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-lg);
+  font: 600 12px/16px var(--font-sans);
+  white-space: nowrap;
+  pointer-events: none;
+  animation: yap-swipe-hint 1.2s ease-in-out infinite;
+}
+@keyframes yap-swipe-hint {
+  50% {
+    translate: -50% -4px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .yap-btn__swipe {
+    animation: none;
+  }
+}
+
 .yap-review {
   display: flex;
   align-items: center;

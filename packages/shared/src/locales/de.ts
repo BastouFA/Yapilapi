@@ -1970,7 +1970,6 @@ export const de: Catalog = {
   'chat.ai.planSaved': 'Plan in dieser Unterhaltung gespeichert',
   'chat.fileTooBig': 'Dateien in Chats dürfen bis zu 50 MB groß sein.',
   'chat.react': 'Reagieren',
-  'chat.reactMore': 'Mehr Emojis',
   'chat.messages': 'Nachrichten',
   'chat.loadEarlier': 'Frühere Nachrichten laden',
   'chat.editedAt': 'Bearbeitet · {time}',
@@ -2014,6 +2013,8 @@ export const de: Catalog = {
   'yap.micOff': 'Der Mikrofonzugriff ist aus. Erlaube ihn in deinem Browser, um Yaps zu senden.',
   'yap.a11y': 'Yap: zum Sprechen halten, loslassen, dann senden oder abbrechen. Du kannst auch die Leertaste gedrückt halten.',
   'yap.review': 'Dein Yap · {time}',
+  'yap.swipeUp': 'Nach oben wischen für freihändig',
+  'yap.locked': 'Freihändig · {time} · Tippen zum Stoppen',
   'yap.prompt':
     'Yaps sind Sprachclips, die sofort beim Eintreffen abgespielt werden, wie bei einem Walkie-Talkie. Dein Browser braucht einen Klick, um Ton zu erlauben.',
   'yap.turnOn': 'Yaps einschalten',

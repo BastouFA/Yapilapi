@@ -76,7 +76,8 @@ function sameOrigin(url: string): string {
 
 /**
  * The big Yap button: hold it (or hold the Space bar when you aren't typing) to talk, let go,
- * then listen back and Send it or Cancel it. Uses the browser's recorder; the server turns it into M4A.
+ * then listen back and Send it or Cancel it. Swipe up while holding and it keeps recording
+ * hands-free until you tap it. Uses the browser's recorder; the server turns it into M4A.
  */
 export function YapButton({
   onRecorded,
@@ -93,6 +94,10 @@ export function YapButton({
   const rec = useRef<MediaRecorder | null>(null);
   const started = useRef(0);
   const holding = useRef(false);
+  // Hands-free: swiped up while holding, so letting go doesn't stop it (a tap does).
+  const [locked, setLocked] = useState(false);
+  const lockedRef = useRef(false);
+  const downY = useRef(0);
   // The recording waiting for Send or Cancel.
   const [review, setReview] = useState<{ file: File; ms: number; url: string } | null>(null);
   const reviewing = useRef(false);
@@ -100,6 +105,8 @@ export function YapButton({
 
   const stop = useCallback(() => {
     holding.current = false;
+    lockedRef.current = false;
+    setLocked(false);
     const r = rec.current;
     rec.current = null;
     setTalking(false);
@@ -208,11 +215,20 @@ export function YapButton({
       aria-pressed={talking}
       onPointerDown={(e) => {
         if (e.button !== 0) return;
+        // Recording hands-free: this tap stops it.
+        if (lockedRef.current) return stop();
         e.currentTarget.setPointerCapture(e.pointerId);
+        downY.current = e.clientY;
         void start();
       }}
-      onPointerUp={stop}
-      onPointerCancel={stop}
+      onPointerMove={(e) => {
+        if (!holding.current || lockedRef.current || downY.current - e.clientY < 48) return;
+        lockedRef.current = true;
+        setLocked(true);
+        navigator.vibrate?.(15);
+      }}
+      onPointerUp={() => !lockedRef.current && stop()}
+      onPointerCancel={() => !lockedRef.current && stop()}
       onContextMenu={(e) => e.preventDefault()}
       onKeyDown={(e) => {
         if ((e.key === 'Enter' || e.key === ' ') && !e.repeat) {
@@ -227,8 +243,20 @@ export function YapButton({
         }
       }}
     >
-      <Icon name="mic" size={20} filled={talking} />
-      <span>{talking ? t('m.yap.release', { time: `0:${String(secs).padStart(2, '0')}` }) : t('m.yap.hold')}</span>
+      {talking && !locked ? (
+        <span className="yap-btn__swipe" aria-hidden>
+          <Icon name="chevron-up" size={14} />
+          {t('yap.swipeUp')}
+        </span>
+      ) : null}
+      <Icon name={locked ? 'lock' : 'mic'} size={20} filled={talking} />
+      <span>
+        {locked
+          ? t('yap.locked', { time: `0:${String(secs).padStart(2, '0')}` })
+          : talking
+            ? t('m.yap.release', { time: `0:${String(secs).padStart(2, '0')}` })
+            : t('m.yap.hold')}
+      </span>
     </button>
   );
 }

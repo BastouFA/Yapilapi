@@ -86,14 +86,14 @@ export function ReactionRow({ message, mine, onToggle }: { message: Message; min
 }
 
 /**
- * Reactions for a message: the quick six and, with "More emojis", two dozen more. It stays open so
- * you can add several; a reaction you already gave is lit, and picking it again takes it back.
- * Focus moves to the first one; arrows move between them; Escape, Done or a tap elsewhere closes
- * it and focus goes back to where it came from (the React button or the message menu).
+ * Reactions for a message: the quick six, then every other emoji in the same row, scrolled
+ * sideways. It stays open so you can add several; a reaction you already gave is lit, and picking
+ * it again takes it back. Focus moves to the first one; arrows move between them (scrolling them
+ * into view); Escape, Done or a tap elsewhere closes it and focus goes back to where it came from
+ * (the React button or the message menu).
  */
 export function ReactionPicker({ mine = [], onPick, onClose }: { mine?: string[]; onPick: (emoji: string) => void; onClose: () => void }) {
   const { t } = useSession();
-  const [more, setMore] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const opener = useRef<HTMLElement | null>(null);
   const close = useRef(onClose);
@@ -137,29 +137,20 @@ export function ReactionPicker({ mine = [], onPick, onClose }: { mine?: string[]
         if (e.relatedTarget && !e.currentTarget.contains(e.relatedTarget as Node)) onClose();
       }}
     >
-      {[...QUICK_REACTIONS, ...(more ? MORE_REACTIONS : [])].map((e) => (
-        <button
-          key={e}
-          type="button"
-          className="chat-picker__item"
-          aria-label={t('m.chat.reactWith', { emoji: e })}
-          aria-pressed={mine.includes(e)}
-          onClick={() => onPick(e)}
-        >
-          {e}
-        </button>
-      ))}
-      {more ? null : (
-        <button
-          type="button"
-          className="chat-picker__item chat-picker__more"
-          aria-label={t('chat.reactMore')}
-          title={t('chat.reactMore')}
-          onClick={() => setMore(true)}
-        >
-          <Icon name="plus" size={20} />
-        </button>
-      )}
+      <div className="chat-picker__row">
+        {[...QUICK_REACTIONS, ...MORE_REACTIONS].map((e) => (
+          <button
+            key={e}
+            type="button"
+            className="chat-picker__item"
+            aria-label={t('m.chat.reactWith', { emoji: e })}
+            aria-pressed={mine.includes(e)}
+            onClick={() => onPick(e)}
+          >
+            {e}
+          </button>
+        ))}
+      </div>
       <button type="button" className="chat-picker__item chat-picker__done" aria-label={t('m.common.done')} title={t('m.common.done')} onClick={onClose}>
         <Icon name="check" size={20} />
       </button>

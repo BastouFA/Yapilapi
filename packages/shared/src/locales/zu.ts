@@ -1974,7 +1974,6 @@ export const zu: Catalog = {
   'chat.ai.planSaved': 'Uhlelo lulondolozwe kule ngxoxo',
   'chat.fileTooBig': 'Amafayela asezingxoxweni angaba kuze kube ngu-50 MB.',
   'chat.react': 'Sabela',
-  'chat.reactMore': 'Ama-emoji amaningi',
   'chat.messages': 'Imilayezo',
   'chat.loadEarlier': 'Layisha imilayezo yangaphambili',
   'chat.editedAt': 'Kuhleliwe · {time}',
@@ -2017,6 +2016,8 @@ export const zu: Catalog = {
   'yap.micOff': 'Ukufinyelela kwemakrofoni kuvaliwe. Kuvumele esipheqululini sakho ukuze uthumele ama-Yap.',
   'yap.a11y': 'Yap: bamba ukuze ukhulume, yeka, bese uthumela noma ukhansela. Ungabamba nenkinobho ye-Space.',
   'yap.review': 'I-Yap yakho · {time}',
+  'yap.swipeUp': 'Swayipha phezulu ukuze ungasebenzisi izandla',
+  'yap.locked': 'Ngaphandle kwezandla · {time} · Thepha ukuze umise',
   'yap.prompt':
     'Ama-Yap ayiziqeshana zezwi ezidlala ngokushesha uma zifika, njenge-walkie-talkie. Isiphequluli sakho sidinga ukuchofoza kanye ukuze sivumele umsindo.',
   'yap.turnOn': 'Vula ama-Yap',

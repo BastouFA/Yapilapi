@@ -10,7 +10,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useIsFocused, useLocalSearchParams, useNavigation } from 'expo-router';
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, Alert, FlatList, Image, Linking, Platform, Pressable, Text, TextInput, View } from 'react-native';
+import { AccessibilityInfo, Alert, FlatList, Image, Linking, Platform, Pressable, Text, TextInput, Vibration, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { ChatGame, Conversation, Message, PinnedMessage } from '../../../../packages/shared/src/types';
 import { MESSAGE_EDIT_MINUTES } from '../../../../packages/shared/src/constants';
@@ -509,6 +509,10 @@ export default function Chat() {
   const [yapping, setYapping] = useState(false);
   const yapHeld = useRef(false);
   const [yapDraft, setYapDraft] = useState<{ uri: string; ms: number } | null>(null);
+  // Hands-free: swiped up while holding, so letting go doesn't stop it (a tap does).
+  const [yapLocked, setYapLocked] = useState(false);
+  const yapLockedRef = useRef(false);
+  const yapTouchY = useRef(0);
 
   async function startYap() {
     if (sending || recordingOn || yapHeld.current || yapDraft) return;
@@ -544,6 +548,8 @@ export default function Chat() {
   async function stopYap() {
     const was = yapHeld.current;
     yapHeld.current = false;
+    yapLockedRef.current = false;
+    setYapLocked(false);
     if (!was || !recorder.isRecording) {
       setYapping(false);
       return;
@@ -1132,13 +1138,42 @@ export default function Chat() {
         </View>
       ) : yaps?.available && !recordingOn && !typing ? (
         <View style={{ paddingHorizontal: space[3], paddingTop: space[2] }}>
+          {yapping && !yapLocked ? (
+            <View
+              pointerEvents="none"
+              importantForAccessibility="no-hide-descendants"
+              style={{
+                position: 'absolute',
+                top: -14,
+                left: 0,
+                right: 0,
+                zIndex: 1,
+                flexDirection: 'row',
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: 4,
+              }}
+            >
+              <Icon name="chevron-up" size={14} color={c.inkMuted} />
+              <Text style={{ color: c.inkMuted, fontSize: 12, fontWeight: '600' }}>{t('yap.swipeUp')}</Text>
+            </View>
+          ) : null}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('m.yap.a11y')}
             accessibilityState={{ selected: yapping, disabled: sending }}
             disabled={sending}
-            onPressIn={() => void startYap()}
-            onPressOut={() => void stopYap()}
+            onPressIn={() => void (yapLockedRef.current ? stopYap() : startYap())}
+            onPressOut={() => !yapLockedRef.current && void stopYap()}
+            onTouchStart={(e) => (yapTouchY.current = e.nativeEvent.pageY)}
+            onTouchMove={(e) => {
+              if (!yapHeld.current || yapLockedRef.current || yapTouchY.current - e.nativeEvent.pageY < 48) return;
+              yapLockedRef.current = true;
+              setYapLocked(true);
+              Vibration.vibrate(15);
+            }}
+            // Sliding up to go hands-free mustn't count as letting go.
+            pressRetentionOffset={{ top: 400, bottom: 40, left: 40, right: 40 }}
             delayLongPress={60_000}
             style={{ opacity: sending ? 0.5 : 1 }}
           >
@@ -1154,9 +1189,13 @@ export default function Chat() {
                 transform: [{ scale: yapping ? 0.97 : 1 }],
               }}
             >
-              <Icon name="mic" size={22} color={c.onYapi} />
+              <Icon name={yapLocked ? 'lock-closed' : 'mic'} size={22} color={c.onYapi} />
               <Text style={{ color: c.onYapi, fontSize: 16, fontWeight: '800', fontVariant: ['tabular-nums'] }}>
-                {yapping ? t('m.yap.release', { time: clock(recording.durationMillis / 1000) }) : t('m.yap.hold')}
+                {yapLocked
+                  ? t('yap.locked', { time: clock(recording.durationMillis / 1000) })
+                  : yapping
+                    ? t('m.yap.release', { time: clock(recording.durationMillis / 1000) })
+                    : t('m.yap.hold')}
               </Text>
               {yapping ? <Waveform color={c.onYapi} bars={7} height={18} /> : null}
             </LinearGradient>

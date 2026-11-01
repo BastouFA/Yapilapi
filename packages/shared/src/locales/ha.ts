@@ -1965,7 +1965,6 @@ export const ha: Catalog = {
   'chat.ai.planSaved': 'An ajiye shirin a wannan tattaunawa',
   'chat.fileTooBig': 'Fayiloli a cikin hira na iya kaiwa MB 50.',
   'chat.react': 'Mayar da martani',
-  'chat.reactMore': 'Ƙarin emoji',
   'chat.messages': 'Saƙonni',
   'chat.loadEarlier': 'Loda saƙonnin da suka gabata',
   'chat.editedAt': 'An gyara · {time}',
@@ -2008,6 +2007,8 @@ export const ha: Catalog = {
   'yap.micOff': 'An kashe izinin makirufo. Ba da izini a mai bincikenka don aika Yap.',
   'yap.a11y': 'Yap: riƙe don magana, saki, sannan aika ko soke. Haka kuma za ka iya riƙe maɓallin Space.',
   'yap.review': 'Yap ɗinka · {time}',
+  'yap.swipeUp': 'Goge sama don ba tare da hannu ba',
+  'yap.locked': 'Ba tare da hannu ba · {time} · Taɓa don tsayawa',
   'yap.prompt':
     'Yap gajerun saƙonnin murya ne da ke kunnuwa da zarar sun iso, kamar oba-oba. Mai bincikenka yana buƙatar danna sau ɗaya don ba da izinin sauti.',
   'yap.turnOn': 'Kunna Yap',

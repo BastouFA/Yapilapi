@@ -1965,7 +1965,6 @@ export const sw: Catalog = {
   'chat.ai.planSaved': 'Mpango umehifadhiwa kwenye mazungumzo haya',
   'chat.fileTooBig': 'Faili kwenye gumzo zinaweza kuwa hadi MB 50.',
   'chat.react': 'Toa hisia',
-  'chat.reactMore': 'Emoji zaidi',
   'chat.messages': 'Jumbe',
   'chat.loadEarlier': 'Pakia jumbe za awali',
   'chat.editedAt': 'Umehaririwa · {time}',
@@ -2008,6 +2007,8 @@ export const sw: Catalog = {
   'yap.micOff': 'Ruhusa ya maikrofoni imezimwa. Iruhusu kwenye kivinjari chako ili utume Yap.',
   'yap.a11y': 'Yap: shikilia ili uzungumze, achilia, kisha tuma au ghairi. Unaweza pia kushikilia kitufe cha Space.',
   'yap.review': 'Yap yako · {time}',
+  'yap.swipeUp': 'Telezesha juu ili urekodi bila mikono',
+  'yap.locked': 'Bila mikono · {time} · Gusa kusimamisha',
   'yap.prompt':
     'Yap ni vipande vya sauti vinavyocheza mara tu vinapofika, kama redio ya mawasiliano. Kivinjari chako kinahitaji kubofya mara moja ili kuruhusu sauti.',
   'yap.turnOn': 'Washa Yap',

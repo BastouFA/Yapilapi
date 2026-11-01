@@ -1970,7 +1970,6 @@ export const nl: Catalog = {
   'chat.ai.planSaved': 'Plan opgeslagen in dit gesprek',
   'chat.fileTooBig': 'Bestanden in chats mogen maximaal 50 MB zijn.',
   'chat.react': 'Reageren',
-  'chat.reactMore': 'Meer emoji’s',
   'chat.messages': 'Berichten',
   'chat.loadEarlier': 'Eerdere berichten laden',
   'chat.editedAt': 'Bewerkt · {time}',
@@ -2013,6 +2012,8 @@ export const nl: Catalog = {
   'yap.micOff': 'Microfoontoegang staat uit. Sta het toe in je browser om Yaps te versturen.',
   'yap.a11y': 'Yap: houd ingedrukt om te praten, laat los en verstuur of annuleer. Je kunt ook de spatiebalk ingedrukt houden.',
   'yap.review': 'Je Yap · {time}',
+  'yap.swipeUp': 'Veeg omhoog voor handsfree',
+  'yap.locked': 'Handsfree · {time} · Tik om te stoppen',
   'yap.prompt':
     'Yaps zijn spraakfragmenten die meteen worden afgespeeld als ze binnenkomen, zoals een walkietalkie. Je browser heeft één klik nodig om geluid toe te staan.',
   'yap.turnOn': 'Yaps aanzetten',

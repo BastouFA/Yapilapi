@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Animated, FlatList, I18nManager, Modal, PanResponder, Pressable, Text, TextInput, View } from 'react-native';
+import { Animated, FlatList, I18nManager, Modal, PanResponder, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Message, MessagePreview, PinnedMessage } from '../../../packages/shared/src/types';
 import type { MessageKey } from '../../../packages/shared/src/i18n-core';
@@ -385,9 +385,9 @@ export interface SheetAction {
 }
 
 /**
- * Reactions for one message, from the heart beside it: the quick six and, with "More emojis", two
- * dozen more. It stays open so you can add several; one you already gave is lit, and picking it
- * again takes it back. Done closes it.
+ * Reactions for one message, from the heart beside it: the quick six, then every other emoji in
+ * the same row, swiped sideways. It stays open so you can add several; one you already gave is
+ * lit, and picking it again takes it back. Done closes it.
  */
 export function ReactionSheet({
   message,
@@ -400,53 +400,43 @@ export function ReactionSheet({
 }) {
   const c = useColors();
   const { t } = useT();
-  const [more, setMore] = useState(false);
-  useEffect(() => {
-    if (!message) setMore(false);
-  }, [message]);
   const mine = new Set(message?.reactions?.filter((r) => r.mine).map((r) => r.emoji));
-  const cell = (selected: boolean, pressed: boolean) => ({
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-    backgroundColor: selected ? c.surfaceSunken : pressed ? c.surfaceSunken : 'transparent',
-    borderWidth: selected ? 2 : 0,
-    borderColor: c.yapi,
-  });
-  const grid = (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 4, marginBottom: space[2] }}>
-      {[...QUICK_REACTIONS, ...(more ? MORE_REACTIONS : [])].map((e) => (
+  const row = (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ gap: 4, paddingHorizontal: space[1] }}
+      style={{ marginBottom: space[2] }}
+    >
+      {[...QUICK_REACTIONS, ...MORE_REACTIONS].map((e) => (
         <Pressable
           key={e}
           accessibilityRole="button"
           accessibilityLabel={t('m.chat.reactWith', { emoji: e })}
           accessibilityState={{ selected: mine.has(e) }}
           onPress={() => onToggle(e, !mine.has(e))}
-          style={({ pressed }) => cell(mine.has(e), pressed)}
+          style={({ pressed }) => ({
+            width: 48,
+            height: 48,
+            borderRadius: 24,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: mine.has(e) || pressed ? c.surfaceSunken : 'transparent',
+            borderWidth: mine.has(e) ? 2 : 0,
+            borderColor: c.yapi,
+          })}
         >
           <Text style={{ fontSize: 26 }}>{e}</Text>
         </Pressable>
       ))}
-      {more ? null : (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('chat.reactMore')}
-          onPress={() => setMore(true)}
-          style={({ pressed }) => [cell(false, pressed), { width: 48, height: 48 }]}
-        >
-          <Icon name="add" size={26} color={c.inkMuted} />
-        </Pressable>
-      )}
-    </View>
+    </ScrollView>
   );
   return (
     <ActionSheet
       visible={!!message}
       onClose={onClose}
       title={t('chat.react')}
-      header={grid}
+      header={row}
       actions={[{ label: t('m.common.done'), icon: 'checkmark', onPress: () => {} }]}
     />
   );
