@@ -2707,6 +2707,15 @@ export const id: Catalog = {
   'push.prompt.notNow': 'Nanti saja',
   'push.prompt.done': 'Notifikasi sudah menyala.',
   'push.prompt.iosHint': 'Untuk notifikasi di iPhone, tambahkan YAPILAPI ke Layar Utama (Bagikan, lalu Tambah ke Layar Utama) dan buka dari sana.',
+  'chat.copyText': 'Salin teks',
+  'chat.copyPhoto': 'Salin foto',
+  'chat.copied': 'Disalin',
+  'push.blocked.title': 'Notifikasi diblokir di perangkat ini',
+  'push.blocked.android':
+    'Ponselmu memblokirnya, jadi aplikasi tidak bisa meminta. Tahan ikon YAPILAPI di layar utama, ketuk Info aplikasi (ⓘ), lalu Notifikasi, dan nyalakan Izinkan notifikasi. Di Chrome atau Samsung Internet: ketuk ikon di kiri alamat, lalu Izin, Notifikasi, Izinkan. Lalu kembali ke sini.',
+  'push.blocked.ios':
+    'Buka Pengaturan iPhone, lalu Notifikasi, lalu YAPILAPI, dan nyalakan Izinkan Notifikasi. Jika YAPILAPI tidak ada, tambahkan dulu ke Layar Utama (Bagikan, lalu Tambah ke Layar Utama) dan buka dari sana.',
+  'push.blocked.computer': 'Klik ikon di kiri alamat, cari Notifikasi dan pilih Izinkan, lalu muat ulang halaman ini.',
   'story.dialog': 'Cerita {name}, {index} dari {total}',
   'story.previous': 'Sebelumnya',
   'story.next': 'Berikutnya',

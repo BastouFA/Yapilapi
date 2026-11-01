@@ -2692,6 +2692,15 @@ export const yo: Catalog = {
   'push.prompt.notNow': 'Kì í ṣe báyìí',
   'push.prompt.done': 'Ìfitónilétí ti tàn.',
   'push.prompt.iosHint': 'Láti gba ìfitónilétí lórí iPhone, fi YAPILAPI kún Ojú-ìbẹ̀rẹ̀ (Pín, lẹ́yìn náà Fi kún Ojú-ìbẹ̀rẹ̀) kí o sì ṣí i láti ibẹ̀.',
+  'chat.copyText': 'Da ọ̀rọ̀ kọ',
+  'chat.copyPhoto': 'Da fọ́tò kọ',
+  'chat.copied': 'A ti dà á kọ',
+  'push.blocked.title': 'A ti dí ìfitónilétí lórí ẹ̀rọ yìí',
+  'push.blocked.android':
+    'Fóònù rẹ ń dí wọn, nítorí náà áàpù kò lè béèrè. Di àmì YAPILAPI mú lórí ojú ilé, tẹ Àlàyé áàpù (ⓘ), lẹ́yìn náà Ìfitónilétí, kí o sì tan Gba ìfitónilétí láàyè. Nínú Chrome tàbí Samsung Internet: tẹ àmì tó wà ní òsì àdírẹ́sì, lẹ́yìn náà Àṣẹ, Ìfitónilétí, Gbà láàyè. Lẹ́yìn náà padà síbí.',
+  'push.blocked.ios':
+    'Ṣí Ètò iPhone rẹ, lẹ́yìn náà Ìfitónilétí, lẹ́yìn náà YAPILAPI, kí o sì tan Gba ìfitónilétí láàyè. Bí YAPILAPI kò bá sí níbẹ̀, kọ́kọ́ fi kún ojú ilé (Pín, lẹ́yìn náà Fi kún ojú ilé) kí o sì ṣí i láti ibẹ̀.',
+  'push.blocked.computer': 'Tẹ àmì tó wà ní òsì àdírẹ́sì, wá Ìfitónilétí kí o yan Gbà láàyè, lẹ́yìn náà tún ojú-ìwé yìí gbé.',
   'story.dialog': 'Ìtàn {name}, {index} nínú {total}',
   'story.previous': 'Ti tẹ́lẹ̀',
   'story.next': 'Èyí tó kàn',

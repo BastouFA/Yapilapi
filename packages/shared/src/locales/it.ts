@@ -2701,6 +2701,15 @@ export const it: Catalog = {
   'push.prompt.done': 'Le notifiche sono attive.',
   'push.prompt.iosHint':
     'Per ricevere notifiche su un iPhone, aggiungi YAPILAPI alla schermata Home (Condividi, poi Aggiungi alla schermata Home) e aprilo da lì.',
+  'chat.copyText': 'Copia testo',
+  'chat.copyPhoto': 'Copia foto',
+  'chat.copied': 'Copiato',
+  'push.blocked.title': 'Le notifiche sono bloccate su questo dispositivo',
+  'push.blocked.android':
+    'Il tuo telefono le blocca, quindi l’app non può chiedere. Tieni premuta l’icona di YAPILAPI nella schermata Home, tocca Info app (ⓘ), poi Notifiche, e attiva Consenti notifiche. In Chrome o Samsung Internet: tocca l’icona a sinistra dell’indirizzo, poi Autorizzazioni, Notifiche, Consenti. Poi torna qui.',
+  'push.blocked.ios':
+    'Apri Impostazioni sull’iPhone, poi Notifiche, poi YAPILAPI, e attiva Consenti notifiche. Se YAPILAPI non c’è, aggiungilo prima alla schermata Home (Condividi, poi Aggiungi alla schermata Home) e aprilo da lì.',
+  'push.blocked.computer': 'Fai clic sull’icona a sinistra dell’indirizzo, trova Notifiche e scegli Consenti, poi ricarica questa pagina.',
   'story.dialog': 'Storia di {name}, {index} di {total}',
   'story.previous': 'Precedente',
   'story.next': 'Successiva',

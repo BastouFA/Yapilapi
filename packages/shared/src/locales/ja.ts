@@ -2692,6 +2692,15 @@ export const ja: Catalog = {
   'push.prompt.notNow': 'あとで',
   'push.prompt.done': '通知がオンになりました。',
   'push.prompt.iosHint': 'iPhone で通知を受け取るには、YAPILAPI をホーム画面に追加し（共有 → ホーム画面に追加）、そこから開いてください。',
+  'chat.copyText': 'テキストをコピー',
+  'chat.copyPhoto': '写真をコピー',
+  'chat.copied': 'コピーしました',
+  'push.blocked.title': 'このデバイスでは通知がブロックされています',
+  'push.blocked.android':
+    'スマホがブロックしているため、アプリから確認できません。ホーム画面のYAPILAPIアイコンを長押しし、アプリ情報(ⓘ)、通知の順にタップして、通知を許可をオンにしてください。ChromeやSamsung Internetでは、アドレスの左のアイコンをタップし、権限、通知、許可の順に選びます。その後ここに戻ってください。',
+  'push.blocked.ios':
+    'iPhoneの設定を開き、通知、YAPILAPIの順に進み、通知を許可をオンにしてください。YAPILAPIが見つからない場合は、先にホーム画面に追加し(共有→ホーム画面に追加)、そこから開いてください。',
+  'push.blocked.computer': 'アドレスの左のアイコンをクリックし、通知を探して許可を選び、このページを再読み込みしてください。',
   'story.dialog': '{name}さんのストーリーズ、{index}/{total}',
   'story.previous': '前へ',
   'story.next': '次へ',

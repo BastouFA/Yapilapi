@@ -2699,6 +2699,15 @@ export const sw: Catalog = {
   'push.prompt.done': 'Arifa zimewashwa.',
   'push.prompt.iosHint':
     'Ili kupata arifa kwenye iPhone, ongeza YAPILAPI kwenye Skrini ya Mwanzo (Shiriki, kisha Ongeza kwenye Skrini ya Mwanzo) na uifungue kutoka hapo.',
+  'chat.copyText': 'Nakili maandishi',
+  'chat.copyPhoto': 'Nakili picha',
+  'chat.copied': 'Imenakiliwa',
+  'push.blocked.title': 'Arifa zimezuiwa kwenye kifaa hiki',
+  'push.blocked.android':
+    'Simu yako inazizuia, kwa hiyo programu haiwezi kuuliza. Shikilia aikoni ya YAPILAPI kwenye skrini ya nyumbani, gusa Maelezo ya programu (ⓘ), kisha Arifa, na uwashe Ruhusu arifa. Kwenye Chrome au Samsung Internet: gusa aikoni iliyo kushoto ya anwani, kisha Ruhusa, Arifa, Ruhusu. Kisha rudi hapa.',
+  'push.blocked.ios':
+    'Fungua Mipangilio ya iPhone, kisha Arifa, kisha YAPILAPI, na uwashe Ruhusu Arifa. Kama YAPILAPI haipo, kwanza iongeze kwenye skrini ya nyumbani (Shiriki, kisha Ongeza kwenye Skrini ya Nyumbani) na uifungue kutoka hapo.',
+  'push.blocked.computer': 'Bofya aikoni iliyo kushoto ya anwani, tafuta Arifa na uchague Ruhusu, kisha pakia upya ukurasa huu.',
   'story.dialog': 'Hadithi ya {name}, {index} kati ya {total}',
   'story.previous': 'Iliyotangulia',
   'story.next': 'Inayofuata',

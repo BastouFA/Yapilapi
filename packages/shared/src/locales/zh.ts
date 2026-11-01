@@ -2676,6 +2676,15 @@ export const zh: Catalog = {
   'push.prompt.notNow': '以后再说',
   'push.prompt.done': '通知已开启。',
   'push.prompt.iosHint': '要在 iPhone 上收到通知，请把 YAPILAPI 添加到主屏幕（共享，然后添加到主屏幕），并从那里打开。',
+  'chat.copyText': '复制文字',
+  'chat.copyPhoto': '复制照片',
+  'chat.copied': '已复制',
+  'push.blocked.title': '此设备已屏蔽通知',
+  'push.blocked.android':
+    '你的手机屏蔽了通知，所以应用无法询问。长按主屏幕上的 YAPILAPI 图标，点按应用信息（ⓘ），再点通知，然后打开允许通知。在 Chrome 或三星浏览器中：点按地址左侧的图标，然后依次选择权限、通知、允许。然后回到这里。',
+  'push.blocked.ios':
+    '打开 iPhone 的设置，依次进入通知、YAPILAPI，然后打开允许通知。如果没有 YAPILAPI，请先把它添加到主屏幕（共享，然后添加到主屏幕），再从那里打开。',
+  'push.blocked.computer': '点击地址左侧的图标，找到通知并选择允许，然后重新加载此页面。',
   'story.dialog': '{name} 的快拍，第 {index} 个，共 {total} 个',
   'story.previous': '上一个',
   'story.next': '下一个',

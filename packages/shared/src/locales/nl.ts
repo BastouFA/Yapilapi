@@ -2706,6 +2706,15 @@ export const nl: Catalog = {
   'push.prompt.notNow': 'Niet nu',
   'push.prompt.done': 'Meldingen staan aan.',
   'push.prompt.iosHint': 'Voor meldingen op een iPhone: zet YAPILAPI op je beginscherm (Deel, dan Zet op beginscherm) en open het vanaf daar.',
+  'chat.copyText': 'Tekst kopiëren',
+  'chat.copyPhoto': 'Foto kopiëren',
+  'chat.copied': 'Gekopieerd',
+  'push.blocked.title': 'Meldingen zijn geblokkeerd op dit apparaat',
+  'push.blocked.android':
+    'Je telefoon blokkeert ze, dus de app kan het niet vragen. Houd het YAPILAPI-pictogram op je startscherm ingedrukt, tik op App-info (ⓘ), dan Meldingen, en zet Meldingen toestaan aan. In Chrome of Samsung Internet: tik op het pictogram links van het adres, dan Machtigingen, Meldingen, Toestaan. Kom daarna hier terug.',
+  'push.blocked.ios':
+    'Open Instellingen op je iPhone, dan Berichtgeving, dan YAPILAPI, en zet Sta berichtgeving toe aan. Staat YAPILAPI er niet bij, zet het dan eerst op je beginscherm (Deel, dan Zet op beginscherm) en open het van daaruit.',
+  'push.blocked.computer': 'Klik op het pictogram links van het adres, zoek Meldingen en kies Toestaan, en laad deze pagina opnieuw.',
   'story.dialog': 'Verhaal van {name}, {index} van {total}',
   'story.previous': 'Vorige',
   'story.next': 'Volgende',

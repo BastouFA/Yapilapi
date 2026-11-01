@@ -2714,6 +2714,15 @@ export const zu: Catalog = {
   'push.prompt.done': 'Izaziso zivuliwe.',
   'push.prompt.iosHint':
     'Ukuze uthole izaziso ku-iPhone, engeza i-YAPILAPI kusikrini sasekhaya (Yabelana, bese Engeza kusikrini sasekhaya) bese uyivula lapho.',
+  'chat.copyText': 'Kopisha umbhalo',
+  'chat.copyPhoto': 'Kopisha isithombe',
+  'chat.copied': 'Kukopishiwe',
+  'push.blocked.title': 'Izaziso zivinjiwe kule divayisi',
+  'push.blocked.android':
+    'Ifoni yakho iyazivimba, ngakho uhlelo alukwazi ukubuza. Bamba isithonjana se-YAPILAPI esikrinini sasekhaya, thepha Ulwazi lohlelo (ⓘ), bese Izaziso, uvule Vumela izaziso. Ku-Chrome noma ku-Samsung Internet: thepha isithonjana esingakwesokunxele sekheli, bese Izimvume, Izaziso, Vumela. Bese ubuyela lapha.',
+  'push.blocked.ios':
+    'Vula Izilungiselelo ze-iPhone, bese Izaziso, bese YAPILAPI, uvule Vumela izaziso. Uma i-YAPILAPI ingekho, qala uyengeze esikrinini sasekhaya (Yabelana, bese Engeza esikrinini sasekhaya) bese uyivula lapho.',
+  'push.blocked.computer': 'Chofoza isithonjana esingakwesokunxele sekheli, uthole Izaziso ukhethe Vumela, bese ulayisha kabusha leli khasi.',
   'story.dialog': 'Indaba ka-{name}, {index} kwezingu-{total}',
   'story.previous': 'Okwedlule',
   'story.next': 'Okulandelayo',

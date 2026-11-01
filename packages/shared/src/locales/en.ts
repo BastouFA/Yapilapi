@@ -2696,6 +2696,15 @@ export const en = {
   'push.prompt.notNow': 'Not now',
   'push.prompt.done': 'Notifications are on.',
   'push.prompt.iosHint': 'To get notifications on an iPhone, add YAPILAPI to your Home Screen (Share, then Add to Home Screen) and open it from there.',
+  'chat.copyText': 'Copy text',
+  'chat.copyPhoto': 'Copy photo',
+  'chat.copied': 'Copied',
+  'push.blocked.title': 'Notifications are blocked on this device',
+  'push.blocked.android':
+    'Your phone is blocking them, so the app can’t ask. Hold the YAPILAPI icon on your home screen, tap App info (ⓘ), then Notifications, and turn on Allow notifications. In Chrome or Samsung Internet: tap the icon left of the address, then Permissions, Notifications, Allow. Then come back here.',
+  'push.blocked.ios':
+    'Open your iPhone’s Settings, then Notifications, then YAPILAPI, and turn on Allow Notifications. If YAPILAPI isn’t there, add it to your Home Screen first (Share, then Add to Home Screen) and open it from there.',
+  'push.blocked.computer': 'Click the icon left of the address, find Notifications and choose Allow, then reload this page.',
   // Web: stories
   'story.dialog': "{name}'s story, {index} of {total}",
   'story.previous': 'Previous',

@@ -83,9 +83,14 @@ function turnedOff() {
  */
 export async function keepBrowserPush() {
   if (!pushSupported() || Notification.permission !== 'granted' || turnedOff()) return;
+  // Every coming back to the app calls this: once in a while is enough.
+  if (Date.now() - lastKept < 10 * 60_000) return;
   const cfg = await pushConfig();
-  if (cfg.webPush && cfg.vapidPublicKey) await registerHere(cfg.vapidPublicKey);
+  if (!cfg.webPush || !cfg.vapidPublicKey) return;
+  await registerHere(cfg.vapidPublicKey);
+  lastKept = Date.now();
 }
+let lastKept = 0;
 
 /** `turnOff`: the person's own choice (Settings), which keepBrowserPush respects; signing out isn't. */
 export async function disableBrowserPush(turnOff = false) {

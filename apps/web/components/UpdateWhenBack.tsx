@@ -21,7 +21,11 @@ export function UpdateWhenBack() {
   // Each time the app opens, and for whichever account is signed in: notifications reach this phone.
   const accountId = me?.id;
   useEffect(() => {
-    if (accountId) void keepBrowserPush().catch(() => {});
+    if (!accountId) return;
+    const keep = () => document.visibilityState === 'visible' && void keepBrowserPush().catch(() => {});
+    keep();
+    document.addEventListener('visibilitychange', keep);
+    return () => document.removeEventListener('visibilitychange', keep);
   }, [accountId]);
   useEffect(() => {
     if (BUILD === 'dev') return;

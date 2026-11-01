@@ -2701,6 +2701,15 @@ export const tr: Catalog = {
   'push.prompt.notNow': 'Şimdi değil',
   'push.prompt.done': 'Bildirimler açık.',
   'push.prompt.iosHint': 'iPhone’da bildirim almak için YAPILAPI’yi ana ekrana ekle (Paylaş, sonra Ana Ekrana Ekle) ve oradan aç.',
+  'chat.copyText': 'Metni kopyala',
+  'chat.copyPhoto': 'Fotoğrafı kopyala',
+  'chat.copied': 'Kopyalandı',
+  'push.blocked.title': 'Bu cihazda bildirimler engelli',
+  'push.blocked.android':
+    'Telefonun bunları engelliyor, bu yüzden uygulama soramıyor. Ana ekrandaki YAPILAPI simgesine basılı tut, Uygulama bilgisi (ⓘ), sonra Bildirimler’e dokun ve Bildirimlere izin ver’i aç. Chrome veya Samsung Internet’te: adresin solundaki simgeye dokun, sonra İzinler, Bildirimler, İzin ver. Sonra buraya dön.',
+  'push.blocked.ios':
+    'iPhone Ayarlar’ını aç, sonra Bildirimler, sonra YAPILAPI, ve Bildirimlere İzin Ver’i aç. YAPILAPI orada yoksa önce Ana Ekran’a ekle (Paylaş, sonra Ana Ekrana Ekle) ve oradan aç.',
+  'push.blocked.computer': 'Adresin solundaki simgeye tıkla, Bildirimler’i bul ve İzin ver’i seç, sonra bu sayfayı yenile.',
   'story.dialog': '{name} hikayesi, {index} / {total}',
   'story.previous': 'Önceki',
   'story.next': 'Sonraki',

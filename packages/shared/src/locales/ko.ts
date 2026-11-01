@@ -2683,6 +2683,15 @@ export const ko: Catalog = {
   'push.prompt.notNow': '나중에',
   'push.prompt.done': '알림이 켜졌어요.',
   'push.prompt.iosHint': 'iPhone에서 알림을 받으려면 YAPILAPI를 홈 화면에 추가하고(공유 → 홈 화면에 추가) 거기서 열어 주세요.',
+  'chat.copyText': '텍스트 복사',
+  'chat.copyPhoto': '사진 복사',
+  'chat.copied': '복사했어요',
+  'push.blocked.title': '이 기기에서 알림이 차단되어 있어요',
+  'push.blocked.android':
+    '휴대폰이 알림을 막고 있어서 앱이 물어볼 수 없어요. 홈 화면의 YAPILAPI 아이콘을 길게 누르고 앱 정보(ⓘ), 알림을 차례로 눌러 알림 허용을 켜 주세요. Chrome이나 Samsung Internet에서는 주소 왼쪽 아이콘을 누르고 권한, 알림, 허용을 선택하세요. 그런 다음 여기로 돌아오세요.',
+  'push.blocked.ios':
+    'iPhone 설정을 열고 알림, YAPILAPI를 차례로 눌러 알림 허용을 켜 주세요. YAPILAPI가 없으면 먼저 홈 화면에 추가하고(공유, 홈 화면에 추가) 거기서 여세요.',
+  'push.blocked.computer': '주소 왼쪽 아이콘을 클릭하고 알림을 찾아 허용을 선택한 뒤 이 페이지를 새로고침하세요.',
   'story.dialog': '{name}님의 스토리, {index}/{total}',
   'story.previous': '이전',
   'story.next': '다음',

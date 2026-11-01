@@ -2698,6 +2698,15 @@ export const es: Catalog = {
   'push.prompt.done': 'Las notificaciones están activadas.',
   'push.prompt.iosHint':
     'Para recibir notificaciones en un iPhone, añade YAPILAPI a tu pantalla de inicio (Compartir y luego Añadir a pantalla de inicio) y ábrelo desde ahí.',
+  'chat.copyText': 'Copiar texto',
+  'chat.copyPhoto': 'Copiar foto',
+  'chat.copied': 'Copiado',
+  'push.blocked.title': 'Las notificaciones están bloqueadas en este dispositivo',
+  'push.blocked.android':
+    'Tu teléfono las bloquea, así que la app no puede preguntar. Mantén pulsado el icono de YAPILAPI en tu pantalla de inicio, toca Información de la app (ⓘ), luego Notificaciones, y activa Permitir notificaciones. En Chrome o Samsung Internet: toca el icono a la izquierda de la dirección, luego Permisos, Notificaciones, Permitir. Después vuelve aquí.',
+  'push.blocked.ios':
+    'Abre Ajustes en tu iPhone, luego Notificaciones, luego YAPILAPI, y activa Permitir notificaciones. Si YAPILAPI no aparece, añádelo primero a tu pantalla de inicio (Compartir y Añadir a pantalla de inicio) y ábrelo desde ahí.',
+  'push.blocked.computer': 'Haz clic en el icono a la izquierda de la dirección, busca Notificaciones y elige Permitir; luego recarga esta página.',
   'story.dialog': 'Historia de {name}, {index} de {total}',
   'story.previous': 'Anterior',
   'story.next': 'Siguiente',

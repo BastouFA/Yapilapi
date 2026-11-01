@@ -2715,6 +2715,15 @@ export const fr: Catalog = {
   'push.prompt.done': 'Les notifications sont activées.',
   'push.prompt.iosHint':
     'Pour recevoir des notifications sur un iPhone, ajoute YAPILAPI à ton écran d’accueil (Partager, puis Sur l’écran d’accueil) et ouvre-le depuis là.',
+  'chat.copyText': 'Copier le texte',
+  'chat.copyPhoto': 'Copier la photo',
+  'chat.copied': 'Copié',
+  'push.blocked.title': 'Les notifications sont bloquées sur cet appareil',
+  'push.blocked.android':
+    'Ton téléphone les bloque, donc l’app ne peut pas demander. Reste appuyé sur l’icône YAPILAPI de ton écran d’accueil, touche Infos sur l’appli (ⓘ), puis Notifications, et active Autoriser les notifications. Dans Chrome ou Samsung Internet : touche l’icône à gauche de l’adresse, puis Autorisations, Notifications, Autoriser. Reviens ensuite ici.',
+  'push.blocked.ios':
+    'Ouvre les Réglages de ton iPhone, puis Notifications, puis YAPILAPI, et active Autoriser les notifications. Si YAPILAPI n’y est pas, ajoute-le d’abord à ton écran d’accueil (Partager, puis Sur l’écran d’accueil) et ouvre-le depuis là.',
+  'push.blocked.computer': 'Clique sur l’icône à gauche de l’adresse, trouve Notifications et choisis Autoriser, puis recharge cette page.',
   'story.dialog': 'Story de {name}, {index} sur {total}',
   'story.previous': 'Précédent',
   'story.next': 'Suivant',

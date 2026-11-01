@@ -2699,6 +2699,15 @@ export const ha: Catalog = {
   'push.prompt.notNow': 'Ba yanzu ba',
   'push.prompt.done': 'An kunna sanarwa.',
   'push.prompt.iosHint': 'Don samun sanarwa a iPhone, ƙara YAPILAPI a Allon Gida (Raba, sannan Ƙara a Allon Gida) ka buɗe shi daga can.',
+  'chat.copyText': 'Kwafi rubutu',
+  'chat.copyPhoto': 'Kwafi hoto',
+  'chat.copied': 'An kwafa',
+  'push.blocked.title': 'An toshe sanarwa a wannan na’ura',
+  'push.blocked.android':
+    'Wayarka ce ke toshe su, don haka manhajar ba za ta iya tambaya ba. Riƙe alamar YAPILAPI a allon gida, taɓa Bayanan manhaja (ⓘ), sannan Sanarwa, ka kunna Bada izinin sanarwa. A Chrome ko Samsung Internet: taɓa alamar da ke hagun adireshi, sannan Izini, Sanarwa, Bada izini. Sannan ka dawo nan.',
+  'push.blocked.ios':
+    'Buɗe Saitunan iPhone, sannan Sanarwa, sannan YAPILAPI, ka kunna Bada izinin sanarwa. Idan YAPILAPI ba ya nan, fara ƙara shi a allon gida (Raba, sannan Ƙara a allon gida) ka buɗe shi daga can.',
+  'push.blocked.computer': 'Danna alamar da ke hagun adireshi, nemo Sanarwa ka zaɓi Bada izini, sannan ka sake loda wannan shafi.',
   'story.dialog': 'Labarin {name}, {index} cikin {total}',
   'story.previous': 'Na baya',
   'story.next': 'Na gaba',

@@ -1,11 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button, Card, Select, Switch, TextField } from '@yapilapi/design-system';
 import { NOTIFICATION_CATEGORIES, TODAY_HOURS, type InteractionSettings, type MessageKey, type TodaySettings, type WeeklyWrapSettings } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { currentSubscription, disableBrowserPush, enableBrowserPush, pushSupported } from '@/lib/push';
+import { PushBlockedSheet } from '@/components/PushPrompt';
 import { useSession } from '@/app/providers';
 import { Anchor } from './Shell';
 
@@ -57,9 +58,20 @@ function usePrefs() {
 export function BrowserPushCard() {
   const { toast, t } = useSession();
   const [on, setOn] = useState<boolean | null>(null);
+  const [blocked, setBlocked] = useState(false);
+  const blockedRef = useRef(false);
   useEffect(() => {
     if (!pushSupported()) return setOn(null);
     currentSubscription().then((s) => setOn(!!s));
+    // Back from the phone's settings with notifications now allowed: they're on.
+    const back = () => {
+      if (document.visibilityState !== 'visible' || !blockedRef.current || Notification.permission !== 'granted') return;
+      blockedRef.current = false;
+      setBlocked(false);
+      void enableBrowserPush().then((r) => r === 'enabled' && setOn(true));
+    };
+    document.addEventListener('visibilitychange', back);
+    return () => document.removeEventListener('visibilitychange', back);
   }, []);
   if (on === null) return null;
   return (
@@ -74,12 +86,16 @@ export function BrowserPushCard() {
               setOn(false);
               return;
             }
-            const r = await enableBrowserPush();
+            const r = await enableBrowserPush().catch(() => 'unavailable' as const);
             if (r === 'enabled') setOn(true);
-            else toast(r === 'denied' ? t('settings.push.denied') : t('settings.push.unsupported'));
+            else if (r === 'denied') {
+              blockedRef.current = true;
+              setBlocked(true);
+            } else toast(t('settings.push.unsupported'));
           }}
         />
       </Card>
+      <PushBlockedSheet open={blocked} onClose={() => setBlocked(false)} />
     </Anchor>
   );
 }

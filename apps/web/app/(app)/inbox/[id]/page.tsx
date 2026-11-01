@@ -26,6 +26,7 @@ import { GroupInfoSheet } from '@/components/GroupInfo';
 import { ReportSheet } from '@/components/PostList';
 import { useRealtime, useSession } from '../../../providers';
 import { useCalls } from '@/components/Calls';
+import { copyImage, copyText } from '@/lib/clipboard';
 import { MiniAppsSheet } from '@/components/MiniApps';
 import { MessageAttachments, ViewOnceMessage, VoiceRecorder, VoiceTranscript } from '@/components/ChatAttachments';
 import { ViewOnceCapture } from '@/components/ViewOnceCapture';
@@ -590,6 +591,27 @@ export default function ChatPage() {
       actions.push({ label: t('chat.react'), icon: 'heart', onSelect: () => setPickerFor(m.id) });
     }
     if (editable) actions.push({ label: t('m.chat.edit'), icon: 'create', onSelect: () => startEdit(m) });
+    // Copy the words or the photo (never a view-once one, which is meant to go).
+    if (!m.unsent && !m.viewOnce) {
+      if (m.body)
+        actions.push({
+          label: t('chat.copyText'),
+          icon: 'copy',
+          onSelect: () => void copyText(m.body).then((ok) => toast(t(ok ? 'chat.copied' : 'common.copyFailed'))),
+        });
+      const photo = m.attachments?.find((a) => a.kind === 'image' && !a.removed && !a.sensitive);
+      if (photo)
+        actions.push({
+          label: t('chat.copyPhoto'),
+          icon: 'copy',
+          onSelect: () =>
+            void copyImage(new URL(photo.url, location.origin).toString()).then((ok) => {
+              // Where the browser can't, the photo opens: holding it there copies or saves it.
+              if (ok) toast(t('chat.copied'));
+              else window.open(photo.url, '_blank', 'noopener');
+            }),
+        });
+    }
     if (canManage && !m.unsent && !m.moderation)
       actions.push(
         pinned

@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Button } from '@yapilapi/design-system';
+import { BottomSheet, Button } from '@yapilapi/design-system';
 import { currentSubscription, enableBrowserPush, pushConfig, pushSupported } from '@/lib/push';
 import { useSession } from '@/app/providers';
 
@@ -26,6 +26,7 @@ export function PushPrompt() {
   const path = usePathname();
   const [show, setShow] = useState<'ask' | 'install' | null>(null);
   const [busy, setBusy] = useState(false);
+  const [blocked, setBlocked] = useState(false);
 
   useEffect(() => {
     if (dismissed()) return;
@@ -36,7 +37,6 @@ export function PushPrompt() {
       if (apple && !standalone && !path.startsWith('/yap')) setShow('install');
       return;
     }
-    if (Notification.permission === 'denied') return;
     void Promise.all([pushConfig(), currentSubscription()]).then(([cfg, sub]) => {
       if (live && cfg.webPush && !sub) setShow('ask');
     });
@@ -73,7 +73,8 @@ export function PushPrompt() {
               if (r === 'enabled') {
                 toast(t('push.prompt.done'));
                 setShow(null);
-              } else toast(r === 'denied' ? t('settings.push.denied') : t('settings.push.unsupported'));
+              } else if (r === 'denied') setBlocked(true);
+              else toast(t('settings.push.unsupported'));
             }}
           >
             {t('push.prompt.turnOn')}
@@ -83,6 +84,22 @@ export function PushPrompt() {
           {t('push.prompt.notNow')}
         </Button>
       </div>
+      <PushBlockedSheet open={blocked} onClose={() => setBlocked(false)} />
     </section>
+  );
+}
+
+/**
+ * The phone itself is blocking notifications: the browser answers "no" without asking anyone, so
+ * nothing in the app can turn them on. What to do on this kind of device.
+ */
+export function PushBlockedSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useSession();
+  const agent = typeof navigator === 'undefined' ? '' : navigator.userAgent;
+  const steps = /iPhone|iPad|iPod/.test(agent) ? 'push.blocked.ios' : /Android/.test(agent) ? 'push.blocked.android' : 'push.blocked.computer';
+  return (
+    <BottomSheet open={open} onClose={onClose} title={t('push.blocked.title')}>
+      <p style={{ margin: 0 }}>{t(steps)}</p>
+    </BottomSheet>
   );
 }

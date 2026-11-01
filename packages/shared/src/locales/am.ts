@@ -2676,6 +2676,15 @@ export const am: Catalog = {
   'push.prompt.notNow': 'አሁን አይደለም',
   'push.prompt.done': 'ማሳወቂያዎች በርተዋል።',
   'push.prompt.iosHint': 'በiPhone ላይ ማሳወቂያ ለማግኘት YAPILAPIን ወደ መነሻ ማያ ገጽ ያክሉ (አጋራ፣ ከዚያ ወደ መነሻ ማያ ገጽ አክል) እና ከዚያ ይክፈቱት።',
+  'chat.copyText': 'ጽሑፍ ቅዳ',
+  'chat.copyPhoto': 'ፎቶ ቅዳ',
+  'chat.copied': 'ተቀድቷል',
+  'push.blocked.title': 'በዚህ መሣሪያ ላይ ማሳወቂያዎች ታግደዋል',
+  'push.blocked.android':
+    'ስልክዎ አግዷቸዋል፣ ስለዚህ መተግበሪያው መጠየቅ አይችልም። በመነሻ ማያ ገጽ ላይ የYAPILAPI ምልክትን ተጭነው ይያዙ፣ የመተግበሪያ መረጃ (ⓘ)፣ ከዚያ ማሳወቂያዎች ይንኩ እና ማሳወቂያዎችን ፍቀድ ያብሩ። በChrome ወይም Samsung Internet፦ ከአድራሻው ግራ ያለውን ምልክት ይንኩ፣ ከዚያ ፈቃዶች፣ ማሳወቂያዎች፣ ፍቀድ። ከዚያ ወደዚህ ይመለሱ።',
+  'push.blocked.ios':
+    'የiPhone ቅንብሮችን ይክፈቱ፣ ከዚያ ማሳወቂያዎች፣ ከዚያ YAPILAPI፣ እና ማሳወቂያዎችን ፍቀድ ያብሩ። YAPILAPI ከሌለ መጀመሪያ ወደ መነሻ ማያ ገጽ ያክሉት (አጋራ፣ ከዚያ ወደ መነሻ ማያ ገጽ አክል) እና ከዚያ ይክፈቱት።',
+  'push.blocked.computer': 'ከአድራሻው ግራ ያለውን ምልክት ጠቅ ያድርጉ፣ ማሳወቂያዎችን ፈልገው ፍቀድ ይምረጡ፣ ከዚያ ገጹን እንደገና ይጫኑ።',
   'story.dialog': 'የ{name} ታሪክ፣ {index} ከ{total}',
   'story.previous': 'ቀዳሚ',
   'story.next': 'ቀጣይ',

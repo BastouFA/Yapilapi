@@ -2694,6 +2694,15 @@ export const ig: Catalog = {
   'push.prompt.notNow': 'Ọ bụghị ugbu a',
   'push.prompt.done': 'Ọkwa agbanyela.',
   'push.prompt.iosHint': 'Iji nweta ọkwa na iPhone, tinye YAPILAPI na Ihuenyo Mbido (Kesaa, wee Tinye na Ihuenyo Mbido) ma mepee ya site n’ebe ahụ.',
+  'chat.copyText': 'Detuo ederede',
+  'chat.copyPhoto': 'Detuo foto',
+  'chat.copied': 'E detuola',
+  'push.blocked.title': 'Egbochiri ọkwa na ngwaọrụ a',
+  'push.blocked.android':
+    'Ekwentị gị na-egbochi ha, ya mere ngwa enweghị ike ịjụ. Jide akara YAPILAPI na ihuenyo ụlọ, pịa Ozi ngwa (ⓘ), mgbe ahụ Ọkwa, ma gbanye Kwe ka ọkwa bịa. Na Chrome ma ọ bụ Samsung Internet: pịa akara dị n’aka ekpe adreesị, mgbe ahụ Ikike, Ọkwa, Kwe. Mgbe ahụ laghachi ebe a.',
+  'push.blocked.ios':
+    'Mepee Ntọala iPhone gị, mgbe ahụ Ọkwa, mgbe ahụ YAPILAPI, ma gbanye Kwe ka ọkwa bịa. Ọ bụrụ na YAPILAPI anọghị ebe ahụ, buru ụzọ tinye ya na ihuenyo ụlọ (Kesaa, mgbe ahụ Tinye na ihuenyo ụlọ) ma mepee ya site n’ebe ahụ.',
+  'push.blocked.computer': 'Pịa akara dị n’aka ekpe adreesị, chọta Ọkwa ma họrọ Kwe, mgbe ahụ bugharịa ibe a ọzọ.',
   'story.dialog': 'Story {name}, {index} n’ime {total}',
   'story.previous': 'Nke gara aga',
   'story.next': 'Nke na-esote',

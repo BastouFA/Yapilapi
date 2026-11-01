@@ -2695,6 +2695,15 @@ export const vi: Catalog = {
   'push.prompt.notNow': 'Để sau',
   'push.prompt.done': 'Đã bật thông báo.',
   'push.prompt.iosHint': 'Để nhận thông báo trên iPhone, hãy thêm YAPILAPI vào Màn hình chính (Chia sẻ, rồi Thêm vào MH chính) và mở từ đó.',
+  'chat.copyText': 'Sao chép văn bản',
+  'chat.copyPhoto': 'Sao chép ảnh',
+  'chat.copied': 'Đã sao chép',
+  'push.blocked.title': 'Thông báo bị chặn trên thiết bị này',
+  'push.blocked.android':
+    'Điện thoại của bạn đang chặn, nên ứng dụng không thể hỏi. Giữ biểu tượng YAPILAPI trên màn hình chính, chạm Thông tin ứng dụng (ⓘ), rồi Thông báo, và bật Cho phép thông báo. Trong Chrome hoặc Samsung Internet: chạm biểu tượng bên trái địa chỉ, rồi Quyền, Thông báo, Cho phép. Sau đó quay lại đây.',
+  'push.blocked.ios':
+    'Mở Cài đặt trên iPhone, rồi Thông báo, rồi YAPILAPI, và bật Cho phép thông báo. Nếu không thấy YAPILAPI, hãy thêm vào Màn hình chính trước (Chia sẻ, rồi Thêm vào Màn hình chính) và mở từ đó.',
+  'push.blocked.computer': 'Bấm biểu tượng bên trái địa chỉ, tìm Thông báo và chọn Cho phép, rồi tải lại trang này.',
   'story.dialog': 'Tin của {name}, {index} trên {total}',
   'story.previous': 'Trước',
   'story.next': 'Tiếp',

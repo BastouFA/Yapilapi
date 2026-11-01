@@ -2708,6 +2708,15 @@ export const de: Catalog = {
   'push.prompt.notNow': 'Nicht jetzt',
   'push.prompt.done': 'Mitteilungen sind an.',
   'push.prompt.iosHint': 'Für Mitteilungen auf einem iPhone: Füge YAPILAPI zum Home-Bildschirm hinzu (Teilen, dann Zum Home-Bildschirm) und öffne es von dort.',
+  'chat.copyText': 'Text kopieren',
+  'chat.copyPhoto': 'Foto kopieren',
+  'chat.copied': 'Kopiert',
+  'push.blocked.title': 'Benachrichtigungen sind auf diesem Gerät blockiert',
+  'push.blocked.android':
+    'Dein Telefon blockiert sie, deshalb kann die App nicht fragen. Halte das YAPILAPI-Symbol auf dem Startbildschirm gedrückt, tippe auf App-Info (ⓘ), dann Benachrichtigungen, und schalte Benachrichtigungen zulassen ein. In Chrome oder Samsung Internet: Tippe auf das Symbol links neben der Adresse, dann Berechtigungen, Benachrichtigungen, Zulassen. Komm danach hierher zurück.',
+  'push.blocked.ios':
+    'Öffne die Einstellungen deines iPhones, dann Mitteilungen, dann YAPILAPI, und schalte Mitteilungen erlauben ein. Fehlt YAPILAPI dort, füge es zuerst zum Home-Bildschirm hinzu (Teilen, dann Zum Home-Bildschirm) und öffne es von dort.',
+  'push.blocked.computer': 'Klicke auf das Symbol links neben der Adresse, suche Benachrichtigungen und wähle Zulassen; lade die Seite dann neu.',
   'story.dialog': 'Story von {name}, {index} von {total}',
   'story.previous': 'Zurück',
   'story.next': 'Weiter',
