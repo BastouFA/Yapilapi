@@ -600,12 +600,13 @@ test('together: the slideshow fits each photo on the screen, and a failed upload
   await page.keyboard.press('Escape');
   await expect(show).toBeHidden();
 
-  // The first upload fails: the sheet stays open with that file marked and Try again, instead of closing.
+  // The first upload is refused (a dropped connection would be tried again by itself): the sheet
+  // stays open with that file marked and Try again, instead of closing.
   let failed = false;
   await page.route('**/api/v1/uploads', (route) => {
     if (failed || route.request().method() !== 'POST') return route.continue();
     failed = true;
-    return route.abort();
+    return route.fulfill({ status: 400, json: { error: { code: 'validation_failed', message: 'Refused.' } } });
   });
   await page
     .locator('input[type=file]')
