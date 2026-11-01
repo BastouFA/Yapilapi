@@ -535,13 +535,16 @@ export function ReelItem({
               src={active || near ? originalSrc : undefined}
               poster={original ? videoPoster(original, saver) : undefined}
               muted={muted}
+              data-sound=""
               loop
               playsInline
               preload={saver ? 'none' : 'metadata'}
               aria-label={t('reel.duet.original', { name: post.remixOf?.post?.author.displayName ?? '' })}
             />
           ) : null}
-          {borrowed ? <audio ref={companion} src={active || near ? borrowed : undefined} muted={muted} loop preload={saver ? 'none' : 'metadata'} /> : null}
+          {borrowed ? (
+            <audio ref={companion} src={active || near ? borrowed : undefined} muted={muted} data-sound="" loop preload={saver ? 'none' : 'metadata'} />
+          ) : null}
           {src ? (
             <video
               ref={video}
@@ -551,6 +554,8 @@ export function ReelItem({
               src={active || near || started ? src : undefined}
               poster={poster}
               muted={muted || !!borrowed || (!!song && !songWithVideo)}
+              // Its own sound is what you hear (no borrowed sound or song over it): Sound on unmutes it at once.
+              data-sound={!borrowed && !(song && !songWithVideo) ? '' : undefined}
               loop
               playsInline
               crossOrigin={videoCrossOrigin(captions)}

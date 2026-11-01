@@ -448,7 +448,15 @@ export function ReelsViewer() {
   const pipAvailable = typeof document !== 'undefined' && !!document.pictureInPictureEnabled && !!current && !current.remixOf;
 
   const toggleMute = () => {
-    setMuted((m) => !m);
+    const sound = muted;
+    // iPhones only let sound start inside the tap itself: unmute the reel playing now straight
+    // away (and keep it playing), rather than after the re-render, when Safari would refuse it.
+    if (sound)
+      list.current?.querySelectorAll<HTMLMediaElement>('.reel--active [data-sound]').forEach((el) => {
+        el.muted = false;
+        if (el.paused && el.src) void el.play().catch(() => {});
+      });
+    setMuted(!sound);
     if (!prefs.soundHintSeen) setPrefs({ soundHintSeen: true });
   };
 
