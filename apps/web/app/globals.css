@@ -3431,7 +3431,7 @@ video.chat-att__media {
   align-items: center;
 }
 /* Reply always shows beside the message; React and the menu come in on hover or focus. */
-.chat-msg__tools > :not(.chat-msg__reply):not(.chat-msg__react):not(.chat-msg__forward) {
+.chat-msg__tools > :not(.chat-msg__reply, .chat-msg__react, .chat-msg__forward) {
   opacity: 0;
   transition: opacity var(--duration-fast) var(--ease-out);
 }
@@ -3445,7 +3445,7 @@ video.chat-att__media {
   opacity: 1;
 }
 @media (hover: none) {
-  .chat-msg__tools > * {
+  .chat-msg .chat-msg__tools > * {
     opacity: 0.75;
   }
 }
