@@ -12,6 +12,20 @@ export interface JobScope {
   after?: string;
 }
 
+/**
+ * Jobs whose server stopped while they ran (a deploy or a restart) stay "running" for ever: after
+ * `minutes` they're queued again, or failed once out of attempts. Returns how many it picked up.
+ */
+export async function reclaimStuckJobs(db: Q, minutes = 30): Promise<number> {
+  const { rowCount } = await db.query(
+    `UPDATE jobs SET status = CASE WHEN attempts >= $2 THEN 'failed' ELSE 'queued' END, run_at = now(),
+            last_error = 'Stopped while running (the server restarted).', finished_at = CASE WHEN attempts >= $2 THEN now() END
+     WHERE status = 'running' AND run_at < now() - make_interval(mins => $1)`,
+    [minutes, MAX_ATTEMPTS],
+  );
+  return rowCount ?? 0;
+}
+
 /** Queue a job and return its id. */
 export async function enqueue(db: Q, kind: string, payload: object, delaySeconds = 0): Promise<string> {
   const { rows } = await db.query(`INSERT INTO jobs (kind, payload, run_at) VALUES ($1, $2, now() + make_interval(secs => $3)) RETURNING id`, [
@@ -36,7 +50,8 @@ export async function enqueueAt(db: Q, kind: string, payload: object, runAt: Dat
  */
 export async function processJobs(db: Pool, handlers: Record<string, JobHandler>, batch = 5, scope: JobScope = {}): Promise<number> {
   const { rows } = await db.query(
-    `UPDATE jobs SET status = 'running', attempts = attempts + 1
+    // While a job runs, run_at is when it started (so a run that died with its server can be found).
+    `UPDATE jobs SET status = 'running', attempts = attempts + 1, run_at = now()
      WHERE id IN (SELECT id FROM jobs WHERE status = 'queued' AND run_at <= now() AND kind = ANY($1) AND ($3::bigint[] IS NULL OR id = ANY($3)) AND id > $4::bigint
                   ORDER BY run_at LIMIT $2 FOR UPDATE SKIP LOCKED)
      RETURNING id, kind, payload, attempts`,

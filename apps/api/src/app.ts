@@ -96,10 +96,11 @@ import dropsModule from './modules/drops.ts';
 import marketModule from './modules/market.ts';
 import musicModule from './modules/music.ts';
 import { musicCatalogFromConfig } from './lib/music/index.ts';
+import { nominatimGeocoder, type Geocoder } from './lib/geocode.ts';
 import { createPushSender } from './lib/push.ts';
 import { securityMailer, setPushSender, setSecurityMailer, unsetSecurityMailer } from './lib/services.ts';
 import { processWebhooks } from './lib/webhooks.ts';
-import { processJobs } from './lib/jobs.ts';
+import { processJobs, reclaimStuckJobs } from './lib/jobs.ts';
 import { sweepTogethers } from './lib/together.ts';
 import { mediaJobHandlers } from './lib/media-processing.ts';
 import { studioJobHandlers } from './lib/studio.ts';
@@ -149,6 +150,8 @@ export async function buildApp(
     paystackFetch?: typeof fetch;
     /** Used for calls to music catalogue providers (tests pass a fake). */
     musicFetch?: typeof fetch;
+    /** Replaces the reverse geocoder made from GEOCODE_URL (tests pass one with a fake fetch and clock). */
+    geocoder?: Geocoder;
     /** Replaces the SMTP connection with EMAIL_TRANSPORT=smtp (tests pass a fake). */
     mailTransport?: MailTransport;
     /** Replaces the model used for translations (tests and local checks pass a stand-in that isn't 'dev'). */
@@ -294,6 +297,7 @@ export async function buildApp(
     mediaModerator: mediaModeratorFromConfig(config),
     roomMedia: meshRoomMedia(config, realtime),
     music: musicCatalogFromConfig(config, db, { fetch: opts.musicFetch, log: (msg, err) => app.log.warn({ err: (err as Error)?.message }, msg) }),
+    geocoder: opts.geocoder ?? nominatimGeocoder({ baseUrl: config.GEOCODE_URL, log: (msg, err) => app.log.warn({ err: (err as Error)?.message }, msg) }),
     jobs: {},
   };
   if (config.APP_ENV === 'production' && config.SMS_PROVIDER === 'dev')
@@ -604,10 +608,18 @@ export async function buildApp(
   };
   if (opts.webhookWorker ?? config.JOB_WORKER) {
     let busy = false;
+    let lastReclaim = 0;
     const skip = quietRounds();
     jobTimer = setInterval(async () => {
       if (busy || skip()) return;
       busy = true;
+      // Once a minute: jobs left running by a server that restarted (a video half made) go again.
+      if (Date.now() - lastReclaim > 60_000) {
+        lastReclaim = Date.now();
+        await reclaimStuckJobs(db, 20)
+          .then((n) => n && app.log.warn({ jobs: n }, 'jobs stopped mid-run queued again'))
+          .catch((e) => app.log.warn({ err: e.message }, 'job reclaim'));
+      }
       await processJobs(db, jobHandlers).catch((e) => app.log.warn({ err: e.message }, 'job worker'));
       // Campaigns and boosts past their end date stop, and their unspent budget is refunded.
       await endExpiredCampaigns(db, ctx.paymentProviders).catch((e) => app.log.warn({ err: e.message }, 'ad expiry'));

@@ -215,6 +215,18 @@ async function processVideo(deps: ProcessDeps, m: MediaRow) {
       '+faststart',
       path.join(dir, 'web.mp4'),
     ]);
+    // Playable now: the poster and the web MP4 go up before the streaming versions are made, which
+    // can take minutes on a small server (and a restart in between would leave nothing to play).
+    const posterJpg = await readFile(path.join(dir, 'poster.jpg'));
+    const poster = await storePoster(deps.storage, posterJpg, { poster: `${base}_poster.jpg`, thumb: `${base}_thumb.webp` });
+    const mp4 = await deps.storage.putFile(path.join(dir, 'web.mp4'), 'mp4', 'video/mp4', `${base}_web.mp4`);
+    const variants: Record<string, string> = { mp4: mp4.url };
+    if (poster.thumb) variants.thumb = poster.thumb;
+    await deps.db.query(
+      `UPDATE media SET poster_url = $2, variants = $3, duration_ms = coalesce($4, duration_ms), width = coalesce(width, $5),
+                        height = coalesce(height, $6), blurhash = coalesce($7, blurhash) WHERE id = $1`,
+      [id, poster.url, variants, info.durationMs, info.width, info.height, poster.placeholder],
+    );
     // Adaptive HLS with two renditions (360p for slow networks, 720p).
     await run(
       [
@@ -309,16 +321,11 @@ async function processVideo(deps: ProcessDeps, m: MediaRow) {
       () => true,
       () => false,
     );
-    const posterJpg = await readFile(path.join(dir, 'poster.jpg'));
-    const poster = await storePoster(deps.storage, posterJpg, { poster: `${base}_poster.jpg`, thumb: `${base}_thumb.webp` });
-    const mp4 = await deps.storage.putFile(path.join(dir, 'web.mp4'), 'mp4', 'video/mp4', `${base}_web.mp4`);
-    const variants: Record<string, string> = { mp4: mp4.url };
     const bytes: Record<string, number> = {
       original: (await stat(input)).size,
       mp4: (await stat(path.join(dir, 'web.mp4'))).size,
       ...poster.bytes,
     };
-    if (poster.thumb) variants.thumb = poster.thumb;
     if (low) {
       variants.mp4_360 = (await deps.storage.putFile(path.join(dir, 'low.mp4'), 'mp4', 'video/mp4', `${base}_360.mp4`)).url;
       bytes.mp4_360 = (await stat(path.join(dir, 'low.mp4'))).size;
