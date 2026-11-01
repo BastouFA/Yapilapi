@@ -52,7 +52,9 @@ export function sampleTimes(durationMs: number | null, count = 3): number[] {
 export function run(args: string[], cwd?: string): Promise<void> {
   return new Promise((resolve, reject) => {
     if (!ffmpegPath) return reject(new Error('ffmpeg is not available'));
-    const p = spawn(ffmpegPath as unknown as string, ['-hide_banner', '-loglevel', 'error', ...args], { cwd });
+    // On the server, below the API itself: a long video never makes the app slow to answer.
+    const cmd = [ffmpegPath as unknown as string, '-hide_banner', '-loglevel', 'error', ...args];
+    const p = process.platform === 'linux' ? spawn('nice', ['-n', '15', ...cmd], { cwd }) : spawn(cmd[0]!, cmd.slice(1), { cwd });
     let err = '';
     p.stderr.on('data', (d) => (err += d));
     p.on('error', reject);
@@ -194,14 +196,21 @@ async function processVideo(deps: ProcessDeps, m: MediaRow) {
     const posterFile = path.join(dir, 'poster.jpg');
     await run(['-ss', '1', '-i', input, '-frames:v', '1', '-vf', 'scale=1280:-2', '-q:v', '3', posterFile]).catch(() => {});
     if (!(await stat(posterFile).catch(() => null))?.size) await run(['-i', input, '-frames:v', '1', '-vf', 'scale=1280:-2', '-q:v', '3', posterFile]);
-    // Web-safe MP4 (H.264/AAC, fast start) as the universal fallback.
+    // Web-safe MP4 (H.264/AAC, fast start) as the universal fallback. One thread and a short
+    // look-ahead: a phone's 4K HEVC video decoded with several threads ran the server (512 MB) out of memory.
     await run([
+      '-threads',
+      '1',
       '-i',
       input,
       '-vf',
-      "scale='min(1280,iw)':-2",
+      "scale='min(1280,iw)':-2,format=yuv420p",
       '-c:v',
       'libx264',
+      '-threads',
+      '1',
+      '-x264-params',
+      'rc-lookahead=10',
       '-preset',
       'veryfast',
       '-crf',
@@ -227,11 +236,15 @@ async function processVideo(deps: ProcessDeps, m: MediaRow) {
                         height = coalesce(height, $6), blurhash = coalesce($7, blurhash) WHERE id = $1`,
       [id, poster.url, variants, info.durationMs, info.width, info.height, poster.placeholder],
     );
-    // Adaptive HLS with two renditions (360p for slow networks, 720p).
+    // Adaptive HLS with two renditions (360p for slow networks, 720p), made from the web MP4 (at
+    // most 1280 wide, cheap to read) rather than the original, which may be 4K.
+    const web = path.join(dir, 'web.mp4');
     await run(
       [
+        '-threads',
+        '1',
         '-i',
-        input,
+        web,
         '-filter_complex',
         "[0:v]split=2[a][b];[a]scale=-2:360[v360];[b]scale=-2:'min(720,ih)'[v720]",
         '-map',
@@ -244,6 +257,8 @@ async function processVideo(deps: ProcessDeps, m: MediaRow) {
         '0:a?',
         '-c:v',
         'libx264',
+        '-threads',
+        '1',
         '-preset',
         'veryfast',
         '-crf',
@@ -278,8 +293,10 @@ async function processVideo(deps: ProcessDeps, m: MediaRow) {
       // Videos without audio: same ladder, no audio maps.
       await run(
         [
+          '-threads',
+          '1',
           '-i',
-          input,
+          web,
           '-filter_complex',
           "[0:v]split=2[a][b];[a]scale=-2:360[v360];[b]scale=-2:'min(720,ih)'[v720]",
           '-map',
@@ -288,6 +305,8 @@ async function processVideo(deps: ProcessDeps, m: MediaRow) {
           '[v720]',
           '-c:v',
           'libx264',
+          '-threads',
+          '1',
           '-preset',
           'veryfast',
           '-crf',

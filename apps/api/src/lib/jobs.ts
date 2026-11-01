@@ -12,16 +12,20 @@ export interface JobScope {
   after?: string;
 }
 
+/** A job stopped mid-run this many times is given up on: it may be what keeps bringing the server down (out of memory). */
+const MAX_STOPPED_RUNS = 3;
+
 /**
  * Jobs whose server stopped while they ran (a deploy or a restart) stay "running" for ever: after
- * `minutes` they're queued again, or failed once out of attempts. Returns how many it picked up.
+ * `minutes` they're queued again, or failed once they've been stopped mid-run a few times (a job
+ * that crashes the server shouldn't crash it again and again). Returns how many it picked up.
  */
 export async function reclaimStuckJobs(db: Q, minutes = 30): Promise<number> {
   const { rowCount } = await db.query(
     `UPDATE jobs SET status = CASE WHEN attempts >= $2 THEN 'failed' ELSE 'queued' END, run_at = now(),
             last_error = 'Stopped while running (the server restarted).', finished_at = CASE WHEN attempts >= $2 THEN now() END
      WHERE status = 'running' AND run_at < now() - make_interval(mins => $1)`,
-    [minutes, MAX_ATTEMPTS],
+    [minutes, Math.min(MAX_STOPPED_RUNS, MAX_ATTEMPTS)],
   );
   return rowCount ?? 0;
 }
