@@ -436,7 +436,7 @@ export const sw: Catalog = {
   'm.reels.make': 'Tengeneza reel',
   'm.reels.caughtUp': 'Umeona zote.',
   'reel.new': 'Mpya',
-  'reel.watchAgain': 'Tazama tena',
+  'reel.seen': 'Imeonekana',
   'reel.backToNewest': 'Rudi kwa mpya zaidi',
   'm.reels.by': 'Reel ya {name}',
   'm.reels.shareTitle': '{name} kwenye YAPILAPI',

@@ -145,7 +145,8 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
         : { ids: [], next: null };
     const rewatch = await hydratePosts(db, more.ids, u.id);
     const items = [...fresh, ...rewatch];
-    const nextCursor = ranked.nextCursor ?? (more.next ? `again:${more.next.at}|${more.next.id}` : null);
+    // The new ones ended exactly at a page's end: the rest starts on the next page.
+    const nextCursor = ranked.nextCursor ?? (room <= 0 ? 'again:start' : more.next ? `again:${more.next.at}|${more.next.id}` : null);
     // Each author's follower count, and whether you follow them, for the follow button on the reel.
     const stats = await db.query(
       `SELECT pr.user_id, (SELECT count(*) FROM follows f WHERE f.followee_id = pr.user_id)::int AS followers,
@@ -821,7 +822,9 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     return {
       mode: surface,
       items: [...posts, ...(await hydratePosts(db, more.ids, userId))],
-      nextCursor: ranked.nextCursor ?? (more.next ? `again:${more.next.at}|${more.next.id}` : null),
+      // The new posts ended exactly at a page's end: the reels start on the next page.
+      nextCursor:
+        ranked.nextCursor ?? (surface === 'for_you' && !reduced && room <= 0 ? 'again:start' : more.next ? `again:${more.next.at}|${more.next.id}` : null),
     };
   }
 

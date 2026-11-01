@@ -438,7 +438,7 @@ export const nl: Catalog = {
   'm.reels.make': 'Maak een reel',
   'm.reels.caughtUp': 'Je bent helemaal bij.',
   'reel.new': 'Nieuw',
-  'reel.watchAgain': 'Nog eens kijken',
+  'reel.seen': 'Gezien',
   'reel.backToNewest': 'Terug naar het nieuwste',
   'm.reels.by': 'Reel van {name}',
   'm.reels.shareTitle': '{name} op YAPILAPI',

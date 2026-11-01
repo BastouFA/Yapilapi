@@ -438,7 +438,7 @@ export const id: Catalog = {
   'm.reels.make': 'Buat reel',
   'm.reels.caughtUp': 'Anda sudah melihat semuanya.',
   'reel.new': 'Baru',
-  'reel.watchAgain': 'Tonton lagi',
+  'reel.seen': 'Sudah dilihat',
   'reel.backToNewest': 'Kembali ke yang terbaru',
   'm.reels.by': 'Reel oleh {name}',
   'm.reels.shareTitle': '{name} di YAPILAPI',

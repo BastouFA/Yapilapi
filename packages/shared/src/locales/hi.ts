@@ -435,7 +435,7 @@ export const hi: Catalog = {
   'm.reels.make': 'रील बनाएँ',
   'm.reels.caughtUp': 'आपने सब देख लिया है।',
   'reel.new': 'नया',
-  'reel.watchAgain': 'फिर से देखें',
+  'reel.seen': 'देखा हुआ',
   'reel.backToNewest': 'सबसे नए पर लौटें',
   'm.reels.by': '{name} की रील',
   'm.reels.shareTitle': 'YAPILAPI पर {name}',

@@ -439,7 +439,7 @@ export const zu: Catalog = {
   'm.reels.make': 'Yenza i-reel',
   'm.reels.caughtUp': 'Usubone konke.',
   'reel.new': 'Okusha',
-  'reel.watchAgain': 'Buka futhi',
+  'reel.seen': 'Sekubukiwe',
   'reel.backToNewest': 'Buyela kokusha kakhulu',
   'm.reels.by': 'I-reel ka-{name}',
   'm.reels.shareTitle': '{name} ku-YAPILAPI',

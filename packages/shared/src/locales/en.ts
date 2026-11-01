@@ -439,7 +439,7 @@ export const en = {
   'm.reels.make': 'Make a reel',
   'm.reels.caughtUp': "You're all caught up.",
   'reel.new': 'New',
-  'reel.watchAgain': 'Watch again',
+  'reel.seen': 'Seen',
   'reel.backToNewest': 'Back to the newest',
   'm.reels.by': 'Reel by {name}',
   'm.reels.shareTitle': '{name} on YAPILAPI',

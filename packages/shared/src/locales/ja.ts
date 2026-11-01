@@ -436,7 +436,7 @@ export const ja: Catalog = {
   'm.reels.make': 'リールを作成',
   'm.reels.caughtUp': 'すべて見終わりました。',
   'reel.new': '新着',
-  'reel.watchAgain': 'もう一度見る',
+  'reel.seen': '視聴済み',
   'reel.backToNewest': '最新に戻る',
   'm.reels.by': '{name}さんのリール',
   'm.reels.shareTitle': 'YAPILAPIの{name}さん',

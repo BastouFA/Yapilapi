@@ -133,7 +133,7 @@ describe('following and friends feeds (joined through your people instead of che
 });
 
 describe('reels (ranked among the newest reels and your people’s reels)', () => {
-  it("ranks a followed person's reel above a stranger's newer one", async () => {
+  it("shows the last posted first, a followed person's older reel right after a stranger's newer one", async () => {
     const fan = await adult();
     const creator = await adult();
     const stranger = await adult();
@@ -157,7 +157,7 @@ describe('reels (ranked among the newest reels and your people’s reels)', () =
     } while (cursor);
     expect(seen).toContain(strangerReel);
     expect(seen).toContain(followedReel);
-    expect(seen.indexOf(followedReel)).toBeLessThan(seen.indexOf(strangerReel));
+    expect(seen.indexOf(strangerReel)).toBeLessThan(seen.indexOf(followedReel));
   });
 });
 

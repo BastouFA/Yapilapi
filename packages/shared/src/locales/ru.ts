@@ -444,7 +444,7 @@ export const ru: Catalog = {
   'm.reels.make': 'Снять рилс',
   'm.reels.caughtUp': 'Вы всё посмотрели.',
   'reel.new': 'Новое',
-  'reel.watchAgain': 'Посмотреть снова',
+  'reel.seen': 'Просмотрено',
   'reel.backToNewest': 'К самым новым',
   'm.reels.by': 'Рилс {name}',
   'm.reels.shareTitle': '{name} в YAPILAPI',

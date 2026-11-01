@@ -435,7 +435,7 @@ export const ig: Catalog = {
   'm.reels.make': 'Mee reel',
   'm.reels.caughtUp': 'Ị hụchaala ihe niile.',
   'reel.new': 'Ọhụrụ',
-  'reel.watchAgain': 'Lee ọzọ',
+  'reel.seen': 'Ahụla',
   'reel.backToNewest': 'Laghachi na nke kachasị ọhụrụ',
   'm.reels.by': 'Reel nke {name}',
   'm.reels.shareTitle': '{name} na YAPILAPI',

@@ -696,11 +696,6 @@ export function ReelItem({
           <span className="reel__top-title" aria-hidden>
             {t('m.title.reels')}
           </span>
-          {rewatch ? (
-            <span className="reel__tag">{t('reel.watchAgain')}</span>
-          ) : Date.now() - new Date(post.createdAt).getTime() < NEW_REEL_MS ? (
-            <span className="reel__tag reel__tag--new">{t('reel.new')}</span>
-          ) : null}
           <button type="button" className="reel__icon-btn" onClick={viewer.toggleMute} aria-pressed={!muted} aria-label={t('m.reels.sound')}>
             <Icon name={muted ? 'volume-off' : 'volume'} size={20} />
           </button>
@@ -750,6 +745,11 @@ export function ReelItem({
                 +{post.collaborators.length}
                 <span className="yp-visually-hidden">{post.collaborators.map((c) => c.displayName).join(', ')}</span>
               </span>
+            ) : null}
+            {rewatch ? (
+              <span className="reel__tag">{t('reel.seen')}</span>
+            ) : Date.now() - new Date(post.createdAt).getTime() < NEW_REEL_MS ? (
+              <span className="reel__tag">{t('reel.new')}</span>
             ) : null}
             {canFollow ? (
               <button

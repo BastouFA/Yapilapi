@@ -434,7 +434,7 @@ export const ko: Catalog = {
   'm.reels.make': '릴스 만들기',
   'm.reels.caughtUp': '모두 확인했어요.',
   'reel.new': '새 릴스',
-  'reel.watchAgain': '다시 보기',
+  'reel.seen': '본 릴스',
   'reel.backToNewest': '최신으로 돌아가기',
   'm.reels.by': '{name}님의 릴스',
   'm.reels.shareTitle': 'YAPILAPI의 {name}님',

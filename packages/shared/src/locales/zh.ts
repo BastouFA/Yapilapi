@@ -434,7 +434,7 @@ export const zh: Catalog = {
   'm.reels.make': '制作短视频',
   'm.reels.caughtUp': '你已经看完了。',
   'reel.new': '新',
-  'reel.watchAgain': '再看一次',
+  'reel.seen': '已看过',
   'reel.backToNewest': '回到最新',
   'm.reels.by': '{name} 的短视频',
   'm.reels.shareTitle': '{name} 在 YAPILAPI 上',

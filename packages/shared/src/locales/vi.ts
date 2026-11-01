@@ -436,7 +436,7 @@ export const vi: Catalog = {
   'm.reels.make': 'Tạo reel',
   'm.reels.caughtUp': 'Bạn đã xem hết rồi.',
   'reel.new': 'Mới',
-  'reel.watchAgain': 'Xem lại',
+  'reel.seen': 'Đã xem',
   'reel.backToNewest': 'Về mới nhất',
   'm.reels.by': 'Reel của {name}',
   'm.reels.shareTitle': '{name} trên YAPILAPI',

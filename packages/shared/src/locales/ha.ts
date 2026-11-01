@@ -437,7 +437,7 @@ export const ha: Catalog = {
   'm.reels.make': 'Ku yi reel',
   'm.reels.caughtUp': 'Kun ga duka.',
   'reel.new': 'Sabo',
-  'reel.watchAgain': 'Sake kallo',
+  'reel.seen': 'An gani',
   'reel.backToNewest': 'Koma zuwa mafi sabo',
   'm.reels.by': 'Reel daga {name}',
   'm.reels.shareTitle': '{name} a YAPILAPI',

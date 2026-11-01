@@ -437,7 +437,7 @@ export const tr: Catalog = {
   'm.reels.make': 'Reel oluştur',
   'm.reels.caughtUp': 'Hepsini gördün.',
   'reel.new': 'Yeni',
-  'reel.watchAgain': 'Tekrar izle',
+  'reel.seen': 'İzlendi',
   'reel.backToNewest': 'En yeniye dön',
   'm.reels.by': '{name} reel’i',
   'm.reels.shareTitle': 'YAPILAPI’de {name}',

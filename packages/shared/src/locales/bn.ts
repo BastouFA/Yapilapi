@@ -436,7 +436,7 @@ export const bn: Catalog = {
   'm.reels.make': 'একটি রিল তৈরি করুন',
   'm.reels.caughtUp': 'আপনি সব দেখে ফেলেছেন।',
   'reel.new': 'নতুন',
-  'reel.watchAgain': 'আবার দেখুন',
+  'reel.seen': 'দেখা হয়েছে',
   'reel.backToNewest': 'সবচেয়ে নতুনে ফিরুন',
   'm.reels.by': '{name}-এর রিল',
   'm.reels.shareTitle': 'YAPILAPI-তে {name}',

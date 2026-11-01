@@ -438,7 +438,7 @@ export const es: Catalog = {
   'm.reels.make': 'Crear un reel',
   'm.reels.caughtUp': 'Ya lo viste todo.',
   'reel.new': 'Nuevo',
-  'reel.watchAgain': 'Ver de nuevo',
+  'reel.seen': 'Visto',
   'reel.backToNewest': 'Volver a lo más reciente',
   'm.reels.by': 'Reel de {name}',
   'm.reels.shareTitle': '{name} en YAPILAPI',

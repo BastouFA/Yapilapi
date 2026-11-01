@@ -435,7 +435,7 @@ export const ur: Catalog = {
   'm.reels.make': 'ریل بنائیں',
   'm.reels.caughtUp': 'آپ نے سب کچھ دیکھ لیا ہے۔',
   'reel.new': 'نیا',
-  'reel.watchAgain': 'دوبارہ دیکھیں',
+  'reel.seen': 'دیکھا ہوا',
   'reel.backToNewest': 'تازہ ترین پر واپس',
   'm.reels.by': '{name} کی ریل',
   'm.reels.shareTitle': 'YAPILAPI پر {name}',

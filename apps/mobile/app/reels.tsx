@@ -1458,11 +1458,6 @@ function Reel({
         <Text style={s.title} accessibilityRole="header" numberOfLines={1}>
           {t('m.title.reels')}
         </Text>
-        {rewatch || Date.now() - new Date(post.createdAt).getTime() < NEW_REEL_MS ? (
-          <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: rewatch ? 'rgba(0,0,0,0.55)' : WHITE }}>
-            <Text style={{ color: rewatch ? WHITE : '#0B0C14', fontSize: 12, fontWeight: '700' }}>{t(rewatch ? 'reel.watchAgain' : 'reel.new')}</Text>
-          </View>
-        ) : null}
         <TopButton icon={muted ? 'volume-mute' : 'volume-high'} label={t('m.reels.sound')} selected={!muted} onPress={onToggleMute} />
         <TopButton icon={clear ? 'eye-off-outline' : 'scan-outline'} label={t('reel.clearView')} selected={clear} onPress={onToggleClear} />
       </Animated.View>
@@ -1523,6 +1518,9 @@ function Reel({
                 onAuthorOpen={() => recordFeedEvent({ postId: post.id, surface: 'reels', kind: 'profile_open' })}
               />
             </Pressable>
+            {rewatch || Date.now() - new Date(post.createdAt).getTime() < NEW_REEL_MS ? (
+              <Text style={{ color: WHITE, fontSize: 12, fontWeight: '600', opacity: 0.85 }}>· {t(rewatch ? 'reel.seen' : 'reel.new')}</Text>
+            ) : null}
             {canFollow ? (
               <Pressable
                 accessibilityRole="button"

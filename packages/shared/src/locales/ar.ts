@@ -435,7 +435,7 @@ export const ar: Catalog = {
   'm.reels.make': 'أنشئ ريل',
   'm.reels.caughtUp': 'لقد شاهدت كل شيء.',
   'reel.new': 'جديد',
-  'reel.watchAgain': 'شاهد مجددًا',
+  'reel.seen': 'تمت المشاهدة',
   'reel.backToNewest': 'العودة إلى الأحدث',
   'm.reels.by': 'ريل من {name}',
   'm.reels.shareTitle': '{name} على YAPILAPI',

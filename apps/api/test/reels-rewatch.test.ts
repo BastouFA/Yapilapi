@@ -83,6 +83,30 @@ describe('Reels never run dry', () => {
     for (const id of reels) expect(seen.has(id)).toBe(true);
   });
 
+  it('carries on when the new ones end exactly at the end of a page', async () => {
+    // Someone who has seen nothing, a page at a time, whatever the number of new ones is.
+    const cleo = await signUp(t.app, { birthDate: '1990-04-02' });
+    const walk = async (path: string, limit: number) => {
+      const seen = new Set<string>();
+      let cursor: string | null = null;
+      for (let i = 0; i < 400; i++) {
+        const res = await as(t.app, cleo).get(`${path}limit=${limit}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
+        for (const p of res.body.items as { id: string }[]) seen.add(p.id);
+        cursor = res.body.nextCursor;
+        if (!cursor) break;
+      }
+      return seen;
+    };
+    for (const limit of [7, 8, 9, 10, 20]) {
+      const onReels = await walk('/v1/reels?', limit);
+      const onForYou = await walk('/v1/feed?mode=for_you&', limit);
+      for (const id of reels) {
+        expect(onReels.has(id)).toBe(true);
+        expect(onForYou.has(id)).toBe(true);
+      }
+    }
+  }, 120_000);
+
   it('the part past the new ones pages through without repeating itself', async () => {
     const { ids, rewatch } = await everything(bo);
     expect(new Set(rewatch).size).toBe(rewatch.length);

@@ -436,7 +436,7 @@ export const yo: Catalog = {
   'm.reels.make': 'Ṣe reel kan',
   'm.reels.caughtUp': 'O ti rí gbogbo rẹ̀.',
   'reel.new': 'Tuntun',
-  'reel.watchAgain': 'Tún wò ó',
+  'reel.seen': 'Ti wò ó',
   'reel.backToNewest': 'Padà sí tuntun jùlọ',
   'm.reels.by': 'Reel láti ọwọ́ {name}',
   'm.reels.shareTitle': '{name} lórí YAPILAPI',

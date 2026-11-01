@@ -434,7 +434,7 @@ export const am: Catalog = {
   'm.reels.make': 'ሪል ይስሩ',
   'm.reels.caughtUp': 'ሁሉንም አይተዋል።',
   'reel.new': 'አዲስ',
-  'reel.watchAgain': 'እንደገና ይመልከቱ',
+  'reel.seen': 'የታየ',
   'reel.backToNewest': 'ወደ አዳዲሶቹ ተመለስ',
   'm.reels.by': 'የ{name} ሪል',
   'm.reels.shareTitle': '{name} በYAPILAPI ላይ',
