@@ -117,8 +117,10 @@ test('two people watch together from a chat, and a second device of the same per
   await said.getByRole('button', { name: 'React' }).click();
   await expect(said.locator('.chat-picker')).toBeVisible();
   await said.locator('.chat-picker__item').first().click();
-  await cleoPage.keyboard.press('Escape');
+  // One tap: the row closes and the reaction shows under the message.
+  await expect(said.locator('.chat-picker')).toHaveCount(0);
   await expect(said.locator('.chat-reaction')).toHaveCount(1);
+  await expect(said.locator('.chat-reaction')).toBeInViewport();
   await expect(page.locator('#watch-chat .chat-msg', { hasText: 'This one is good' }).first().locator('.chat-reaction')).toHaveCount(1);
   await audit(cleoPage, 'the chat sheet');
   await cleoPage.getByRole('button', { name: 'Close' }).click();

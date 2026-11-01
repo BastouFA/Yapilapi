@@ -679,6 +679,8 @@ function SideChat({ conversationId, meId }: { conversationId: string; meId: stri
         onClose={() => setReactFor(null)}
         onToggle={(emoji, on) => {
           const m = messages.find((x) => x.id === reactFor);
+          // One tap, one reaction: the sheet closes and the reaction shows under the message.
+          setReactFor(null);
           if (m) void react(m, emoji, on);
         }}
       />

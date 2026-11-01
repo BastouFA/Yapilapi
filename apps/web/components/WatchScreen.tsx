@@ -805,6 +805,7 @@ function WatchChat({ conversationId, group, onUnread }: { conversationId: string
   const [everything, setEverything] = useState(false);
   const [jump, setJump] = useState<string | null>(null);
   const [highlight, setHighlight] = useState<string | null>(null);
+  const [reveal, setReveal] = useState<string | null>(null);
   const list = useRef<HTMLDivElement>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
   const stick = useRef(true);
@@ -870,7 +871,10 @@ function WatchChat({ conversationId, group, onUnread }: { conversationId: string
           ) ?? cur,
       );
     // Your own taps are already shown.
-    if (e.type === 'message.reaction' && e.data.userId !== me?.id) patch(e.data.id, (x) => applyReaction(x, e.data.emoji, false, !!e.data.removed));
+    if (e.type === 'message.reaction' && e.data.userId !== me?.id) {
+      patch(e.data.id, (x) => applyReaction(x, e.data.emoji, false, !!e.data.removed));
+      if (stick.current) setReveal(e.data.id);
+    }
     if (e.type === 'message.system') setMessages((cur) => cur?.map((x) => (x.id === e.data.id ? { ...x, system: e.data.system } : x)) ?? cur);
   });
 
@@ -880,6 +884,17 @@ function WatchChat({ conversationId, group, onUnread }: { conversationId: string
     const el = list.current;
     if (el && stick.current) el.scrollTop = el.scrollHeight;
   }, [lastId]);
+
+  // The emoji row and a new reaction go under the message: in this small list that can be out of
+  // sight, and a tap would seem to do nothing. Bring the bottom of the message into view.
+  useEffect(() => {
+    const box = list.current;
+    const el = reveal ? box?.querySelector<HTMLElement>(`[data-message="${reveal}"]`) : null;
+    if (!box || !el) return;
+    setReveal(null);
+    const below = el.getBoundingClientRect().bottom - box.getBoundingClientRect().bottom;
+    if (below > 0) box.scrollTop += below + 4;
+  }, [reveal, messages, pickerFor]);
 
   // Go to a quoted message once it's in the list, and mark it for a moment. Only this list
   // scrolls: the video stays where it is.
@@ -927,6 +942,10 @@ function WatchChat({ conversationId, group, onUnread }: { conversationId: string
   }
 
   async function react(m: Message, emoji: string, on: boolean) {
+    // One tap, one reaction: the row closes and the reaction shows under the message.
+    setPickerFor(null);
+    setPanelFor(null);
+    setReveal(m.id);
     patch(m.id, (x) => applyReaction(x, emoji, true, !on));
     try {
       if (on) await api.messages.react(m.id, emoji);
@@ -1038,7 +1057,10 @@ function WatchChat({ conversationId, group, onUnread }: { conversationId: string
                         className="yp-action chat-msg__quick chat-msg__react"
                         aria-label={t('chat.react')}
                         title={t('chat.react')}
-                        onClick={() => setPickerFor(m.id)}
+                        onClick={() => {
+                          setPickerFor(m.id);
+                          setReveal(m.id);
+                        }}
                       >
                         <Icon name="heart" size={18} />
                       </button>
