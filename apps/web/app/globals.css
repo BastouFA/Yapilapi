@@ -3564,6 +3564,26 @@ video.chat-att__media {
   font-size: 22px;
   cursor: pointer;
 }
+/* The phone wouldn't start the other person's sound by itself: a tap does. */
+.call__tap {
+  position: absolute;
+  left: 50%;
+  bottom: calc(136px + env(safe-area-inset-bottom, 0px));
+  translate: -50% 0;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: #f1f5f3;
+  color: #050807;
+  font: 700 16px/22px var(--font-sans);
+  cursor: pointer;
+}
+
 /* The emoji you just picked pops up out of its button and fades. */
 .reaction-burst {
   position: fixed;

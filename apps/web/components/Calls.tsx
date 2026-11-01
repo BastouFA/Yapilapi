@@ -39,6 +39,8 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
   const [cameraOff, setCameraOff] = useState(false);
   const [facing, setFacing] = useState<'user' | 'environment'>('user');
   const [cameras, setCameras] = useState(0);
+  // The phone wouldn't start the other person's sound by itself: "Tap for sound" (any tap does it).
+  const [soundBlocked, setSoundBlocked] = useState(false);
   const local = useRef<MediaStream | null>(null);
   const peers = useRef(new Map<string, RTCPeerConnection>());
   // The people this device sent the offer to: it's the one to restart the connection if it fails.
@@ -74,6 +76,7 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
     setMuted(false);
     setCameraOff(false);
     setFacing('user');
+    setSoundBlocked(false);
   }, []);
 
   // Who's in the call: names and faces from the chat.
@@ -92,7 +95,7 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
 
   async function getMedia(kind: 'audio' | 'video') {
     local.current = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true },
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
       video: kind === 'video' ? { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } : false,
     });
     if (localVideo.current) localVideo.current.srcObject = local.current;
@@ -186,6 +189,14 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  /** Inside a tap, where phones allow it: every voice and picture of the call plays. */
+  function unlockSound() {
+    document.querySelectorAll<HTMLMediaElement>('[data-call-remote]').forEach((el) => {
+      if (el.paused) void el.play().catch(() => {});
+    });
+    setSoundBlocked(false);
+  }
+
   async function hangUp() {
     if (call) await api.calls.end(call.id).catch(() => {});
     cleanup();
@@ -268,14 +279,16 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
         pending.current.delete(e.data.from);
       };
       if (e.data.type === 'offer') {
-        await pc.setRemoteDescription(e.data.data);
+        await pc.setRemoteDescription(clearVoice(e.data.data));
         await flush();
         const ans = await pc.createAnswer();
         await pc.setLocalDescription(ans);
+        void tuneSenders(pc);
         await api.calls.signal(cur.id, e.data.from, 'answer', ans);
       } else if (e.data.type === 'answer') {
-        await pc.setRemoteDescription(e.data.data);
+        await pc.setRemoteDescription(clearVoice(e.data.data));
         await flush();
+        void tuneSenders(pc);
       } else if (e.data.type === 'candidate') {
         if (pc.remoteDescription) await pc.addIceCandidate(e.data.data).catch(() => {});
         else pending.current.set(e.data.from, [...(pending.current.get(e.data.from) ?? []), e.data.data]);
@@ -345,7 +358,7 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
       {compact && call ? (
         <div className="call-bar" role="region" aria-label={t('m.calls.call')}>
           {Object.entries(remotes).map(([uid, stream]) => (
-            <RemoteVideo key={uid} stream={stream} audioOnly />
+            <RemoteVideo key={uid} stream={stream} audioOnly onBlocked={() => setSoundBlocked(true)} />
           ))}
           <Icon name="phone" size={18} />
           <span className="call-bar__status" role="status">
@@ -365,20 +378,21 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
           aria-modal
           aria-label={phase === 'incoming' ? t('calls.incoming') : t('m.calls.call')}
           aria-describedby="call-status"
+          onPointerDownCapture={soundBlocked ? unlockSound : undefined}
           ref={overlay}
           tabIndex={-1}
         >
           {showVideo ? (
             <div className="call__grid" data-count={Object.keys(remotes).length}>
               {Object.entries(remotes).map(([uid, stream]) => (
-                <RemoteVideo key={uid} stream={stream} audioOnly={false} />
+                <RemoteVideo key={uid} stream={stream} audioOnly={false} onBlocked={() => setSoundBlocked(true)} />
               ))}
             </div>
           ) : (
             // Voice calls (and video ones until the picture arrives): who it is, big.
             <>
               {Object.entries(remotes).map(([uid, stream]) => (
-                <RemoteVideo key={uid} stream={stream} audioOnly />
+                <RemoteVideo key={uid} stream={stream} audioOnly onBlocked={() => setSoundBlocked(true)} />
               ))}
             </>
           )}
@@ -416,20 +430,30 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
               <CallButton icon={call.kind === 'video' ? 'video' : 'phone'} label={t('m.calls.answer')} tone="answer" onClick={() => void answer()} />
             </div>
           ) : (
-            <div className="call__controls">
-              <CallButton icon={muted ? 'mic-off' : 'mic'} label={muted ? t('m.calls.unmute') : t('m.calls.mute')} pressed={muted} onClick={toggleMute} />
-              {call.kind === 'video' ? (
-                <CallButton
-                  icon="video"
-                  label={cameraOff ? t('m.calls.cameraOn') : t('m.calls.cameraOff')}
-                  pressed={cameraOff}
-                  struck={cameraOff}
-                  onClick={toggleCamera}
-                />
+            <>
+              {soundBlocked ? (
+                <button type="button" className="call__tap" onClick={unlockSound}>
+                  <Icon name="volume" size={20} />
+                  {t('watch.tapForSound')}
+                </button>
               ) : null}
-              {call.kind === 'video' && cameras > 1 ? <CallButton icon="switch" label={t('m.calls.switchCamera')} onClick={() => void switchCamera()} /> : null}
-              <CallButton icon="phone" label={t('m.calls.hangUp')} tone="end" onClick={() => void hangUp()} />
-            </div>
+              <div className="call__controls">
+                <CallButton icon={muted ? 'mic-off' : 'mic'} label={muted ? t('m.calls.unmute') : t('m.calls.mute')} pressed={muted} onClick={toggleMute} />
+                {call.kind === 'video' ? (
+                  <CallButton
+                    icon="video"
+                    label={cameraOff ? t('m.calls.cameraOn') : t('m.calls.cameraOff')}
+                    pressed={cameraOff}
+                    struck={cameraOff}
+                    onClick={toggleCamera}
+                  />
+                ) : null}
+                {call.kind === 'video' && cameras > 1 ? (
+                  <CallButton icon="switch" label={t('m.calls.switchCamera')} onClick={() => void switchCamera()} />
+                ) : null}
+                <CallButton icon="phone" label={t('m.calls.hangUp')} tone="end" onClick={() => void hangUp()} />
+              </div>
+            </>
           )}
         </div>
       ) : null}
@@ -468,17 +492,83 @@ function CallButton({
   );
 }
 
-function RemoteVideo({ stream, audioOnly }: { stream: MediaStream; audioOnly: boolean }) {
+/**
+ * The other person. A voice call plays in an <audio> element: iPhones can silently refuse sound from
+ * a hidden video. If the phone still won't start it by itself, `onBlocked` asks for a tap.
+ */
+function RemoteVideo({ stream, audioOnly, onBlocked }: { stream: MediaStream; audioOnly: boolean; onBlocked: () => void }) {
   const { t } = useSession();
-  const ref = useRef<HTMLVideoElement>(null);
+  const ref = useRef<HTMLMediaElement | null>(null);
+  const blocked = useRef(onBlocked);
+  blocked.current = onBlocked;
   useEffect(() => {
-    const v = ref.current;
-    if (!v) return;
-    v.srcObject = stream;
-    // iPhones can hold back playback that wasn't started by a tap: ask again.
-    void v.play().catch(() => {});
+    const el = ref.current;
+    if (!el) return;
+    el.srcObject = stream;
+    el.muted = false;
+    const start = () =>
+      void el.play().catch((e: unknown) => {
+        if ((e as Error)?.name === 'NotAllowedError') blocked.current();
+      });
+    start();
+    // A track arriving or the connection coming back can leave it paused.
+    stream.addEventListener('addtrack', start);
+    return () => stream.removeEventListener('addtrack', start);
   }, [stream]);
-  return <video ref={ref} autoPlay playsInline className={audioOnly ? 'call__audio' : 'call__remote'} aria-label={t('calls.participant')} />;
+  return audioOnly ? (
+    <audio ref={(el) => void (ref.current = el)} autoPlay data-call-remote className="call__audio" aria-label={t('calls.participant')} />
+  ) : (
+    <video ref={(el) => void (ref.current = el)} autoPlay playsInline data-call-remote className="call__remote" aria-label={t('calls.participant')} />
+  );
+}
+
+/**
+ * Clear voice, set on the description from the other side (it says how they want to receive):
+ * Opus at up to 64 kbit/s (phones default to about half), recovering lost packets, and never
+ * dropping quiet moments, which cuts the start of words.
+ */
+function clearVoice(desc: RTCSessionDescriptionInit): RTCSessionDescriptionInit {
+  const sdp = desc.sdp;
+  if (!sdp) return desc;
+  const opus = /a=rtpmap:(\d+) opus\/48000/i.exec(sdp)?.[1];
+  if (!opus) return desc;
+  const line = new RegExp(`a=fmtp:${opus} ([^\\r\\n]*)`);
+  const wanted = { maxaveragebitrate: '64000', useinbandfec: '1', usedtx: '0' };
+  const merge = (old: string) => {
+    const params = new Map(
+      old
+        .split(';')
+        .filter(Boolean)
+        .map((kv) => kv.trim().split('=') as [string, string]),
+    );
+    for (const [k, v] of Object.entries(wanted)) params.set(k, v);
+    return [...params].map(([k, v]) => `${k}=${v}`).join(';');
+  };
+  return {
+    ...desc,
+    sdp: line.test(sdp)
+      ? sdp.replace(line, (_, old: string) => `a=fmtp:${opus} ${merge(old)}`)
+      : sdp.replace(/(a=rtpmap:\d+ opus\/48000[^\r\n]*\r?\n)/i, `$1a=fmtp:${opus} ${merge('')}\r\n`),
+  };
+}
+
+/** Voice goes first on a weak network: a generous rate for sound, and the picture gives way before it. */
+async function tuneSenders(pc: RTCPeerConnection) {
+  for (const sender of pc.getSenders()) {
+    const kind = sender.track?.kind;
+    if (!kind) continue;
+    try {
+      if (kind === 'audio') (sender.track as MediaStreamTrack & { contentHint: string }).contentHint = 'speech';
+      const params = sender.getParameters();
+      if (!params.encodings?.length) continue;
+      params.encodings[0]!.maxBitrate = kind === 'audio' ? 64_000 : 1_500_000;
+      params.encodings[0]!.priority = kind === 'audio' ? 'high' : 'medium';
+      params.encodings[0]!.networkPriority = kind === 'audio' ? 'high' : 'medium';
+      await sender.setParameters(params);
+    } catch {
+      /* not every browser takes these; the call goes on with its defaults */
+    }
+  }
 }
 
 /** 0:42, 12:05, 1:02:09. */
