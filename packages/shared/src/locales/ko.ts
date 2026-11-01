@@ -1958,6 +1958,7 @@ export const ko: Catalog = {
   'chat.ai.planSaved': '이 대화에 계획을 저장했어요',
   'chat.fileTooBig': '채팅의 파일은 최대 50MB까지 가능해요.',
   'chat.react': '반응',
+  'chat.reactMore': '이모지 더 보기',
   'chat.messages': '메시지',
   'chat.loadEarlier': '이전 메시지 불러오기',
   'chat.editedAt': '수정됨 · {time}',

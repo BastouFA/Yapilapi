@@ -1970,6 +1970,7 @@ export const id: Catalog = {
   'chat.ai.planSaved': 'Rencana disimpan ke percakapan ini',
   'chat.fileTooBig': 'File di obrolan maksimal 50 MB.',
   'chat.react': 'Beri reaksi',
+  'chat.reactMore': 'Emoji lainnya',
   'chat.messages': 'Pesan',
   'chat.loadEarlier': 'Muat pesan sebelumnya',
   'chat.editedAt': 'Diedit · {time}',

@@ -1970,6 +1970,7 @@ export const nl: Catalog = {
   'chat.ai.planSaved': 'Plan opgeslagen in dit gesprek',
   'chat.fileTooBig': 'Bestanden in chats mogen maximaal 50 MB zijn.',
   'chat.react': 'Reageren',
+  'chat.reactMore': 'Meer emoji’s',
   'chat.messages': 'Berichten',
   'chat.loadEarlier': 'Eerdere berichten laden',
   'chat.editedAt': 'Bewerkt · {time}',

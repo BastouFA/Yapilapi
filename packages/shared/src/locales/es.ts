@@ -1964,6 +1964,7 @@ export const es: Catalog = {
   'chat.ai.planSaved': 'Plan guardado en esta conversación',
   'chat.fileTooBig': 'En los chats, los archivos pueden pesar hasta 50 MB.',
   'chat.react': 'Reaccionar',
+  'chat.reactMore': 'Más emojis',
   'chat.messages': 'Mensajes',
   'chat.loadEarlier': 'Cargar mensajes anteriores',
   'chat.editedAt': 'Editado · {time}',

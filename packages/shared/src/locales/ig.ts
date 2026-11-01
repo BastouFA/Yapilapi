@@ -1963,6 +1963,7 @@ export const ig: Catalog = {
   'chat.ai.planSaved': 'Echekwara atụmatụ na mkparịta ụka a',
   'chat.fileTooBig': 'Faịlụ na mkparịta ụka nwere ike iru 50 MB.',
   'chat.react': 'Meghachi omume',
+  'chat.reactMore': 'Emoji ndị ọzọ',
   'chat.messages': 'Ozi',
   'chat.loadEarlier': 'Bulite ozi ndị gara aga',
   'chat.editedAt': 'E deziri ya · {time}',

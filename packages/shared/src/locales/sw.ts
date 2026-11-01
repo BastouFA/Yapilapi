@@ -1965,6 +1965,7 @@ export const sw: Catalog = {
   'chat.ai.planSaved': 'Mpango umehifadhiwa kwenye mazungumzo haya',
   'chat.fileTooBig': 'Faili kwenye gumzo zinaweza kuwa hadi MB 50.',
   'chat.react': 'Toa hisia',
+  'chat.reactMore': 'Emoji zaidi',
   'chat.messages': 'Jumbe',
   'chat.loadEarlier': 'Pakia jumbe za awali',
   'chat.editedAt': 'Umehaririwa · {time}',

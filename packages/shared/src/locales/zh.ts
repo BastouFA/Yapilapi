@@ -1952,6 +1952,7 @@ export const zh: Catalog = {
   'chat.ai.planSaved': '计划已保存到这个对话',
   'chat.fileTooBig': '聊天中的文件最大为 50 MB。',
   'chat.react': '回应',
+  'chat.reactMore': '更多表情',
   'chat.messages': '消息',
   'chat.loadEarlier': '加载更早的消息',
   'chat.editedAt': '已编辑 · {time}',

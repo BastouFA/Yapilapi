@@ -3406,11 +3406,12 @@ video.chat-att__media {
   align-items: center;
 }
 /* Reply always shows beside the message; React and the menu come in on hover or focus. */
-.chat-msg__tools > :not(.chat-msg__reply) {
+.chat-msg__tools > :not(.chat-msg__reply):not(.chat-msg__react) {
   opacity: 0;
   transition: opacity var(--duration-fast) var(--ease-out);
 }
-.chat-msg__reply {
+.chat-msg__reply,
+.chat-msg__react {
   opacity: 0.75;
 }
 .chat-msg:hover .chat-msg__tools > *,
@@ -3422,13 +3423,10 @@ video.chat-att__media {
     opacity: 0.75;
   }
 }
-/* On small screens React lives in the message menu; Reply stays beside every message, one tap away. */
+/* Reply and React stay beside every message on small screens too, one tap away. */
 @media (max-width: 600px) {
-  .chat-msg__quick:not(.chat-msg__reply) {
-    display: none;
-  }
   .chat-msg__line .yp-bubble {
-    max-width: calc(100% - 92px);
+    max-width: calc(100% - 132px);
   }
 }
 /* The reply bubble faces the message it answers. */
@@ -3538,6 +3536,8 @@ video.chat-att__media {
 }
 .chat-picker {
   display: flex;
+  flex-wrap: wrap;
+  max-width: min(100%, 420px);
   gap: 2px;
   margin-block: 4px;
   padding: 4px;
@@ -3555,9 +3555,24 @@ video.chat-att__media {
   font-size: 22px;
   cursor: pointer;
 }
+.chat-picker:has(.chat-picker__item:nth-child(10)) {
+  border-radius: var(--radius-lg);
+}
+.chat-picker__item {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  color: var(--ink-muted);
+}
 .chat-picker__item:hover,
 .chat-picker__item:focus-visible {
   background: var(--surface-sunken);
+}
+/* Reactions you already gave are lit; picking one again takes it back. */
+.chat-picker__item[aria-pressed='true'] {
+  background: color-mix(in oklab, var(--yapi) 22%, transparent);
+  box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--yapi) 60%, transparent);
 }
 .chat-system {
   align-self: center;

@@ -2005,6 +2005,7 @@ export const ar: Catalog = {
   'chat.ai.planSaved': 'حُفظت الخطة في هذه المحادثة',
   'chat.fileTooBig': 'يمكن أن يصل حجم الملفات في المحادثات إلى 50 ميغابايت.',
   'chat.react': 'تفاعل',
+  'chat.reactMore': 'المزيد من الرموز التعبيرية',
   'chat.messages': 'الرسائل',
   'chat.loadEarlier': 'تحميل الرسائل السابقة',
   'chat.editedAt': 'معدّلة · {time}',

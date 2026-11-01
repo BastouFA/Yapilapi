@@ -1964,6 +1964,7 @@ export const bn: Catalog = {
   'chat.ai.planSaved': 'পরিকল্পনা এই কথোপকথনে সেভ হয়েছে',
   'chat.fileTooBig': 'চ্যাটে ফাইল সর্বোচ্চ 50 MB হতে পারে।',
   'chat.react': 'রিঅ্যাক্ট করুন',
+  'chat.reactMore': 'আরও ইমোজি',
   'chat.messages': 'বার্তা',
   'chat.loadEarlier': 'আগের বার্তা লোড করুন',
   'chat.editedAt': 'সম্পাদিত · {time}',

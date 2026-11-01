@@ -1966,6 +1966,7 @@ export const ur: Catalog = {
   'chat.ai.planSaved': 'منصوبہ اس گفتگو میں محفوظ ہو گیا',
   'chat.fileTooBig': 'چیٹس میں فائلیں زیادہ سے زیادہ 50 MB کی ہو سکتی ہیں۔',
   'chat.react': 'ردعمل دیں',
+  'chat.reactMore': 'مزید ایموجی',
   'chat.messages': 'پیغامات',
   'chat.loadEarlier': 'پچھلے پیغامات لوڈ کریں',
   'chat.editedAt': 'ترمیم شدہ · {time}',

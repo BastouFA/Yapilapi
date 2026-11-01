@@ -1965,6 +1965,7 @@ export const hi: Catalog = {
   'chat.ai.planSaved': 'प्लान इस बातचीत में सेव हुआ',
   'chat.fileTooBig': 'चैट में फ़ाइलें 50 MB तक की हो सकती हैं।',
   'chat.react': 'रिएक्ट करें',
+  'chat.reactMore': 'और इमोजी',
   'chat.messages': 'मैसेज',
   'chat.loadEarlier': 'पुराने मैसेज लोड करें',
   'chat.editedAt': 'एडिट किया गया · {time}',

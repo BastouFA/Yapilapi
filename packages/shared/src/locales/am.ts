@@ -1952,6 +1952,7 @@ export const am: Catalog = {
   'chat.ai.planSaved': 'ዕቅዱ በዚህ ውይይት ውስጥ ተቀምጧል',
   'chat.fileTooBig': 'በውይይቶች ውስጥ ያሉ ፋይሎች እስከ 50 MB ሊሆኑ ይችላሉ።',
   'chat.react': 'ምላሽ ይስጡ',
+  'chat.reactMore': 'ተጨማሪ ኢሞጂዎች',
   'chat.messages': 'መልዕክቶች',
   'chat.loadEarlier': 'የቀደሙ መልዕክቶችን ይጫኑ',
   'chat.editedAt': 'ተስተካክሏል · {time}',

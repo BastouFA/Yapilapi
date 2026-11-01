@@ -2033,6 +2033,7 @@ export const ru: Catalog = {
   'chat.ai.planSaved': 'План сохранён в этом разговоре',
   'chat.fileTooBig': 'Файлы в чатах — не больше 50 МБ.',
   'chat.react': 'Реакция',
+  'chat.reactMore': 'Ещё эмодзи',
   'chat.messages': 'Сообщения',
   'chat.loadEarlier': 'Загрузить более ранние сообщения',
   'chat.editedAt': 'Изменено · {time}',

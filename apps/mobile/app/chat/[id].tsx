@@ -53,6 +53,7 @@ import {
   DisappearingSheet,
   MessageActions,
   PinnedBar,
+  ReactionSheet,
   previewOf,
   previewText,
   Quote,
@@ -133,6 +134,8 @@ export default function Chat() {
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [editing, setEditing] = useState<Message | null>(null);
   const [actionsFor, setActionsFor] = useState<Message | null>(null);
+  // The reactions sheet from the heart beside a message (by id, so it shows the reactions as they change).
+  const [reactFor, setReactFor] = useState<string | null>(null);
   const report = useReport();
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -911,6 +914,7 @@ export default function Chat() {
   const latest = useRef({
     jumpTo,
     setActionsFor,
+    setReactFor,
     startReply,
     react,
     patchMessage,
@@ -925,6 +929,7 @@ export default function Chat() {
   latest.current = {
     jumpTo,
     setActionsFor,
+    setReactFor,
     startReply,
     react,
     patchMessage,
@@ -940,6 +945,7 @@ export default function Chat() {
     () => ({
       jumpTo: (mid) => void latest.current.jumpTo(mid),
       openActions: (m) => latest.current.setActionsFor(m),
+      openReactions: (m) => latest.current.setReactFor(m.id),
       startReply: (m) => latest.current.startReply(m),
       react: (m, emoji, on) => void latest.current.react(m, emoji, on),
       patchMessage: (mid, fn) => latest.current.patchMessage(mid, fn),
@@ -1396,6 +1402,14 @@ export default function Chat() {
           <AutoTranslateSwitch onError={setSettingsError} />
         </BottomSheet>
       ) : null}
+      <ReactionSheet
+        message={reactFor ? (messages.find((x) => x.id === reactFor) ?? null) : null}
+        onClose={() => setReactFor(null)}
+        onToggle={(emoji, on) => {
+          const m = messages.find((x) => x.id === reactFor);
+          if (m) void react(m, emoji, on);
+        }}
+      />
       <MessageActions
         open={!!actionsFor}
         onClose={() => setActionsFor(null)}
@@ -1608,6 +1622,7 @@ export default function Chat() {
 interface RowHandlers {
   jumpTo: (id: string) => void;
   openActions: (m: Message) => void;
+  openReactions: (m: Message) => void;
   startReply: (m: Message) => void;
   react: (m: Message, emoji: string, on: boolean) => void;
   patchMessage: (id: string, fn: (m: Message) => Message) => void;
@@ -1705,17 +1720,28 @@ const MessageRow = memo(function MessageRow({
   // tail corner on that side.
   // Reply, one tap away beside every message: a small speech bubble facing the message it answers.
   const replyTab = item.unsent ? null : (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={t('m.chat.reply')}
-      onPress={() => h.startReply(item)}
-      hitSlop={4}
-      style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', opacity: 0.8 }}
-    >
-      <View style={mine ? { transform: [{ scaleX: -1 }] } : undefined}>
-        <Icon name="chatbubble-outline" size={20} color={c.yapi} />
-      </View>
-    </Pressable>
+    <View style={{ flexDirection: mine ? 'row-reverse' : 'row' }}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t('m.chat.reply')}
+        onPress={() => h.startReply(item)}
+        hitSlop={4}
+        style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', opacity: 0.8 }}
+      >
+        <View style={mine ? { transform: [{ scaleX: -1 }] } : undefined}>
+          <Icon name="chatbubble-outline" size={20} color={c.yapi} />
+        </View>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t('chat.react')}
+        onPress={() => h.openReactions(item)}
+        hitSlop={4}
+        style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', opacity: 0.8 }}
+      >
+        <Icon name="heart-outline" size={20} color={c.yapi} />
+      </Pressable>
+    </View>
   );
   const bubbleView = mine ? (
     <View style={{ alignSelf: 'flex-end', maxWidth: '88%', gap: 2 }}>

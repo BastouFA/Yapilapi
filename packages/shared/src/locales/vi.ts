@@ -1964,6 +1964,7 @@ export const vi: Catalog = {
   'chat.ai.planSaved': 'Đã lưu kế hoạch vào cuộc trò chuyện này',
   'chat.fileTooBig': 'Tệp trong cuộc trò chuyện có thể tối đa 50 MB.',
   'chat.react': 'Bày tỏ cảm xúc',
+  'chat.reactMore': 'Thêm biểu tượng cảm xúc',
   'chat.messages': 'Tin nhắn',
   'chat.loadEarlier': 'Tải tin nhắn cũ hơn',
   'chat.editedAt': 'Đã chỉnh sửa · {time}',

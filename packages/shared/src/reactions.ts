@@ -1,0 +1,28 @@
+/** Reactions on chat messages: the six always in reach, and more a tap away. Each person can add several. */
+export const QUICK_REACTIONS = ['❤️', '😂', '😮', '😢', '👍', '🙏'] as const;
+export const MORE_REACTIONS = [
+  '🔥',
+  '😍',
+  '🥰',
+  '🤣',
+  '😅',
+  '😭',
+  '😡',
+  '🤯',
+  '🥳',
+  '😎',
+  '🤔',
+  '👀',
+  '👏',
+  '🙌',
+  '💯',
+  '✨',
+  '🎉',
+  '🤝',
+  '💪',
+  '🫶',
+  '👌',
+  '✅',
+  '😴',
+  '🤗',
+] as const;

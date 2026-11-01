@@ -542,8 +542,8 @@ export default function ChatPage() {
     composer.current?.focus();
   }
 
+  // The picker stays open, so several reactions can go on one message.
   async function react(m: Message, emoji: string, on: boolean) {
-    setPickerFor(null);
     if (!me) return;
     patchMessage(m.id, (x) => applyReaction(x, emoji, true, !on));
     try {
@@ -985,7 +985,7 @@ export default function ChatPage() {
                             </button>
                             <button
                               type="button"
-                              className="yp-action chat-msg__quick"
+                              className="yp-action chat-msg__quick chat-msg__react"
                               aria-label={t('chat.react')}
                               title={t('chat.react')}
                               onClick={() => setPickerFor(m.id)}
@@ -1000,6 +1000,7 @@ export default function ChatPage() {
                   </div>
                   {pickerFor === m.id ? (
                     <ReactionPicker
+                      mine={m.reactions?.filter((r) => r.mine).map((r) => r.emoji)}
                       onPick={(emoji) => void react(m, emoji, !m.reactions?.some((r) => r.emoji === emoji && r.mine))}
                       onClose={() => setPickerFor(null)}
                     />

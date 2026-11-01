@@ -1969,6 +1969,7 @@ export const tr: Catalog = {
   'chat.ai.planSaved': 'Plan bu sohbete kaydedildi',
   'chat.fileTooBig': 'Sohbetlerdeki dosyalar en fazla 50 MB olabilir.',
   'chat.react': 'Tepki ver',
+  'chat.reactMore': 'Daha fazla emoji',
   'chat.messages': 'Mesajlar',
   'chat.loadEarlier': 'Önceki mesajları yükle',
   'chat.editedAt': 'Düzenlendi · {time}',

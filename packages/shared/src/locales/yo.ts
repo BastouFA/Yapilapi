@@ -1962,6 +1962,7 @@ export const yo: Catalog = {
   'chat.ai.planSaved': 'A ti fi ètò pamọ́ sínú ìjíròrò yìí',
   'chat.fileTooBig': 'Fáìlì nínú ìjíròrò kò gbọdọ̀ ju 50 MB lọ.',
   'chat.react': 'Fèsì pẹ̀lú àmì',
+  'chat.reactMore': 'Emoji míràn',
   'chat.messages': 'Àwọn ọ̀rọ̀',
   'chat.loadEarlier': 'Ṣí àwọn ọ̀rọ̀ tó ṣáájú',
   'chat.editedAt': 'A ti ṣàtúnṣe · {time}',

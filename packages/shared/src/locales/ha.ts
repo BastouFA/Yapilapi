@@ -1965,6 +1965,7 @@ export const ha: Catalog = {
   'chat.ai.planSaved': 'An ajiye shirin a wannan tattaunawa',
   'chat.fileTooBig': 'Fayiloli a cikin hira na iya kaiwa MB 50.',
   'chat.react': 'Mayar da martani',
+  'chat.reactMore': 'Ƙarin emoji',
   'chat.messages': 'Saƙonni',
   'chat.loadEarlier': 'Loda saƙonnin da suka gabata',
   'chat.editedAt': 'An gyara · {time}',

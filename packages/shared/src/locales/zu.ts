@@ -1974,6 +1974,7 @@ export const zu: Catalog = {
   'chat.ai.planSaved': 'Uhlelo lulondolozwe kule ngxoxo',
   'chat.fileTooBig': 'Amafayela asezingxoxweni angaba kuze kube ngu-50 MB.',
   'chat.react': 'Sabela',
+  'chat.reactMore': 'Ama-emoji amaningi',
   'chat.messages': 'Imilayezo',
   'chat.loadEarlier': 'Layisha imilayezo yangaphambili',
   'chat.editedAt': 'Kuhleliwe · {time}',

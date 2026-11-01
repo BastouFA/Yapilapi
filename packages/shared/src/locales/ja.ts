@@ -1961,6 +1961,7 @@ export const ja: Catalog = {
   'chat.ai.planSaved': 'プランをこの会話に保存しました',
   'chat.fileTooBig': 'チャットのファイルは50MBまでです。',
   'chat.react': 'リアクション',
+  'chat.reactMore': 'ほかの絵文字',
   'chat.messages': 'メッセージ',
   'chat.loadEarlier': '以前のメッセージを読み込む',
   'chat.editedAt': '編集済み · {time}',

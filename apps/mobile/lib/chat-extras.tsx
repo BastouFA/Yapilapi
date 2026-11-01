@@ -20,7 +20,8 @@ import { openWatch } from './watch';
  */
 
 /** Quick reactions offered on every message. */
-export const QUICK_REACTIONS = ['❤️', '😂', '😮', '😢', '👍', '🙏'] as const;
+import { MORE_REACTIONS, QUICK_REACTIONS } from '../../../packages/shared/src/reactions';
+export { QUICK_REACTIONS };
 export const DISAPPEARING_OPTIONS: (number | null)[] = [null, 86_400, 604_800, 7_776_000];
 
 type T = (key: MessageKey, vars?: Record<string, string | number>) => string;
@@ -381,6 +382,74 @@ export interface SheetAction {
   icon: React.ComponentProps<typeof Icon>['name'];
   danger?: boolean;
   onPress: () => void;
+}
+
+/**
+ * Reactions for one message, from the heart beside it: the quick six and, with "More emojis", two
+ * dozen more. It stays open so you can add several; one you already gave is lit, and picking it
+ * again takes it back. Done closes it.
+ */
+export function ReactionSheet({
+  message,
+  onClose,
+  onToggle,
+}: {
+  message: Message | null;
+  onClose: () => void;
+  onToggle: (emoji: string, on: boolean) => void;
+}) {
+  const c = useColors();
+  const { t } = useT();
+  const [more, setMore] = useState(false);
+  useEffect(() => {
+    if (!message) setMore(false);
+  }, [message]);
+  const mine = new Set(message?.reactions?.filter((r) => r.mine).map((r) => r.emoji));
+  const cell = (selected: boolean, pressed: boolean) => ({
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    backgroundColor: selected ? c.surfaceSunken : pressed ? c.surfaceSunken : 'transparent',
+    borderWidth: selected ? 2 : 0,
+    borderColor: c.yapi,
+  });
+  const grid = (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 4, marginBottom: space[2] }}>
+      {[...QUICK_REACTIONS, ...(more ? MORE_REACTIONS : [])].map((e) => (
+        <Pressable
+          key={e}
+          accessibilityRole="button"
+          accessibilityLabel={t('m.chat.reactWith', { emoji: e })}
+          accessibilityState={{ selected: mine.has(e) }}
+          onPress={() => onToggle(e, !mine.has(e))}
+          style={({ pressed }) => cell(mine.has(e), pressed)}
+        >
+          <Text style={{ fontSize: 26 }}>{e}</Text>
+        </Pressable>
+      ))}
+      {more ? null : (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('chat.reactMore')}
+          onPress={() => setMore(true)}
+          style={({ pressed }) => [cell(false, pressed), { width: 48, height: 48 }]}
+        >
+          <Icon name="add" size={26} color={c.inkMuted} />
+        </Pressable>
+      )}
+    </View>
+  );
+  return (
+    <ActionSheet
+      visible={!!message}
+      onClose={onClose}
+      title={t('chat.react')}
+      header={grid}
+      actions={[{ label: t('m.common.done'), icon: 'checkmark', onPress: () => {} }]}
+    />
+  );
 }
 
 /** The long-press menu of a message: quick reactions, then actions. */

@@ -1964,6 +1964,7 @@ export const en = {
   'chat.ai.planSaved': 'Plan saved to this conversation',
   'chat.fileTooBig': 'Files in chats can be up to 50 MB.',
   'chat.react': 'React',
+  'chat.reactMore': 'More emojis',
   'chat.messages': 'Messages',
   'chat.loadEarlier': 'Load earlier messages',
   'chat.editedAt': 'Edited · {time}',
