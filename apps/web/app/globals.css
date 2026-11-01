@@ -910,6 +910,15 @@ html[data-locale-pending] body {
   height: 100%;
   object-fit: cover;
 }
+/* A picked video plays or pauses with the button in its middle. */
+.thumbs figure > .thumbs__play {
+  top: 50%;
+  left: 50%;
+  inset-inline-end: auto;
+  translate: -50% -50%;
+  width: 40px;
+  height: 40px;
+}
 /* Only the remove button sits on the photo; "Tag people" and "Suggest a description" stay under it. */
 .thumbs figure > button {
   position: absolute;

@@ -74,7 +74,8 @@ const PhotoEditor = dynamic(() => import('@/components/editor/PhotoEditor').then
 const VideoEditor = dynamic(() => import('@/components/editor/VideoEditor').then((m) => m.VideoEditor), { ssr: false, loading: () => <EditorLoading /> });
 const CollageEditor = dynamic(() => import('@/components/Collage').then((m) => m.CollageEditor), { ssr: false, loading: () => <EditorLoading /> });
 
-type Uploaded = { id: string; kind: 'image' | 'video' | 'audio'; url: string; altText: string; tags: DraftTag[] };
+/** `preview`: the picked file itself, shown at once (phones won't draw an uploaded video until it plays). */
+type Uploaded = { id: string; kind: 'image' | 'video' | 'audio'; url: string; altText: string; tags: DraftTag[]; preview?: string };
 
 /** Reels: 3 minutes, or 10 minutes with YAPILAPI Plus (the API enforces the same limits). */
 const REEL_MAX_SECONDS = 180;
@@ -86,6 +87,43 @@ type Kind = (typeof KINDS)[number];
 
 /** Photos and videos that open in the editor before uploading (GIFs keep their animation, so they skip it). */
 const EDITABLE = new Set(['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/webm']);
+
+/**
+ * A picked video in Create: its first frame (`#t=0.1` makes iPhones draw it), and a tap plays or
+ * pauses it, muted, so you can check it's the right one.
+ */
+function VideoThumb({ src }: { src: string }) {
+  const { t } = useSession();
+  const ref = useRef<HTMLVideoElement>(null);
+  const [playing, setPlaying] = useState(false);
+  return (
+    <>
+      <video
+        ref={ref}
+        src={src.startsWith('blob:') ? `${src}#t=0.1` : src}
+        muted
+        playsInline
+        preload="metadata"
+        loop
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+      />
+      <button
+        type="button"
+        className="thumbs__play"
+        aria-label={playing ? t('m.common.pause') : t('m.common.play')}
+        onClick={() => {
+          const v = ref.current;
+          if (!v) return;
+          if (v.paused) void v.play().catch(() => {});
+          else v.pause();
+        }}
+      >
+        <Icon name={playing ? 'pause' : 'play'} size={18} />
+      </button>
+    </>
+  );
+}
 
 /** A video file's length, read in the browser before uploading. */
 function videoSeconds(file: File): Promise<number> {
@@ -464,7 +502,18 @@ function Create() {
           const { media: started } = await api.media.edit(m.id, edits);
           const done = await api.media.waitUntilReady(started.id);
           setMedia((cur) => [...cur, { id: done.id, kind: 'video', url: done.variants.mp4 ?? done.url, altText: '', tags: [] }]);
-        } else setMedia((cur) => [...cur, { id: m.id, kind: m.kind, url: m.url, altText: '', tags: m.kind === 'image' ? tags : [] }]);
+        } else
+          setMedia((cur) => [
+            ...cur,
+            {
+              id: m.id,
+              kind: m.kind,
+              url: m.url,
+              altText: '',
+              tags: m.kind === 'image' ? tags : [],
+              preview: m.kind === 'video' ? URL.createObjectURL(f) : undefined,
+            },
+          ]);
       } catch (e) {
         toast(errorMessage(e));
       } finally {
@@ -881,8 +930,15 @@ function Create() {
               {media.map((m, i) => (
                 <div key={m.id} className="stack-sm" style={{ width: 96 }}>
                   <figure>
-                    {m.kind === 'video' ? <video src={m.url} muted /> : <img src={m.url} alt={m.altText} />}
-                    <button type="button" aria-label={t('m.common.remove')} onClick={() => setMedia((cur) => cur.filter((x) => x.id !== m.id))}>
+                    {m.kind === 'video' ? <VideoThumb src={m.preview ?? m.url} /> : <img src={m.url} alt={m.altText} />}
+                    <button
+                      type="button"
+                      aria-label={t('m.common.remove')}
+                      onClick={() => {
+                        if (m.preview) URL.revokeObjectURL(m.preview);
+                        setMedia((cur) => cur.filter((x) => x.id !== m.id));
+                      }}
+                    >
                       ×
                     </button>
                   </figure>
