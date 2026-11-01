@@ -121,7 +121,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
       sensitiveOk: await seesSensitiveMedia(db, u.id),
       reader: await readerLanguages(db, u.id, ctx.ai.machineTranslation),
     };
-    // First what they haven't seen, newest posted first in each page. When that runs out, it carries on
+    // First what they haven't seen, last posted first. When that runs out, it carries on
     // with everything else, newest first, marked `rewatch`: Reels always has something to scroll.
     const again = /^again:(.+)\|([0-9a-f-]{36})$/.exec(q.cursor ?? '');
     const ranked = q.cursor?.startsWith('again:') ? { items: [], nextCursor: null } : await rankedPage(db, options, q.cursor, q.limit);

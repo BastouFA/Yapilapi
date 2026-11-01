@@ -745,7 +745,8 @@ export async function rankedPage(
     }
     session = null;
   }
-  const list = await rankFeed(db, { ...o, asOf: c.asOf });
+  const ranked = await rankFeed(db, { ...o, asOf: c.asOf });
+  const list = o.surface === 'reels' ? await newestPostedFirst(db, ranked) : ranked;
   const page = list.slice(c.o, c.o + limit);
   if (c.o + limit >= list.length) return { items: page, nextCursor: null };
   // Keep the order for the next pages (and clear this person's old ones on the way).
@@ -759,6 +760,15 @@ export async function rankedPage(
     ])
   ).rows[0]!.id;
   return { items: page, nextCursor: encodeCursor({ asOf: c.asOf, o: c.o + limit, s: session }) };
+}
+
+/** Reels last posted first, across every page, so a new one is never behind older ones. */
+async function newestPostedFirst(db: Q, items: Arranged[]): Promise<Arranged[]> {
+  const { rows } = await db.query<{ id: string }>(`SELECT id FROM posts WHERE id = ANY($1::uuid[]) ORDER BY created_at DESC, id DESC`, [
+    items.map((x) => x.id),
+  ]);
+  const byId = new Map(items.map((x) => [x.id, x]));
+  return rows.map((r) => byId.get(r.id)!);
 }
 
 /** The posts of a kept page that the viewer may still see, in order. */
