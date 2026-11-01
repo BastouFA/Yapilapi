@@ -146,8 +146,11 @@ const NAV_GLYPH: Record<Exclude<NavEntry['id'], 'profile'>, IconName> = {
 const isCentre = (id: NavEntry['id']) => id === 'create' || id === 'yap';
 /** How long a press is held before it counts as a long press. */
 const LONG_PRESS_MS = 450;
-/** How long Spark's menu waits after a tap, so its sheet doesn't cover the tap effect as it starts. */
-const SPARK_MENU_DELAY_MS = 180;
+/**
+ * How long Spark's menu waits after a tap, so the turn of the spark is seen before the sheet slides
+ * up over it (on phones the sheet covers the menu bar).
+ */
+const SPARK_MENU_DELAY_MS = 380;
 const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /** The person's avatar in a soft squircle; a thin brand-gradient ring when "You" is the current page. */
