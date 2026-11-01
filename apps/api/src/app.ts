@@ -96,7 +96,6 @@ import dropsModule from './modules/drops.ts';
 import marketModule from './modules/market.ts';
 import musicModule from './modules/music.ts';
 import { musicCatalogFromConfig } from './lib/music/index.ts';
-import { nominatimGeocoder, type Geocoder } from './lib/geocode.ts';
 import { createPushSender } from './lib/push.ts';
 import { securityMailer, setPushSender, setSecurityMailer, unsetSecurityMailer } from './lib/services.ts';
 import { processWebhooks } from './lib/webhooks.ts';
@@ -150,8 +149,6 @@ export async function buildApp(
     paystackFetch?: typeof fetch;
     /** Used for calls to music catalogue providers (tests pass a fake). */
     musicFetch?: typeof fetch;
-    /** Replaces the reverse geocoder made from GEOCODE_URL (tests pass one with a fake fetch and clock). */
-    geocoder?: Geocoder;
     /** Replaces the SMTP connection with EMAIL_TRANSPORT=smtp (tests pass a fake). */
     mailTransport?: MailTransport;
     /** Replaces the model used for translations (tests and local checks pass a stand-in that isn't 'dev'). */
@@ -297,7 +294,6 @@ export async function buildApp(
     mediaModerator: mediaModeratorFromConfig(config),
     roomMedia: meshRoomMedia(config, realtime),
     music: musicCatalogFromConfig(config, db, { fetch: opts.musicFetch, log: (msg, err) => app.log.warn({ err: (err as Error)?.message }, msg) }),
-    geocoder: opts.geocoder ?? nominatimGeocoder({ baseUrl: config.GEOCODE_URL, log: (msg, err) => app.log.warn({ err: (err as Error)?.message }, msg) }),
     jobs: {},
   };
   if (config.APP_ENV === 'production' && config.SMS_PROVIDER === 'dev')
