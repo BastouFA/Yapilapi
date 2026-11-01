@@ -405,6 +405,21 @@
 .watch-chat__list .chat-system {
   max-width: 100%;
 }
+.watch-chat__list .chat-msg {
+  flex: none;
+}
+/* Reply and React stay beside the bubble in this narrow column. */
+.watch-chat__list .chat-msg__line .yp-bubble {
+  max-width: calc(100% - 92px);
+}
+.watch-chat__list .chat-picker {
+  flex-wrap: wrap;
+  border-radius: var(--radius-lg);
+}
+/* The chat's "Replying to" strip, over the box: here it's in a column, so only as tall as it needs. */
+.watch-chat > .chat-compose-context {
+  flex: none;
+}
 .watch-chat__composer {
   display: flex;
   align-items: flex-end;

@@ -101,6 +101,25 @@ test('two people watch together from a chat, and a second device of the same per
   await cleoPage.locator('#watch-msg').press('Enter');
   await expect(cleoPage.locator('#watch-chat')).toContainText('This one is good');
   await expect(cleoPage.locator('.watch-stage')).toBeInViewport();
+
+  // Reply and React sit beside each message, as in the chat, and reach the other person.
+  const said = cleoPage.locator('#watch-chat .chat-msg', { hasText: 'This one is good' }).first();
+  await expect(said.getByRole('button', { name: 'Reply' })).toBeVisible();
+  await said.getByRole('button', { name: 'Reply' }).click();
+  await expect(cleoPage.locator('#watch-chat .chat-compose-context')).toContainText('This one is good');
+  await expect(cleoPage.locator('#watch-msg')).toBeFocused();
+  await cleoPage.locator('#watch-msg').fill('The ending especially');
+  await cleoPage.locator('#watch-msg').press('Enter');
+  await expect(cleoPage.locator('#watch-chat .chat-compose-context')).toHaveCount(0);
+  const answer = cleoPage.locator('#watch-chat .chat-msg', { hasText: 'The ending especially' });
+  await expect(answer.locator('.chat-quote')).toContainText('This one is good');
+  await expect(page.locator('#watch-chat .chat-msg', { hasText: 'The ending especially' }).locator('.chat-quote')).toContainText('This one is good');
+  await said.getByRole('button', { name: 'React' }).click();
+  await expect(said.locator('.chat-picker')).toBeVisible();
+  await said.locator('.chat-picker__item').first().click();
+  await cleoPage.keyboard.press('Escape');
+  await expect(said.locator('.chat-reaction')).toHaveCount(1);
+  await expect(page.locator('#watch-chat .chat-msg', { hasText: 'This one is good' }).first().locator('.chat-reaction')).toHaveCount(1);
   await audit(cleoPage, 'the chat sheet');
   await cleoPage.getByRole('button', { name: 'Close' }).click();
 

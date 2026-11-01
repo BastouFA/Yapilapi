@@ -32,7 +32,7 @@ import {
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { useRealtime, useSession } from '@/app/providers';
 import { REACTION_LABEL } from '@/components/Rooms';
-import { previewText, SystemLine } from '@/components/ChatExtras';
+import { applyReaction, EmojiPanel, MessageQuote, previewText, ReactionPicker, ReactionRow, SystemLine } from '@/components/ChatExtras';
 import { useCalls } from '@/components/Calls';
 import { addNotes, chatName, playbackNotes, postThumb, watchDeviceId } from '@/components/WatchTogether';
 import { AddSheet, UploadProgress, useDropFile, useWatchUpload, WatchSuggestions, type Addition } from '@/components/WatchAdd';
@@ -796,8 +796,19 @@ function WatchChat({ conversationId, group, onUnread }: { conversationId: string
   const { me, t, toast, locale } = useSession();
   const [messages, setMessages] = useState<(Message & { pending?: boolean })[] | null>(null);
   const [body, setBody] = useState('');
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [echo, setEcho] = useState<string | null>(null);
+  const [pickerFor, setPickerFor] = useState<string | null>(null);
+  const [panelFor, setPanelFor] = useState<string | null>(null);
+  const panelMessage = panelFor ? messages?.find((x) => x.id === panelFor) : undefined;
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [everything, setEverything] = useState(false);
+  const [jump, setJump] = useState<string | null>(null);
+  const [highlight, setHighlight] = useState<string | null>(null);
   const list = useRef<HTMLDivElement>(null);
+  const composer = useRef<HTMLTextAreaElement>(null);
   const stick = useRef(true);
+  const patch = (id: string, change: (m: Message) => Message) => setMessages((cur) => cur?.map((x) => (x.id === id ? change(x) : x)) ?? cur);
 
   useEffect(() => {
     let live = true;
@@ -805,6 +816,7 @@ function WatchChat({ conversationId, group, onUnread }: { conversationId: string
       (r) => {
         if (!live) return;
         setMessages(r.items);
+        setCursor(r.nextCursor);
         void api.conversations.read(conversationId).catch(() => {});
       },
       () => live && setMessages([]),
@@ -828,10 +840,37 @@ function WatchChat({ conversationId, group, onUnread }: { conversationId: string
         if (m.kind !== 'system') onUnread?.();
       }
     }
+    // What you were answering or reacting to is gone: stop.
+    if (e.type === 'message.deleted' || e.type === 'message.hidden' || e.type === 'message.unsent') {
+      setReplyTo((cur) => (cur?.id === e.data.id ? null : cur));
+      setPickerFor((cur) => (cur === e.data.id ? null : cur));
+      setPanelFor((cur) => (cur === e.data.id ? null : cur));
+    }
     if (e.type === 'message.deleted' || e.type === 'message.hidden') setMessages((cur) => cur?.filter((x) => x.id !== e.data.id) ?? cur);
-    if (e.type === 'message.unsent') setMessages((cur) => cur?.map((x) => (x.id === e.data.id ? { ...x, unsent: true, body: '', attachments: [] } : x)) ?? cur);
+    if (e.type === 'message.unsent')
+      setMessages(
+        (cur) =>
+          cur?.map((x) =>
+            x.id === e.data.id
+              ? { ...x, unsent: true, body: '', attachments: [], reactions: [] }
+              : x.replyTo && x.replyTo.id === e.data.id
+                ? { ...x, replyTo: { ...x.replyTo, unsent: true, body: '', attachmentKind: null } }
+                : x,
+          ) ?? cur,
+      );
     if (e.type === 'message.edited')
-      setMessages((cur) => cur?.map((x) => (x.id === e.data.id ? { ...x, body: e.data.body, editedAt: e.data.editedAt } : x)) ?? cur);
+      setMessages(
+        (cur) =>
+          cur?.map((x) =>
+            x.id === e.data.id
+              ? { ...x, body: e.data.body, editedAt: e.data.editedAt }
+              : x.replyTo && x.replyTo.id === e.data.id
+                ? { ...x, replyTo: { ...x.replyTo, body: String(e.data.body).slice(0, 200) } }
+                : x,
+          ) ?? cur,
+      );
+    // Your own taps are already shown.
+    if (e.type === 'message.reaction' && e.data.userId !== me?.id) patch(e.data.id, (x) => applyReaction(x, e.data.emoji, false, !!e.data.removed));
     if (e.type === 'message.system') setMessages((cur) => cur?.map((x) => (x.id === e.data.id ? { ...x, system: e.data.system } : x)) ?? cur);
   });
 
@@ -842,17 +881,75 @@ function WatchChat({ conversationId, group, onUnread }: { conversationId: string
     if (el && stick.current) el.scrollTop = el.scrollHeight;
   }, [lastId]);
 
+  // Go to a quoted message once it's in the list, and mark it for a moment. Only this list
+  // scrolls: the video stays where it is.
+  useEffect(() => {
+    const box = list.current;
+    const el = jump ? box?.querySelector<HTMLElement>(`[data-message="${jump}"]`) : null;
+    if (!box || !el) return;
+    const top = box.scrollTop + el.getBoundingClientRect().top - box.getBoundingClientRect().top - (box.clientHeight - el.offsetHeight) / 2;
+    box.scrollTo({ top, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    const target = jump;
+    setHighlight(target);
+    setJump(null);
+    setTimeout(() => setHighlight((h) => (h === target ? null : h)), 1800);
+  }, [jump, messages, everything]);
+
+  /** Scroll to a message, loading earlier ones until it's there. */
+  async function jumpTo(target: string) {
+    setEverything(true);
+    if (messages?.some((m) => m.id === target)) return setJump(target);
+    let c = cursor;
+    const earlier: Message[] = [];
+    try {
+      for (let i = 0; i < 20 && c && !earlier.some((m) => m.id === target); i++) {
+        const r = await api.conversations.messages(conversationId, c);
+        earlier.unshift(...r.items);
+        c = r.nextCursor;
+      }
+    } catch (err) {
+      toast(errorMessage(err));
+    }
+    if (earlier.length) {
+      setMessages((cur) => [...earlier, ...(cur ?? [])]);
+      setCursor(c);
+    }
+    if (earlier.some((m) => m.id === target)) setJump(target);
+    else toast(t('m.chat.notFound'));
+  }
+
+  // Replying: the message gives a little bounce toward the message box, as in the chat.
+  function startReply(m: Message) {
+    setReplyTo(m);
+    setEcho(m.id);
+    setTimeout(() => setEcho((x) => (x === m.id ? null : x)), 600);
+    composer.current?.focus();
+  }
+
+  async function react(m: Message, emoji: string, on: boolean) {
+    patch(m.id, (x) => applyReaction(x, emoji, true, !on));
+    try {
+      if (on) await api.messages.react(m.id, emoji);
+      else await api.messages.unreact(m.id, emoji);
+    } catch (err) {
+      patch(m.id, (x) => applyReaction(x, emoji, true, on));
+      toast(errorMessage(err));
+    }
+  }
+
   async function send(e?: FormEvent) {
     e?.preventDefault();
     const text = body.trim();
     if (!text || !me) return;
     const clientId = crypto.randomUUID();
+    const quoting = replyTo;
     const optimistic: Message & { pending: boolean } = {
       id: clientId,
       conversationId,
       sender: { id: me.id, username: me.username, displayName: me.displayName, avatarUrl: me.avatarUrl, mode: me.mode },
       body: text,
-      replyToId: null,
+      replyToId: quoting?.id ?? null,
+      replyTo: quoting ? messagePreviewOf(quoting) : undefined,
       attachments: [],
       createdAt: new Date().toISOString(),
       clientId,
@@ -861,14 +958,16 @@ function WatchChat({ conversationId, group, onUnread }: { conversationId: string
     stick.current = true;
     setMessages((cur) => [...(cur ?? []), optimistic]);
     setBody('');
+    setReplyTo(null);
     try {
-      const { message, notice, noticeCode } = await api.conversations.send(conversationId, text, clientId);
+      const { message, notice, noticeCode } = await api.conversations.send(conversationId, text, clientId, [], quoting ? { replyToId: quoting.id } : {});
       setMessages((cur) => cur?.map((x) => (x.clientId === clientId ? message : x)) ?? cur);
       const n = noticeText({ code: noticeCode, message: notice }, t);
       if (n) toast(n);
     } catch (err) {
       setMessages((cur) => cur?.filter((x) => x.clientId !== clientId) ?? cur);
       setBody(text);
+      setReplyTo(quoting);
       toast(errorMessage(err));
     }
   }
@@ -897,39 +996,112 @@ function WatchChat({ conversationId, group, onUnread }: { conversationId: string
         {messages === null ? (
           <Skeleton height={120} />
         ) : (
-          messages.slice(-80).map((m) => {
+          (everything ? messages : messages.slice(-80)).map((m) => {
             if (m.kind === 'system') return <SystemLine key={m.id} message={m} meId={me?.id} />;
             const mine = m.sender.id === me?.id;
             // Cards the server wrote (a game, a location, an offer) and story replies are said in your language.
             const card = m.game || m.location || m.offer || m.storyReply;
             const text = m.unsent ? t('m.chat.unsent') : m.body && !card ? m.body : previewText(t, messagePreviewOf(m), { meId: me?.id, locale });
             return (
-              <ChatBubble
+              <div
                 key={m.id}
-                locale={locale}
-                mine={mine}
-                sender={group ? m.sender.displayName : undefined}
-                body={text}
-                pending={m.pending}
-                time={new Intl.DateTimeFormat(locale, { timeStyle: 'short' }).format(new Date(m.createdAt))}
-              />
+                data-message={m.id}
+                className={`chat-msg${mine ? ' chat-msg--mine' : ''}${echo === m.id ? ' chat-msg--echo' : ''}${highlight === m.id ? ' chat-msg--highlight' : ''}`}
+              >
+                <div className="chat-msg__line">
+                  <ChatBubble
+                    locale={locale}
+                    mine={mine}
+                    sender={group ? m.sender.displayName : undefined}
+                    body={
+                      <>
+                        {m.replyTo && !m.unsent ? <MessageQuote preview={m.replyTo} mine={mine} meId={me?.id} onJump={(mid) => void jumpTo(mid)} /> : null}
+                        {text}
+                      </>
+                    }
+                    pending={m.pending}
+                    time={new Intl.DateTimeFormat(locale, { timeStyle: 'short' }).format(new Date(m.createdAt))}
+                  />
+                  {!m.pending && !m.unsent ? (
+                    <div className="chat-msg__tools">
+                      <button
+                        type="button"
+                        className="yp-action chat-msg__quick chat-msg__reply"
+                        aria-label={t('m.chat.reply')}
+                        title={t('m.chat.reply')}
+                        onClick={() => startReply(m)}
+                      >
+                        <Icon name="message" size={18} />
+                      </button>
+                      <button
+                        type="button"
+                        className="yp-action chat-msg__quick chat-msg__react"
+                        aria-label={t('chat.react')}
+                        title={t('chat.react')}
+                        onClick={() => setPickerFor(m.id)}
+                      >
+                        <Icon name="heart" size={18} />
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+                {pickerFor === m.id ? (
+                  <ReactionPicker
+                    mine={m.reactions?.filter((r) => r.mine).map((r) => r.emoji)}
+                    onMore={() => {
+                      setPickerFor(null);
+                      setPanelFor(m.id);
+                    }}
+                    onPick={(emoji) => void react(m, emoji, !m.reactions?.some((r) => r.emoji === emoji && r.mine))}
+                    onClose={() => setPickerFor(null)}
+                  />
+                ) : null}
+                <ReactionRow message={m} mine={mine} onToggle={(emoji, on) => void react(m, emoji, on)} />
+              </div>
             );
           })
         )}
       </div>
+      {replyTo ? (
+        <div className="chat-compose-context" key={replyTo.id}>
+          {/* The message box is described by this, so "Replying to …" is read when it gets focus. */}
+          <div style={{ minWidth: 0 }} id="watch-reply-context">
+            <span className="chat-compose-context__label">
+              {replyTo.sender.id === me?.id ? t('m.chat.replyingToSelf') : t('m.chat.replyingTo', { name: replyTo.sender.displayName })}
+            </span>
+            <span className="chat-compose-context__text" dir="auto">
+              {previewText(t, messagePreviewOf(replyTo), { meId: me?.id, locale })}
+            </span>
+          </div>
+          <button
+            type="button"
+            className="yp-action"
+            aria-label={t('m.chat.cancelReply')}
+            onClick={() => {
+              setReplyTo(null);
+              // This button goes away; keep focus in the message box.
+              composer.current?.focus();
+            }}
+          >
+            <Icon name="x" size={18} />
+          </button>
+        </div>
+      ) : null}
       <form className="watch-chat__composer" onSubmit={(e) => void send(e)}>
         <label htmlFor="watch-msg" className="yp-visually-hidden">
           {t('watch.chatPlaceholder')}
         </label>
         <textarea
+          ref={composer}
           id="watch-msg"
           rows={1}
           placeholder={t('watch.chatPlaceholder')}
           value={body}
           maxLength={4000}
-          aria-describedby="watch-chat-note"
+          aria-describedby={replyTo ? 'watch-reply-context watch-chat-note' : 'watch-chat-note'}
           onChange={(e) => setBody(e.currentTarget.value)}
           onKeyDown={(e) => {
+            if (e.key === 'Escape' && replyTo) setReplyTo(null);
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
               void send();
@@ -943,6 +1115,12 @@ function WatchChat({ conversationId, group, onUnread }: { conversationId: string
       <p className="muted watch-chat__note" id="watch-chat-note">
         {t('watch.chatNote')}
       </p>
+      <EmojiPanel
+        open={!!panelMessage}
+        mine={panelMessage?.reactions?.filter((r) => r.mine).map((r) => r.emoji)}
+        onPick={(emoji) => panelMessage && void react(panelMessage, emoji, !panelMessage.reactions?.some((r) => r.emoji === emoji && r.mine))}
+        onClose={() => setPanelFor(null)}
+      />
     </>
   );
 }

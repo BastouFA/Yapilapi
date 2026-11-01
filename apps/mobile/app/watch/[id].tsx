@@ -20,7 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Message, Post, PublicUser } from '../../../../packages/shared/src/types';
 import { WATCH_REACTIONS, youtubeWatchUrl, type WatchQueueItem, type WatchSkipReason } from '../../../../packages/shared/src/watch';
 import { client, errorMessage } from '../../lib/api';
-import { previewOf, previewText, SystemLine } from '../../lib/chat-extras';
+import { applyReaction, previewOf, previewText, Quote, ReactionRow, ReactionSheet, SystemLine } from '../../lib/chat-extras';
 import { useDataSaver } from '../../lib/data-saver';
 import { useT } from '../../lib/i18n';
 import { useReducedMotion } from '../../lib/motion';
@@ -368,13 +368,21 @@ function ControlButton({ icon, label, onPress, disabled, big }: { icon: IconName
 /** The chat beside the video: the conversation's newest messages, live, and a box to write in. */
 function SideChat({ conversationId, meId }: { conversationId: string; meId: string }) {
   const c = useColors();
-  const { t } = useT();
+  const { t, locale } = useT();
   const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<Message[]>([]);
   const [body, setBody] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [reactFor, setReactFor] = useState<string | null>(null);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [highlight, setHighlight] = useState<string | null>(null);
   const sending = useRef(false);
   const list = useRef<FlatList<Message>>(null);
+  const input = useRef<TextInput>(null);
+  // Follow the newest message, unless you scrolled up to read.
+  const stick = useRef(true);
+  const patch = (id: string, change: (m: Message) => Message) => setMessages((cur) => cur.map((x) => (x.id === id ? change(x) : x)));
 
   useEffect(() => {
     let live = true;
@@ -384,6 +392,7 @@ function SideChat({ conversationId, meId }: { conversationId: string; meId: stri
         const page = await api.conversations.messages(conversationId);
         if (!live) return;
         setMessages(page.items);
+        setCursor(page.nextCursor);
         void api.conversations.read(conversationId).catch(() => {});
       } catch (e) {
         if (live) setError(errorMessage(e));
@@ -395,24 +404,105 @@ function SideChat({ conversationId, meId }: { conversationId: string; meId: stri
   }, [conversationId]);
 
   useRealtime((e) => {
-    if (e.type !== 'message.created' || e.data?.conversationId !== conversationId) return;
-    const m = e.data as Message;
-    setMessages((cur) => (cur.some((x) => x.id === m.id || (m.clientId && x.clientId === m.clientId)) ? cur : [...cur, m]));
-    void client().then((api) => api.conversations.read(conversationId).catch(() => {}));
+    if (e.data?.conversationId !== conversationId) return;
+    if (e.type === 'message.created') {
+      const m = e.data as Message;
+      setMessages((cur) => (cur.some((x) => x.id === m.id || (m.clientId && x.clientId === m.clientId)) ? cur : [...cur, m]));
+      void client().then((api) => api.conversations.read(conversationId).catch(() => {}));
+    }
+    // What you were answering or reacting to is gone: stop.
+    if (e.type === 'message.deleted' || e.type === 'message.hidden' || e.type === 'message.unsent') {
+      setReplyTo((cur) => (cur?.id === e.data.id ? null : cur));
+      setReactFor((cur) => (cur === e.data.id ? null : cur));
+    }
+    if (e.type === 'message.deleted' || e.type === 'message.hidden') setMessages((cur) => cur.filter((x) => x.id !== e.data.id));
+    if (e.type === 'message.unsent')
+      setMessages((cur) =>
+        cur.map((x) =>
+          x.id === e.data.id
+            ? { ...x, unsent: true, body: '', attachments: [], reactions: [] }
+            : x.replyTo && x.replyTo.id === e.data.id
+              ? { ...x, replyTo: { ...x.replyTo, unsent: true, body: '', attachmentKind: null } }
+              : x,
+        ),
+      );
+    if (e.type === 'message.edited')
+      setMessages((cur) =>
+        cur.map((x) =>
+          x.id === e.data.id
+            ? { ...x, body: e.data.body, editedAt: e.data.editedAt }
+            : x.replyTo && x.replyTo.id === e.data.id
+              ? { ...x, replyTo: { ...x.replyTo, body: String(e.data.body).slice(0, 200) } }
+              : x,
+        ),
+      );
+    // Your own taps are already shown.
+    if (e.type === 'message.reaction' && e.data.userId !== meId) patch(e.data.id, (x) => applyReaction(x, e.data.emoji, false, !!e.data.removed));
   });
+
+  /** Scroll to a quoted message, loading earlier ones until it's there. */
+  async function jumpTo(target: string) {
+    let all = messages;
+    if (!all.some((m) => m.id === target)) {
+      let c2 = cursor;
+      const earlier: Message[] = [];
+      try {
+        const api = await client();
+        for (let i = 0; i < 20 && c2 && !earlier.some((m) => m.id === target); i++) {
+          const r = await api.conversations.messages(conversationId, c2);
+          earlier.unshift(...r.items);
+          c2 = r.nextCursor;
+        }
+      } catch (e) {
+        setError(errorMessage(e));
+      }
+      all = [...earlier, ...messages];
+      if (earlier.length) {
+        setMessages(all);
+        setCursor(c2);
+      }
+    }
+    const index = all.findIndex((m) => m.id === target);
+    if (index < 0) return setError(t('m.chat.notFound'));
+    stick.current = false;
+    setHighlight(target);
+    setTimeout(() => setHighlight((h) => (h === target ? null : h)), 1800);
+    setTimeout(() => list.current?.scrollToIndex({ index, viewPosition: 0.5, animated: true }), 50);
+  }
+
+  function startReply(m: Message) {
+    setReplyTo(m);
+    input.current?.focus();
+  }
+
+  async function react(m: Message, emoji: string, on: boolean) {
+    patch(m.id, (x) => applyReaction(x, emoji, true, !on));
+    try {
+      const api = await client();
+      if (on) await api.messages.react(m.id, emoji);
+      else await api.messages.unreact(m.id, emoji);
+    } catch (e) {
+      patch(m.id, (x) => applyReaction(x, emoji, true, on));
+      setError(errorMessage(e));
+    }
+  }
 
   async function send() {
     const text = body.trim();
     if (!text || sending.current) return;
     sending.current = true;
+    const quoting = replyTo;
+    stick.current = true;
     setBody('');
+    setReplyTo(null);
     setError(null);
     const clientId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     try {
-      const { message } = await (await client()).conversations.send(conversationId, text, clientId);
+      const { message } = await (await client()).conversations.send(conversationId, text, clientId, [], quoting ? { replyToId: quoting.id } : {});
       setMessages((cur) => (cur.some((x) => x.id === message.id) ? cur : [...cur, message]));
     } catch (e) {
       setBody(text);
+      setReplyTo(quoting);
       setError(errorMessage(e));
     } finally {
       sending.current = false;
@@ -433,24 +523,110 @@ function SideChat({ conversationId, meId }: { conversationId: string; meId: stri
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         contentContainerStyle={{ padding: space[3], gap: space[2] }}
-        onContentSizeChange={() => list.current?.scrollToEnd({ animated: false })}
+        scrollEventThrottle={64}
+        onScroll={({ nativeEvent: n }) => {
+          stick.current = n.contentSize.height - n.contentOffset.y - n.layoutMeasurement.height < 80;
+        }}
+        onContentSizeChange={() => {
+          if (stick.current) list.current?.scrollToEnd({ animated: false });
+        }}
+        onScrollToIndexFailed={(info) => {
+          list.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false });
+          setTimeout(() => list.current?.scrollToIndex({ index: info.index, viewPosition: 0.5, animated: true }), 100);
+        }}
         renderItem={({ item: m }) => {
           if (m.kind === 'system') return <SystemLine message={m} meId={meId} />;
           const mine = m.sender.id === meId;
           const text = m.unsent ? t('m.chat.unsent') : previewText(t, previewOf(m), { meId });
+          const tint = mine ? c.onYapi : c.ink;
+          const quote = m.replyTo && !m.unsent ? <Quote preview={m.replyTo} tint={tint} meId={meId} onJump={(mid) => void jumpTo(mid)} /> : null;
+          // Reply and React, one tap away beside every message, as in the chat.
+          const tools = m.unsent ? null : (
+            <View style={{ flexDirection: mine ? 'row-reverse' : 'row' }}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('m.chat.reply')}
+                onPress={() => startReply(m)}
+                style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', opacity: 0.8 }}
+              >
+                <View style={mine ? { transform: [{ scaleX: -1 }] } : undefined}>
+                  <Icon name="chatbubble-outline" size={20} color={c.yapi} />
+                </View>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('chat.react')}
+                onPress={() => setReactFor(m.id)}
+                style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', opacity: 0.8 }}
+              >
+                <Icon name="heart-outline" size={20} color={c.yapi} />
+              </Pressable>
+            </View>
+          );
           return (
-            // One stop per message for screen readers: who wrote it, then what they wrote.
-            <View accessible style={{ alignSelf: mine ? 'flex-end' : 'flex-start', maxWidth: '85%', gap: 2 }}>
-              {!mine ? <Text style={[{ color: c.inkMuted, fontSize: 12, fontWeight: '600' }, userText]}>{m.sender.displayName}</Text> : null}
-              <View style={{ backgroundColor: mine ? c.yapi : c.surface, borderRadius: radius.lg, paddingHorizontal: space[3], paddingVertical: space[2] }}>
-                <Text style={[{ color: mine ? c.onYapi : c.ink, fontSize: 15, lineHeight: 20, fontStyle: m.unsent ? 'italic' : 'normal' }, userText]}>
-                  {text}
-                </Text>
+            <View
+              style={{
+                alignSelf: mine ? 'flex-end' : 'flex-start',
+                maxWidth: '100%',
+                gap: 2,
+                borderRadius: radius.lg,
+                backgroundColor: highlight === m.id ? c.surfaceSunken : 'transparent',
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: mine ? 'flex-end' : 'flex-start' }}>
+                {mine ? tools : null}
+                {/* One stop per message for screen readers: who wrote it, then what they wrote. A quote is its own stop, so it can be pressed. */}
+                <View accessible={!quote} style={{ flexShrink: 1, gap: 2 }}>
+                  {!mine ? <Text style={[{ color: c.inkMuted, fontSize: 12, fontWeight: '600' }, userText]}>{m.sender.displayName}</Text> : null}
+                  <View style={{ backgroundColor: mine ? c.yapi : c.surface, borderRadius: radius.lg, paddingHorizontal: space[3], paddingVertical: space[2] }}>
+                    {quote}
+                    <Text style={[{ color: tint, fontSize: 15, lineHeight: 20, fontStyle: m.unsent ? 'italic' : 'normal' }, userText]}>{text}</Text>
+                  </View>
+                </View>
+                {mine ? null : tools}
               </View>
+              <ReactionRow message={m} mine={mine} onToggle={(emoji, on) => void react(m, emoji, on)} />
             </View>
           );
         }}
       />
+      {replyTo ? (
+        <View
+          accessibilityLiveRegion="polite"
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: space[2],
+            marginHorizontal: space[3],
+            marginTop: space[2],
+            paddingStart: space[3],
+            paddingEnd: space[1],
+            paddingVertical: space[1],
+            borderStartWidth: 3,
+            borderStartColor: c.yapi,
+            borderRadius: radius.md,
+            backgroundColor: c.surface,
+          }}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: c.yapi, fontSize: 12, fontWeight: '700' }}>
+              {replyTo.sender.id === meId ? t('m.chat.replyingToSelf') : t('m.chat.replyingTo', { name: replyTo.sender.displayName })}
+            </Text>
+            <Text numberOfLines={1} style={[{ color: c.ink, fontSize: 14 }, userText]}>
+              {previewText(t, previewOf(replyTo), { meId, locale })}
+            </Text>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('m.chat.cancelReply')}
+            hitSlop={8}
+            onPress={() => setReplyTo(null)}
+            style={{ padding: space[2] }}
+          >
+            <Icon name="close" size={20} color={c.inkMuted} />
+          </Pressable>
+        </View>
+      ) : null}
       <View
         style={{
           flexDirection: 'row',
@@ -462,6 +638,7 @@ function SideChat({ conversationId, meId }: { conversationId: string; meId: stri
         }}
       >
         <TextInput
+          ref={input}
           accessibilityLabel={t('watch.chatPlaceholder')}
           accessibilityHint={t('watch.chatNote')}
           placeholder={t('watch.chatPlaceholder')}
@@ -497,6 +674,14 @@ function SideChat({ conversationId, meId }: { conversationId: string; meId: stri
         </Pressable>
       </View>
       <Text style={{ color: c.inkMuted, fontSize: 11, textAlign: 'center', marginTop: -space[2], paddingBottom: space[1] }}>{t('watch.chatNote')}</Text>
+      <ReactionSheet
+        message={reactFor ? (messages.find((x) => x.id === reactFor) ?? null) : null}
+        onClose={() => setReactFor(null)}
+        onToggle={(emoji, on) => {
+          const m = messages.find((x) => x.id === reactFor);
+          if (m) void react(m, emoji, on);
+        }}
+      />
     </View>
   );
 }
