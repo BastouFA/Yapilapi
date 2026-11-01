@@ -946,6 +946,10 @@ export default function ChatPage() {
             ) : (
               said
             );
+            // A card, a photo or a player needs the width: on phones Reply and React go under it.
+            const wide =
+              !m.unsent &&
+              !!(m.poll || m.list || m.game || m.mix || m.location || m.market || m.offer || m.viewOnce || m.story || m.attachments.length || shared);
             const content = m.unsent ? (
               <span className="chat-unsent">{mine ? t('m.chat.unsentMine') : t('m.chat.unsent')}</span>
             ) : m.poll ? (
@@ -993,7 +997,7 @@ export default function ChatPage() {
                 {showDay ? <div className="yp-chat__day">{day}</div> : null}
                 <div
                   id={`msg-${m.id}`}
-                  className={`chat-msg${mine ? ' chat-msg--mine' : ''}${highlight === m.id ? ' chat-msg--highlight' : ''}${echo === m.id ? ' chat-msg--echo' : ''}`}
+                  className={`chat-msg${mine ? ' chat-msg--mine' : ''}${wide ? ' chat-msg--wide' : ''}${highlight === m.id ? ' chat-msg--highlight' : ''}${echo === m.id ? ' chat-msg--echo' : ''}`}
                   onContextMenu={(e) => {
                     if (mine || m.unsent) return;
                     e.preventDefault();

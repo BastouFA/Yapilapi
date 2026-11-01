@@ -310,7 +310,8 @@ export function PlacePicker({ value, onChange }: { value: TaggedPlace | null; on
   };
   if (!open)
     return (
-      <div className="stack" style={{ gap: 'var(--space-2)' }}>
+      // 14px, like rows of small buttons: their 44px touch areas don't overlap.
+      <div className="stack" style={{ gap: 14 }}>
         <div className="row">
           <Button size="sm" variant="ghost" icon="map-pin" onClick={() => setOpen(true)}>
             {t('map.tagPlace')}

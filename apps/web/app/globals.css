@@ -3437,6 +3437,12 @@ video.chat-att__media {
   .chat-msg__line .yp-bubble {
     max-width: calc(100% - 132px);
   }
+  .chat-msg--wide .chat-msg__line {
+    flex-wrap: wrap;
+  }
+  .chat-msg--wide .chat-msg__line .yp-bubble {
+    max-width: 100%;
+  }
 }
 /* The reply bubble faces the message it answers. */
 .chat-msg__reply {
