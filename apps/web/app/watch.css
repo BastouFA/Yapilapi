@@ -1115,16 +1115,23 @@
 .watch-chat.watch-chat--sheet {
   position: fixed;
   inset-inline: 0;
-  bottom: 0;
+  /* Above the keyboard, which goes over the page without moving it (set in WatchScreen). */
+  bottom: var(--watch-keyboard, 0px);
   z-index: 1100;
   display: none;
-  height: min(56dvh, 520px);
+  height: min(56dvh, 520px, var(--watch-room, 100dvh));
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
   box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.25);
 }
 .watch-chat.watch-chat--sheet.watch-chat--open {
   display: flex;
+}
+.watch-chat.watch-chat--sheet[data-keyboard='open'] {
+  padding-bottom: calc(var(--space-2) + var(--watch-keyboard-bar, 0px));
+}
+.watch-chat--sheet[data-keyboard='open'] .watch-chat__note {
+  display: none;
 }
 .watch-chat--sheet .watch-chat__close {
   display: grid;

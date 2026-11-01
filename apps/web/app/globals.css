@@ -3769,6 +3769,8 @@ video.chat-att__media {
 }
 /* Where a phone's keyboard would be, under the message box. */
 .emoji-dock {
+  /* Clear of the bottom bar when it's scrolled into view. */
+  scroll-margin-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
   margin-top: var(--space-2);
   padding: var(--space-2);
   border: 1px solid var(--line);
@@ -12698,4 +12700,13 @@ button.profile-song__play::after {
 .page-back + .yp-topbar {
   margin-top: 0;
   padding-top: var(--space-2);
+}
+
+/* An iPhone zooms the whole page in when a box with text under 16px gets focus, and stays zoomed. */
+@media (pointer: coarse) {
+  input,
+  textarea,
+  select {
+    font-size: max(16px, 1em) !important;
+  }
 }

@@ -884,6 +884,17 @@ function WatchChat({ conversationId, group, onUnread }: { conversationId: string
     const el = list.current;
     if (el && stick.current) el.scrollTop = el.scrollHeight;
   }, [lastId]);
+  // Also when the list changes size: the phone's sheet opening (it had no size while closed, so
+  // nothing could scroll) and the keyboard coming up.
+  useEffect(() => {
+    const el = list.current;
+    if (!el) return;
+    const follow = new ResizeObserver(() => {
+      if (stick.current) el.scrollTop = el.scrollHeight;
+    });
+    follow.observe(el);
+    return () => follow.disconnect();
+  }, []);
 
   // The emoji row and a new reaction go under the message: in this small list that can be out of
   // sight, and a tap would seem to do nothing. Bring the bottom of the message into view.
@@ -1232,6 +1243,34 @@ export function WatchScreen({ id }: { id: string }) {
   const [chatOpen, setChatOpen] = useState(false);
   const [unread, setUnread] = useState(0);
   const narrow = useNarrow();
+  const sheet = useRef<HTMLElement>(null);
+  // A phone's keyboard goes over the page without moving it, and would hide the message box and
+  // the "Replying to" strip: keep the sheet above it, in the room that's left.
+  useEffect(() => {
+    const view = window.visualViewport;
+    if (!narrow || !view) return;
+    const fit = () => {
+      const el = sheet.current;
+      if (!el) return;
+      // Pinching the page in isn't a keyboard.
+      const whole = view.scale <= 1.01;
+      const open = whole && window.innerHeight - view.height > 80;
+      // Safari may move the page up by itself: only what's still hidden is left to make up.
+      const covered = whole ? Math.max(0, Math.round(window.innerHeight - view.height - view.offsetTop)) : 0;
+      el.style.setProperty('--watch-keyboard', `${covered}px`);
+      el.style.setProperty('--watch-room', open ? `${Math.round(view.height)}px` : '100dvh');
+      // An iPhone's bar over the keyboard (arrows and a check mark) floats over the page and isn't counted.
+      el.style.setProperty('--watch-keyboard-bar', open && /iP(hone|ad|od)/.test(navigator.userAgent) ? '60px' : '0px');
+      el.dataset.keyboard = open ? 'open' : 'closed';
+    };
+    fit();
+    view.addEventListener('resize', fit);
+    view.addEventListener('scroll', fit);
+    return () => {
+      view.removeEventListener('resize', fit);
+      view.removeEventListener('scroll', fit);
+    };
+  }, [narrow]);
   const { session, current, playback, isHost, video } = w;
   // Left on your other device: back to the chat here too.
   const conversationId = session?.conversationId;
@@ -1361,7 +1400,12 @@ export function WatchScreen({ id }: { id: string }) {
 
   // On phones the chat is a sheet in <body> (fixed to the screen, out of the page's layout).
   const chat = (
-    <aside className={`watch-chat${narrow ? ' watch-chat--sheet' : ''}${chatOpen ? ' watch-chat--open' : ''}`} id="watch-chat" aria-label={t('watch.chat')}>
+    <aside
+      ref={sheet}
+      className={`watch-chat${narrow ? ' watch-chat--sheet' : ''}${chatOpen ? ' watch-chat--open' : ''}`}
+      id="watch-chat"
+      aria-label={t('watch.chat')}
+    >
       {narrow ? (
         <button type="button" className="watch-chat__close yp-action" aria-label={t('m.common.close')} onClick={() => setChatOpen(false)}>
           <Icon name="chevron-down" />

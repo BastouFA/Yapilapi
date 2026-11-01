@@ -123,6 +123,11 @@ export default function ChatPage() {
   const composer = useRef<HTMLTextAreaElement>(null);
   // The emoji panel, where a phone's keyboard would be. Where the caret goes after an emoji goes in.
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const emojiDock = useRef<HTMLDivElement>(null);
+  // It opens under the message box, which can be the bottom of the screen.
+  useEffect(() => {
+    if (emojiOpen) emojiDock.current?.scrollIntoView({ block: 'nearest' });
+  }, [emojiOpen]);
   const caret = useRef<number | null>(null);
   useLayoutEffect(() => {
     if (caret.current === null) return;
@@ -1416,8 +1421,10 @@ export default function ChatPage() {
           title={emojiOpen ? t('emoji.keyboard') : t('emoji.button')}
           aria-expanded={emojiOpen}
           onClick={() => {
-            // Back to the keyboard goes back to writing.
+            // Back to the keyboard goes back to writing. The other way the keyboard has to go, or it
+            // stays over the emojis.
             if (emojiOpen) composer.current?.focus();
+            else composer.current?.blur();
             setEmojiOpen(!emojiOpen);
           }}
         >
@@ -1485,6 +1492,7 @@ export default function ChatPage() {
       {emojiOpen ? (
         <div
           className="emoji-dock"
+          ref={emojiDock}
           onKeyDown={(e) => {
             if (e.key !== 'Escape') return;
             e.stopPropagation();

@@ -161,6 +161,9 @@ export function ReactionPicker({
       className="chat-picker"
       role="group"
       aria-label={t('chat.react')}
+      // Safari doesn't focus a button you press: focus would go to a list around it, the "tabbing
+      // out" below would close this, and the press would land on nothing.
+      onMouseDown={(e) => e.preventDefault()}
       onKeyDown={(e) => {
         const items = [...(ref.current?.querySelectorAll<HTMLButtonElement>('button') ?? [])];
         const i = items.indexOf(document.activeElement as HTMLButtonElement);
