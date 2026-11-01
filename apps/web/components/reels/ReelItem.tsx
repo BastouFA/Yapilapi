@@ -25,6 +25,7 @@ import { prefersReducedMotion, type ReelPrefs } from './prefs';
 
 /** What the viewer does for a reel (it owns the list, the sheets and the shared settings). */
 export interface ReelViewerApi {
+  unlockSound: () => void;
   like: (p: Post, force?: boolean) => void;
   follow: (p: Post) => void;
   comments: (p: Post, atMs: number | null) => void;
@@ -98,6 +99,8 @@ export function ReelItem({
   clear,
   prefs,
   saver,
+  askFirst,
+  next,
   frameRatio,
   moments,
   showSoundHint,
@@ -118,6 +121,10 @@ export function ReelItem({
   prefs: ReelPrefs;
   /** Play the small file and wait for a tap (Data saver or the "Data saver" quality). */
   saver: boolean;
+  /** Data saver was turned on by hand: a reel waits for a press. On its own (a slow connection) it still plays, just smaller. */
+  askFirst: boolean;
+  /** The next reel: loaded ahead, so it plays the moment it's scrolled to. */
+  next: boolean;
   /** Width over height of the frame, to choose between filling it and showing the whole video. */
   frameRatio: number;
   moments: ReelMoment[];
@@ -139,6 +146,8 @@ export function ReelItem({
   const [holding, setHolding] = useState<null | 'pause' | 'fast'>(null);
   const [playing, setPlaying] = useState(false);
   const [blocked, setBlocked] = useState(false);
+  // Sound is on, but the phone only let this reel start in silence.
+  const [soundHeld, setSoundHeld] = useState(false);
   const [time, setTime] = useState({ current: 0, duration: 0 });
   const [awake, setAwake] = useState(true);
   const [scrubbing, setScrubbing] = useState(false);
@@ -151,7 +160,7 @@ export function ReelItem({
   const [revealed, setRevealed] = useState(false);
 
   const covered = !!media?.sensitive && !revealed;
-  const waiting = saver && !started;
+  const waiting = askFirst && !started;
   const src = media ? videoSrc(media, saver) : undefined;
   const poster = media ? videoPoster(media, saver) : undefined;
   // Duets play beside the original; reels using another sound play that sound; a catalogue song loops its part.
@@ -239,21 +248,36 @@ export function ReelItem({
     const v = video.current;
     if (!v) return;
     if (shouldPlay) {
-      void v.play().then(
-        () => {
-          setPlaying(true);
-          setBlocked(false);
-        },
-        () => {
-          setPlaying(false);
-          setBlocked(true);
-        },
-      );
+      const playingNow = () => {
+        setPlaying(true);
+        setBlocked(false);
+      };
+      // Only a refusal needs a press. Scrolling on quickly interrupts a start, and that's nothing.
+      const refused = (e: unknown) => {
+        if ((e as Error)?.name !== 'NotAllowedError') return;
+        setPlaying(false);
+        setBlocked(true);
+      };
+      void v.play().then(playingNow, (e: unknown) => {
+        // A phone can refuse sound without a tap just before: it plays at once in silence, with "Tap for sound".
+        if ((e as Error)?.name !== 'NotAllowedError' || v.muted) return refused(e);
+        v.muted = true;
+        setSoundHeld(true);
+        void v.play().then(playingNow, refused);
+      });
     } else {
       v.pause();
       setPlaying(false);
     }
   }, [shouldPlay, src]);
+
+  // Moving on from a reel that was silenced that way: it goes back to following the sound button.
+  useEffect(() => {
+    const v = video.current;
+    if (active || !soundHeld || !v) return;
+    v.muted = false;
+    setSoundHeld(false);
+  }, [active, soundHeld]);
 
   // Speed (and 2× while holding the edge).
   useEffect(() => {
@@ -362,7 +386,17 @@ export function ReelItem({
   const faint = !awake && playing && !details && !scrubbing;
 
   // "Tap for sound" shows once: it goes after a few seconds on screen (or when sound goes on).
-  const hintShown = showSoundHint && active && muted && playing && !clear;
+  const hintShown = ((showSoundHint && muted) || soundHeld) && active && playing && !clear;
+  /** "Tap for sound" on a reel the phone started in silence: this tap lets it. */
+  const soundHere = () => {
+    const v = video.current;
+    if (v) {
+      v.muted = false;
+      void v.play().catch(() => {});
+    }
+    setSoundHeld(false);
+    viewer.unlockSound();
+  };
   useEffect(() => {
     if (!hintShown) return;
     const id = setTimeout(() => viewer.soundHintSeen(), 8000);
@@ -378,6 +412,7 @@ export function ReelItem({
 
   const togglePlay = () => {
     if (covered) return;
+    if (soundHeld) return soundHere();
     if (waiting) {
       setStarted(true);
       setUserPaused(false);
@@ -564,7 +599,7 @@ export function ReelItem({
               loop
               playsInline
               crossOrigin={videoCrossOrigin(captions)}
-              preload={saver ? 'none' : active ? 'auto' : 'metadata'}
+              preload={saver ? 'none' : active || next ? 'auto' : 'metadata'}
               aria-label={media?.altText || post.body || t('reel.videoBy', { name: post.author.displayName })}
               onLoadedMetadata={(e) => {
                 const v = e.currentTarget;
@@ -680,7 +715,7 @@ export function ReelItem({
         ) : null}
 
         {hintShown ? (
-          <button type="button" className="reel__sound-hint" onClick={viewer.toggleMute}>
+          <button type="button" className="reel__sound-hint" onClick={soundHeld ? soundHere : viewer.toggleMute}>
             <Icon name="volume-off" size={16} />
             {t('reel.tapForSound')}
           </button>

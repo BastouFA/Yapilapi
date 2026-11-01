@@ -93,7 +93,8 @@ const SCRIM = 'rgba(5,6,11,0.42)';
 const ACCENT = '#FF5C7A';
 const SUN = '#FFBE3D';
 const MINT = '#3DDBC2';
-const VIEWABILITY = { itemVisiblePercentThreshold: 60 };
+// Past halfway it's the one on screen: it plays while the swipe is still settling.
+const VIEWABILITY = { itemVisiblePercentThreshold: 51 };
 const TAP_MS = 260;
 // Left sooner than this after it came on screen (and not played to the end): a skip.
 const SKIP_MS = 2000;
@@ -1028,9 +1029,12 @@ function Reel({
   const reduce = useReducedMotion();
   const media = post.media.find((m) => m.kind === 'video') ?? post.media[0];
   // Data saver: nothing loads or plays until the reel is tapped; then the smallest version plays.
-  const saver = useDataSaver().active;
+  const dataSaver = useDataSaver();
+  const saver = dataSaver.active;
+  const askFirst = dataSaver.mode === 'on';
   const [started, setStarted] = useState(false);
-  const waiting = saver && !started && !post.locked;
+  // Data saver turned on by hand: a reel waits for a press. On its own (a slow connection) it still plays, just smaller.
+  const waiting = askFirst && !started && !post.locked;
   const src = media && !waiting ? reelSource(media, saver) : null;
   const [paused, setPaused] = useState(false);
   const [fast, setFast] = useState(false);

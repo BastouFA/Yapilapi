@@ -82,6 +82,7 @@ export function ReelsViewer() {
       return next;
     });
   const saver = prefs.quality === 'saver' || (prefs.quality === 'auto' && dataSaver.active);
+  const askFirst = prefs.quality === 'saver' || (prefs.quality === 'auto' && dataSaver.mode === 'on');
 
   const more = useCallback(
     async (c?: string | null) => {
@@ -139,9 +140,10 @@ export function ReelsViewer() {
     if (!root || !count) return;
     const io = new IntersectionObserver(
       (entries) => {
-        for (const e of entries) if (e.isIntersecting && e.intersectionRatio >= 0.6) setActive(Number((e.target as HTMLElement).dataset.index));
+        // Past halfway it's the one on screen: it plays while the swipe is still settling.
+        for (const e of entries) if (e.isIntersecting && e.intersectionRatio >= 0.51) setActive(Number((e.target as HTMLElement).dataset.index));
       },
-      { root, threshold: [0.6] },
+      { root, threshold: [0.51] },
     );
     root.querySelectorAll<HTMLElement>('.reel').forEach((el) => io.observe(el));
     return () => io.disconnect();
@@ -456,6 +458,21 @@ export function ReelsViewer() {
   };
   const pipAvailable = typeof document !== 'undefined' && !!document.pictureInPictureEnabled && !!current && !current.remixOf;
 
+  /**
+   * Inside a tap, where phones allow it: a start and a stop on the other reels, so each may later play
+   * with sound by itself as it's scrolled to. Too short to be heard.
+   */
+  const unlockSound = () => {
+    list.current?.querySelectorAll<HTMLMediaElement>('.reel:not(.reel--active) [data-sound]').forEach((el) => {
+      if (!el.src) return;
+      const muted = el.muted;
+      el.muted = false;
+      void el.play().catch(() => {});
+      el.pause();
+      el.muted = muted;
+    });
+  };
+
   const toggleMute = () => {
     const sound = muted;
     // iPhones only let sound start inside the tap itself: unmute the reel playing now straight
@@ -465,6 +482,7 @@ export function ReelsViewer() {
         el.muted = false;
         if (el.paused && el.src) void el.play().catch(() => {});
       });
+    if (sound) unlockSound();
     setMuted(!sound);
     if (!prefs.soundHintSeen) setPrefs({ soundHintSeen: true });
   };
@@ -472,6 +490,7 @@ export function ReelsViewer() {
   // One stable object for every reel: its methods always call the latest versions of the above.
   const impl = useRef<ReelViewerApi>(null!);
   impl.current = {
+    unlockSound,
     like: (p, force) => void toggle(p, 'like', force),
     follow: (p) => void follow(p),
     comments: (p, atMs) => setSheet({ kind: 'comments', post: p, atMs }),
@@ -525,6 +544,7 @@ export function ReelsViewer() {
       save: call('save'),
       saveTo: (p: Post) => impl.current.saveTo?.(p),
       toggleMute: call('toggleMute'),
+      unlockSound: call('unlockSound'),
       toggleClear: call('toggleClear'),
       next: call('next'),
       previous: call('previous'),
@@ -645,7 +665,9 @@ export function ReelsViewer() {
             stats={authors[p.author.id]}
             index={i}
             active={i === active}
-            near={i === active + 1 || i === active - 1}
+            near={i === active + 1 || i === active - 1 || i === active + 2}
+            next={i === active + 1}
+            askFirst={askFirst}
             muted={muted}
             rewatch={rewatch.has(p.id)}
             clear={clear}
