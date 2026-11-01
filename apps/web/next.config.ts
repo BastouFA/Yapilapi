@@ -41,7 +41,11 @@ function contentSecurityPolicy(): string {
 const config: NextConfig = {
   transpilePackages: ['@yapilapi/design-system', '@yapilapi/shared', '@yapilapi/api-client'],
   // Settings > Help shows the version (pnpm sets npm_package_version when it runs the web app's scripts).
-  env: { NEXT_PUBLIC_APP_VERSION: process.env.NEXT_PUBLIC_APP_VERSION || process.env.npm_package_version || '0.1.0' },
+  // NEXT_PUBLIC_BUILD_ID: the commit (Vercel sets VERCEL_GIT_COMMIT_SHA), so open pages notice a newer version (app/app-version).
+  env: {
+    NEXT_PUBLIC_APP_VERSION: process.env.NEXT_PUBLIC_APP_VERSION || process.env.npm_package_version || '0.1.0',
+    NEXT_PUBLIC_BUILD_ID: process.env.VERCEL_GIT_COMMIT_SHA || 'dev',
+  },
   // The browser talks to the API through /api on the same origin, so the
   // session cookie is first-party and httpOnly.
   async rewrites() {
