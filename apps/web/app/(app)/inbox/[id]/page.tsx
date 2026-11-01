@@ -1287,32 +1287,6 @@ export default function ChatPage() {
       {/* Following the newest message scrolls to here, so the Yap row and suggested replies under the
           messages are in sight too, not under the message box that stays at the bottom. */}
       <div ref={endRef} className="chat-end" />
-      {pasted.length && !editing ? (
-        <div className="chat-paste">
-          <button type="button" className="chat-paste__send" disabled={!!uploading} onClick={() => void sendPasted()}>
-            {pastedThumb ? <img className="chat-paste__thumb" src={pastedThumb} alt="" /> : <Icon name="play" size={18} />}
-            <span>{t('chat.sendPasted')}</span>
-            {pasted.length > 1 ? <span className="chat-paste__time">{pasted.length}</span> : null}
-          </button>
-          <button type="button" className="yp-action" aria-label={t('common.cancel')} title={t('common.cancel')} onClick={() => setPasted([])}>
-            <Icon name="x" size={18} />
-          </button>
-        </div>
-      ) : null}
-      {copied && !editing ? (
-        <div className="chat-paste">
-          <button type="button" className="chat-paste__send" disabled={pasting} onClick={() => void pasteVoice()}>
-            <Icon name="mic" size={18} />
-            <span>{t('chat.pasteVoice')}</span>
-            {copied.durationMs ? (
-              <span className="chat-paste__time">{`${Math.floor(copied.durationMs / 60_000)}:${String(Math.round(copied.durationMs / 1000) % 60).padStart(2, '0')}`}</span>
-            ) : null}
-          </button>
-          <button type="button" className="yp-action" aria-label={t('common.cancel')} title={t('common.cancel')} onClick={clearCopiedVoice}>
-            <Icon name="x" size={18} />
-          </button>
-        </div>
-      ) : null}
       <form
         className={`yp-composer${replyTo || editing ? ' yp-composer--context' : ''}`}
         onSubmit={(e) => {
@@ -1320,6 +1294,32 @@ export default function ChatPage() {
           void send();
         }}
       >
+        {pasted.length && !editing ? (
+          <div className="chat-paste">
+            <button type="button" className="chat-paste__send" disabled={!!uploading} onClick={() => void sendPasted()}>
+              {pastedThumb ? <img className="chat-paste__thumb" src={pastedThumb} alt="" /> : <Icon name="play" size={18} />}
+              <span>{t('chat.sendPasted')}</span>
+              {pasted.length > 1 ? <span className="chat-paste__time">{pasted.length}</span> : null}
+            </button>
+            <button type="button" className="yp-action" aria-label={t('common.cancel')} title={t('common.cancel')} onClick={() => setPasted([])}>
+              <Icon name="x" size={18} />
+            </button>
+          </div>
+        ) : null}
+        {copied && !editing ? (
+          <div className="chat-paste">
+            <button type="button" className="chat-paste__send" disabled={pasting} onClick={() => void pasteVoice()}>
+              <Icon name="mic" size={18} />
+              <span>{t('chat.pasteVoice')}</span>
+              {copied.durationMs ? (
+                <span className="chat-paste__time">{`${Math.floor(copied.durationMs / 60_000)}:${String(Math.round(copied.durationMs / 1000) % 60).padStart(2, '0')}`}</span>
+              ) : null}
+            </button>
+            <button type="button" className="yp-action" aria-label={t('common.cancel')} title={t('common.cancel')} onClick={clearCopiedVoice}>
+              <Icon name="x" size={18} />
+            </button>
+          </div>
+        ) : null}
         {replyTo || editing ? (
           <div className="chat-compose-context" key={editing ? 'edit' : replyTo?.id}>
             {/* The message box is described by this, so "Replying to …" is read when it gets focus. */}
