@@ -224,6 +224,7 @@ export const ar: Catalog = {
   'm.common.stat': '{label}: {count}',
   'm.common.loadingMore': 'جارٍ التحميل…',
   'm.common.retry': 'حاول مرة أخرى',
+  'compose.uploadFailed': 'لم يُرفع هذا، لذا لم يُنشر شيء بعد.',
   'm.notFound.title': 'هذه الصفحة غير موجودة في التطبيق',
   'm.notFound.body': 'ربما نُقلت أو حُذفت، أو أنها تُفتح على الويب فقط.',
   'm.notFound.home': 'الانتقال إلى نبض',

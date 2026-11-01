@@ -224,6 +224,7 @@ export const ko: Catalog = {
   'm.common.stat': '{label}: {count}',
   'm.common.loadingMore': '불러오는 중…',
   'm.common.retry': '다시 시도',
+  'compose.uploadFailed': '업로드되지 않아 아직 아무것도 게시되지 않았어요.',
   'm.notFound.title': '앱에 없는 페이지예요',
   'm.notFound.body': '이동했거나 삭제되었을 수 있고, 웹에서만 열리는 페이지일 수도 있어요.',
   'm.notFound.home': '펄스로 가기',

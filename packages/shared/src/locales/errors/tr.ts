@@ -1024,6 +1024,7 @@ export const tr: Record<string, string> = {
   'Add a photo or video.': 'Bir fotoğraf ya da video ekle.',
   'Write something first.': 'Önce bir şey yaz.',
   'This upload expired. Start it again.': 'Bu yüklemenin süresi doldu. Yeniden başlat.',
+  'This upload was interrupted. Start it again.': 'Bu yükleme kesildi. Yeniden başlat.',
   'Files can be up to 200 MB, or 500 MB with YAPILAPI Plus.': 'Dosyalar en fazla 200 MB, YAPILAPI Plus ile 500 MB olabilir.',
   'Files can be up to 500 MB.': 'Dosyalar en fazla 500 MB olabilir.',
   "Upload doesn't exist or isn't visible to you.": 'Yükleme yok ya da sana görünmüyor.',

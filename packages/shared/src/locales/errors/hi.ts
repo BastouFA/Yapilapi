@@ -1028,6 +1028,7 @@ export const hi: Record<string, string> = {
   'Add a photo or video.': 'एक फ़ोटो या वीडियो जोड़ें।',
   'Write something first.': 'पहले कुछ लिखें।',
   'This upload expired. Start it again.': 'इस अपलोड का समय खत्म हो गया। इसे फिर से शुरू करें।',
+  'This upload was interrupted. Start it again.': 'यह अपलोड रुक गया। इसे फिर से शुरू करें।',
   'Files can be up to 200 MB, or 500 MB with YAPILAPI Plus.': 'फ़ाइलें 200 MB तक की हो सकती हैं, या YAPILAPI Plus के साथ 500 MB तक।',
   'Files can be up to 500 MB.': 'फ़ाइलें 500 MB तक की हो सकती हैं।',
   "Upload doesn't exist or isn't visible to you.": 'अपलोड मौजूद नहीं है या आपको नहीं दिखता।',

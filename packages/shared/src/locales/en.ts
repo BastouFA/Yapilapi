@@ -228,6 +228,7 @@ export const en = {
   'm.common.stat': '{label}: {count}',
   'm.common.loadingMore': 'Loading…',
   'm.common.retry': 'Try again',
+  'compose.uploadFailed': 'This didn’t upload, so nothing has been posted yet.',
   'm.notFound.title': "This page isn't in the app",
   'm.notFound.body': 'It may have moved or been removed, or it only opens on the web.',
   'm.notFound.home': 'Go to Pulse',

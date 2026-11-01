@@ -351,7 +351,8 @@ export async function buildApp(
     app.get('/media/*', { config: { rateLimit: false } }, async (req, reply) => {
       const key = (req.params as { '*': string })['*'];
       // private/ holds digital products: only buyers get them, through /v1/downloads.
-      if (!/^[\w/.-]+$/.test(key) || key.includes('..') || key.startsWith('private/')) return reply.code(404).send();
+      // .chunks/ holds the parts of uploads still arriving.
+      if (!/^[\w/.-]+$/.test(key) || key.includes('..') || key.startsWith('private/') || key.startsWith('.chunks/')) return reply.code(404).send();
       const obj = await storage.get!(key, req.headers.range);
       if (!obj) return reply.code(404).send({ error: { code: 'not_found', message: 'Media not found.' } });
       // Browsers keep media for a year; shared caches never do. The web app proxies /media (Vercel), and a

@@ -224,6 +224,7 @@ export const hi: Catalog = {
   'm.common.stat': '{label}: {count}',
   'm.common.loadingMore': 'लोड हो रहा है…',
   'm.common.retry': 'फिर से कोशिश करें',
+  'compose.uploadFailed': 'यह अपलोड नहीं हुआ, इसलिए अभी कुछ पोस्ट नहीं हुआ है।',
   'm.notFound.title': 'यह पेज ऐप में नहीं है',
   'm.notFound.body': 'हो सकता है यह कहीं और चला गया हो, हटा दिया गया हो, या सिर्फ़ वेब पर खुलता हो।',
   'm.notFound.home': 'धड़कन पर जाएँ',

@@ -225,6 +225,7 @@ export const ha: Catalog = {
   'm.common.stat': '{label}: {count}',
   'm.common.loadingMore': 'Ana lodawa…',
   'm.common.retry': 'Sake gwadawa',
+  'compose.uploadFailed': 'Wannan bai loda ba, don haka ba a wallafa komai ba tukuna.',
   'm.notFound.title': 'Wannan shafin ba ya cikin manhajar',
   'm.notFound.body': 'Wataƙila an matsar da shi ko an cire shi, ko kuma yana buɗewa a yanar gizo kawai.',
   'm.notFound.home': 'Je zuwa Bugun',

@@ -1012,6 +1012,7 @@ export const ig: Record<string, string> = {
   'Add a photo or video.': 'Tinye foto ma ọ bụ vidiyo.',
   'Write something first.': 'Buru ụzọ dee ihe.',
   'This upload expired. Start it again.': 'Nbugo a agafeela oge. Malite ya ọzọ.',
+  'This upload was interrupted. Start it again.': 'Ebubata a kwụsịrị. Malite ya ọzọ.',
   'Files can be up to 200 MB, or 500 MB with YAPILAPI Plus.': 'Faịlụ nwere ike iru 200 MB, ma ọ bụ 500 MB na YAPILAPI Plus.',
   'Files can be up to 500 MB.': 'Faịlụ nwere ike iru 500 MB.',
   "Upload doesn't exist or isn't visible to you.": 'Nbugo a adịghị ma ọ bụ ị nweghị ike ịhụ ya.',

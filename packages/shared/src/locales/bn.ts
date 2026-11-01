@@ -224,6 +224,7 @@ export const bn: Catalog = {
   'm.common.stat': '{label}: {count}',
   'm.common.loadingMore': 'লোড হচ্ছে…',
   'm.common.retry': 'আবার চেষ্টা করুন',
+  'compose.uploadFailed': 'এটি আপলোড হয়নি, তাই এখনও কিছু পোস্ট হয়নি।',
   'm.notFound.title': 'এই পেজটি অ্যাপে নেই',
   'm.notFound.body': 'এটি হয়তো সরানো বা মুছে ফেলা হয়েছে, অথবা শুধু ওয়েবে খোলে।',
   'm.notFound.home': 'স্পন্দনে যান',

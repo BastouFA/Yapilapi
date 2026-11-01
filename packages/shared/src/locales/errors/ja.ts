@@ -1013,6 +1013,7 @@ export const ja: Record<string, string> = {
   'Add a photo or video.': '写真か動画を追加してください。',
   'Write something first.': '先に何か書いてください。',
   'This upload expired. Start it again.': 'このアップロードは期限切れです。もう一度始めてください。',
+  'This upload was interrupted. Start it again.': 'アップロードが中断されました。もう一度始めてください。',
   'Files can be up to 200 MB, or 500 MB with YAPILAPI Plus.': 'ファイルは200MBまで、YAPILAPI Plusなら500MBまでです。',
   'Files can be up to 500 MB.': 'ファイルは500MBまでです。',
   "Upload doesn't exist or isn't visible to you.": 'アップロードが存在しないか、あなたには表示されません。',

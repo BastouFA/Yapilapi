@@ -224,6 +224,7 @@ export const ig: Catalog = {
   'm.common.stat': '{label}: {count}',
   'm.common.loadingMore': 'Na-ebu…',
   'm.common.retry': 'Nwaa ọzọ',
+  'compose.uploadFailed': 'Nke a ebugoghị, ya mere ebipụtabeghị ihe ọ bụla.',
   'm.notFound.title': 'Peeji a anọghị n’ime app',
   'm.notFound.body': 'O nwere ike ịbụ na a kwagara ya ma ọ bụ wepụ ya, ma ọ bụ na ọ na-emepe naanị na web.',
   'm.notFound.home': 'Gaa na Ịkụ obi',

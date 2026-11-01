@@ -1021,6 +1021,7 @@ export const ru: Record<string, string> = {
   'Add a photo or video.': 'Добавьте фото или видео.',
   'Write something first.': 'Сначала напишите что-нибудь.',
   'This upload expired. Start it again.': 'Срок этой загрузки истёк. Начните её заново.',
+  'This upload was interrupted. Start it again.': 'Загрузка прервалась. Начните её заново.',
   'Files can be up to 200 MB, or 500 MB with YAPILAPI Plus.': 'Размер файла — не больше 200 МБ или 500 МБ с YAPILAPI Plus.',
   'Files can be up to 500 MB.': 'Размер файла — не больше 500 МБ.',
   "Upload doesn't exist or isn't visible to you.": 'Эта загрузка не существует или вам не видна.',

@@ -224,6 +224,7 @@ export const ur: Catalog = {
   'm.common.stat': '{label}: {count}',
   'm.common.loadingMore': 'لوڈ ہو رہا ہے…',
   'm.common.retry': 'دوبارہ کوشش کریں',
+  'compose.uploadFailed': 'یہ اپ لوڈ نہیں ہوا، اس لیے ابھی کچھ پوسٹ نہیں ہوا۔',
   'm.notFound.title': 'یہ صفحہ ایپ میں نہیں ہے',
   'm.notFound.body': 'شاید یہ منتقل یا ہٹا دیا گیا ہے، یا یہ صرف ویب پر کھلتا ہے۔',
   'm.notFound.home': 'نبض پر جائیں',

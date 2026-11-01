@@ -225,6 +225,7 @@ export const ja: Catalog = {
   'm.common.stat': '{label}: {count}',
   'm.common.loadingMore': '読み込み中…',
   'm.common.retry': 'もう一度試す',
+  'compose.uploadFailed': 'アップロードできなかったため、まだ何も投稿されていません。',
   'm.notFound.title': 'このページはアプリにありません',
   'm.notFound.body': '移動または削除されたか、ウェブでのみ開けるページです。',
   'm.notFound.home': 'パルスへ',

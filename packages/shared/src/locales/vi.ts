@@ -225,6 +225,7 @@ export const vi: Catalog = {
   'm.common.stat': '{label}: {count}',
   'm.common.loadingMore': 'Đang tải…',
   'm.common.retry': 'Thử lại',
+  'compose.uploadFailed': 'Tệp chưa tải lên được nên chưa có gì được đăng.',
   'm.notFound.title': 'Trang này không có trong ứng dụng',
   'm.notFound.body': 'Có thể trang đã được chuyển hoặc gỡ, hoặc chỉ mở được trên web.',
   'm.notFound.home': 'Đến Nhịp',

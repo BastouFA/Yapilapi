@@ -1106,6 +1106,7 @@ export const ha: Record<string, string> = {
   'Write something first.': 'Ku fara rubuta wani abu.',
   // apps/api/src/modules/uploads.ts
   'This upload expired. Start it again.': 'Wannan lodawar ta ƙare. Ku sake farawa.',
+  'This upload was interrupted. Start it again.': 'An katse wannan lodawa. Sake farawa.',
   'Files can be up to 200 MB, or 500 MB with YAPILAPI Plus.': 'Fayiloli na iya kaiwa 200 MB, ko 500 MB da YAPILAPI Plus.',
   'Files can be up to 500 MB.': 'Fayiloli na iya kaiwa 500 MB.',
   "Upload doesn't exist or isn't visible to you.": 'Ba a sami lodawar ba, ko kuma ba za ku iya ganinta ba.',

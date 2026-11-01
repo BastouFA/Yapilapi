@@ -225,6 +225,7 @@ export const sw: Catalog = {
   'm.common.stat': '{label}: {count}',
   'm.common.loadingMore': 'Inapakia…',
   'm.common.retry': 'Jaribu tena',
+  'compose.uploadFailed': 'Hii haijapakiwa, kwa hiyo bado hakuna kilichochapishwa.',
   'm.notFound.title': 'Ukurasa huu haupo kwenye programu',
   'm.notFound.body': 'Huenda umehamishwa au kuondolewa, au unafunguka kwenye wavuti pekee.',
   'm.notFound.home': 'Nenda kwenye Mdundo',

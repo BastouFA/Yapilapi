@@ -1040,6 +1040,7 @@ export const zu: Record<string, string> = {
   'Add a photo or video.': 'Engeza isithombe noma ividiyo.',
   'Write something first.': 'Bhala okuthile kuqala.',
   'This upload expired. Start it again.': 'Lokhu kulayisha kuphelelwe yisikhathi. Kuqale futhi.',
+  'This upload was interrupted. Start it again.': 'Lokhu kulayisha kuphazamisekile. Qala kabusha.',
   'Files can be up to 200 MB, or 500 MB with YAPILAPI Plus.': 'Amafayela angaba kuze kube ngu-200 MB, noma ngu-500 MB ne-YAPILAPI Plus.',
   'Files can be up to 500 MB.': 'Amafayela angaba kuze kube ngu-500 MB.',
   "Upload doesn't exist or isn't visible to you.": 'Ukulayisha akukho noma awukwazi ukukubona.',

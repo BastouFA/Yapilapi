@@ -21,6 +21,13 @@ export interface StoredObject {
 }
 
 /** Object storage abstraction. Local disk in development; S3-compatible + CDN in production. */
+/**
+ * Where a part of a resumable upload waits for the rest: in the media storage, not on this server's
+ * disk. A deploy or a restart in the middle of an upload replaces the server, and its disk with it.
+ * /media won't serve these.
+ */
+export const chunkKey = (uploadId: string, index: number) => `.chunks/${uploadId}/${index}`;
+
 export interface MediaStorage {
   driver: 'local' | 's3';
   put(data: Buffer, ext: string, mime: string): Promise<StoredObject>;

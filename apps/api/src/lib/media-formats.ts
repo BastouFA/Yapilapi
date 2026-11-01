@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import ffmpegPath from './ffmpeg-path.ts';
@@ -211,6 +211,55 @@ function ffmpeg(args: string[]): Promise<string> {
     p.on('error', reject);
     p.on('close', (code) => (code === 0 ? resolve(err) : reject(Object.assign(new Error(`ffmpeg exited ${code}`), { stderr: err }))));
   });
+}
+
+/**
+ * A whole video on disk without its tags, like stripVideoMetadata but file to file: nothing of it
+ * is held in memory, so a long video can't run the server out of it.
+ */
+export async function videoFileToWeb(input: string, d: Detected, dir: string): Promise<{ file: string; mime: string; ext: string }> {
+  const named = path.join(dir, `in.${d.ext}`);
+  await rename(input, named);
+  if (REMUX_VIDEO.has(d.ext)) {
+    const faststart = d.ext === 'mp4' || d.ext === 'mov' || d.ext === '3gp' ? ['-movflags', '+faststart'] : [];
+    const file = path.join(dir, `out.${d.ext}`);
+    const ok = await ffmpeg(['-loglevel', 'error', '-y', '-i', named, '-map', '0:v', '-map', '0:a?', '-c', 'copy', ...NO_METADATA, ...faststart, file]).then(
+      () => true,
+      () => false,
+    );
+    if (ok && (await stat(file).catch(() => null))?.size) return { file, mime: d.mime, ext: d.ext };
+  }
+  const file = path.join(dir, 'out.mp4');
+  await ffmpeg([
+    '-loglevel',
+    'error',
+    '-y',
+    '-threads',
+    '1',
+    '-i',
+    named,
+    '-map',
+    '0:v:0',
+    '-map',
+    '0:a:0?',
+    '-c:v',
+    'libx264',
+    '-threads',
+    '1',
+    '-preset',
+    'veryfast',
+    '-crf',
+    '23',
+    '-pix_fmt',
+    'yuv420p',
+    '-c:a',
+    'aac',
+    ...NO_METADATA,
+    '-movflags',
+    '+faststart',
+    file,
+  ]);
+  return { file, mime: 'video/mp4', ext: 'mp4' };
 }
 
 async function ffmpegConvert(buf: Buffer, inExt: string, outExt: string, args: string[]): Promise<Buffer> {

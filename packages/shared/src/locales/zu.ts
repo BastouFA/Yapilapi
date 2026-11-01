@@ -225,6 +225,7 @@ export const zu: Catalog = {
   'm.common.stat': '{label}: {count}',
   'm.common.loadingMore': 'Iyalayisha…',
   'm.common.retry': 'Zama futhi',
+  'compose.uploadFailed': 'Lokhu akulayishwanga, ngakho akukashicilelwa lutho.',
   'm.notFound.title': 'Leli khasi alikho ku-app',
   'm.notFound.body': 'Kungenzeka lisuswe noma lithuthiwe, noma livuleka kuwebhu kuphela.',
   'm.notFound.home': 'Iya ku-Isigqi',

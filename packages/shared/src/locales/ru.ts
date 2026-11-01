@@ -225,6 +225,7 @@ export const ru: Catalog = {
   'm.common.stat': '{label}: {count}',
   'm.common.loadingMore': 'Загрузка…',
   'm.common.retry': 'Попробовать ещё раз',
+  'compose.uploadFailed': 'Файл не загрузился, поэтому ничего ещё не опубликовано.',
   'm.notFound.title': 'Этой страницы нет в приложении',
   'm.notFound.body': 'Возможно, её перенесли или удалили, либо она открывается только в веб-версии.',
   'm.notFound.home': 'Перейти в Пульс',

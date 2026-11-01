@@ -1016,6 +1016,7 @@ export const vi: Record<string, string> = {
   'Add a photo or video.': 'Thêm một ảnh hoặc video.',
   'Write something first.': 'Hãy viết gì đó trước.',
   'This upload expired. Start it again.': 'Lượt tải lên này đã hết hạn. Hãy bắt đầu lại.',
+  'This upload was interrupted. Start it again.': 'Quá trình tải lên bị gián đoạn. Hãy bắt đầu lại.',
   'Files can be up to 200 MB, or 500 MB with YAPILAPI Plus.': 'Tệp có thể tối đa 200 MB, hoặc 500 MB với YAPILAPI Plus.',
   'Files can be up to 500 MB.': 'Tệp có thể tối đa 500 MB.',
   "Upload doesn't exist or isn't visible to you.": 'Lượt tải lên này không tồn tại hoặc bạn không xem được.',

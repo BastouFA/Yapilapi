@@ -1102,6 +1102,7 @@ export const es: Record<string, string> = {
   'Write something first.': 'Primero escribe algo.',
   // apps/api/src/modules/uploads.ts
   'This upload expired. Start it again.': 'Esta subida caducó. Empiézala de nuevo.',
+  'This upload was interrupted. Start it again.': 'Esta subida se interrumpió. Empiézala de nuevo.',
   'Files can be up to 200 MB, or 500 MB with YAPILAPI Plus.': 'Los archivos pueden ocupar hasta 200 MB, o 500 MB con YAPILAPI Plus.',
   'Files can be up to 500 MB.': 'Los archivos pueden ocupar hasta 500 MB.',
   "Upload doesn't exist or isn't visible to you.": 'La subida no existe o no puedes verla.',

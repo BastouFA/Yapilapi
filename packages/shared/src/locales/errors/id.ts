@@ -1023,6 +1023,7 @@ export const id: Record<string, string> = {
   'Add a photo or video.': 'Tambahkan foto atau video.',
   'Write something first.': 'Tulis sesuatu dulu.',
   'This upload expired. Start it again.': 'Unggahan ini sudah kedaluwarsa. Mulai lagi.',
+  'This upload was interrupted. Start it again.': 'Unggahan ini terputus. Mulai lagi.',
   'Files can be up to 200 MB, or 500 MB with YAPILAPI Plus.': 'File maksimal 200 MB, atau 500 MB dengan YAPILAPI Plus.',
   'Files can be up to 500 MB.': 'File maksimal 500 MB.',
   "Upload doesn't exist or isn't visible to you.": 'Unggahan ini tidak ada atau tidak bisa Anda lihat.',

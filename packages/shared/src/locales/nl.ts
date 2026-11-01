@@ -225,6 +225,7 @@ export const nl: Catalog = {
   'm.common.stat': '{label}: {count}',
   'm.common.loadingMore': 'Laden…',
   'm.common.retry': 'Probeer het opnieuw',
+  'compose.uploadFailed': 'Dit is niet geüpload, dus er is nog niets geplaatst.',
   'm.notFound.title': 'Deze pagina staat niet in de app',
   'm.notFound.body': 'Hij is misschien verplaatst of verwijderd, of hij opent alleen op het web.',
   'm.notFound.home': 'Ga naar Hartslag',

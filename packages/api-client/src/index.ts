@@ -249,6 +249,9 @@ export interface ClientOptions {
   prepareUpload?: (file: File) => Promise<File>;
 }
 
+/** Uploads under way, by file: trying the same file again carries on from what already arrived. */
+const resumableUploads = new Map<string, string>();
+
 /** Typed client for the YAPILAPI API, shared by web, mobile and admin. */
 export function createClient(opts: ClientOptions) {
   const f = opts.fetch ?? fetch;
@@ -1788,34 +1791,79 @@ export function createClient(opts: ClientOptions) {
       cancel: (id: string) => post(`/v1/bookings/${id}/cancel`),
     },
     uploads: {
-      /** Chunked, resumable upload. Retries each chunk and resumes from what the server already has. */
+      /**
+       * Chunked, resumable upload. A part that fails is tried again for over a minute (a weak network,
+       * or the server restarting), and trying the same file again carries on from what already arrived.
+       */
       resumable: async (file: File, onProgress?: (fraction: number) => void, altText?: string) => {
         if (opts.prepareUpload) file = await opts.prepareUpload(file);
-        const s = await post<{ uploadId: string; chunkSize: number; totalChunks: number }>('/v1/uploads', {
-          filename: file.name,
-          mime: file.type,
-          size: file.size,
-        });
-        const status = await get<{ missing: number[] }>(`/v1/uploads/${s.uploadId}`);
-        let done = s.totalChunks - status.missing.length;
-        for (const i of status.missing) {
-          const chunk = file.slice(i * s.chunkSize, Math.min(file.size, (i + 1) * s.chunkSize));
-          for (let attempt = 0; ; attempt++) {
+        type Finished = { media: { id: string; kind: 'image' | 'video' | 'audio'; url: string; altText: string | null } };
+        const key = `${file.name}:${file.size}:${file.lastModified}`;
+        // Worth trying again: no answer, or the server having trouble. Anything else won't change by itself.
+        const passing = (e: unknown) => !(e instanceof ApiError) || e.status === 0 || e.status === 429 || e.status >= 500;
+        const WAITS = [1000, 2000, 4000, 8000, 15000, 15000, 15000, 15000];
+        const patient = async <T>(attempt: () => Promise<T>): Promise<T> => {
+          for (let i = 0; ; i++) {
             try {
-              const headers: Record<string, string> = { 'content-type': 'application/octet-stream' };
-              if (opts.token) headers.authorization = `Bearer ${opts.token}`;
-              const res = await f(`${opts.baseUrl}/v1/uploads/${s.uploadId}/chunks/${i}`, { method: 'PUT', body: chunk, headers, credentials: 'include' });
-              if (!res.ok) throw new ApiError(res.status, 'upload_failed', 'A part of the upload failed.');
-              break;
+              return await attempt();
             } catch (e) {
-              if (attempt >= 4) throw e;
-              await new Promise((r) => setTimeout(r, 500 * 2 ** attempt));
+              if (i >= WAITS.length || !passing(e)) throw e;
+              await new Promise((r) => setTimeout(r, WAITS[i]));
             }
           }
-          onProgress?.(++done / s.totalChunks);
-        }
-        return post<{ media: { id: string; kind: 'image' | 'video' | 'audio'; url: string; altText: string | null } }>(`/v1/uploads/${s.uploadId}/complete`, {
-          altText,
+        };
+        const run = async (): Promise<Finished> => {
+          let uploadId = resumableUploads.get(key);
+          let missing: number[] | null = null;
+          let chunkSize = 0;
+          let totalChunks = 0;
+          if (uploadId) {
+            const known = uploadId;
+            const was = await patient(() => get<{ status: string; missing: number[]; chunkSize?: number; totalChunks?: number }>(`/v1/uploads/${known}`)).catch(
+              () => null,
+            );
+            if (was?.status === 'open' && was.chunkSize && was.totalChunks) {
+              missing = was.missing;
+              chunkSize = was.chunkSize;
+              totalChunks = was.totalChunks;
+            } else uploadId = undefined;
+          }
+          if (!uploadId || !missing) {
+            const s = await patient(() =>
+              post<{ uploadId: string; chunkSize: number; totalChunks: number }>('/v1/uploads', { filename: file.name, mime: file.type, size: file.size }),
+            );
+            uploadId = s.uploadId;
+            chunkSize = s.chunkSize;
+            totalChunks = s.totalChunks;
+            missing = Array.from({ length: totalChunks }, (_, i) => i);
+            resumableUploads.set(key, uploadId);
+          }
+          const id = uploadId;
+          let done = totalChunks - missing.length;
+          if (done) onProgress?.(done / totalChunks);
+          for (const i of missing) {
+            const chunk = file.slice(i * chunkSize, Math.min(file.size, (i + 1) * chunkSize));
+            await patient(async () => {
+              const headers: Record<string, string> = { 'content-type': 'application/octet-stream' };
+              if (opts.token) headers.authorization = `Bearer ${opts.token}`;
+              const res = await f(`${opts.baseUrl}/v1/uploads/${id}/chunks/${i}`, { method: 'PUT', body: chunk, headers, credentials: 'include' }).catch(() => {
+                throw new ApiError(0, 'network', "Can't reach YAPILAPI. Check your connection and try again.");
+              });
+              if (!res.ok) throw new ApiError(res.status, 'upload_failed', 'A part of the upload failed.');
+            });
+            onProgress?.(++done / totalChunks);
+          }
+          const finished = await patient(() => post<Finished>(`/v1/uploads/${id}/complete`, { altText }));
+          resumableUploads.delete(key);
+          return finished;
+        };
+        return run().catch((e: unknown) => {
+          // Its parts were lost (kept on a server since replaced): once more from the start.
+          if (e instanceof ApiError && e.code === 'upload_parts_lost') {
+            resumableUploads.delete(key);
+            return run();
+          }
+          throw e;
         });
       },
     },

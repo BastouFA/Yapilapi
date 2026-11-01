@@ -225,6 +225,7 @@ export const tr: Catalog = {
   'm.common.stat': '{label}: {count}',
   'm.common.loadingMore': 'Yükleniyor…',
   'm.common.retry': 'Tekrar dene',
+  'compose.uploadFailed': 'Bu yüklenemedi, yani henüz hiçbir şey paylaşılmadı.',
   'm.notFound.title': 'Bu sayfa uygulamada yok',
   'm.notFound.body': 'Taşınmış ya da kaldırılmış olabilir veya yalnızca web’de açılıyor olabilir.',
   'm.notFound.home': 'Nabız’a git',

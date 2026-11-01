@@ -209,6 +209,7 @@ function Create() {
   // People invited to co-author (people you follow who follow you back).
   const [collaborators, setCollaborators] = useState<PublicUser[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [failedUpload, setFailedUpload] = useState<{ file: File; edits: EditorParamsInput | null; tags: DraftTag[]; why: string } | null>(null);
   const [progress, setProgress] = useState<number | null>(null);
   const [poll, setPoll] = useState<string[] | null>(null);
   // A web link shown under the post (null: no link field).
@@ -514,8 +515,10 @@ function Create() {
               preview: m.kind === 'video' ? URL.createObjectURL(f) : undefined,
             },
           ]);
+        setFailedUpload(null);
       } catch (e) {
-        toast(errorMessage(e));
+        // Stays on screen with Try again: a message that goes away leaves people thinking it was posted.
+        setFailedUpload({ file: f, edits, tags, why: errorMessage(e) });
       } finally {
         setEditing(false);
         setProgress(null);
@@ -1068,6 +1071,16 @@ function Create() {
               hidden
               onChange={(e) => choose(e.currentTarget.files)}
             />
+            {failedUpload && !uploading ? (
+              <div className="upload-failed" role="alert">
+                <p>
+                  <strong>{t('compose.uploadFailed')}</strong> {failedUpload.why}
+                </p>
+                <Button size="sm" onClick={() => enqueueUpload(failedUpload.file, failedUpload.edits, failedUpload.tags)}>
+                  {t('m.common.retry')}
+                </Button>
+              </div>
+            ) : null}
             {media[0]?.kind === 'audio' ? null : (
               <Button size="sm" variant="secondary" icon="image" loading={uploading} onClick={() => fileRef.current?.click()}>
                 {editing

@@ -225,6 +225,7 @@ export const yo: Catalog = {
   'm.common.stat': '{label}: {count}',
   'm.common.loadingMore': 'Ó ń ṣí…',
   'm.common.retry': 'Gbìyànjú lẹ́ẹ̀kan sí i',
+  'compose.uploadFailed': 'Èyí kò gbé sókè, nítorí náà a kò tíì fi ohunkóhun ránṣẹ́.',
   'm.notFound.title': 'Ojú-ìwé yìí kò sí nínú áàpù',
   'm.notFound.body': 'Ó lè ti yí padà tàbí kí wọ́n ti yọ ọ́ kúrò, tàbí orí wẹ́ẹ̀bù nìkan ni ó ti ń ṣí.',
   'm.notFound.home': 'Lọ sí Ìlù',

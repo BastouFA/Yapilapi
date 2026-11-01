@@ -225,6 +225,7 @@ export const de: Catalog = {
   'm.common.stat': '{label}: {count}',
   'm.common.loadingMore': 'Wird geladen…',
   'm.common.retry': 'Erneut versuchen',
+  'compose.uploadFailed': 'Das wurde nicht hochgeladen, also ist noch nichts gepostet.',
   'm.notFound.title': 'Diese Seite gibt es in der App nicht',
   'm.notFound.body': 'Sie wurde vielleicht verschoben oder entfernt, oder sie öffnet sich nur im Web.',
   'm.notFound.home': 'Zu Puls',

@@ -997,6 +997,7 @@ export const ko: Record<string, string> = {
   'Add a photo or video.': '사진 또는 동영상을 추가하세요.',
   'Write something first.': '먼저 무언가를 쓰세요.',
   'This upload expired. Start it again.': '업로드가 만료됐어요. 다시 시작하세요.',
+  'This upload was interrupted. Start it again.': '업로드가 중단되었어요. 다시 시작하세요.',
   'Files can be up to 200 MB, or 500 MB with YAPILAPI Plus.': '파일은 최대 200MB, YAPILAPI Plus로는 500MB까지 가능해요.',
   'Files can be up to 500 MB.': '파일은 최대 500MB까지 가능해요.',
   "Upload doesn't exist or isn't visible to you.": '업로드가 존재하지 않거나 볼 수 없어요.',

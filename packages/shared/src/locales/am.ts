@@ -224,6 +224,7 @@ export const am: Catalog = {
   'm.common.stat': '{label}፦ {count}',
   'm.common.loadingMore': 'በመጫን ላይ…',
   'm.common.retry': 'እንደገና ይሞክሩ',
+  'compose.uploadFailed': 'ይህ አልተጫነም፣ ስለዚህ እስካሁን ምንም አልተለጠፈም።',
   'm.notFound.title': 'ይህ ገጽ በመተግበሪያው ውስጥ የለም',
   'm.notFound.body': 'ተዛውሮ ወይም ተወግዶ ሊሆን ይችላል፣ ወይም በድር ላይ ብቻ ይከፈታል።',
   'm.notFound.home': 'ወደ ትርታ ይሂዱ',

@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { Pool } from 'pg';
 import { tx } from '@yapilapi/database';
 import type { Config } from '../config.ts';
-import type { MediaStorage } from './storage.ts';
+import { chunkKey, type MediaStorage } from './storage.ts';
 import { purgeMedia, removeFiles, removeLiveRecordingFolder, unusedMedia } from './media-files.ts';
 
 /**
@@ -203,9 +203,12 @@ async function sweepRawRecordings(deps: RetentionDeps): Promise<number> {
   return n;
 }
 
-/** Folders of resumable uploads that expired or finished (the chunks on disk). */
-async function sweepUploadChunks(deps: RetentionDeps, ids: string[]): Promise<void> {
-  for (const id of ids) await rm(path.resolve(deps.config.UPLOAD_DIR, '.chunks', id), { recursive: true, force: true }).catch(() => {});
+/** The parts of resumable uploads that expired or finished: in storage, or on disk from before they went there. */
+async function sweepUploadChunks(deps: RetentionDeps, sessions: { id: string; total_chunks: number }[]): Promise<void> {
+  for (const { id, total_chunks } of sessions) {
+    for (let i = 0; i < total_chunks; i++) await deps.storage.remove?.(chunkKey(id, i))?.catch(() => {});
+    await rm(path.resolve(deps.config.UPLOAD_DIR, '.chunks', id), { recursive: true, force: true }).catch(() => {});
+  }
 }
 
 /**
@@ -245,13 +248,10 @@ export async function runRetention(deps: RetentionDeps): Promise<{ counts: Recor
   await step('oauthCodes', () => deleteInBatches(db, 'oauth_codes', `expires_at < ${oneTime}`));
   await step('downloadLinks', () => deleteInBatches(db, 'download_links', `expires_at < ${oneTime}`));
   await step('uploadSessions', async () => {
-    const { rows } = await db.query<{ id: string }>(
-      `DELETE FROM upload_sessions WHERE expires_at < ${oneTime} OR (status IN ('completed', 'failed', 'expired') AND created_at < ${oneTime}) RETURNING id`,
+    const { rows } = await db.query<{ id: string; total_chunks: number }>(
+      `DELETE FROM upload_sessions WHERE expires_at < ${oneTime} OR (status IN ('completed', 'failed', 'expired') AND created_at < ${oneTime}) RETURNING id, total_chunks`,
     );
-    await sweepUploadChunks(
-      deps,
-      rows.map((r) => r.id),
-    );
+    await sweepUploadChunks(deps, rows);
     return rows.length;
   });
   await step('jobs', () =>

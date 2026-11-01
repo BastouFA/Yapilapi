@@ -225,6 +225,7 @@ export const id: Catalog = {
   'm.common.stat': '{label}: {count}',
   'm.common.loadingMore': 'Memuat…',
   'm.common.retry': 'Coba lagi',
+  'compose.uploadFailed': 'Ini gagal diunggah, jadi belum ada yang diposting.',
   'm.notFound.title': 'Halaman ini tidak ada di aplikasi',
   'm.notFound.body': 'Halaman ini mungkin sudah dipindahkan atau dihapus, atau hanya bisa dibuka di web.',
   'm.notFound.home': 'Buka Denyut',

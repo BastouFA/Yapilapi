@@ -975,6 +975,7 @@ export const zh: Record<string, string> = {
   'Add a photo or video.': '请添加一张照片或一段视频。',
   'Write something first.': '请先写点什么。',
   'This upload expired. Start it again.': '这次上传已过期。请重新开始。',
+  'This upload was interrupted. Start it again.': '上传已中断。请重新开始。',
   'Files can be up to 200 MB, or 500 MB with YAPILAPI Plus.': '文件最大为 200 MB，拥有 YAPILAPI Plus 可达 500 MB。',
   'Files can be up to 500 MB.': '文件最大为 500 MB。',
   "Upload doesn't exist or isn't visible to you.": '这次上传不存在，或者你无法查看。',

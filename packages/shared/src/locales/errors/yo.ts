@@ -1089,6 +1089,7 @@ export const yo: Record<string, string> = {
   'Write something first.': 'Kọ́kọ́ kọ nǹkan kan.',
   // apps/api/src/modules/uploads.ts
   'This upload expired. Start it again.': 'Ìgbéjáde sókè yìí ti parí àsìkò rẹ̀. Tún un bẹ̀rẹ̀.',
+  'This upload was interrupted. Start it again.': 'Ìgbéjáde yìí dúró. Tún un bẹ̀rẹ̀.',
   'Files can be up to 200 MB, or 500 MB with YAPILAPI Plus.': 'Fáìlì kò gbọ́dọ̀ ju 200 MB lọ, tàbí 500 MB pẹ̀lú YAPILAPI Plus.',
   'Files can be up to 500 MB.': 'Fáìlì kò gbọ́dọ̀ ju 500 MB lọ.',
   "Upload doesn't exist or isn't visible to you.": 'Ìgbéjáde sókè náà kò sí, tàbí o kò lè rí i.',

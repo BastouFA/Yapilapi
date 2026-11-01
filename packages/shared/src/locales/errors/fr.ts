@@ -1121,6 +1121,7 @@ export const fr: Record<string, string> = {
   'Write something first.': 'Écris d’abord quelque chose.',
   // apps/api/src/modules/uploads.ts
   'This upload expired. Start it again.': 'Cet envoi a expiré. Recommence-le.',
+  'This upload was interrupted. Start it again.': 'Cet envoi a été interrompu. Recommence-le.',
   'Files can be up to 200 MB, or 500 MB with YAPILAPI Plus.': 'Les fichiers peuvent faire jusqu’à 200 Mo, ou 500 Mo avec YAPILAPI Plus.',
   'Files can be up to 500 MB.': 'Les fichiers peuvent faire jusqu’à 500 Mo.',
   "Upload doesn't exist or isn't visible to you.": 'Cet envoi n’existe pas ou tu ne peux pas le voir.',

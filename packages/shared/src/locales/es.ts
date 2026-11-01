@@ -225,6 +225,7 @@ export const es: Catalog = {
   'm.common.stat': '{label}: {count}',
   'm.common.loadingMore': 'Cargando…',
   'm.common.retry': 'Reintentar',
+  'compose.uploadFailed': 'No se ha subido, así que aún no se ha publicado nada.',
   'm.notFound.title': 'Esta página no está en la app',
   'm.notFound.body': 'Puede que se haya movido o eliminado, o que solo se abra en la web.',
   'm.notFound.home': 'Ir a Pulso',

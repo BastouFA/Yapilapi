@@ -1027,6 +1027,7 @@ export const it: Record<string, string> = {
   'Add a photo or video.': 'Aggiungi una foto o un video.',
   'Write something first.': 'Scrivi prima qualcosa.',
   'This upload expired. Start it again.': 'Questo caricamento è scaduto. Ricomincialo.',
+  'This upload was interrupted. Start it again.': 'Questo caricamento è stato interrotto. Ricomincialo.',
   'Files can be up to 200 MB, or 500 MB with YAPILAPI Plus.': 'I file possono arrivare a 200 MB, o 500 MB con YAPILAPI Plus.',
   'Files can be up to 500 MB.': 'I file possono arrivare a 500 MB.',
   "Upload doesn't exist or isn't visible to you.": 'Questo caricamento non esiste o non è visibile per te.',

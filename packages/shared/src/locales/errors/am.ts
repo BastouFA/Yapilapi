@@ -980,6 +980,7 @@ export const am: Record<string, string> = {
   'Add a photo or video.': 'ፎቶ ወይም ቪዲዮ ያክሉ።',
   'Write something first.': 'መጀመሪያ የሆነ ነገር ይጻፉ።',
   'This upload expired. Start it again.': 'ይህ ሰቀላ ጊዜው አልፎበታል። እንደገና ይጀምሩት።',
+  'This upload was interrupted. Start it again.': 'ይህ መጫን ተቋርጧል። እንደገና ይጀምሩት።',
   'Files can be up to 200 MB, or 500 MB with YAPILAPI Plus.': 'ፋይሎች እስከ 200 MB፣ ወይም በYAPILAPI Plus እስከ 500 MB ሊሆኑ ይችላሉ።',
   'Files can be up to 500 MB.': 'ፋይሎች እስከ 500 MB ሊሆኑ ይችላሉ።',
   "Upload doesn't exist or isn't visible to you.": 'ሰቀላው የለም ወይም ለእርስዎ አይታይም።',

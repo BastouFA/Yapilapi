@@ -224,6 +224,7 @@ export const zh: Catalog = {
   'm.common.stat': '{label}：{count}',
   'm.common.loadingMore': '加载中…',
   'm.common.retry': '重试',
+  'compose.uploadFailed': '上传失败，所以还没有发布任何内容。',
   'm.notFound.title': '这个页面不在应用中',
   'm.notFound.body': '它可能已被移动或删除，或者只能在网页上打开。',
   'm.notFound.home': '前往脉动',

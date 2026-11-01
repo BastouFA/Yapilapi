@@ -1075,6 +1075,7 @@ export const ar: Record<string, string> = {
   'Write something first.': 'اكتب شيئًا أولًا.',
   // apps/api/src/modules/uploads.ts
   'This upload expired. Start it again.': 'انتهت صلاحية هذا الرفع. ابدأه مرة أخرى.',
+  'This upload was interrupted. Start it again.': 'توقف هذا الرفع. ابدأه من جديد.',
   'Files can be up to 200 MB, or 500 MB with YAPILAPI Plus.': 'يمكن أن يصل حجم الملفات إلى 200 MB، أو 500 MB مع YAPILAPI Plus.',
   'Files can be up to 500 MB.': 'يمكن أن يصل حجم الملفات إلى 500 MB.',
   "Upload doesn't exist or isn't visible to you.": 'الرفع غير موجود أو لا يمكنك رؤيته.',

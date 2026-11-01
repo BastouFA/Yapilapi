@@ -1104,6 +1104,7 @@ export const sw: Record<string, string> = {
   'Write something first.': 'Andika kitu kwanza.',
   // apps/api/src/modules/uploads.ts
   'This upload expired. Start it again.': 'Upakiaji huu umeisha muda. Uanze tena.',
+  'This upload was interrupted. Start it again.': 'Upakiaji huu ulikatizwa. Uanze tena.',
   'Files can be up to 200 MB, or 500 MB with YAPILAPI Plus.': 'Faili zinaweza kuwa hadi 200 MB, au 500 MB ukiwa na YAPILAPI Plus.',
   'Files can be up to 500 MB.': 'Faili zinaweza kuwa hadi 500 MB.',
   "Upload doesn't exist or isn't visible to you.": 'Upakiaji haupo au huwezi kuuona.',

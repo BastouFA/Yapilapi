@@ -1034,6 +1034,7 @@ export const nl: Record<string, string> = {
   'Add a photo or video.': 'Voeg een foto of video toe.',
   'Write something first.': 'Schrijf eerst iets.',
   'This upload expired. Start it again.': 'Deze upload is verlopen. Begin opnieuw.',
+  'This upload was interrupted. Start it again.': 'Deze upload is onderbroken. Begin opnieuw.',
   'Files can be up to 200 MB, or 500 MB with YAPILAPI Plus.': 'Bestanden mogen maximaal 200 MB zijn, of 500 MB met YAPILAPI Plus.',
   'Files can be up to 500 MB.': 'Bestanden mogen maximaal 500 MB zijn.',
   "Upload doesn't exist or isn't visible to you.": 'Deze upload bestaat niet of is niet zichtbaar voor jou.',

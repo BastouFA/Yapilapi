@@ -1013,6 +1013,7 @@ export const bn: Record<string, string> = {
   'Add a photo or video.': 'একটি ছবি বা ভিডিও যোগ করুন।',
   'Write something first.': 'আগে কিছু লিখুন।',
   'This upload expired. Start it again.': 'এই আপলোডের মেয়াদ শেষ হয়ে গেছে। আবার শুরু করুন।',
+  'This upload was interrupted. Start it again.': 'এই আপলোড থেমে গেছে। আবার শুরু করুন।',
   'Files can be up to 200 MB, or 500 MB with YAPILAPI Plus.': 'ফাইল সর্বোচ্চ 200 MB হতে পারে, YAPILAPI Plus থাকলে 500 MB।',
   'Files can be up to 500 MB.': 'ফাইল সর্বোচ্চ 500 MB হতে পারে।',
   "Upload doesn't exist or isn't visible to you.": 'আপলোডটি নেই বা আপনি এটি দেখতে পারবেন না।',
