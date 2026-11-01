@@ -30,7 +30,7 @@ import {
   NOW_STATUS_AUDIENCES,
   NOW_STATUS_ICONS,
   NOW_STATUS_MAX,
-  PLACE_CATEGORIES,
+  CREATABLE_PLACE_CATEGORIES,
   POST_KINDS,
   PRODUCT_KINDS,
   POST_VISIBILITIES,
@@ -779,7 +779,7 @@ export const rsvpSchema = z.object({ status: z.enum(RSVP_STATUSES) });
 
 export const createPlaceSchema = z.object({
   name: trimmed(120),
-  category: z.enum(PLACE_CATEGORIES),
+  category: z.enum(CREATABLE_PLACE_CATEGORIES),
   address: z.string().trim().max(300).optional(),
   city: z.string().trim().max(100).optional(),
   country: z.string().trim().length(2).optional(),

@@ -207,6 +207,12 @@ const schema = z.object({
   MUSIC_LICENSED_API_KEY: z.string().default(''),
   /** The partner's name as the music picker shows it. */
   MUSIC_LICENSED_NAME: z.string().default('Licensed catalogue'),
+  /**
+   * Reverse geocoding for "Where you are" when tagging a post (lib/geocode.ts): a Nominatim address.
+   * Unset: OpenStreetMap's public service, except in tests (off, so nothing leaves the machine).
+   * "off" turns it off: the apps then suggest only the place pages near you.
+   */
+  GEOCODE_URL: z.string().optional(),
   /** The commit being run, which Render sets on every deploy; shown in the admin console's System tab. Unset elsewhere. */
   RENDER_GIT_COMMIT: z.string().default(''),
   /** Generated "[Dev data]" tones for development and tests. Unset: on outside production; never on in production. */
@@ -223,6 +229,7 @@ const resolved = schema.transform((c) => ({
   JOB_WORKER: c.JOB_WORKER ?? c.APP_ENV !== 'test',
   MEDIA_MODERATION_PROVIDER: c.MEDIA_MODERATION_PROVIDER ?? (c.APP_ENV === 'production' ? ('none' as const) : ('dev' as const)),
   MUSIC_DEV_PROVIDER: c.APP_ENV !== 'production' && (c.MUSIC_DEV_PROVIDER ?? true),
+  GEOCODE_URL: /^(off|none|false|0)$/i.test(c.GEOCODE_URL ?? '') ? '' : (c.GEOCODE_URL ?? (c.APP_ENV === 'test' ? '' : 'https://nominatim.openstreetmap.org')),
 }));
 
 export type Config = z.infer<typeof resolved>;

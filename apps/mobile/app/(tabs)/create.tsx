@@ -237,6 +237,8 @@ export default function Create() {
   const [yap, setYap] = useState<{ uri: string; ms: number } | null>(null);
   const [yapKey, setYapKey] = useState(0);
   const [yapPlace, setYapPlace] = useState<PlacePick | null>(null);
+  // A post's or reel's place page (shown on it, and on the Near you map); not for community posts.
+  const [place, setPlace] = useState<PlacePick | null>(null);
   // Uploaded once: trying again after a refused post doesn't send the recording twice.
   const uploadedYap = useRef<{ uri: string; voice: VoiceClip } | null>(null);
 
@@ -395,6 +397,7 @@ export default function Create() {
           );
           setPoll(post.poll ? post.poll.options.map((o) => o.label) : null);
           setLink(post.linkUrl ?? null);
+          setPlace(post.place ?? null);
           const fields = {
             ...(post.community ? { communityId: post.community.id } : {}),
             ...(post.event ? { eventId: post.event.id } : {}),
@@ -673,6 +676,7 @@ export default function Create() {
     const assisted = aiUsed ? { aiAssisted: true } : {};
     // Only when it differs from the account's choice: left out, the post follows the account.
     const countsChoice = hideCounts !== hideCountsDefault ? { hideCounts } : {};
+    const tagged = place && !keptParts?.fields.communityId ? { placeId: place.id } : {};
     if (kind === 'reel') {
       const v = media!;
       return {
@@ -685,6 +689,7 @@ export default function Create() {
         ...(allowEchoes !== 'default' ? { allowEchoes } : {}),
         commentPolicy,
         ...countsChoice,
+        ...tagged,
         // A duet or remix uses the original; otherwise a sound plays in full instead of the video's own, and a song plays the chosen part.
         ...(remix && original
           ? { remixOf: remix.id, remixMode: remix.mode }
@@ -732,6 +737,7 @@ export default function Create() {
       ...(coauthors.length ? { collaborators: coauthors.map((u) => u.id) } : {}),
       commentPolicy,
       ...countsChoice,
+      ...tagged,
       ...(music && postCanHaveMusic
         ? {
             music: {
@@ -762,6 +768,7 @@ export default function Create() {
     setMore([]);
     setPoll(null);
     setLink(null);
+    setPlace(null);
     setCommentPolicy('everyone');
     setAllowRemix(true);
     hideCountsSet.current = false;
@@ -1363,6 +1370,8 @@ export default function Create() {
             ) : null}
             {kind === 'post' && media?.kind === 'image' ? <PhotoTagger uri={media.local} value={photoTags} onChange={setPhotoTags} /> : null}
             {kind !== 'story' ? <CoauthorPicker value={coauthors} onChange={setCoauthors} /> : null}
+            {/* Where it was made (optional): "Are you here?" suggests the area and the place pages near you. */}
+            {kind !== 'story' && !keptParts?.fields.communityId ? <PlacePicker value={place} onChange={setPlace} /> : null}
 
             {kind === 'reel' && !remix ? <MusicField use="reel" value={music} onChange={setMusic} /> : null}
             {kind === 'post' && postCanHaveMusic ? <MusicField use="post" value={music} onChange={setMusic} /> : null}

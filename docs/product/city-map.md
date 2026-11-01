@@ -109,9 +109,18 @@ picture) that opens the item; a group lists its items.
 (`GET /v1/search?type=places`) and sends `placeId`. Posts show the place as a chip linking to its page (web and phone); lives
 return it as `place`. A draft keeps its place.
 
+**Where you are.** With nothing tagged, the picker (web, and the phone's post, reel and Yap composer) asks "Are you here?": the
+place pages within a kilometre, nearest first (five at most), and the area you're in, as chips. It shows at once when the site or
+app may already read where you are, else after "Use where I am"; nothing is tagged without a tap. `GET /v1/places/here?lat&lng`
+gets them: the apps send the point rounded to 3 decimal places (about 100 metres), and the server names the area with reverse
+geocoding (`apps/api/src/lib/geocode.ts`: Nominatim at `GEOCODE_URL`, answers kept a day by rounded point and language, at most
+one request a second for the whole server, "can't tell" rather than a queue when busy; `off` turns it off). The point isn't kept
+or logged. Tapping the area calls `POST /v1/places/here`, which uses a place page with the same name and city within 3 km, or
+makes one of kind `area` (made only this way, never in the place form); its point is the geocoder's, never the person's.
+
 ## 7. Not done yet
 
 - "Add a place" in the phone's go-live screen (the phone's Yap composer and Ask the city have one: `PlacePicker` in `apps/mobile/lib/city-map.tsx`).
 - The phone screen is type-checked but not yet run on a device (dragging, tile loading).
 - Places buzzing counts posts only; stories and check-ins could count too.
-- A geocoder for cities without place pages.
+- A geocoder for cities without place pages (reverse geocoding names the area you're in when tagging; searching a city by name still needs its place pages).

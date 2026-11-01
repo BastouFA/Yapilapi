@@ -23,8 +23,9 @@ import {
   type MapLayer,
   type MapTarget,
 } from '../../../packages/shared/src/city-map';
-import { clockTime, distanceMetres, type LatLng } from '../../../packages/shared/src/location';
-import { client, mediaUrl, webUrl } from './api';
+import { clockTime, distanceMetres, herePoint, type LatLng, type PlaceArea, type PlacesHere } from '../../../packages/shared/src/location';
+import { client, errorMessage, mediaUrl, webUrl } from './api';
+import { Chip, ChipRow } from './chips';
 import { useT } from './i18n';
 import { elevation, radius, space } from './theme';
 import { Avatar, Button, Field, Icon, useColors, userText, type IconName } from './ui';
@@ -491,6 +492,128 @@ export function PlacePicker({ value, onChange, label }: { value: PlacePick | nul
         </View>
       ))}
       {q.trim().length >= 2 && !places.length ? <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t('m.sticker.noPlaces')}</Text> : null}
+      {q.trim() ? null : (
+        <HereSuggestions
+          onPick={(p) => {
+            onChange(p);
+            setQ('');
+          }}
+        />
+      )}
+    </View>
+  );
+}
+
+/** The last "Where you are" answer, kept for a couple of minutes so the picker doesn't ask again each time it shows. */
+let lastHere: { at: number; answer: PlacesHere } | null = null;
+const HERE_KEEP_MS = 2 * 60 * 1000;
+const keptHere = () => (lastHere && Date.now() - lastHere.at < HERE_KEEP_MS ? lastHere.answer : null);
+
+/**
+ * "Are you here?": the area you're in and the place pages near you, as chips to tap. Shows at once
+ * when the app may already read where you are, else after "Use where I am" (the permission prompt
+ * comes then, never before). Nothing is tagged without a tap. The point is rounded to about 100
+ * metres before it's sent (herePoint) and isn't kept anywhere.
+ */
+function HereSuggestions({ onPick }: { onPick: (p: PlacePick) => void }) {
+  const c = useColors();
+  const { t, locale } = useT();
+  const [answer, setAnswer] = useState<PlacesHere | null>(keptHere);
+  const [state, setState] = useState<'idle' | 'finding' | 'ready' | 'failed' | 'denied'>(() => (keptHere() ? 'ready' : 'idle'));
+  const [tagging, setTagging] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const live = useRef(true);
+
+  async function find(ask: boolean) {
+    setState('finding');
+    try {
+      const at = herePoint(await readHere(ask));
+      const r = await (await client()).places.here(at.lat, at.lng);
+      lastHere = { at: Date.now(), answer: r };
+      if (!live.current) return;
+      setAnswer(r);
+      setState(r.area || r.nearby.length ? 'ready' : 'failed');
+    } catch (e) {
+      if (live.current) setState(e === 'denied' ? 'denied' : 'failed');
+    }
+  }
+
+  useEffect(() => {
+    live.current = true;
+    if (state === 'idle')
+      void Location.getForegroundPermissionsAsync().then(
+        (perm) => {
+          if (perm.status === 'granted' && live.current) void find(false);
+        },
+        () => {},
+      );
+    return () => {
+      live.current = false;
+    };
+    // Only when the picker first shows.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function tagArea(area: PlaceArea) {
+    setTagging(true);
+    setProblem(null);
+    try {
+      const { place } = await (await client()).places.tagHere(area);
+      onPick({ id: place.id, name: place.name, city: place.city ?? null });
+    } catch (e) {
+      if (live.current) setProblem(errorMessage(e));
+    } finally {
+      if (live.current) setTagging(false);
+    }
+  }
+
+  if (state === 'idle' || state === 'finding')
+    return (
+      <View style={{ flexDirection: 'row' }}>
+        <Button
+          label={t(state === 'finding' ? 'place.here.finding' : 'place.here.use')}
+          variant="ghost"
+          size="sm"
+          icon="locate-outline"
+          disabled={state === 'finding'}
+          onPress={() => void find(true)}
+        />
+      </View>
+    );
+  if (state !== 'ready' || !answer)
+    return (
+      <View style={{ gap: space[1] }}>
+        <Text accessibilityLiveRegion="polite" style={{ color: c.inkMuted, fontSize: 13 }}>
+          {t(state === 'denied' ? 'place.here.denied' : 'place.here.failed')}
+        </Text>
+      </View>
+    );
+  const area = answer.area;
+  return (
+    <View style={{ gap: space[2] }}>
+      <Text accessibilityRole="header" style={{ color: c.inkMuted, fontSize: 13, fontWeight: '600' }}>
+        {t('place.here.title')}
+      </Text>
+      <ChipRow label={t('place.here.title')}>
+        {area ? (
+          <Chip
+            icon="location"
+            label={area.city && area.city !== area.name ? `${area.name}, ${area.city}` : area.name}
+            disabled={tagging}
+            onPress={() => void tagArea(area)}
+          />
+        ) : null}
+        {answer.nearby.map((p) => (
+          <Chip
+            key={p.id}
+            icon="location-outline"
+            label={p.name}
+            meta={mapDistance(t, p.distanceM, locale) ?? undefined}
+            onPress={() => onPick({ id: p.id, name: p.name, city: p.city })}
+          />
+        ))}
+      </ChipRow>
+      {problem ? <Text style={{ color: c.danger, fontSize: 13 }}>{problem}</Text> : null}
     </View>
   );
 }

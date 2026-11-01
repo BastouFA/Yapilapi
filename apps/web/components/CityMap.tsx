@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { Button, Icon, TextField, type IconName } from '@yapilapi/design-system';
 import {
   MAP_ATTRIBUTION,
@@ -13,6 +13,7 @@ import {
   clockTime,
   clusterItems,
   distanceMetres,
+  herePoint,
   mapDistance,
   mapTargetPath,
   panBy,
@@ -23,9 +24,11 @@ import {
   type MapCluster,
   type MapItem,
   type MapLayer,
+  type PlaceArea,
+  type PlacesHere,
 } from '@yapilapi/shared';
 import { useSession } from '@/app/providers';
-import { api } from '@/lib/api';
+import { api, errorMessage } from '@/lib/api';
 
 /**
  * Near you's map on the web (docs/product/city-map.md): web-mercator tiles placed as images, with
@@ -300,12 +303,20 @@ export function PlacePicker({ value, onChange }: { value: TaggedPlace | null; on
         </Button>
       </div>
     );
+  const pick = (p: TaggedPlace) => {
+    onChange(p);
+    setOpen(false);
+    setQ('');
+  };
   if (!open)
     return (
-      <div className="row">
-        <Button size="sm" variant="ghost" icon="map-pin" onClick={() => setOpen(true)}>
-          {t('map.tagPlace')}
-        </Button>
+      <div className="stack" style={{ gap: 'var(--space-2)' }}>
+        <div className="row">
+          <Button size="sm" variant="ghost" icon="map-pin" onClick={() => setOpen(true)}>
+            {t('map.tagPlace')}
+          </Button>
+        </div>
+        <HereSuggestions onPick={pick} />
       </div>
     );
   return (
@@ -315,15 +326,7 @@ export function PlacePicker({ value, onChange }: { value: TaggedPlace | null; on
         <ul className="citymap__list">
           {found.map((p) => (
             <li key={p.id}>
-              <button
-                type="button"
-                className="citymap-row citymap-row--button"
-                onClick={() => {
-                  onChange({ id: p.id, name: p.name, city: p.city ?? null });
-                  setOpen(false);
-                  setQ('');
-                }}
-              >
+              <button type="button" className="citymap-row citymap-row--button" onClick={() => pick({ id: p.id, name: p.name, city: p.city ?? null })}>
                 <span className="citymap-row__thumb" aria-hidden="true">
                   <Icon name="map-pin" size={20} />
                 </span>
@@ -336,10 +339,139 @@ export function PlacePicker({ value, onChange }: { value: TaggedPlace | null; on
           ))}
         </ul>
       ) : null}
+      {q.trim() ? null : <HereSuggestions onPick={pick} />}
       <div className="row">
         <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
           {t('m.common.close')}
         </Button>
+      </div>
+    </div>
+  );
+}
+
+/** The last "Where you are" answer, kept for a couple of minutes so the picker doesn't ask again each time it shows. */
+let lastHere: { at: number; answer: PlacesHere } | null = null;
+const HERE_KEEP_MS = 2 * 60 * 1000;
+
+/** Whether this site may already read where the browser is, so suggestions can show without asking. */
+async function geoGranted(): Promise<boolean> {
+  try {
+    return (await navigator.permissions?.query({ name: 'geolocation' }))?.state === 'granted';
+  } catch {
+    return false;
+  }
+}
+
+/** Where the browser is, once: a quick, low-power answer is enough for naming the area. */
+function readHerePosition(): Promise<LatLng> {
+  return new Promise((resolve, reject) => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return reject('unavailable');
+    navigator.geolocation.getCurrentPosition(
+      (p) => resolve(herePoint({ lat: p.coords.latitude, lng: p.coords.longitude })),
+      (e) => reject(e.code === e.PERMISSION_DENIED ? 'denied' : 'unavailable'),
+      { enableHighAccuracy: false, timeout: 8_000, maximumAge: 120_000 },
+    );
+  });
+}
+
+/**
+ * "Are you here?": the area you're in and the place pages near you, as chips to tap. Shows at once
+ * when the site may already read where you are, else after "Use where I am". Nothing is tagged
+ * without a tap. The point is rounded to about 100 metres before it's sent (herePoint) and isn't
+ * kept anywhere but this page.
+ */
+function HereSuggestions({ onPick }: { onPick: (p: TaggedPlace) => void }) {
+  const { t, locale, toast } = useSession();
+  const [state, setState] = useState<'idle' | 'finding' | 'ready' | 'failed' | 'denied'>(() =>
+    lastHere && Date.now() - lastHere.at < HERE_KEEP_MS ? 'ready' : 'idle',
+  );
+  const [answer, setAnswer] = useState<PlacesHere | null>(() => (lastHere && Date.now() - lastHere.at < HERE_KEEP_MS ? lastHere.answer : null));
+  const [tagging, setTagging] = useState(false);
+  const live = useRef(true);
+  const labelId = useId();
+
+  async function find() {
+    setState('finding');
+    try {
+      const at = await readHerePosition();
+      const r = await api.places.here(at.lat, at.lng);
+      lastHere = { at: Date.now(), answer: r };
+      if (!live.current) return;
+      setAnswer(r);
+      setState(r.area || r.nearby.length ? 'ready' : 'failed');
+    } catch (e) {
+      if (live.current) setState(e === 'denied' ? 'denied' : 'failed');
+    }
+  }
+
+  useEffect(() => {
+    live.current = true;
+    if (state === 'idle' && typeof navigator !== 'undefined' && navigator.geolocation)
+      void geoGranted().then((ok) => {
+        if (ok && live.current) void find();
+      });
+    return () => {
+      live.current = false;
+    };
+    // Only when the picker first shows.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function tagArea(area: PlaceArea) {
+    setTagging(true);
+    try {
+      const { place } = await api.places.tagHere(area);
+      onPick({ id: place.id, name: place.name, city: place.city ?? null });
+    } catch (e) {
+      toast(errorMessage(e));
+    } finally {
+      if (live.current) setTagging(false);
+    }
+  }
+
+  if (typeof navigator !== 'undefined' && !navigator.geolocation) return null;
+  if (state === 'idle')
+    return (
+      <div className="row">
+        <Button size="sm" variant="ghost" icon="map-pin" onClick={() => void find()}>
+          {t('place.here.use')}
+        </Button>
+      </div>
+    );
+  if (state === 'finding')
+    return (
+      <p className="place-here__note" role="status">
+        {t('place.here.finding')}
+      </p>
+    );
+  if (state !== 'ready' || !answer)
+    return (
+      <p className="place-here__note" role="status">
+        {t(state === 'denied' ? 'place.here.denied' : 'place.here.failed')}
+      </p>
+    );
+  const area = answer.area;
+  return (
+    <div className="place-here" role="group" aria-labelledby={labelId}>
+      <span id={labelId} className="place-here__title">
+        {t('place.here.title')}
+      </span>
+      <div className="row">
+        {area ? (
+          <button type="button" className="yp-chip place-here__chip" disabled={tagging} onClick={() => void tagArea(area)}>
+            <span aria-hidden="true">📍</span>
+            <bdi className="place-here__text">{area.city && area.city !== area.name ? `${area.name}, ${area.city}` : area.name}</bdi>
+          </button>
+        ) : null}
+        {answer.nearby.map((p) => {
+          const far = mapDistance(t, p.distanceM, locale);
+          return (
+            <button key={p.id} type="button" className="yp-chip place-here__chip" onClick={() => onPick({ id: p.id, name: p.name, city: p.city })}>
+              <bdi className="place-here__text">{p.name}</bdi>
+              {far ? <span className="place-here__far">{far}</span> : null}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

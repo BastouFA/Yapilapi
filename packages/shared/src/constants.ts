@@ -199,7 +199,10 @@ export const FEED_EVENTS_MAX_BATCH = 50;
 
 export const PRODUCT_KINDS = ['product', 'service', 'ticket', 'booking', 'digital'] as const;
 
-export const PLACE_CATEGORIES = ['restaurant', 'store', 'venue', 'attraction', 'service'] as const;
+/** The kinds of place page someone can make. */
+export const CREATABLE_PLACE_CATEGORIES = ['restaurant', 'store', 'venue', 'attraction', 'service'] as const;
+/** Every kind of place page: 'area' (a neighbourhood or a town) is made only from "Where you are" when tagging a post. */
+export const PLACE_CATEGORIES = [...CREATABLE_PLACE_CATEGORIES, 'area'] as const;
 
 export const USER_ROLES = ['user', 'moderator', 'admin'] as const;
 export type UserRole = (typeof USER_ROLES)[number];

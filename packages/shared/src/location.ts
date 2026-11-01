@@ -184,6 +184,49 @@ export function mapPattern(p: LatLng, count = 7): { x1: number; y1: number; x2: 
   return lines;
 }
 
+// ─── Where you are, when tagging a post ─────────────────────────────────
+
+/**
+ * "Where you are" in the place picker: the place pages near you and the area you're in (a
+ * neighbourhood or a town, named by reverse geocoding on the server), suggested and tagged only on a
+ * tap. The point is rounded to about 100 metres (3 decimal places) before it leaves the device; the
+ * server uses it for this answer only and keeps nothing.
+ */
+export interface PlaceArea {
+  name: string;
+  city: string | null;
+  /** ISO 3166-1 alpha-2, upper case. */
+  country: string | null;
+  /** The area's own point as the geocoder gives it, never the person's. */
+  lat: number;
+  lng: number;
+}
+
+export interface NearbyPlace {
+  id: string;
+  name: string;
+  city: string | null;
+  /** From the point that was sent, in metres. */
+  distanceM: number;
+}
+
+export interface PlacesHere {
+  /** Place pages within PLACE_HERE_METRES, nearest first (PLACE_HERE_MAX at most). */
+  nearby: NearbyPlace[];
+  /** The area the point is in; null when it can't be told (or reverse geocoding is off or busy). */
+  area: PlaceArea | null;
+}
+
+/** How far a place page can be and still be suggested, in metres. */
+export const PLACE_HERE_METRES = 1000;
+/** The most place pages suggested. */
+export const PLACE_HERE_MAX = 5;
+
+/** The point "Where you are" sends: rounded to 3 decimal places (about 100 metres). */
+export function herePoint(p: LatLng): LatLng {
+  return { lat: round(Math.max(-90, Math.min(90, p.lat)), 3), lng: round(wrapLng(p.lng), 3) };
+}
+
 // ─── Words ──────────────────────────────────────────────────────────────
 
 /** The app's translator (web and phone pass their own `t`, `tp` and language). */

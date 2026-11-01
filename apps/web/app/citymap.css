@@ -368,3 +368,42 @@
   text-align: start;
   cursor: pointer;
 }
+
+/* "Are you here?" in the place picker: the area you're in and the place pages near you, as chips. */
+.place-here {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  /* Clear of the buttons under it: the chips' touch targets reach 7px below them. */
+  margin-block-end: 2px;
+}
+.place-here__title {
+  font: 600 13px/18px var(--font-sans);
+  color: var(--ink-muted);
+}
+.place-here__note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+/* The chip doesn't clip, so its 44px touch layer reaches past it; a long name is cut off inside it instead. */
+.place-here__chip {
+  max-width: 100%;
+  min-width: 0;
+}
+.place-here__chip:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+.place-here__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.place-here__far {
+  flex-shrink: 0;
+  font-weight: 500;
+  color: var(--ink-muted);
+}

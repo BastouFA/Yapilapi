@@ -5,14 +5,19 @@ import {
   createOrderSchema,
   createPlaceSchema,
   createProductSchema,
+  herePoint,
   hoursKeyDays,
   CURRENCY_SCALE,
   PLACE_CATEGORIES,
+  PLACE_HERE_MAX,
+  PLACE_HERE_METRES,
   PLATFORM_FEE_BPS,
   processingFeeCents,
+  type PlacesHere,
 } from '@yapilapi/shared';
 import { z } from 'zod';
 import { AppError, badRequest, featureDisabled, forbidden, notFound, parse } from '../lib/errors.ts';
+import { requestLocale } from '../lib/error-language.ts';
 import type { AppContext } from '../lib/context.ts';
 import { audit, isEnabled, notify, track } from '../lib/services.ts';
 import { emitWebhook } from '../lib/webhooks.ts';
@@ -250,6 +255,93 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
       params,
     );
     return { items: rows };
+  });
+
+  /**
+   * "Where you are" in the place picker: the place pages within a kilometre, nearest first, and the
+   * area the point is in (lib/geocode.ts). The apps send a point rounded to about 100 metres and only
+   * suggest: nothing is tagged until the person taps. The point isn't kept, and the request log
+   * lines (which carry the URL, so the point) are left out for this route.
+   */
+  app.get(
+    '/v1/places/here',
+    { preHandler: requireAuth, logLevel: 'warn', config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
+    async (req): Promise<PlacesHere> => {
+      const q = parse(z.object({ lat: z.coerce.number().min(-90).max(90), lng: z.coerce.number().min(-180).max(180) }), req.query);
+      const at = herePoint(q);
+      const km = PLACE_HERE_METRES / 1000;
+      const dLat = km / 111;
+      const dLng = km / (111 * Math.cos((at.lat * Math.PI) / 180) || 1);
+      const [{ rows }, area] = await Promise.all([
+        db.query<{ id: string; name: string; city: string | null; metres: number }>(
+          `SELECT id, name, city, metres FROM (
+           SELECT pl.id, pl.name, pl.city,
+                  2 * 6371000 * asin(sqrt(power(sin(radians(pl.lat - $1) / 2), 2) + cos(radians($1)) * cos(radians(pl.lat)) * power(sin(radians(pl.lng - $2) / 2), 2))) AS metres
+           FROM places pl
+           WHERE pl.deleted_at IS NULL AND pl.lat BETWEEN $1 - $3::float8 AND $1 + $3::float8 AND pl.lng BETWEEN $2 - $4::float8 AND $2 + $4::float8
+         ) near WHERE metres <= $5 ORDER BY metres, id LIMIT $6`,
+          // A few more than are shown, so the area's own page can be left out below.
+          [at.lat, at.lng, dLat, dLng, PLACE_HERE_METRES, PLACE_HERE_MAX + 1],
+        ),
+        ctx.geocoder.reverse(at, requestLocale(req)),
+      ]);
+      // The area's own place page is the area suggestion already.
+      const same = (p: { name: string; city: string | null }) =>
+        !!area && p.name.toLowerCase() === area.name.toLowerCase() && (p.city ?? '').toLowerCase() === (area.city ?? '').toLowerCase();
+      const nearby = rows
+        .filter((r) => !same(r))
+        .slice(0, PLACE_HERE_MAX)
+        .map((r) => ({ id: r.id, name: r.name, city: r.city, distanceM: Math.round(r.metres) }));
+      return { nearby, area };
+    },
+  );
+
+  /**
+   * Tagging the area "Where you are" suggested: its place page, made the first time. A place with
+   * the same name and city within 3 km is used again (whichever kind it is), so everyone tagging
+   * the same neighbourhood shares one page.
+   */
+  app.post('/v1/places/here', { preHandler: requireAuth, config: { rateLimit: { max: 30, timeWindow: '1 hour' } } }, async (req, reply) => {
+    const u = me(req);
+    const input = parse(
+      z.object({
+        name: z.string().trim().min(1).max(120),
+        city: z.string().trim().max(100).nullish(),
+        country: z
+          .string()
+          .trim()
+          .regex(/^[A-Za-z]{2}$/)
+          .nullish(),
+        lat: z.number().min(-90).max(90),
+        lng: z.number().min(-180).max(180),
+      }),
+      req.body,
+    );
+    const at = herePoint(input);
+    const city = input.city || null;
+    const km = 3;
+    const dLat = km / 111;
+    const dLng = km / (111 * Math.cos((at.lat * Math.PI) / 180) || 1);
+    const { id, created } = await tx(db, async (c) => {
+      // Two people tagging the same new area at once make one page.
+      await c.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [`place-area:${input.name.toLowerCase()}|${(city ?? '').toLowerCase()}`]);
+      const found = await c.query<{ id: string }>(
+        `SELECT pl.id FROM places pl
+         WHERE pl.deleted_at IS NULL AND lower(pl.name) = lower($1) AND lower(coalesce(pl.city, '')) = lower(coalesce($2::text, ''))
+           AND pl.lat BETWEEN $3 - $5::float8 AND $3 + $5::float8 AND pl.lng BETWEEN $4 - $6::float8 AND $4 + $6::float8
+         ORDER BY power(pl.lat - $3, 2) + power((pl.lng - $4) * cos(radians($3)), 2), pl.created_at
+         LIMIT 1`,
+        [input.name, city, at.lat, at.lng, dLat, dLng],
+      );
+      if (found.rows[0]) return { id: found.rows[0].id, created: false };
+      const made = await c.query<{ id: string }>(
+        `INSERT INTO places (name, category, city, country, lat, lng, created_by) VALUES ($1, 'area', $2, $3, $4, $5, $6) RETURNING id`,
+        [input.name, city, input.country?.toUpperCase() ?? null, at.lat, at.lng, u.id],
+      );
+      return { id: made.rows[0]!.id, created: true };
+    });
+    if (created) reply.code(201);
+    return { place: await loadPlace(id, u.id) };
   });
 
   app.get('/v1/places/:id', async (req) => {

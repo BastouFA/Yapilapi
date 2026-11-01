@@ -208,6 +208,8 @@ import type {
   RadioPage,
   RadioStation,
   RadioStations,
+  PlaceArea,
+  PlacesHere,
 } from '@yapilapi/shared';
 
 export class ApiError extends Error {
@@ -1546,6 +1548,10 @@ export function createClient(opts: ClientOptions) {
     places: {
       list: (params: Record<string, unknown> = {}) => get<{ items: Record<string, any>[] }>(`/v1/places${qs(params)}`),
       get: (id: string) => get<{ place: Record<string, any>; events: EventItem[]; products: Record<string, any>[] }>(`/v1/places/${id}`),
+      /** "Where you are": place pages within a kilometre and the area the point is in. Send a point rounded with herePoint. */
+      here: (lat: number, lng: number) => get<PlacesHere>(`/v1/places/here${qs({ lat, lng })}`),
+      /** Tag the area "Where you are" suggested: its place page, made the first time someone tags it. */
+      tagHere: (area: PlaceArea) => post<{ place: Record<string, any> }>('/v1/places/here', area),
       /** The owner changes a place: details, opening hours by day, and people per time slot (null: no limit). */
       update: (
         id: string,
