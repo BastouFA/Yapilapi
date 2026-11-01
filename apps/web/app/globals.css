@@ -3664,6 +3664,30 @@ video.chat-att__media {
   display: grid;
   gap: var(--space-2);
 }
+.emoji-panel__tone-row {
+  display: flex;
+  justify-content: space-between;
+}
+.emoji-panel__tone {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: var(--radius-full);
+  background: none;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+.emoji-panel__tone:hover {
+  background: var(--surface-sunken);
+}
+.emoji-panel__tone[aria-pressed='true'] {
+  border-color: var(--yapi);
+  background: var(--surface-sunken);
+}
 .emoji-panel__tabs {
   display: flex;
   justify-content: space-between;

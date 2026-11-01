@@ -142,6 +142,30 @@ describe('read receipts', () => {
     expect((await as(t.app, ada).get(`/v1/conversations/${c}`)).body.conversation.readBy).toEqual([]);
   });
 
+  it('tells all your devices the unread count once a chat is read', async () => {
+    const [ada, bo] = [await adult(), await adult()];
+    await befriend(ada, bo);
+    const one = (await as(t.app, ada).post('/v1/conversations', { memberIds: [bo.id] })).body.conversation.id;
+    const cleo = await adult();
+    await befriend(cleo, bo);
+    const two = (await as(t.app, cleo).post('/v1/conversations', { memberIds: [bo.id] })).body.conversation.id;
+    await as(t.app, ada).post(`/v1/conversations/${one}/messages`, { body: 'hi', clientId: 'u1' });
+    await as(t.app, ada).post(`/v1/conversations/${one}/messages`, { body: 'there', clientId: 'u2' });
+    await as(t.app, cleo).post(`/v1/conversations/${two}/messages`, { body: 'hey', clientId: 'u3' });
+    const otherDevice = connect(bo);
+
+    const first = await as(t.app, bo).post(`/v1/conversations/${one}/read`);
+    expect(first.body.unread).toBe(1);
+    expect(otherDevice.of('messages.unread').at(-1)?.data.count).toBe(1);
+    const second = await as(t.app, bo).post(`/v1/conversations/${two}/read`);
+    expect(second.body.unread).toBe(0);
+    expect(second.body.notifications).toBe(0);
+    expect(otherDevice.of('messages.unread').at(-1)?.data.count).toBe(0);
+    const list = (await as(t.app, bo).get('/v1/conversations')).body.items as { unreadCount: number }[];
+    expect(list.reduce((sum, c) => sum + c.unreadCount, 0)).toBe(0);
+    otherDevice.remove();
+  });
+
   it('can be turned off, and then go neither way', async () => {
     const [ada, bo] = [await adult(), await adult()];
     await befriend(ada, bo);

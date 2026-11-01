@@ -33,6 +33,7 @@ import type { AppContext } from '../lib/context.ts';
 import { decodeCursor, keyCursorOf, type KeyCursor } from '../lib/cursor.ts';
 import { analyzeText } from '../lib/moderation.ts';
 import { isEnabled, notify, track } from '../lib/services.ts';
+import { unreadNotifications } from './notifications.ts';
 import { smartRepliesEverywhereSql, smartRepliesState } from '../lib/ai/assists.ts';
 import { ageOf, areFriends, followEachOther, isBlockedEitherWay, publicUserFrom, usersByIds } from '../lib/users.ts';
 import { messagesAllowed, READ_RECEIPTS_ON, seesSensitiveMedia, seesSensitiveSql } from '../lib/interactions.ts';
@@ -946,7 +947,11 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     const { id } = parse(idParam, req.params);
     await assertMember(id, me(req).id);
     await markRead(id, me(req).id);
-    return { ok: true };
+    // The count every device of yours shows: reading on one clears it on the others.
+    // A Yap that came while you were away is read with its chat too, so the notifications count changes as well.
+    const [unread, notifications] = await Promise.all([unreadTotal(me(req).id), unreadNotifications(db, me(req).id)]);
+    await ctx.realtime.publish([me(req).id], { type: 'messages.unread', data: { count: unread, notifications } });
+    return { ok: true, unread, notifications };
   });
 
   /**
@@ -982,6 +987,18 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
    * people with a block between them, and not when either side has read receipts off). The push
    * about new messages here is done with (lib/message-push.ts).
    */
+  /** Unread across your chats, counted like each chat's own number in the inbox. */
+  async function unreadTotal(userId: string): Promise<number> {
+    const { rows } = await db.query<{ unread: number }>(
+      `SELECT count(*)::int AS unread FROM conversation_members cm
+       JOIN messages m ON m.conversation_id = cm.conversation_id AND m.created_at > cm.last_read_at
+       WHERE cm.user_id = $1 AND cm.left_at IS NULL AND m.sender_id <> $1 AND m.deleted_at IS NULL
+         AND m.moderation_status = 'normal' AND (m.kind <> 'system' OR (m.meta->>'type' = 'call' AND m.meta->>'outcome' = 'missed'))`,
+      [userId],
+    );
+    return rows[0]?.unread ?? 0;
+  }
+
   async function markRead(conversationId: string, userId: string) {
     const { rows } = await db.query<{ last_read_at: Date; kind: string }>(
       `UPDATE conversation_members cm SET last_read_at = now() FROM conversations c

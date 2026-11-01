@@ -122,6 +122,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const [translationWorks, setTranslationWorks] = useState(true);
   const [voice, setVoice] = useState<VoiceOffers>({ transcripts: false, translation: false, listen: false });
   const [unread, setUnreadState] = useState({ notifications: 0, messages: 0 });
+  const unreadAnswers = useRef(0);
+  const setUnread = useCallback((u: Partial<{ notifications: number; messages: number }>) => {
+    if (u.messages !== undefined) unreadAnswers.current++;
+    setUnreadState((s) => ({ ...s, ...u }));
+  }, []);
   const [toastState, setToastState] = useState<{ id: number; message: string; action?: ToastAction } | null>(null);
   const toastId = useRef(0);
   const toast = useCallback((message: string, action?: ToastAction) => setToastState({ id: ++toastId.current, message, action }), []);
@@ -265,8 +270,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
       sharedRequest('notifications', () => api.notifications.list())
         .then((r) => setUnreadState((u) => ({ ...u, notifications: r.unread })))
         .catch(() => {});
+      // Set aside if the server said a newer count meanwhile: this list may be from before a chat was read.
+      const asked = unreadAnswers.current;
       sharedRequest('conversations', () => api.conversations.list())
-        .then((r) => setUnreadState((u) => ({ ...u, messages: r.items.reduce((s, c) => s + c.unreadCount, 0) })))
+        .then((r) => {
+          if (asked === unreadAnswers.current) setUnreadState((u) => ({ ...u, messages: r.items.reduce((s, c) => s + c.unreadCount, 0) }));
+        })
         .catch(() => {});
     };
     loadCounts();
@@ -309,13 +318,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
         if (event.type === 'notification.created' && !event.data?.grouped) setUnreadState((u) => ({ ...u, notifications: u.notifications + 1 }));
         // The same as the server counts: messages from others, and calls you missed (not the other lines in a chat).
         const counts = event.data?.kind !== 'system' || (event.data.system?.type === 'call' && event.data.system.outcome === 'missed');
-        if (
-          event.type === 'message.created' &&
-          counts &&
-          event.data.sender.id !== me.id &&
-          !location.pathname.startsWith(`/inbox/${event.data.conversationId}`)
-        )
+        // In the open chat it counts only while the page is out of sight: there, nobody has read it yet.
+        const onScreen = location.pathname.startsWith(`/inbox/${event.data?.conversationId}`) && document.visibilityState === 'visible';
+        if (event.type === 'message.created' && counts && event.data.sender.id !== me.id && !onScreen)
           setUnreadState((u) => ({ ...u, messages: u.messages + 1 }));
+        // A chat was read, on this device or another: the server's own count.
+        if (event.type === 'messages.unread') setUnread({ messages: event.data.count, notifications: event.data.notifications });
         // One page's handler failing doesn't keep the event from the others.
         listeners.current.forEach((l) => {
           try {
@@ -380,7 +388,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     const ws = socket.current;
     if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(frame));
   }, []);
-  const setUnread = useCallback((u: Partial<{ notifications: number; messages: number }>) => setUnreadState((s) => ({ ...s, ...u })), []);
+
   const t = useCallback((key: MessageKey, vars?: Record<string, string | number>) => translate(key, locale, isolate(locale, vars)), [locale]);
   const tp = useCallback(
     (key: PluralKey, count: number, vars?: Record<string, string | number>) => translatePlural(key, count, locale, isolate(locale, vars)),

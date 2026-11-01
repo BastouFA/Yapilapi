@@ -253,6 +253,24 @@ export interface ClientOptions {
 const resumableUploads = new Map<string, string>();
 
 /** Typed client for the YAPILAPI API, shared by web, mobile and admin. */
+const PATIENT_WAITS = [1000, 2000, 4000, 8000, 15000, 15000, 15000, 15000];
+
+/**
+ * Tries again for over a minute while there's no answer or the server is having trouble (a weak
+ * network, or the server restarting). Anything else won't change by itself, so it's thrown at once.
+ */
+export async function patiently<T>(attempt: () => Promise<T>): Promise<T> {
+  for (let i = 0; ; i++) {
+    try {
+      return await attempt();
+    } catch (e) {
+      const passing = !(e instanceof ApiError) || e.status === 0 || e.status === 429 || e.status >= 500;
+      if (i >= PATIENT_WAITS.length || !passing) throw e;
+      await new Promise((r) => setTimeout(r, PATIENT_WAITS[i]));
+    }
+  }
+}
+
 export function createClient(opts: ClientOptions) {
   const f = opts.fetch ?? fetch;
   /** The app's own headers, and its language. */
@@ -1183,7 +1201,8 @@ export function createClient(opts: ClientOptions) {
       /** Suggested replies in this chat: on, off, or null for the default (on in one-to-one chats, off in groups). */
       setSmartReplies: (id: string, enabled: boolean | null) =>
         put<{ smartReplies: ConversationSmartReplies }>(`/v1/conversations/${id}/smart-replies`, { enabled }),
-      read: (id: string) => post(`/v1/conversations/${id}/read`),
+      /** Marks the chat read; `unread` is what is still unread across all your chats, `notifications` the same for notifications. */
+      read: (id: string) => post<{ ok: true; unread: number; notifications: number }>(`/v1/conversations/${id}/read`),
       /** A poll: 2 to 10 options; one choice unless `multiple`; `endsAt` from 5 minutes to 30 days ahead. */
       createPoll: (
         id: string,
@@ -1800,19 +1819,6 @@ export function createClient(opts: ClientOptions) {
         if (opts.prepareUpload) file = await opts.prepareUpload(file);
         type Finished = { media: { id: string; kind: 'image' | 'video' | 'audio'; url: string; altText: string | null } };
         const key = `${file.name}:${file.size}:${file.lastModified}`;
-        // Worth trying again: no answer, or the server having trouble. Anything else won't change by itself.
-        const passing = (e: unknown) => !(e instanceof ApiError) || e.status === 0 || e.status === 429 || e.status >= 500;
-        const WAITS = [1000, 2000, 4000, 8000, 15000, 15000, 15000, 15000];
-        const patient = async <T>(attempt: () => Promise<T>): Promise<T> => {
-          for (let i = 0; ; i++) {
-            try {
-              return await attempt();
-            } catch (e) {
-              if (i >= WAITS.length || !passing(e)) throw e;
-              await new Promise((r) => setTimeout(r, WAITS[i]));
-            }
-          }
-        };
         const run = async (): Promise<Finished> => {
           let uploadId = resumableUploads.get(key);
           let missing: number[] | null = null;
@@ -1820,9 +1826,9 @@ export function createClient(opts: ClientOptions) {
           let totalChunks = 0;
           if (uploadId) {
             const known = uploadId;
-            const was = await patient(() => get<{ status: string; missing: number[]; chunkSize?: number; totalChunks?: number }>(`/v1/uploads/${known}`)).catch(
-              () => null,
-            );
+            const was = await patiently(() =>
+              get<{ status: string; missing: number[]; chunkSize?: number; totalChunks?: number }>(`/v1/uploads/${known}`),
+            ).catch(() => null);
             if (was?.status === 'open' && was.chunkSize && was.totalChunks) {
               missing = was.missing;
               chunkSize = was.chunkSize;
@@ -1830,7 +1836,7 @@ export function createClient(opts: ClientOptions) {
             } else uploadId = undefined;
           }
           if (!uploadId || !missing) {
-            const s = await patient(() =>
+            const s = await patiently(() =>
               post<{ uploadId: string; chunkSize: number; totalChunks: number }>('/v1/uploads', { filename: file.name, mime: file.type, size: file.size }),
             );
             uploadId = s.uploadId;
@@ -1844,7 +1850,7 @@ export function createClient(opts: ClientOptions) {
           if (done) onProgress?.(done / totalChunks);
           for (const i of missing) {
             const chunk = file.slice(i * chunkSize, Math.min(file.size, (i + 1) * chunkSize));
-            await patient(async () => {
+            await patiently(async () => {
               const headers: Record<string, string> = { 'content-type': 'application/octet-stream' };
               if (opts.token) headers.authorization = `Bearer ${opts.token}`;
               const res = await f(`${opts.baseUrl}/v1/uploads/${id}/chunks/${i}`, { method: 'PUT', body: chunk, headers, credentials: 'include' }).catch(() => {
@@ -1854,7 +1860,7 @@ export function createClient(opts: ClientOptions) {
             });
             onProgress?.(++done / totalChunks);
           }
-          const finished = await patient(() => post<Finished>(`/v1/uploads/${id}/complete`, { altText }));
+          const finished = await patiently(() => post<Finished>(`/v1/uploads/${id}/complete`, { altText }));
           resumableUploads.delete(key);
           return finished;
         };

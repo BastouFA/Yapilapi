@@ -56,6 +56,8 @@ function useUnreadChats(signedIn: boolean, tab: number) {
   useEffect(load, [load, tab]);
   useRealtime((e) => {
     if (e.type === 'message.created' || e.type === 'conversation.created' || e.type === 'app.foreground') load();
+    // A chat was read, here or on another device: the server's own count.
+    if (e.type === 'messages.unread') setCount(e.data.count);
   });
   return count;
 }

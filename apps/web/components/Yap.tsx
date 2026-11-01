@@ -84,7 +84,8 @@ export function YapButton({
   onError,
   disabled,
 }: {
-  onRecorded: (file: File, durationMs: number) => void;
+  /** Says whether it went: one that didn't stays here to send again. */
+  onRecorded: (file: File, durationMs: number) => Promise<boolean>;
   onError: (message: string) => void;
   disabled?: boolean;
 }) {
@@ -100,6 +101,7 @@ export function YapButton({
   const downY = useRef(0);
   // The recording waiting for Send or Cancel.
   const [review, setReview] = useState<{ file: File; ms: number; url: string } | null>(null);
+  const [sending, setSending] = useState(false);
   const reviewing = useRef(false);
   reviewing.current = !!review;
 
@@ -197,9 +199,13 @@ export function YapButton({
     return (
       <YapReview
         review={review}
+        sending={sending}
         onSend={() => {
-          onRecorded(review.file, review.ms);
-          setReview(null);
+          setSending(true);
+          void onRecorded(review.file, review.ms).then((sent) => {
+            setSending(false);
+            if (sent) setReview(null);
+          });
         }}
         onCancel={() => setReview(null)}
       />
@@ -269,7 +275,7 @@ const yapClock = (ms: number) => {
 };
 
 /** The Yap you just recorded: listen back, then Send it or Cancel it (nothing is sent until Send). */
-function YapReview({ review, onSend, onCancel }: { review: { url: string; ms: number }; onSend: () => void; onCancel: () => void }) {
+function YapReview({ review, sending, onSend, onCancel }: { review: { url: string; ms: number }; sending: boolean; onSend: () => void; onCancel: () => void }) {
   const { t } = useSession();
   const player = useRef<HTMLAudioElement>(null);
   const send = useRef<HTMLButtonElement>(null);
@@ -295,12 +301,12 @@ function YapReview({ review, onSend, onCancel }: { review: { url: string; ms: nu
       <span className="yap-review__time" aria-hidden>
         {t('yap.review', { time: yapClock(review.ms) })}
       </span>
-      <Button variant="ghost" icon="trash" onClick={onCancel}>
+      <Button variant="ghost" icon="trash" onClick={onCancel} disabled={sending}>
         {t('common.cancel')}
       </Button>
-      <button type="button" ref={send} className="yap-review__send" onClick={onSend}>
+      <button type="button" ref={send} className="yap-review__send" onClick={onSend} disabled={sending}>
         <Icon name="send" size={20} />
-        <span>{t('inbox.send')}</span>
+        <span>{sending ? t('chat.sendingYap') : t('inbox.send')}</span>
       </button>
     </div>
   );

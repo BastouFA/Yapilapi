@@ -1,10 +1,10 @@
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import ffmpegPath from '../src/lib/ffmpeg-path.ts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { detectMedia } from '../src/lib/media-formats.ts';
+import { detectMedia, toWebFormat } from '../src/lib/media-formats.ts';
 import { mediaJobHandlers } from '../src/lib/media-processing.ts';
 import { signUp, testApp, type TestUser } from './helpers.ts';
 import type { BuiltApp } from '../src/app.ts';
@@ -117,5 +117,53 @@ describe('photo, video and audio formats', () => {
   it('refuses files that are not photos, videos or audio, whatever they are called', async () => {
     expect((await upload('notes.jpg', Buffer.from('just some text, not a photo'), 'image/jpeg')).status).toBe(415);
     expect((await upload('doc.pdf', Buffer.from('%PDF-1.7 fake'), 'application/pdf')).status).toBe(415);
+  });
+
+  describe('sound recorded in the browser', () => {
+    const FFMPEG = ffmpegPath as unknown as string;
+    /** Rich sound like music, as a browser records it, with its loudest moment at about this level. */
+    const recording = (volume: string) => {
+      const dir = mkdtempSync(path.join(tmpdir(), 'ypl-rec-'));
+      const file = path.join(dir, 'in.webm');
+      execFileSync(FFMPEG, [
+        '-hide_banner',
+        '-loglevel',
+        'error',
+        '-y',
+        '-f',
+        'lavfi',
+        '-i',
+        'anoisesrc=d=4:c=pink:r=48000:a=1',
+        '-af',
+        `volume=${volume}`,
+        '-c:a',
+        'libopus',
+        '-b:a',
+        '128k',
+        file,
+      ]);
+      return readFileSync(file);
+    };
+    const about = (out: Buffer) => {
+      const dir = mkdtempSync(path.join(tmpdir(), 'ypl-out-'));
+      const file = path.join(dir, 'out.m4a');
+      writeFileSync(file, out);
+      const info = spawnSync(FFMPEG, ['-hide_banner', '-i', file, '-af', 'volumedetect', '-f', 'null', '-']).stderr.toString();
+      return { peak: Number(/max_volume:\s*(-?[\d.]+) dB/.exec(info)?.[1]), kbps: Number(/Audio: aac.*?(\d+) kb\/s/.exec(info)?.[1]) };
+    };
+
+    it('keeps it clear', async () => {
+      const raw = recording('-3dB');
+      const out = await toWebFormat(raw, detectMedia(raw, 'audio/webm')!);
+      expect(out.mime).toBe('audio/mp4');
+      expect(about(out.buf).kbps).toBeGreaterThan(100);
+    });
+
+    it('raises a quiet one, without going past the top', async () => {
+      const raw = recording('-16dB');
+      const { peak } = about((await toWebFormat(raw, detectMedia(raw, 'audio/webm')!)).buf);
+      expect(peak).toBeGreaterThan(-4);
+      expect(peak).toBeLessThanOrEqual(0);
+    });
   });
 });

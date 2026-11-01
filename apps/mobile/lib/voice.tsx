@@ -543,8 +543,8 @@ export const VOICE_RECORDING: RecordingOptions = {
   ...RecordingPresets.HIGH_QUALITY,
   sampleRate: 44100,
   numberOfChannels: 1,
-  bitRate: 96000,
-  web: { mimeType: 'audio/webm', bitsPerSecond: 96000 },
+  bitRate: 128000,
+  web: { mimeType: 'audio/webm', bitsPerSecond: 128000 },
 };
 /** As Yaps are recorded, with the loudness reported for the live waveform. */
 const RECORDING: RecordingOptions = { ...VOICE_RECORDING, isMeteringEnabled: true };

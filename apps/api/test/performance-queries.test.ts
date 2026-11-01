@@ -153,7 +153,7 @@ describe('reels (ranked among the newest reels and your people’s reels)', () =
     do {
       const r = await as(t.app, fan).get(`/v1/reels?limit=20${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
       seen.push(...ids(r.body.items));
-      cursor = seen.includes(strangerReel) ? null : r.body.nextCursor;
+      cursor = seen.includes(strangerReel) && seen.includes(followedReel) ? null : r.body.nextCursor;
     } while (cursor);
     expect(seen).toContain(strangerReel);
     expect(seen).toContain(followedReel);

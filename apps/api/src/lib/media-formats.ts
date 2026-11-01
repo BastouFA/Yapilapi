@@ -113,10 +113,23 @@ export async function toWebFormat(buf: Buffer, d: Detected): Promise<{ buf: Buff
   }
   if (d.kind === 'image') return { buf: await stripImageMetadata(buf, d.mime), mime: d.mime, ext: d.ext };
   if (d.kind === 'audio') {
-    const toM4a = () => ffmpegConvert(buf, d.ext, 'm4a', ['-vn', '-c:a', 'aac', '-b:a', '96k', ...NO_METADATA, '-movflags', '+faststart']);
     // A browser's recording in pieces (fragmented MP4 from Safari) can say it lasts no time at all,
     // and an iPhone won't play it: it's rebuilt from its sound, like WebM is.
     let converted = !WEB_AUDIO.has(d.mime) || isFragmentedMp4(buf);
+    // A quiet recording is raised, all of it by the same amount, so music keeps its louder and softer parts.
+    const gainDb = converted ? await quietGainDb(buf, d.ext) : 0;
+    const toM4a = () =>
+      ffmpegConvert(buf, d.ext, 'm4a', [
+        '-vn',
+        ...(gainDb ? ['-af', `volume=${gainDb}dB`] : []),
+        '-c:a',
+        'aac',
+        '-b:a',
+        AUDIO_BITRATE,
+        ...NO_METADATA,
+        '-movflags',
+        '+faststart',
+      ]);
     let out: Buffer;
     if (converted) out = await toM4a();
     else {
@@ -270,6 +283,33 @@ async function ffmpegConvert(buf: Buffer, inExt: string, outExt: string, args: s
     await writeFile(input, buf);
     await ffmpeg(['-loglevel', 'error', '-y', '-i', input, ...args, output]);
     return await readFile(output);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+/** Sound we encode ourselves: enough for a song to stay clear, at about 1 MB a minute. */
+const AUDIO_BITRATE = '128k';
+/** Recordings whose loudest moment is under this (dB) are raised... */
+const QUIET_PEAK_DB = -6;
+/** ...until it's here, by at most MAX_RAISE_DB (a near-silent room doesn't become loud hiss)... */
+const RAISED_PEAK_DB = -1.5;
+const MAX_RAISE_DB = 18;
+/** ...and one under this has nothing in it worth raising. */
+const SILENT_PEAK_DB = -50;
+
+/** How much (dB) to raise a quiet recording; 0 when it's loud enough, silent, or can't be read. */
+async function quietGainDb(buf: Buffer, ext: string): Promise<number> {
+  const dir = await mkdtemp(path.join(tmpdir(), 'ypl-peak-'));
+  try {
+    const input = path.join(dir, `in.${ext}`);
+    await writeFile(input, buf);
+    const info = await ffmpeg(['-i', input, '-map', '0:a:0', '-af', 'volumedetect', '-f', 'null', '-']);
+    const peak = Number(/max_volume:\s*(-?\d+(?:\.\d+)?) dB/.exec(info)?.[1]);
+    if (!Number.isFinite(peak) || peak >= QUIET_PEAK_DB || peak < SILENT_PEAK_DB) return 0;
+    return Math.round(Math.min(MAX_RAISE_DB, RAISED_PEAK_DB - peak) * 10) / 10;
+  } catch {
+    return 0;
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

@@ -19,6 +19,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { AIPanel, BottomSheet, Button, ChatBubble, EmptyState, Icon, Menu, Skeleton, Switch, TranslatableText, type MenuAction } from '@yapilapi/design-system';
 import type { ChatGame, Conversation, Message, ScheduledMessage } from '@yapilapi/shared';
+import { patiently } from '@yapilapi/api-client';
 import { api, errorMessage, isGone } from '@/lib/api';
 import { useChatBase } from '@/lib/chat-base';
 import { closeChatNotifications } from '@/lib/push';
@@ -73,7 +74,7 @@ type Pending = Message & { pending?: boolean };
 export default function ChatPage() {
   const { id } = useParams<{ id: string }>();
   const base = useChatBase();
-  const { me, t, tp, toast, locale, setUnread, unread, flags, sendRealtime } = useSession();
+  const { me, t, tp, toast, locale, setUnread, flags, sendRealtime } = useSession();
   const [conv, setConv] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Pending[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -185,6 +186,15 @@ export default function ChatPage() {
       (r) => setConv(r.conversation),
       () => {},
     );
+  // Read means on screen: the badge then takes the server's count, the one all your devices show.
+  function markRead() {
+    if (document.visibilityState !== 'visible') return;
+    api.conversations.read(id).then(
+      (r) => setUnread({ messages: r.unread, notifications: r.notifications }),
+      () => {},
+    );
+    void closeChatNotifications(id);
+  }
   function load() {
     setLoadError(null);
     Promise.all([api.conversations.get(id), api.conversations.messages(id)]).then(
@@ -192,10 +202,7 @@ export default function ChatPage() {
         setConv(c.conversation);
         setMessages(r.items);
         setCursor(r.nextCursor);
-        void api.conversations.read(id).catch(() => {});
-        void closeChatNotifications(id);
-        // What was unread here is read now.
-        setUnread({ messages: Math.max(0, unread.messages - c.conversation.unreadCount) });
+        markRead();
       },
       (e) => setLoadError({ gone: isGone(e), text: isGone(e) ? t('chat.group.gone') : errorMessage(e) }),
     );
@@ -203,6 +210,17 @@ export default function ChatPage() {
   }
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+  // Back to this page: what came in while it was out of sight is read now.
+  useEffect(() => {
+    const back = () => markRead();
+    document.addEventListener('visibilitychange', back);
+    window.addEventListener('focus', back);
+    return () => {
+      document.removeEventListener('visibilitychange', back);
+      window.removeEventListener('focus', back);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -269,14 +287,17 @@ export default function ChatPage() {
     // down. Messages already here, including older ones scrolled back to, stay.
     if (e.type === 'ready')
       api.conversations.messages(id).then(
-        (page) =>
+        (page) => {
+          // They are on screen now, so they are read.
+          markRead();
           setMessages((cur) => {
             if (!cur) return cur;
             const fresh = new Map(page.items.map((m) => [m.id, m]));
             const ids = new Set(cur.map((m) => m.id));
             const clientIds = new Set(cur.map((m) => m.clientId).filter(Boolean));
             return [...cur.map((m) => fresh.get(m.id) ?? m), ...page.items.filter((m) => !ids.has(m.id) && !(m.clientId && clientIds.has(m.clientId)))];
-          }),
+          });
+        },
         () => {},
       );
     if (e.type === 'message.created' && e.data.conversationId === id) {
@@ -288,7 +309,7 @@ export default function ChatPage() {
         if (pendingIdx >= 0) return cur.map((x, i) => (i === pendingIdx ? m : x));
         return [...cur, m];
       });
-      if (e.data.sender.id !== me?.id) void api.conversations.read(id);
+      if (e.data.sender.id !== me?.id) markRead();
       setTyping((cur) => (cur?.userId === e.data.sender.id ? null : cur));
     }
     // Disappeared (or removed by moderation), or deleted just for you on another device.
@@ -435,19 +456,25 @@ export default function ChatPage() {
   const lastArrived = messages?.filter((m) => !m.pending).at(-1)?.id ?? null;
 
   /** Upload a photo, video or voice recording, then send it as a message (a yap, or view once). */
-  async function sendFile(file: File, label: string, o: { kind?: 'yap'; viewOnce?: boolean } = {}) {
-    if (!me) return;
-    if (file.size > 50 * 1024 * 1024) return toast(t('chat.fileTooBig'));
+  /** Sends a file, and says whether it went. A moment without the server doesn't lose it: it keeps trying for over a minute. */
+  async function sendFile(file: File, label: string, o: { kind?: 'yap'; viewOnce?: boolean } = {}): Promise<boolean> {
+    if (!me) return false;
+    if (file.size > 50 * 1024 * 1024) {
+      toast(t('chat.fileTooBig'));
+      return false;
+    }
     setUploading(label);
     try {
-      const { media } = await api.media.upload(file, undefined, { viewOnce: o.viewOnce });
+      const { media } = await patiently(() => api.media.upload(file, undefined, { viewOnce: o.viewOnce }));
       const clientId = crypto.randomUUID();
-      const { message, notice, noticeCode } = await api.conversations.send(id, '', clientId, [{ mediaId: media.id }], o);
+      const { message, notice, noticeCode } = await patiently(() => api.conversations.send(id, '', clientId, [{ mediaId: media.id }], o));
       setMessages((cur) => (cur?.some((x) => x.id === message.id) ? cur : [...(cur ?? []), message]));
       const note = noticeText({ code: noticeCode, message: notice }, t);
       if (note) toast(note);
+      return true;
     } catch (e) {
       toast(errorMessage(e));
+      return false;
     } finally {
       setUploading(null);
     }
@@ -614,6 +641,22 @@ export default function ChatPage() {
           icon: 'copy',
           onSelect: () => void copyText(m.body).then((ok) => toast(t(ok ? 'chat.copied' : 'common.copyFailed'))),
         });
+      // A voice: its words, and a link that plays it (clipboards don't take sound).
+      const voice = m.attachments?.find((a) => a.kind === 'audio' && !a.removed && a.url);
+      if (voice) {
+        const words = m.transcript?.text;
+        if (words)
+          actions.push({
+            label: t('chat.copyWords'),
+            icon: 'copy',
+            onSelect: () => void copyText(words).then((ok) => toast(t(ok ? 'chat.copied' : 'common.copyFailed'))),
+          });
+        actions.push({
+          label: t('chat.copyVoice'),
+          icon: 'copy',
+          onSelect: () => void copyText(new URL(voice.url, location.origin).toString()).then((ok) => toast(t(ok ? 'chat.copied' : 'common.copyFailed'))),
+        });
+      }
       const photo = m.attachments?.find((a) => a.kind === 'image' && !a.removed && !a.sensitive);
       if (photo)
         actions.push({
@@ -1097,7 +1140,7 @@ export default function ChatPage() {
       {conv?.yaps?.available ? (
         <div className="yap-row">
           <TurnOnYapsPrompt />
-          <YapButton disabled={!!uploading} onError={toast} onRecorded={(f) => void sendFile(f, t('chat.sendingYap'), { kind: 'yap' })} />
+          <YapButton disabled={!!uploading} onError={toast} onRecorded={(f) => sendFile(f, t('chat.sendingYap'), { kind: 'yap' })} />
         </div>
       ) : null}
       {!editing ? (

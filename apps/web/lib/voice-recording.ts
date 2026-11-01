@@ -1,14 +1,18 @@
 /**
  * How the web records a voice (Yaps, voice replies and intros, voice messages, Hold to Yap): one
- * channel, with the browser's echo cancelling, noise suppression and level control, at a rate
- * that keeps a voice clear. The server cleans up and re-encodes what it keeps (lib/voice.ts).
+ * channel, as the microphone hears it, at a rate that also keeps music clear. The server evens out
+ * the level of what it keeps (lib/media-formats.ts, lib/voice.ts).
  */
 
-/** The microphone as a voice recording asks for it. */
-export const VOICE_AUDIO: MediaTrackConstraints = { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 };
+/**
+ * The microphone as a voice recording asks for it. Without the browser's call filters: echo
+ * cancelling and noise suppression take music for noise and chop it, and level control makes it
+ * pump. Those are for live calls (components/Calls.tsx), where the other side's sound comes back.
+ */
+export const VOICE_AUDIO: MediaTrackConstraints = { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 };
 
 /** Bits a second the browser records a voice at. */
-const VOICE_BITS_PER_SECOND = 96_000;
+const VOICE_BITS_PER_SECOND = 128_000;
 
 /**
  * Safari and every browser on an iPhone or iPad. They record MP4 (AAC) well; their WebM recorder

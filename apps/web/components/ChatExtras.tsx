@@ -12,8 +12,13 @@ import {
   groupLineText,
   messagePreviewText,
   favouriteReactions,
+  inTone,
   REACTION_GROUPS,
+  readTone,
   rememberReaction,
+  SKIN_TONES,
+  type SkinTone,
+  withTone,
   type Message,
   type MessageReceipt,
   type MessageKey,
@@ -119,6 +124,36 @@ function useRecentReactions(): string[] {
   );
 }
 
+// ── Your skin colour for emojis, kept on this device ──
+const TONE_KEY = 'ypl.reactions.tone';
+let tone: SkinTone | null = null;
+const toneListeners = new Set<() => void>();
+function readSkinTone(): SkinTone {
+  if (tone !== null) return tone;
+  try {
+    tone = readTone(localStorage.getItem(TONE_KEY));
+  } catch {
+    tone = '';
+  }
+  return tone;
+}
+function chooseSkinTone(next: SkinTone) {
+  tone = next;
+  try {
+    localStorage.setItem(TONE_KEY, next);
+  } catch {
+    /* storage off: remembered for this visit */
+  }
+  toneListeners.forEach((l) => l());
+}
+function useSkinTone(): SkinTone {
+  return useSyncExternalStore(
+    (l) => (toneListeners.add(l), () => void toneListeners.delete(l)),
+    readSkinTone,
+    () => '',
+  );
+}
+
 /** The emoji you picked pops up out of its button and fades, so you see it land. */
 function burst(from: HTMLElement, emoji: string) {
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -164,7 +199,7 @@ export function ReactionPicker({
 }) {
   const { t } = useSession();
   // Your favourites: the emojis you used lately first, then the usual six.
-  const favourites = favouriteReactions(useRecentReactions());
+  const favourites = favouriteReactions(useRecentReactions(), useSkinTone());
   const pick = pickWith(onPick, mine);
   const ref = useRef<HTMLDivElement>(null);
   const opener = useRef<HTMLElement | null>(null);
@@ -231,17 +266,44 @@ export function ReactionPicker({
 /**
  * Every emoji, by kind (the ones you used lately, faces, hearts, hands and people, celebrate, food
  * and drink, signs), from + in the reactions bar. The tabs jump to a kind. It stays open so you can
- * add several; one you already gave is lit, and picking it again takes it back.
+ * add several; one you already gave is lit, and picking it again takes it back. The row on top
+ * chooses the skin colour of every hand and person, and stays chosen.
  */
 export function EmojiPanel({ open, mine = [], onPick, onClose }: { open: boolean; mine?: string[]; onPick: (emoji: string) => void; onClose: () => void }) {
   const { t } = useSession();
   const body = useRef<HTMLDivElement>(null);
   const recentOnes = useRecentReactions();
+  const skinTone = useSkinTone();
   const pick = pickWith(onPick, mine);
-  const groups: { id: string; emojis: readonly string[] }[] = [...(recentOnes.length ? [{ id: 'recent', emojis: recentOnes }] : []), ...REACTION_GROUPS];
+  const groups: { id: string; emojis: readonly string[] }[] = [...(recentOnes.length ? [{ id: 'recent', emojis: recentOnes }] : []), ...REACTION_GROUPS].map(
+    (g) => ({
+      id: g.id,
+      emojis: inTone(g.emojis, skinTone),
+    }),
+  );
   return (
     <BottomSheet open={open} onClose={onClose} title={t('chat.react')}>
       <div className="emoji-panel">
+        <div className="emoji-panel__tones" role="group" aria-labelledby="emoji-tones-h">
+          <span className="emoji-panel__heading" id="emoji-tones-h">
+            {t('emoji.skinTone')}
+          </span>
+          <div className="emoji-panel__tone-row">
+            {SKIN_TONES.map((option, i) => (
+              <button
+                key={option || 'yellow'}
+                type="button"
+                className="emoji-panel__tone"
+                aria-label={t(`emoji.tone${i}` as MessageKey)}
+                title={t(`emoji.tone${i}` as MessageKey)}
+                aria-pressed={skinTone === option}
+                onClick={() => chooseSkinTone(option)}
+              >
+                {withTone('👋', option)}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="emoji-panel__tabs" role="group" aria-label={t('chat.reactMore')}>
           {groups.map((g) => (
             <button

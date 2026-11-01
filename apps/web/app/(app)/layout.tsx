@@ -98,7 +98,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     { id: 'home', href: '/home' },
     { id: 'discover', href: '/discover' },
     { id: 'create', href: '/create', opens: () => setCreating(true) },
-    { id: 'inbox', href: '/inbox', badge: unread.messages + unread.notifications },
+    { id: 'inbox', href: '/inbox', badge: unread.messages },
     { id: 'profile', href: `/u/${me.username}`, avatar: { name: me.displayName, src: me.avatarUrl } },
   ];
 

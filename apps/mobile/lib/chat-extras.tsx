@@ -21,7 +21,17 @@ import { openWatch } from './watch';
 
 /** Quick reactions offered on every message. */
 import * as SecureStore from 'expo-secure-store';
-import { favouriteReactions, QUICK_REACTIONS, REACTION_GROUPS, rememberReaction } from '../../../packages/shared/src/reactions';
+import {
+  favouriteReactions,
+  inTone,
+  QUICK_REACTIONS,
+  REACTION_GROUPS,
+  readTone,
+  rememberReaction,
+  SKIN_TONES,
+  type SkinTone,
+  withTone,
+} from '../../../packages/shared/src/reactions';
 export { QUICK_REACTIONS };
 export const DISAPPEARING_OPTIONS: (number | null)[] = [null, 86_400, 604_800, 7_776_000];
 
@@ -417,6 +427,35 @@ function useRecentReactions(): string[] {
   return r;
 }
 
+// ── Your skin colour for emojis, kept on this phone ──
+const TONE_KEY = 'reactions.tone';
+let tone: SkinTone = '';
+let toneLoaded = false;
+const toneListeners = new Set<(t: SkinTone) => void>();
+function chooseSkinTone(next: SkinTone) {
+  tone = next;
+  toneListeners.forEach((l) => l(next));
+  void SecureStore.setItemAsync(TONE_KEY, next).catch(() => {});
+}
+function useSkinTone(): SkinTone {
+  const [current, setCurrent] = useState(tone);
+  useEffect(() => {
+    if (!toneLoaded) {
+      toneLoaded = true;
+      SecureStore.getItemAsync(TONE_KEY)
+        .then((v) => {
+          tone = readTone(v);
+          toneListeners.forEach((l) => l(tone));
+        })
+        .catch(() => {});
+    }
+    toneListeners.add(setCurrent);
+    setCurrent(tone);
+    return () => void toneListeners.delete(setCurrent);
+  }, []);
+  return current;
+}
+
 /**
  * Reactions for one message, from the heart beside it: a row of your favourites (the emojis you
  * used lately, then the usual six) and +, which opens every emoji by kind with tabs, Recent first.
@@ -435,6 +474,7 @@ export function ReactionSheet({
   const c = useColors();
   const { t } = useT();
   const recentOnes = useRecentReactions();
+  const skinTone = useSkinTone();
   const [all, setAll] = useState(false);
   const [tab, setTab] = useState<string>('faces');
   const scroll = useRef<ScrollView>(null);
@@ -469,11 +509,14 @@ export function ReactionSheet({
       <Text style={{ fontSize: 26 }}>{e}</Text>
     </Pressable>
   );
-  const groups = [...(recentOnes.length ? [{ id: 'recent', emojis: recentOnes }] : []), ...REACTION_GROUPS];
+  const groups = [...(recentOnes.length ? [{ id: 'recent', emojis: recentOnes }] : []), ...REACTION_GROUPS].map((g) => ({
+    id: g.id,
+    emojis: inTone(g.emojis, skinTone),
+  }));
   const header = (
     <View style={{ marginBottom: space[2], gap: space[2] }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        {favouriteReactions(recentOnes).map(cell)}
+        {favouriteReactions(recentOnes, skinTone).map(cell)}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={t('chat.reactMore')}
@@ -486,6 +529,32 @@ export function ReactionSheet({
       </View>
       {all ? (
         <>
+          <View accessibilityRole="radiogroup" accessibilityLabel={t('emoji.skinTone')}>
+            <Text style={{ color: c.inkMuted, fontSize: 13, fontWeight: '600', marginBottom: space[1] }}>{t('emoji.skinTone')}</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              {SKIN_TONES.map((option, i) => (
+                <Pressable
+                  key={option || 'yellow'}
+                  accessibilityRole="radio"
+                  accessibilityLabel={t(`emoji.tone${i}` as MessageKey)}
+                  accessibilityState={{ selected: skinTone === option }}
+                  onPress={() => chooseSkinTone(option)}
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 22,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: skinTone === option ? c.surfaceSunken : 'transparent',
+                    borderWidth: skinTone === option ? 2 : 0,
+                    borderColor: c.yapi,
+                  }}
+                >
+                  <Text style={{ fontSize: 24 }}>{withTone('👋', option)}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 4 }}>
             {groups.map((g) => (
               <Pressable
@@ -549,9 +618,10 @@ export function MessageActions({
 }) {
   const c = useColors();
   const { t } = useT();
+  const skinTone = useSkinTone();
   const reactions = onReact ? (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: space[2] }}>
-      {QUICK_REACTIONS.map((e) => (
+      {inTone(QUICK_REACTIONS, skinTone).map((e) => (
         <Pressable
           key={e}
           accessibilityRole="button"
