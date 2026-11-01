@@ -20,7 +20,8 @@ import { openWatch } from './watch';
  */
 
 /** Quick reactions offered on every message. */
-import { MORE_REACTIONS, QUICK_REACTIONS } from '../../../packages/shared/src/reactions';
+import * as SecureStore from 'expo-secure-store';
+import { favouriteReactions, QUICK_REACTIONS, REACTION_GROUPS, rememberReaction } from '../../../packages/shared/src/reactions';
 export { QUICK_REACTIONS };
 export const DISAPPEARING_OPTIONS: (number | null)[] = [null, 86_400, 604_800, 7_776_000];
 
@@ -384,10 +385,43 @@ export interface SheetAction {
   onPress: () => void;
 }
 
+// ── Your emojis: the ones you used lately, kept on this phone ──
+const RECENT_KEY = 'reactions.recent';
+let recent: string[] = [];
+let recentLoaded = false;
+const recentListeners = new Set<(r: string[]) => void>();
+function loadRecent() {
+  if (recentLoaded) return;
+  recentLoaded = true;
+  SecureStore.getItemAsync(RECENT_KEY)
+    .then((v) => {
+      const list: unknown = JSON.parse(v ?? '[]');
+      recent = Array.isArray(list) ? list.filter((x): x is string => typeof x === 'string') : [];
+      recentListeners.forEach((l) => l(recent));
+    })
+    .catch(() => {});
+}
+function noteReaction(emoji: string) {
+  recent = rememberReaction(recent, emoji);
+  recentListeners.forEach((l) => l(recent));
+  void SecureStore.setItemAsync(RECENT_KEY, JSON.stringify(recent)).catch(() => {});
+}
+function useRecentReactions(): string[] {
+  const [r, setR] = useState(recent);
+  useEffect(() => {
+    loadRecent();
+    recentListeners.add(setR);
+    setR(recent);
+    return () => void recentListeners.delete(setR);
+  }, []);
+  return r;
+}
+
 /**
- * Reactions for one message, from the heart beside it: the quick six, then every other emoji in
- * the same row, swiped sideways. It stays open so you can add several; one you already gave is
- * lit, and picking it again takes it back. Done closes it.
+ * Reactions for one message, from the heart beside it: a row of your favourites (the emojis you
+ * used lately, then the usual six) and +, which opens every emoji by kind with tabs, Recent first.
+ * It stays open so you can add several; one you already gave is lit, and picking it again takes
+ * it back. Done closes it.
  */
 export function ReactionSheet({
   message,
@@ -400,43 +434,102 @@ export function ReactionSheet({
 }) {
   const c = useColors();
   const { t } = useT();
+  const recentOnes = useRecentReactions();
+  const [all, setAll] = useState(false);
+  const [tab, setTab] = useState<string>('faces');
+  const scroll = useRef<ScrollView>(null);
+  const offsets = useRef<Record<string, number>>({});
+  useEffect(() => {
+    if (!message) setAll(false);
+  }, [message]);
   const mine = new Set(message?.reactions?.filter((r) => r.mine).map((r) => r.emoji));
-  const row = (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ gap: 4, paddingHorizontal: space[1] }}
-      style={{ marginBottom: space[2] }}
+  const toggle = (e: string) => {
+    if (!mine.has(e)) noteReaction(e);
+    onToggle(e, !mine.has(e));
+  };
+  const cell = (e: string) => (
+    <Pressable
+      key={e}
+      accessibilityRole="button"
+      accessibilityLabel={t('m.chat.reactWith', { emoji: e })}
+      accessibilityState={{ selected: mine.has(e) }}
+      onPress={() => toggle(e)}
+      style={({ pressed }) => ({
+        width: 46,
+        height: 46,
+        borderRadius: 23,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: mine.has(e) || pressed ? c.surfaceSunken : 'transparent',
+        borderWidth: mine.has(e) ? 2 : 0,
+        borderColor: c.yapi,
+        transform: [{ scale: pressed ? 1.25 : 1 }],
+      })}
     >
-      {[...QUICK_REACTIONS, ...MORE_REACTIONS].map((e) => (
+      <Text style={{ fontSize: 26 }}>{e}</Text>
+    </Pressable>
+  );
+  const groups = [...(recentOnes.length ? [{ id: 'recent', emojis: recentOnes }] : []), ...REACTION_GROUPS];
+  const header = (
+    <View style={{ marginBottom: space[2], gap: space[2] }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+        {favouriteReactions(recentOnes).map(cell)}
         <Pressable
-          key={e}
           accessibilityRole="button"
-          accessibilityLabel={t('m.chat.reactWith', { emoji: e })}
-          accessibilityState={{ selected: mine.has(e) }}
-          onPress={() => onToggle(e, !mine.has(e))}
-          style={({ pressed }) => ({
-            width: 48,
-            height: 48,
-            borderRadius: 24,
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: mine.has(e) || pressed ? c.surfaceSunken : 'transparent',
-            borderWidth: mine.has(e) ? 2 : 0,
-            borderColor: c.yapi,
-          })}
+          accessibilityLabel={t('chat.reactMore')}
+          accessibilityState={{ expanded: all }}
+          onPress={() => setAll((v) => !v)}
+          style={{ width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center', backgroundColor: c.surfaceSunken }}
         >
-          <Text style={{ fontSize: 26 }}>{e}</Text>
+          <Icon name={all ? 'chevron-up' : 'add'} size={24} color={c.inkMuted} />
         </Pressable>
-      ))}
-    </ScrollView>
+      </View>
+      {all ? (
+        <>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 4 }}>
+            {groups.map((g) => (
+              <Pressable
+                key={g.id}
+                accessibilityRole="tab"
+                accessibilityLabel={t(`emoji.${g.id}` as MessageKey)}
+                accessibilityState={{ selected: tab === g.id }}
+                onPress={() => {
+                  setTab(g.id);
+                  scroll.current?.scrollTo({ y: offsets.current[g.id] ?? 0, animated: true });
+                }}
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: tab === g.id ? c.surfaceSunken : 'transparent',
+                }}
+              >
+                {g.id === 'recent' ? <Icon name="time-outline" size={20} color={c.inkMuted} /> : <Text style={{ fontSize: 20 }}>{g.emojis[0]}</Text>}
+              </Pressable>
+            ))}
+          </ScrollView>
+          <ScrollView ref={scroll} style={{ maxHeight: 340 }} nestedScrollEnabled>
+            {groups.map((g) => (
+              <View key={g.id} onLayout={(e) => (offsets.current[g.id] = e.nativeEvent.layout.y)}>
+                <Text style={{ color: c.inkMuted, fontSize: 13, fontWeight: '600', marginTop: space[2], marginBottom: space[1] }}>
+                  {t(`emoji.${g.id}` as MessageKey)}
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>{g.emojis.map(cell)}</View>
+              </View>
+            ))}
+          </ScrollView>
+        </>
+      ) : null}
+    </View>
   );
   return (
     <ActionSheet
       visible={!!message}
       onClose={onClose}
       title={t('chat.react')}
-      header={row}
+      header={header}
       actions={[{ label: t('m.common.done'), icon: 'checkmark', onPress: () => {} }]}
     />
   );

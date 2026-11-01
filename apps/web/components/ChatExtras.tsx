@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { BottomSheet, Button, Icon } from '@yapilapi/design-system';
 import {
   chatTheme,
@@ -11,8 +11,9 @@ import {
   DISAPPEARING_SECONDS,
   groupLineText,
   messagePreviewText,
-  MORE_REACTIONS,
-  QUICK_REACTIONS,
+  favouriteReactions,
+  REACTION_GROUPS,
+  rememberReaction,
   type Message,
   type MessageKey,
   type MessagePreview,
@@ -85,15 +86,85 @@ export function ReactionRow({ message, mine, onToggle }: { message: Message; min
   );
 }
 
+// ── Your emojis: the ones you used lately, kept on this device ──
+const RECENT_KEY = 'ypl.reactions.recent';
+const NO_RECENT: string[] = [];
+let recent: string[] | null = null;
+const recentListeners = new Set<() => void>();
+function readRecent(): string[] {
+  if (recent) return recent;
+  try {
+    const v: unknown = JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]');
+    recent = Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    recent = [];
+  }
+  return recent;
+}
+function noteReaction(emoji: string) {
+  recent = rememberReaction(readRecent(), emoji);
+  try {
+    localStorage.setItem(RECENT_KEY, JSON.stringify(recent));
+  } catch {
+    /* storage off: remembered for this visit */
+  }
+  recentListeners.forEach((l) => l());
+}
+function useRecentReactions(): string[] {
+  return useSyncExternalStore(
+    (l) => (recentListeners.add(l), () => void recentListeners.delete(l)),
+    readRecent,
+    () => NO_RECENT,
+  );
+}
+
+/** The emoji you picked pops up out of its button and fades, so you see it land. */
+function burst(from: HTMLElement, emoji: string) {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const r = from.getBoundingClientRect();
+  const el = document.createElement('span');
+  el.className = 'reaction-burst';
+  el.textContent = emoji;
+  el.setAttribute('aria-hidden', 'true');
+  el.style.left = `${r.left + r.width / 2}px`;
+  el.style.top = `${r.top + r.height / 2}px`;
+  el.addEventListener('animationend', () => el.remove());
+  document.body.appendChild(el);
+}
+
+/** Picking an emoji: it pops, and a new one joins your favourites. */
+function pickWith(onPick: (emoji: string) => void, mine: string[]) {
+  return (e: string, button: HTMLElement) => {
+    if (!mine.includes(e)) {
+      noteReaction(e);
+      burst(button, e);
+    }
+    onPick(e);
+  };
+}
+
 /**
- * Reactions for a message: the quick six, then every other emoji in the same row, scrolled
- * sideways. It stays open so you can add several; a reaction you already gave is lit, and picking
- * it again takes it back. Focus moves to the first one; arrows move between them (scrolling them
- * into view); Escape, Done or a tap elsewhere closes it and focus goes back to where it came from
- * (the React button or the message menu).
+ * Reactions for a message: a rounded bar with the six favourites and +, which opens every emoji
+ * (EmojiPanel). It stays open so you can add several; a reaction you already gave is lit, and
+ * picking it again takes it back. Focus moves to the first one; arrows move between them; Escape
+ * or a tap elsewhere closes it and focus goes back to where it came from (the React button or the
+ * message menu).
  */
-export function ReactionPicker({ mine = [], onPick, onClose }: { mine?: string[]; onPick: (emoji: string) => void; onClose: () => void }) {
+export function ReactionPicker({
+  mine = [],
+  onPick,
+  onMore,
+  onClose,
+}: {
+  mine?: string[];
+  onPick: (emoji: string) => void;
+  onMore: () => void;
+  onClose: () => void;
+}) {
   const { t } = useSession();
+  // Your favourites: the emojis you used lately first, then the usual six.
+  const favourites = favouriteReactions(useRecentReactions());
+  const pick = pickWith(onPick, mine);
   const ref = useRef<HTMLDivElement>(null);
   const opener = useRef<HTMLElement | null>(null);
   const close = useRef(onClose);
@@ -137,24 +208,78 @@ export function ReactionPicker({ mine = [], onPick, onClose }: { mine?: string[]
         if (e.relatedTarget && !e.currentTarget.contains(e.relatedTarget as Node)) onClose();
       }}
     >
-      <div className="chat-picker__row">
-        {[...QUICK_REACTIONS, ...MORE_REACTIONS].map((e) => (
-          <button
-            key={e}
-            type="button"
-            className="chat-picker__item"
-            aria-label={t('m.chat.reactWith', { emoji: e })}
-            aria-pressed={mine.includes(e)}
-            onClick={() => onPick(e)}
-          >
-            {e}
-          </button>
-        ))}
-      </div>
-      <button type="button" className="chat-picker__item chat-picker__done" aria-label={t('m.common.done')} title={t('m.common.done')} onClick={onClose}>
-        <Icon name="check" size={20} />
+      {favourites.map((e) => (
+        <button
+          key={e}
+          type="button"
+          className="chat-picker__item"
+          aria-label={t('m.chat.reactWith', { emoji: e })}
+          aria-pressed={mine.includes(e)}
+          onClick={(ev) => pick(e, ev.currentTarget)}
+        >
+          {e}
+        </button>
+      ))}
+      <button type="button" className="chat-picker__item chat-picker__more" aria-label={t('chat.reactMore')} title={t('chat.reactMore')} onClick={onMore}>
+        <Icon name="plus" size={20} />
       </button>
     </div>
+  );
+}
+
+/**
+ * Every emoji, by kind (the ones you used lately, faces, hearts, hands and people, celebrate, food
+ * and drink, signs), from + in the reactions bar. The tabs jump to a kind. It stays open so you can
+ * add several; one you already gave is lit, and picking it again takes it back.
+ */
+export function EmojiPanel({ open, mine = [], onPick, onClose }: { open: boolean; mine?: string[]; onPick: (emoji: string) => void; onClose: () => void }) {
+  const { t } = useSession();
+  const body = useRef<HTMLDivElement>(null);
+  const recentOnes = useRecentReactions();
+  const pick = pickWith(onPick, mine);
+  const groups: { id: string; emojis: readonly string[] }[] = [...(recentOnes.length ? [{ id: 'recent', emojis: recentOnes }] : []), ...REACTION_GROUPS];
+  return (
+    <BottomSheet open={open} onClose={onClose} title={t('chat.react')}>
+      <div className="emoji-panel">
+        <div className="emoji-panel__tabs" role="group" aria-label={t('chat.reactMore')}>
+          {groups.map((g) => (
+            <button
+              key={g.id}
+              type="button"
+              className="emoji-panel__tab"
+              aria-label={t(`emoji.${g.id}` as MessageKey)}
+              title={t(`emoji.${g.id}` as MessageKey)}
+              onClick={() => body.current?.querySelector(`#emoji-${g.id}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' })}
+            >
+              {g.id === 'recent' ? <Icon name="clock" size={20} /> : g.emojis[0]}
+            </button>
+          ))}
+        </div>
+        <div className="emoji-panel__body" ref={body}>
+          {groups.map((g) => (
+            <section key={g.id} id={`emoji-${g.id}`} aria-labelledby={`emoji-${g.id}-h`}>
+              <h3 className="emoji-panel__heading" id={`emoji-${g.id}-h`}>
+                {t(`emoji.${g.id}` as MessageKey)}
+              </h3>
+              <div className="emoji-panel__grid">
+                {g.emojis.map((e) => (
+                  <button
+                    key={e}
+                    type="button"
+                    className="chat-picker__item"
+                    aria-label={t('m.chat.reactWith', { emoji: e })}
+                    aria-pressed={mine.includes(e)}
+                    onClick={(ev) => pick(e, ev.currentTarget)}
+                  >
+                    {e}
+                  </button>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      </div>
+    </BottomSheet>
   );
 }
 

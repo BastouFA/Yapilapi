@@ -42,6 +42,7 @@ import {
   MessageQuote,
   PinnedBar,
   previewText,
+  EmojiPanel,
   ReactionPicker,
   ReactionRow,
   SystemLine,
@@ -95,6 +96,9 @@ export default function ChatPage() {
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [editing, setEditing] = useState<Message | null>(null);
   const [pickerFor, setPickerFor] = useState<string | null>(null);
+  // Every emoji, from + in the reactions bar: for this message.
+  const [panelFor, setPanelFor] = useState<string | null>(null);
+  const panelMessage = panelFor ? messages?.find((x) => x.id === panelFor) : undefined;
   const [searchOpen, setSearchOpen] = useState(false);
   // The chat's options menu opens search; closing search puts focus back on that button.
   const chatMenu = useRef<HTMLDivElement>(null);
@@ -1001,6 +1005,10 @@ export default function ChatPage() {
                   {pickerFor === m.id ? (
                     <ReactionPicker
                       mine={m.reactions?.filter((r) => r.mine).map((r) => r.emoji)}
+                      onMore={() => {
+                        setPickerFor(null);
+                        setPanelFor(m.id);
+                      }}
                       onPick={(emoji) => void react(m, emoji, !m.reactions?.some((r) => r.emoji === emoji && r.mine))}
                       onClose={() => setPickerFor(null)}
                     />
@@ -1390,6 +1398,12 @@ export default function ChatPage() {
           <AutoTranslateSwitch />
         </BottomSheet>
       ) : null}
+      <EmojiPanel
+        open={!!panelMessage}
+        mine={panelMessage?.reactions?.filter((r) => r.mine).map((r) => r.emoji)}
+        onPick={(emoji) => panelMessage && void react(panelMessage, emoji, !panelMessage.reactions?.some((r) => r.emoji === emoji && r.mine))}
+        onClose={() => setPanelFor(null)}
+      />
       <MiniAppsSheet
         open={appsOpen}
         onClose={() => setAppsOpen(false)}
