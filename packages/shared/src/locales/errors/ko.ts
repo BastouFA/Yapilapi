@@ -630,6 +630,7 @@ export const ko: Record<string, string> = {
   'Only group admins can remove people.': '그룹 관리자만 사람을 내보낼 수 있어요.',
   'Only group admins can choose admins.': '그룹 관리자만 관리자를 정할 수 있어요.',
   'React with an emoji.': '이모지로 반응하세요.',
+  'This message can’t be forwarded.': '이 메시지는 전달할 수 없습니다.',
   'To keep younger people safe, you can only message them once you are friends.': '어린 사용자를 보호하기 위해 친구가 된 후에만 메시지를 보낼 수 있어요.',
   'This person only gets messages from people they know.': '이 사람은 아는 사람의 메시지만 받아요.',
   'To keep younger people safe, adults and people under 18 can be in a group together only when they are friends.':

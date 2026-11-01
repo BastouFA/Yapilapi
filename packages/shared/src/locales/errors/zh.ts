@@ -612,6 +612,7 @@ export const zh: Record<string, string> = {
   'Only group admins can remove people.': '只有群管理员可以移除成员。',
   'Only group admins can choose admins.': '只有群管理员可以指定管理员。',
   'React with an emoji.': '请用一个表情符号回应。',
+  'This message can’t be forwarded.': '此消息无法转发。',
   'To keep younger people safe, you can only message them once you are friends.': '为了保护未成年人的安全，你们成为好友后你才能给对方发消息。',
   'This person only gets messages from people they know.': '这个人只接收认识的人的消息。',
   'To keep younger people safe, adults and people under 18 can be in a group together only when they are friends.':

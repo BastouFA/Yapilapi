@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { BottomSheet, Button, Icon } from '@yapilapi/design-system';
+import { patiently } from '@yapilapi/api-client';
+import { Avatar, BottomSheet, Button, Icon } from '@yapilapi/design-system';
 import {
   chatTheme,
   chessDrawReason,
@@ -12,6 +13,7 @@ import {
   groupLineText,
   messagePreviewText,
   favouriteReactions,
+  FORWARD_MAX_CHATS,
   inTone,
   REACTION_GROUPS,
   readTone,
@@ -19,6 +21,7 @@ import {
   SKIN_TONES,
   type SkinTone,
   withTone,
+  type Conversation,
   type Message,
   type MessageReceipt,
   type MessageKey,
@@ -341,6 +344,92 @@ export function EmojiPanel({ open, mine = [], onPick, onClose }: { open: boolean
             </section>
           ))}
         </div>
+      </div>
+    </BottomSheet>
+  );
+}
+
+/** A chat's name: its title, or the people in it. */
+export function conversationTitle(c: Conversation, meId: string, justYou: string): string {
+  if (c.title) return c.title;
+  const others = c.members.filter((m) => m.id !== meId);
+  return others.map((m) => m.displayName).join(', ') || justYou;
+}
+
+/** Forward a message: choose up to FORWARD_MAX_CHATS of your chats, and a copy goes to each. */
+export function ForwardSheet({ message, onClose, onForwarded }: { message: Message | null; onClose: () => void; onForwarded: (messages: Message[]) => void }) {
+  const { me, t, toast } = useSession();
+  const [chats, setChats] = useState<Conversation[] | null>(null);
+  const [query, setQuery] = useState('');
+  const [chosen, setChosen] = useState<string[]>([]);
+  const [sending, setSending] = useState(false);
+  const messageId = message?.id;
+  useEffect(() => {
+    if (!messageId) return;
+    setQuery('');
+    setChosen([]);
+    setChats(null);
+    api.conversations.list().then(
+      (r) => setChats(r.items.filter((c) => c.kind !== 'community')),
+      (e) => {
+        toast(errorMessage(e));
+        setChats([]);
+      },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messageId]);
+  if (!message || !me) return null;
+  const titled = (chats ?? []).map((c) => ({ chat: c, title: conversationTitle(c, me.id, t('m.chat.justYou')) }));
+  const words = query.trim().toLowerCase();
+  const shown = words ? titled.filter((x) => x.title.toLowerCase().includes(words)) : titled;
+  const full = chosen.length >= FORWARD_MAX_CHATS;
+  const send = async () => {
+    setSending(true);
+    const clientId = crypto.randomUUID();
+    try {
+      const r = await patiently(() => api.messages.forward(message.id, chosen, clientId));
+      onForwarded(r.messages);
+      toast(r.failed[0]?.message ?? t('chat.forwarded'));
+      onClose();
+    } catch (e) {
+      toast(errorMessage(e));
+    } finally {
+      setSending(false);
+    }
+  };
+  return (
+    <BottomSheet open onClose={onClose} title={t('chat.forwardTo')}>
+      <div className="forward-sheet">
+        <input
+          className="yp-input forward-sheet__search"
+          type="search"
+          value={query}
+          placeholder={t('chat.forwardSearch')}
+          aria-label={t('chat.forwardSearch')}
+          onChange={(e) => setQuery(e.currentTarget.value)}
+        />
+        <div className="forward-sheet__list" role="group" aria-label={t('chat.forwardTo')}>
+          {chats && !shown.length ? <p className="muted">{t('chat.forwardEmpty')}</p> : null}
+          {shown.map(({ chat, title }) => {
+            const on = chosen.includes(chat.id);
+            const other = chat.members.find((m) => m.id !== me.id);
+            return (
+              <label key={chat.id} className="forward-sheet__chat">
+                <Avatar name={title} src={chat.members.length <= 2 ? other?.avatarUrl : undefined} size="sm" />
+                <span className="forward-sheet__name">{title}</span>
+                <input
+                  type="checkbox"
+                  checked={on}
+                  disabled={!on && full}
+                  onChange={() => setChosen((cur) => (on ? cur.filter((x) => x !== chat.id) : [...cur, chat.id]))}
+                />
+              </label>
+            );
+          })}
+        </div>
+        <Button icon="forward" disabled={!chosen.length || sending} onClick={() => void send()}>
+          {chosen.length ? `${t('chat.forward')} (${chosen.length})` : t('chat.forward')}
+        </Button>
       </div>
     </BottomSheet>
   );

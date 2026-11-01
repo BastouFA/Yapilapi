@@ -707,6 +707,7 @@ export const ha: Record<string, string> = {
   'Only group admins can remove people.': 'Masu kula da rukuni ne kawai za su iya cire mutane.',
   'Only group admins can choose admins.': 'Masu kula da rukuni ne kawai za su iya zaɓar masu kula.',
   'React with an emoji.': 'Mayar da martani da emoji.',
+  'This message can’t be forwarded.': 'Ba za a iya tura wannan saƙon ba.',
   'To keep younger people safe, you can only message them once you are friends.': 'Don kare matasa, za ku iya aika musu saƙo ne kawai bayan kun zama abokai.',
   'This person only gets messages from people they know.': 'Wannan mutumin yana karɓar saƙonni ne kawai daga mutanen da ya sani.',
   'To keep younger people safe, adults and people under 18 can be in a group together only when they are friends.':

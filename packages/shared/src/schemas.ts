@@ -590,6 +590,14 @@ export const createConversationSchema = z.object({
 export const renameConversationSchema = z.object({ title: z.string().trim().min(1).max(80) });
 /** Make someone in a group an admin, or take it back (group admins). */
 export const memberRoleSchema = z.object({ role: z.enum(['admin', 'member']) });
+/** Forward a message you can see to up to this many chats at once. */
+export const FORWARD_MAX_CHATS = 5;
+export const forwardMessageSchema = z.object({
+  conversationIds: z.array(uuid).min(1).max(FORWARD_MAX_CHATS),
+  /** The same value when trying again: nothing is sent twice. */
+  clientId: z.string().max(40).optional(),
+});
+
 export const sendMessageSchema = z
   .object({
     body: z.string().trim().max(4000).default(''),

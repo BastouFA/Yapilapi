@@ -662,6 +662,7 @@ export const zu: Record<string, string> = {
   'Only group admins can remove people.': 'Abaphathi beqembu kuphela abangasusa abantu.',
   'Only group admins can choose admins.': 'Abaphathi beqembu kuphela abangakhetha abaphathi.',
   'React with an emoji.': 'Sabela nge-emoji.',
+  'This message can’t be forwarded.': 'Lo mlayezo awukwazi ukudluliselwa.',
   'To keep younger people safe, you can only message them once you are friends.':
     'Ukuze sigcine abantu abasebasha bephephile, ungabathumelela imilayezo kuphela uma senibangani.',
   'This person only gets messages from people they know.': 'Lo muntu uthola imilayezo kuphela evela kubantu abaziyo.',

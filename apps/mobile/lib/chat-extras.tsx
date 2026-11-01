@@ -2,7 +2,9 @@ import { router } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Animated, FlatList, I18nManager, Modal, PanResponder, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { Message, MessagePreview, PinnedMessage } from '../../../packages/shared/src/types';
+import type { Conversation, Message, MessagePreview, PinnedMessage } from '../../../packages/shared/src/types';
+import { patiently } from '../../../packages/api-client/src/index';
+import { FORWARD_MAX_CHATS } from '../../../packages/shared/src/schemas';
 import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import { chatTheme } from '../../../packages/shared/src/chat-theme';
 import { chessDrawReason } from '../../../packages/shared/src/games/index';
@@ -11,7 +13,8 @@ import { client, errorMessage } from './api';
 import { useT } from './i18n';
 import { useSession } from './session';
 import { radius, space } from './theme';
-import { ActionSheet, BottomSheet, Button, Icon, useColors, userText, useScreenFocused } from './ui';
+import { conversationTitle } from './post';
+import { ActionSheet, Avatar, BottomSheet, Button, Icon, useColors, userText, useScreenFocused } from './ui';
 import { openWatch } from './watch';
 
 /**
@@ -454,6 +457,120 @@ function useSkinTone(): SkinTone {
     return () => void toneListeners.delete(setCurrent);
   }, []);
   return current;
+}
+
+// ── A voice message copied in a chat, to paste into another: clipboards don't take sound ──
+export type CopiedVoice = { messageId: string; durationMs: number | null; at: number };
+/** How long a copied voice message waits to be pasted. */
+const COPIED_KEEP_MS = 30 * 60_000;
+let copied: CopiedVoice | null = null;
+const copiedListeners = new Set<(v: CopiedVoice | null) => void>();
+function setCopied(v: CopiedVoice | null) {
+  copied = v;
+  copiedListeners.forEach((l) => l(v));
+}
+export const copyVoice = (messageId: string, durationMs: number | null) => setCopied({ messageId, durationMs, at: Date.now() });
+export const clearCopiedVoice = () => setCopied(null);
+export function useCopiedVoice(): CopiedVoice | null {
+  const [v, setV] = useState(copied);
+  useEffect(() => {
+    copiedListeners.add(setV);
+    setV(copied);
+    return () => void copiedListeners.delete(setV);
+  }, []);
+  return v && Date.now() - v.at < COPIED_KEEP_MS ? v : null;
+}
+
+/** Forward a message: choose up to FORWARD_MAX_CHATS of your chats, and a copy goes to each. */
+export function ForwardSheet({ message, onClose, onForwarded }: { message: Message | null; onClose: () => void; onForwarded: (messages: Message[]) => void }) {
+  const c = useColors();
+  const { t } = useT();
+  const { me } = useSession();
+  const [chats, setChats] = useState<Conversation[] | null>(null);
+  const [query, setQuery] = useState('');
+  const [chosen, setChosen] = useState<string[]>([]);
+  const [sending, setSending] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const messageId = message?.id;
+  useEffect(() => {
+    if (!messageId) return;
+    setQuery('');
+    setChosen([]);
+    setProblem(null);
+    setChats(null);
+    void client()
+      .then((api) => api.conversations.list())
+      .then(
+        (r) => setChats(r.items.filter((x) => x.kind !== 'community')),
+        (e) => {
+          setProblem(errorMessage(e));
+          setChats([]);
+        },
+      );
+  }, [messageId]);
+  const words = query.trim().toLowerCase();
+  const titled = (chats ?? []).map((chat) => ({ chat, title: conversationTitle(chat, me?.id, t) }));
+  const shown = words ? titled.filter((x) => x.title.toLowerCase().includes(words)) : titled;
+  const send = async () => {
+    if (!message) return;
+    setSending(true);
+    setProblem(null);
+    const clientId = `${message.id.slice(0, 8)}-${Date.now()}`;
+    try {
+      const api = await client();
+      const r = await patiently(() => api.messages.forward(message.id, chosen, clientId));
+      onForwarded(r.messages);
+      if (r.failed[0]) setProblem(r.failed[0].message);
+      else onClose();
+    } catch (e) {
+      setProblem(errorMessage(e));
+    } finally {
+      setSending(false);
+    }
+  };
+  return (
+    <BottomSheet visible={!!message} title={t('chat.forwardTo')} onClose={onClose} gap={2}>
+      <TextInput
+        accessibilityLabel={t('chat.forwardSearch')}
+        placeholder={t('chat.forwardSearch')}
+        placeholderTextColor={c.inkMuted}
+        value={query}
+        onChangeText={setQuery}
+        style={{ minHeight: 44, paddingHorizontal: space[3], borderRadius: radius.md, backgroundColor: c.surfaceSunken, color: c.ink }}
+      />
+      <ScrollView style={{ maxHeight: 340 }}>
+        {chats && !shown.length ? <Text style={{ color: c.inkMuted, padding: space[2] }}>{t('chat.forwardEmpty')}</Text> : null}
+        {shown.map(({ chat, title }) => {
+          const on = chosen.includes(chat.id);
+          const off = !on && chosen.length >= FORWARD_MAX_CHATS;
+          const other = chat.members.find((m) => m.id !== me?.id);
+          return (
+            <Pressable
+              key={chat.id}
+              accessibilityRole="checkbox"
+              accessibilityLabel={title}
+              accessibilityState={{ checked: on, disabled: off }}
+              disabled={off}
+              onPress={() => setChosen((cur) => (on ? cur.filter((x) => x !== chat.id) : [...cur, chat.id]))}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], minHeight: 52, opacity: off ? 0.5 : 1 }}
+            >
+              <Avatar name={title} url={chat.members.length <= 2 ? other?.avatarUrl : undefined} size={36} />
+              <Text numberOfLines={1} style={[{ flex: 1, color: c.ink, fontSize: 15, fontWeight: '600' }, userText]}>
+                {title}
+              </Text>
+              <Icon name={on ? 'checkbox' : 'square-outline'} size={24} color={on ? c.yapi : c.inkMuted} />
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+      {problem ? <Text style={{ color: c.danger }}>{problem}</Text> : null}
+      <Button
+        label={chosen.length ? `${t('chat.forward')} (${chosen.length})` : t('chat.forward')}
+        disabled={!chosen.length || sending}
+        onPress={() => void send()}
+      />
+    </BottomSheet>
+  );
 }
 
 /**

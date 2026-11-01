@@ -655,6 +655,7 @@ export const ur: Record<string, string> = {
   'Only group admins can remove people.': 'صرف گروپ ایڈمنز لوگوں کو ہٹا سکتے ہیں۔',
   'Only group admins can choose admins.': 'صرف گروپ ایڈمنز ایڈمنز چن سکتے ہیں۔',
   'React with an emoji.': 'ایموجی سے ردعمل دیں۔',
+  'This message can’t be forwarded.': 'یہ پیغام آگے نہیں بھیجا جا سکتا۔',
   'To keep younger people safe, you can only message them once you are friends.':
     'کم عمر لوگوں کو محفوظ رکھنے کے لیے، آپ انہیں صرف دوست بننے کے بعد پیغام بھیج سکتے ہیں۔',
   'This person only gets messages from people they know.': 'اس شخص کو صرف ان لوگوں کے پیغامات آتے ہیں جنہیں وہ جانتا ہے۔',

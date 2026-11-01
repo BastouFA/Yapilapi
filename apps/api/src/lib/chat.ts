@@ -138,16 +138,16 @@ export function storedKeys(row: {
  * uploaded that isn't used anywhere else (a post, a story, another message) is deleted
  * from storage, so its address stops working for everyone. Returns how many were removed.
  */
-export async function revokeChatMedia(deps: Pick<ChatDeps, 'db' | 'storage'>, ownerId: string, mediaIds: string[]): Promise<number> {
+export async function revokeChatMedia(deps: Pick<ChatDeps, 'db' | 'storage'>, mediaIds: string[]): Promise<number> {
   const ids = [...new Set(mediaIds.filter(Boolean))];
   if (!ids.length) return 0;
   const { rows } = await deps.db.query(
     `SELECT m.id, m.url, m.poster_url, m.hls_url, m.variants, m.storage_key FROM media m
-     WHERE m.id = ANY($1::uuid[]) AND m.owner_id = $2 AND m.deleted_at IS NULL AND NOT m.private
+     WHERE m.id = ANY($1::uuid[]) AND m.deleted_at IS NULL AND NOT m.private
        AND NOT EXISTS (SELECT 1 FROM post_media pm WHERE pm.media_id = m.id)
        AND NOT EXISTS (SELECT 1 FROM moments mo WHERE mo.media_id = m.id)
        AND NOT EXISTS (SELECT 1 FROM messages x WHERE x.deleted_at IS NULL AND x.attachments @> jsonb_build_array(jsonb_build_object('mediaId', m.id::text)))`,
-    [ids, ownerId],
+    [ids],
   );
   for (const r of rows) {
     for (const key of storedKeys(r)) await deps.storage.remove?.(key).catch(() => {});
@@ -179,7 +179,7 @@ export async function expireMessages(deps: ChatDeps, limit = 200): Promise<numbe
     const done = await db.query(`DELETE FROM messages WHERE id = $1 AND expires_at <= now() RETURNING id`, [m.id]);
     if (!done.rowCount) continue;
     n++;
-    await revokeChatMedia(deps, m.sender_id, mediaIdsOf(m.attachments)).catch(() => 0);
+    await revokeChatMedia(deps, mediaIdsOf(m.attachments)).catch(() => 0);
     if (deps.realtime) {
       const members = (
         await db.query<{ user_id: string }>(`SELECT user_id FROM conversation_members WHERE conversation_id = $1 AND left_at IS NULL`, [m.conversation_id])

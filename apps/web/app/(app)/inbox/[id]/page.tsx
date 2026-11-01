@@ -5,6 +5,8 @@ import {
   noticeText,
   isVideoFile,
   replaceFinalEmoticon,
+  canForward,
+  copyableVoice,
   MEDIA_ACCEPT,
   MESSAGE_EDIT_MINUTES,
   messagePreviewOf,
@@ -28,6 +30,7 @@ import { GroupInfoSheet } from '@/components/GroupInfo';
 import { ReportSheet } from '@/components/PostList';
 import { useRealtime, useSession } from '../../../providers';
 import { useCalls } from '@/components/Calls';
+import { clearCopiedVoice, copyVoice, useCopiedVoice } from '@/lib/chat-clipboard';
 import { copyImage, copyText } from '@/lib/clipboard';
 import { MiniAppsSheet } from '@/components/MiniApps';
 import { MessageAttachments, ViewOnceMessage, VoiceRecorder, VoiceTranscript } from '@/components/ChatAttachments';
@@ -46,6 +49,7 @@ import {
   PinnedBar,
   previewText,
   EmojiPanel,
+  ForwardSheet,
   ReactionPicker,
   ReceiptMark,
   ReactionRow,
@@ -116,6 +120,9 @@ export default function ChatPage() {
   /** Messages sharing a post the reader can't see: their link stays as it was written. */
   const [unseenPosts, setUnseenPosts] = useState<string[]>([]);
   const composer = useRef<HTMLTextAreaElement>(null);
+  const [forwarding, setForwarding] = useState<Message | null>(null);
+  const copied = useCopiedVoice();
+  const [pasting, setPasting] = useState(false);
   const [pollOpen, setPollOpen] = useState(false);
   // "Vote on a time or place" on a plan's page opens its chat with a new poll (?poll=1).
   useEffect(() => {
@@ -480,6 +487,27 @@ export default function ChatPage() {
     }
   }
 
+  /** Sends the copied voice message into this chat, the message itself. */
+  async function pasteVoice() {
+    if (!copied || pasting) return;
+    setPasting(true);
+    try {
+      const { messages: sent } = await patiently(() => api.messages.forward(copied.messageId, [id], `paste-${copied.at}`));
+      addForwarded(sent);
+      clearCopiedVoice();
+    } catch (e) {
+      toast(errorMessage(e));
+    } finally {
+      setPasting(false);
+    }
+  }
+
+  /** What was just forwarded, if some of it landed in this chat. */
+  function addForwarded(sent: Message[]) {
+    const here = sent.filter((m) => m.conversationId === id);
+    setMessages((cur) => (cur ? [...cur, ...here.filter((m) => !cur.some((x) => x.id === m.id))] : cur));
+  }
+
   async function saveEdit(m: Message) {
     const text = replaceFinalEmoticon(body.trim());
     if (!text) return toast(t('m.chat.editEmpty'));
@@ -632,6 +660,7 @@ export default function ChatPage() {
       actions.push({ label: t('m.chat.reply'), icon: 'message', onSelect: () => startReply(m) });
       actions.push({ label: t('chat.react'), icon: 'heart', onSelect: () => setPickerFor(m.id) });
     }
+    if (canForward(m)) actions.push({ label: t('chat.forward'), icon: 'forward', onSelect: () => setForwarding(m) });
     if (editable) actions.push({ label: t('m.chat.edit'), icon: 'create', onSelect: () => startEdit(m) });
     // Copy the words or the photo (never a view-once one, which is meant to go).
     if (!m.unsent && !m.viewOnce) {
@@ -641,22 +670,24 @@ export default function ChatPage() {
           icon: 'copy',
           onSelect: () => void copyText(m.body).then((ok) => toast(t(ok ? 'chat.copied' : 'common.copyFailed'))),
         });
-      // A voice: its words, and a link that plays it (clipboards don't take sound).
-      const voice = m.attachments?.find((a) => a.kind === 'audio' && !a.removed && a.url);
-      if (voice) {
-        const words = m.transcript?.text;
-        if (words)
-          actions.push({
-            label: t('chat.copyWords'),
-            icon: 'copy',
-            onSelect: () => void copyText(words).then((ok) => toast(t(ok ? 'chat.copied' : 'common.copyFailed'))),
-          });
+      // A voice: its words, and the message itself, to paste into another chat.
+      const words = m.transcript?.text;
+      if (words)
+        actions.push({
+          label: t('chat.copyWords'),
+          icon: 'copy',
+          onSelect: () => void copyText(words).then((ok) => toast(t(ok ? 'chat.copied' : 'common.copyFailed'))),
+        });
+      const voice = copyableVoice(m);
+      if (voice)
         actions.push({
           label: t('chat.copyVoice'),
           icon: 'copy',
-          onSelect: () => void copyText(new URL(voice.url, location.origin).toString()).then((ok) => toast(t(ok ? 'chat.copied' : 'common.copyFailed'))),
+          onSelect: () => {
+            copyVoice(m.id, voice.durationMs ?? null);
+            toast(t('chat.voiceCopied'));
+          },
         });
-      }
       const photo = m.attachments?.find((a) => a.kind === 'image' && !a.removed && !a.sensitive);
       if (photo)
         actions.push({
@@ -1054,6 +1085,12 @@ export default function ChatPage() {
                       sender={others.length > 1 ? m.sender.displayName : undefined}
                       body={
                         <>
+                          {m.forwarded && !m.unsent ? (
+                            <span className="chat-forwarded">
+                              <Icon name="forward" size={14} />
+                              {t('chat.forwarded')}
+                            </span>
+                          ) : null}
                           {m.replyTo && !m.unsent ? <MessageQuote preview={m.replyTo} mine={mine} meId={me?.id} onJump={(mid) => void jumpTo(mid)} /> : null}
                           {content}
                         </>
@@ -1084,6 +1121,17 @@ export default function ChatPage() {
                             >
                               <Icon name="heart" size={18} />
                             </button>
+                            {canForward(m) ? (
+                              <button
+                                type="button"
+                                className="yp-action chat-msg__quick chat-msg__forward"
+                                aria-label={t('chat.forward')}
+                                title={t('chat.forward')}
+                                onClick={() => setForwarding(m)}
+                              >
+                                <Icon name="forward" size={18} />
+                              </button>
+                            ) : null}
                           </>
                         ) : null}
                         <Menu label={t('m.chat.messageOptions')} actions={actionsFor(m, mine)} />
@@ -1157,6 +1205,20 @@ export default function ChatPage() {
       {/* Following the newest message scrolls to here, so the Yap row and suggested replies under the
           messages are in sight too, not under the message box that stays at the bottom. */}
       <div ref={endRef} className="chat-end" />
+      {copied && !editing ? (
+        <div className="chat-paste">
+          <button type="button" className="chat-paste__send" disabled={pasting} onClick={() => void pasteVoice()}>
+            <Icon name="mic" size={18} />
+            <span>{t('chat.pasteVoice')}</span>
+            {copied.durationMs ? (
+              <span className="chat-paste__time">{`${Math.floor(copied.durationMs / 60_000)}:${String(Math.round(copied.durationMs / 1000) % 60).padStart(2, '0')}`}</span>
+            ) : null}
+          </button>
+          <button type="button" className="yp-action" aria-label={t('common.cancel')} title={t('common.cancel')} onClick={clearCopiedVoice}>
+            <Icon name="x" size={18} />
+          </button>
+        </div>
+      ) : null}
       <form
         className={`yp-composer${replyTo || editing ? ' yp-composer--context' : ''}`}
         onSubmit={(e) => {
@@ -1264,8 +1326,14 @@ export default function ChatPage() {
           aria-describedby={replyTo || editing ? 'compose-context' : undefined}
           value={body}
           maxLength={4000}
+          onPaste={(e) => {
+            // Nothing else on the clipboard: Paste means the voice message you copied.
+            if (!copied || e.clipboardData.getData('text') || e.clipboardData.files.length) return;
+            e.preventDefault();
+            void pasteVoice();
+          }}
           onChange={(e) => {
-            // ":)" then a space becomes "🙂 ".
+            // ":)" then a space becomes "🙂 "
             const next = withEmoticons(e, body);
             setBody(next);
             if (next.trim() && !editing) saidTyping();
@@ -1488,6 +1556,7 @@ export default function ChatPage() {
           <AutoTranslateSwitch />
         </BottomSheet>
       ) : null}
+      <ForwardSheet message={forwarding} onClose={() => setForwarding(null)} onForwarded={addForwarded} />
       <EmojiPanel
         open={!!panelMessage}
         mine={panelMessage?.reactions?.filter((r) => r.mine).map((r) => r.emoji)}

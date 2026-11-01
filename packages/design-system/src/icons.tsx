@@ -43,6 +43,7 @@ const PATHS = {
   download: ['M12 4v11', 'M7 10l5 5 5-5', 'M5 19h14'],
   more: ['M5 12h.01', 'M12 12h.01', 'M19 12h.01'],
   send: ['M4 12l16-8-6 16-3-7-7-1z'],
+  forward: ['M14 5l7 7-7 7', 'M21 12H10a6 6 0 0 0-6 6v1'],
   mic: ['M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z', 'M5 11a7 7 0 0 0 14 0', 'M12 18v3'],
   'mic-off': ['M9 9v3a3 3 0 0 0 5.1 2.1', 'M15 9.3V6a3 3 0 0 0-5.7-1.3', 'M5 11a7 7 0 0 0 11.4 5.4', 'M19 11a7 7 0 0 1-.6 2.8', 'M12 18v3', 'M3 3l18 18'],
   /** A raised hand, for asking to speak in a room. */
@@ -135,7 +136,7 @@ export type IconName = keyof typeof PATHS | NavGlyphName;
 export const ICON_NAMES = [...Object.keys(PATHS), ...Object.keys(NAV_GLYPHS)] as IconName[];
 
 /** Icons that point along the reading direction; they mirror in right-to-left layouts. */
-const DIRECTIONAL = new Set<IconName>(['chevron-right', 'chevron-left', 'arrow-left', 'send', 'logout', ...NAV_GLYPH_DIRECTIONAL]);
+const DIRECTIONAL = new Set<IconName>(['chevron-right', 'chevron-left', 'arrow-left', 'send', 'forward', 'logout', ...NAV_GLYPH_DIRECTIONAL]);
 
 const isGlyph = (name: IconName): name is NavGlyphName => name in NAV_GLYPHS;
 

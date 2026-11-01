@@ -654,6 +654,7 @@ export const it: Record<string, string> = {
   'Only group admins can remove people.': 'Solo gli amministratori del gruppo possono rimuovere persone.',
   'Only group admins can choose admins.': 'Solo gli amministratori del gruppo possono scegliere gli amministratori.',
   'React with an emoji.': 'Reagisci con un’emoji.',
+  'This message can’t be forwarded.': 'Questo messaggio non può essere inoltrato.',
   'To keep younger people safe, you can only message them once you are friends.': 'Per proteggere i più giovani, puoi scrivergli solo quando siete amici.',
   'This person only gets messages from people they know.': 'Questa persona riceve messaggi solo da chi conosce.',
   'To keep younger people safe, adults and people under 18 can be in a group together only when they are friends.':

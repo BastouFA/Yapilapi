@@ -646,6 +646,7 @@ export const vi: Record<string, string> = {
   'Only group admins can remove people.': 'Chỉ quản trị viên nhóm mới mời được người khác ra khỏi nhóm.',
   'Only group admins can choose admins.': 'Chỉ quản trị viên nhóm mới chọn được quản trị viên.',
   'React with an emoji.': 'Hãy bày tỏ cảm xúc bằng một emoji.',
+  'This message can’t be forwarded.': 'Không thể chuyển tiếp tin nhắn này.',
   'To keep younger people safe, you can only message them once you are friends.':
     'Để bảo vệ người trẻ tuổi, bạn chỉ có thể nhắn tin cho họ khi hai bạn đã là bạn bè.',
   'This person only gets messages from people they know.': 'Người này chỉ nhận tin nhắn từ những người họ quen.',

@@ -650,6 +650,7 @@ export const ru: Record<string, string> = {
   'Only group admins can remove people.': 'Удалять людей могут только администраторы группы.',
   'Only group admins can choose admins.': 'Назначать администраторов могут только администраторы группы.',
   'React with an emoji.': 'Отреагируйте эмодзи.',
+  'This message can’t be forwarded.': 'Это сообщение нельзя переслать.',
   'To keep younger people safe, you can only message them once you are friends.':
     'Чтобы защитить младших пользователей, писать им можно, только когда вы станете друзьями.',
   'This person only gets messages from people they know.': 'Этот человек получает сообщения только от знакомых.',

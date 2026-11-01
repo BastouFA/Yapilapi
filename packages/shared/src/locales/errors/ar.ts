@@ -685,6 +685,7 @@ export const ar: Record<string, string> = {
   'Only group admins can remove people.': 'لا يمكن إزالة الأشخاص إلا لمشرفي المجموعة.',
   'Only group admins can choose admins.': 'لا يمكن اختيار المشرفين إلا لمشرفي المجموعة.',
   'React with an emoji.': 'تفاعل باستخدام رمز تعبيري.',
+  'This message can’t be forwarded.': 'لا يمكن إعادة توجيه هذه الرسالة.',
   'To keep younger people safe, you can only message them once you are friends.': 'حفاظًا على سلامة الأصغر سنًا، يمكنك مراسلته فقط بعد أن تصبحا صديقين.',
   'This person only gets messages from people they know.': 'لا يتلقى هذا الشخص الرسائل إلا من أشخاص يعرفهم.',
   'To keep younger people safe, adults and people under 18 can be in a group together only when they are friends.':

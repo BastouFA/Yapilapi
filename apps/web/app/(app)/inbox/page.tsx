@@ -12,13 +12,8 @@ import { useChatBase } from '@/lib/chat-base';
 import { PeoplePicker } from '@/components/PeoplePicker';
 import { useRealtime, useSession } from '../../providers';
 import { FreeStrip } from '@/components/Plans';
+import { conversationTitle } from '@/components/ChatExtras';
 import { FriendRequests } from '@/components/FriendRequests';
-
-function conversationTitle(c: Conversation, meId: string, justYou: string): string {
-  if (c.title) return c.title;
-  const others = c.members.filter((m) => m.id !== meId);
-  return others.map((m) => m.displayName).join(', ') || justYou;
-}
 
 export default function Inbox() {
   const { me, t, tp, locale, toast, unread } = useSession();

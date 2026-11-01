@@ -15,6 +15,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { ChatGame, Conversation, Message, PinnedMessage } from '../../../../packages/shared/src/types';
 import { MESSAGE_EDIT_MINUTES } from '../../../../packages/shared/src/constants';
 import { replaceFinalEmoticon } from '../../../../packages/shared/src/emoticons';
+import { canForward, copyableVoice } from '../../../../packages/shared/src/forwarding';
+import { patiently } from '../../../../packages/api-client/src/index';
 import { messageReceipt, type MessageReceipt } from '../../../../packages/shared/src/receipts';
 import { useCalls } from '../../lib/calls';
 import { client, errorMessage, mediaUrl } from '../../lib/api';
@@ -52,7 +54,11 @@ import {
   applyReaction,
   disappearingText,
   DisappearingSheet,
+  clearCopiedVoice,
+  copyVoice,
+  ForwardSheet,
   MessageActions,
+  useCopiedVoice,
   PinnedBar,
   ReactionSheet,
   previewOf,
@@ -135,6 +141,9 @@ export default function Chat() {
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [editing, setEditing] = useState<Message | null>(null);
   const [actionsFor, setActionsFor] = useState<Message | null>(null);
+  const [forwarding, setForwarding] = useState<Message | null>(null);
+  const copied = useCopiedVoice();
+  const [pasting, setPasting] = useState(false);
   // The reactions sheet from the heart beside a message (by id, so it shows the reactions as they change).
   const [reactFor, setReactFor] = useState<string | null>(null);
   const report = useReport();
@@ -739,6 +748,28 @@ export default function Chat() {
     setReplyTo(null);
   }
 
+  /** What was just forwarded, if some of it landed in this chat. */
+  function addForwarded(sent: Message[]) {
+    const here = sent.filter((m) => m.conversationId === id);
+    setMessages((cur) => [...cur, ...here.filter((m) => !cur.some((x) => x.id === m.id))]);
+  }
+
+  /** Sends the copied voice message into this chat, the message itself. */
+  async function pasteVoice() {
+    if (!copied || pasting) return;
+    setPasting(true);
+    try {
+      const api = await client();
+      const { messages: sent } = await patiently(() => api.messages.forward(copied.messageId, [id], `paste-${copied.at}`));
+      addForwarded(sent);
+      clearCopiedVoice();
+    } catch (e) {
+      Alert.alert(errorMessage(e));
+    } finally {
+      setPasting(false);
+    }
+  }
+
   function startReply(m: Message) {
     setActionsFor(null);
     setEditing(null);
@@ -819,6 +850,9 @@ export default function Chat() {
       Date.now() - new Date(m.createdAt).getTime() < MESSAGE_EDIT_MINUTES * 60_000;
     const out: SheetAction[] = [];
     if (!m.unsent) out.push({ label: t('m.chat.reply'), icon: 'arrow-undo-outline', onPress: () => startReply(m) });
+    if (canForward(m)) out.push({ label: t('chat.forward'), icon: 'arrow-redo-outline', onPress: () => setForwarding(m) });
+    const voice = copyableVoice(m);
+    if (voice) out.push({ label: t('chat.copyVoice'), icon: 'copy-outline', onPress: () => copyVoice(m.id, voice.durationMs ?? null) });
     if (editable) out.push({ label: t('m.chat.edit'), icon: 'create-outline', onPress: () => startEdit(m) });
     if (canManage && !m.unsent && !m.moderation)
       out.push(
@@ -1245,6 +1279,39 @@ export default function Chat() {
           }}
         />
       ) : null}
+      {copied && !editing ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[1], paddingHorizontal: space[2], paddingBottom: space[1] }}>
+          <Pressable
+            accessibilityRole="button"
+            disabled={pasting}
+            onPress={() => void pasteVoice()}
+            style={{
+              flex: 1,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: space[2],
+              minHeight: 44,
+              paddingHorizontal: space[3],
+              borderRadius: 22,
+              borderWidth: 1,
+              borderColor: c.line,
+              backgroundColor: c.surface,
+              opacity: pasting ? 0.6 : 1,
+            }}
+          >
+            <Icon name="mic-outline" size={18} color={c.ink} />
+            <Text style={{ color: c.ink, fontWeight: '600', fontSize: 14 }}>{t('chat.pasteVoice')}</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('common.cancel')}
+            onPress={clearCopiedVoice}
+            style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Icon name="close" size={20} color={c.inkMuted} />
+          </Pressable>
+        </View>
+      ) : null}
       {replyTo || editing ? (
         <View
           accessibilityLiveRegion="polite"
@@ -1481,6 +1548,7 @@ export default function Chat() {
           if (m) void react(m, emoji, on);
         }}
       />
+      <ForwardSheet message={forwarding} onClose={() => setForwarding(null)} onForwarded={addForwarded} />
       <MessageActions
         open={!!actionsFor}
         onClose={() => setActionsFor(null)}
@@ -1804,6 +1872,12 @@ const MessageRow = memo(function MessageRow({
       {/* A reply to a story says so first ("Replied to your story"), in your language. */}
       {item.storyReply ? (
         <Text style={[{ color: tint, fontSize: 12, opacity: 0.8 }, userText]}>{storyReplyLabel(item.storyReply, item.sender.id, meId, t)}</Text>
+      ) : null}
+      {item.forwarded ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Icon name="arrow-redo-outline" size={13} color={tint} />
+          <Text style={{ color: tint, fontSize: 12, fontStyle: 'italic', opacity: 0.8 }}>{t('chat.forwarded')}</Text>
+        </View>
       ) : null}
       {item.story ? <StoryCardView card={item.story} dark={mine} /> : null}
       <Attachments items={item.attachments} tint={tint} />

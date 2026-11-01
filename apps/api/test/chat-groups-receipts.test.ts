@@ -142,6 +142,82 @@ describe('read receipts', () => {
     expect((await as(t.app, ada).get(`/v1/conversations/${c}`)).body.conversation.readBy).toEqual([]);
   });
 
+  describe('forwarding', () => {
+    const chat = async (a: TestUser, b: TestUser) => {
+      await befriend(a, b);
+      return (await as(t.app, a).post('/v1/conversations', { memberIds: [b.id] })).body.conversation.id as string;
+    };
+    const voice = async (owner: TestUser) =>
+      (
+        await db().query<{ id: string }>(
+          `INSERT INTO media (owner_id, kind, url, mime, status, duration_ms) VALUES ($1,'audio','http://localhost:4000/media/v.m4a','audio/mp4','ready',4000) RETURNING id`,
+          [owner.id],
+        )
+      ).rows[0]!.id;
+
+    it('sends someone else’s voice message on to another chat, saying it was forwarded, not playing out loud', async () => {
+      const [ada, bo, cleo] = [await adult(), await adult(), await adult()];
+      const from = await chat(ada, bo);
+      const to = await chat(bo, cleo);
+      const media = await voice(ada);
+      const sent = await as(t.app, ada).post(`/v1/conversations/${from}/messages`, { attachments: [{ mediaId: media }], kind: 'yap' });
+      expect(sent.status).toBe(201);
+      const cleoLive = connect(cleo);
+      const r = await as(t.app, bo).post(`/v1/messages/${sent.body.message.id}/forward`, { conversationIds: [to], clientId: 'f1' });
+      expect(r.status).toBe(201);
+      expect(r.body.failed).toEqual([]);
+      const copy = r.body.messages[0];
+      expect(copy.conversationId).toBe(to);
+      expect(copy.sender.id).toBe(bo.id);
+      expect(copy.forwarded).toBe(true);
+      expect(copy.kind).toBeUndefined();
+      expect(copy.attachments[0].mediaId).toBe(media);
+      expect(cleoLive.of('yap')).toHaveLength(0);
+      expect(cleoLive.of('message.created').some((e) => e.data.id === copy.id && e.data.forwarded)).toBe(true);
+      const listed = (await as(t.app, cleo).get(`/v1/conversations/${to}/messages`)).body.items as any[];
+      expect(listed.find((m) => m.id === copy.id)?.forwarded).toBe(true);
+      // The same try again sends nothing new.
+      const again = await as(t.app, bo).post(`/v1/messages/${sent.body.message.id}/forward`, { conversationIds: [to], clientId: 'f1' });
+      expect(again.body.messages[0].id).toBe(copy.id);
+      cleoLive.remove();
+    });
+
+    it('keeps the file for the copy when the original goes, and lets it go with the last one', async () => {
+      const [ada, bo, cleo] = [await adult(), await adult(), await adult()];
+      const from = await chat(ada, bo);
+      const to = await chat(bo, cleo);
+      const media = await voice(ada);
+      const sent = await as(t.app, ada).post(`/v1/conversations/${from}/messages`, { attachments: [{ mediaId: media }] });
+      const copy = (await as(t.app, bo).post(`/v1/messages/${sent.body.message.id}/forward`, { conversationIds: [to] })).body.messages[0];
+      const gone = async () => (await db().query(`SELECT deleted_at FROM media WHERE id = $1`, [media])).rows[0].deleted_at !== null;
+      expect((await as(t.app, ada).post(`/v1/messages/${sent.body.message.id}/unsend`)).status).toBeLessThan(300);
+      expect(await gone()).toBe(false);
+      expect((await as(t.app, bo).post(`/v1/messages/${copy.id}/unsend`)).status).toBeLessThan(300);
+      expect(await gone()).toBe(true);
+    });
+
+    it('is refused for a chat you’re not in, someone else’s message, view once and disappearing ones', async () => {
+      const [ada, bo, cleo] = [await adult(), await adult(), await adult()];
+      const from = await chat(ada, bo);
+      const notMine = await chat(ada, cleo);
+      const sent = await as(t.app, ada).post(`/v1/conversations/${from}/messages`, { body: 'just for bo' });
+      const id = sent.body.message.id;
+      const mine = await chat(cleo, bo);
+      // Cleo was never in that chat.
+      expect((await as(t.app, cleo).post(`/v1/messages/${id}/forward`, { conversationIds: [mine] })).status).toBeGreaterThanOrEqual(400);
+      // Bo isn't in this one.
+      expect((await as(t.app, bo).post(`/v1/messages/${id}/forward`, { conversationIds: [notMine] })).status).toBeGreaterThanOrEqual(400);
+      await db().query(`UPDATE messages SET expires_at = now() + interval '1 hour' WHERE id = $1`, [id]);
+      const timed = await as(t.app, bo).post(`/v1/messages/${id}/forward`, { conversationIds: [mine] });
+      expect(timed.status).toBe(422);
+      await db().query(`UPDATE messages SET expires_at = NULL, view_once = true WHERE id = $1`, [id]);
+      expect((await as(t.app, bo).post(`/v1/messages/${id}/forward`, { conversationIds: [mine] })).status).toBe(422);
+      // A sent file that isn't from the message stays out of reach of the normal way of sending.
+      const hers = await voice(ada);
+      expect((await as(t.app, bo).post(`/v1/conversations/${mine}/messages`, { attachments: [{ mediaId: hers }] })).status).toBe(404);
+    });
+  });
+
   it('tells all your devices the unread count once a chat is read', async () => {
     const [ada, bo] = [await adult(), await adult()];
     await befriend(ada, bo);

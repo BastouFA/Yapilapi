@@ -618,6 +618,7 @@ export const am: Record<string, string> = {
   'Only group admins can remove people.': 'ሰዎችን ማስወገድ የሚችሉት የቡድን አስተዳዳሪዎች ብቻ ናቸው።',
   'Only group admins can choose admins.': 'አስተዳዳሪዎችን መምረጥ የሚችሉት የቡድን አስተዳዳሪዎች ብቻ ናቸው።',
   'React with an emoji.': 'በኢሞጂ ምላሽ ይስጡ።',
+  'This message can’t be forwarded.': 'ይህን መልእክት ማስተላለፍ አይቻልም።',
   'To keep younger people safe, you can only message them once you are friends.': 'ወጣቶችን ደህንነታቸውን ለመጠበቅ፣ መልዕክት ሊልኩላቸው የሚችሉት ጓደኛሞች ሲሆኑ ብቻ ነው።',
   'This person only gets messages from people they know.': 'ይህ ሰው መልዕክቶችን የሚቀበለው ከሚያውቃቸው ሰዎች ብቻ ነው።',
   'To keep younger people safe, adults and people under 18 can be in a group together only when they are friends.':

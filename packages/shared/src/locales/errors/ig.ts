@@ -642,6 +642,7 @@ export const ig: Record<string, string> = {
   'Only group admins can remove people.': 'Naanị ndị nchịkwa otu nwere ike iwepụ ndị mmadụ.',
   'Only group admins can choose admins.': 'Naanị ndị nchịkwa otu nwere ike ịhọrọ ndị nchịkwa.',
   'React with an emoji.': 'Jiri emoji meghachi omume.',
+  'This message can’t be forwarded.': 'Enweghị ike ịzigara ozi a.',
   'To keep younger people safe, you can only message them once you are friends.':
     'Iji chekwaa ndị na-eto eto, ị nwere ike izitere ha ozi naanị ozugbo unu bụ ndị enyi.',
   'This person only gets messages from people they know.': 'Onye a na-enweta ozi naanị site n’aka ndị ọ maara.',

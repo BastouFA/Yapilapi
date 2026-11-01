@@ -650,6 +650,7 @@ export const id: Record<string, string> = {
   'Only group admins can remove people.': 'Hanya admin grup yang bisa mengeluarkan orang.',
   'Only group admins can choose admins.': 'Hanya admin grup yang bisa memilih admin.',
   'React with an emoji.': 'Beri reaksi dengan emoji.',
+  'This message can’t be forwarded.': 'Pesan ini tidak dapat diteruskan.',
   'To keep younger people safe, you can only message them once you are friends.':
     'Untuk menjaga keamanan orang yang lebih muda, Anda hanya bisa mengirim pesan kepadanya setelah berteman.',
   'This person only gets messages from people they know.': 'Orang ini hanya menerima pesan dari orang yang dikenalnya.',

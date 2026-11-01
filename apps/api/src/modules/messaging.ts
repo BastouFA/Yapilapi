@@ -12,6 +12,7 @@ import {
   MESSAGE_EDIT_MINUTES,
   messageSearchSchema,
   pageQuerySchema,
+  forwardMessageSchema,
   sendMessageSchema,
   yapSettingsSchema,
   type Conversation,
@@ -697,12 +698,69 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
   });
 
   /**
+   * Forward a message you can see: a new message of yours in each chat, with its words and files.
+   * Each one goes through every rule of sending, so a chat that can't take it is simply reported.
+   * A Yap arrives as a voice message: it doesn't play out loud for people who didn't expect it.
+   */
+  app.post('/v1/messages/:id/forward', { preHandler: requireAuth, config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (req, reply) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    const input = parse(forwardMessageSchema, req.body);
+    const source = (
+      await db.query(
+        `SELECT m.conversation_id, m.body, m.attachments, m.view_once, m.expires_at, m.unsent_at, m.moderation_status, m.story_id, m.meta FROM messages m
+         WHERE m.id = $1 AND m.deleted_at IS NULL AND m.kind <> 'system' AND ${VISIBLE_TO_READER}`,
+        [id, u.id],
+      )
+    ).rows[0];
+    if (!source) throw notFound('Message');
+    await assertMember(source.conversation_id, u.id);
+    const media = mediaIdsOf(source.attachments);
+    const unforwardable = () => new AppError(422, 'not_forwardable', 'This message can’t be forwarded.');
+    if (source.view_once || source.expires_at || source.unsent_at || source.moderation_status !== 'normal' || source.story_id || source.meta?.storyReply)
+      throw unforwardable();
+    if (!source.body && !media.length) throw unforwardable();
+    if (media.length) {
+      const { rows } = await db.query<{ moderation: string }>(`SELECT moderation FROM media WHERE id = ANY($1::uuid[])`, [media]);
+      if (rows.some((m) => m.moderation === 'blocked')) throw unforwardable();
+      // Someone who isn't shown a sensitive file can't pass it on either.
+      if (rows.some((m) => m.moderation === 'sensitive') && !(await seesSensitiveMedia(db, u.id))) throw unforwardable();
+    }
+    const attachments = (source.attachments as { mediaId?: string; name?: string }[])
+      .filter((a) => a.mediaId)
+      .map((a) => ({ mediaId: a.mediaId!, name: a.name }));
+    const messages: Message[] = [];
+    const failed: { conversationId: string; message: string }[] = [];
+    const chats = [...new Set(input.conversationIds)];
+    for (const [i, conversationId] of chats.entries()) {
+      try {
+        const clientId = input.clientId ? `${input.clientId}:${i}` : undefined;
+        const sent = await sendMessage(u, conversationId, parse(sendMessageSchema, { body: source.body, attachments, clientId }), { media });
+        messages.push(sent.message);
+      } catch (e) {
+        // None of them went: the reason is the answer. Some did: it says which didn't.
+        if (!(e instanceof AppError) || chats.length === 1) throw e;
+        failed.push({ conversationId, message: e.message });
+      }
+    }
+    if (!messages.length) throw new AppError(422, 'not_forwardable', failed[0]?.message ?? 'This message can’t be forwarded.');
+    reply.code(201);
+    return { messages, failed };
+  });
+
+  /**
    * Send a message as `u` into conversation `id`, with every rule that applies at this moment:
    * membership, blocks and who can message whom, minor safety, pace limits, spam checks and the
    * chat's disappearing timer. Used when you press Send and when a message scheduled for later
    * goes out.
    */
-  async function sendMessage(u: Sender, id: string, input: SendInput): Promise<{ message: Message; notice?: string; noticeCode?: NoticeCode }> {
+  async function sendMessage(
+    u: Sender,
+    id: string,
+    input: SendInput,
+    /** Forwarding: these files came with a message the sender can see, so they don't have to be their own. */
+    forwarding?: { media: string[] },
+  ): Promise<{ message: Message; notice?: string; noticeCode?: NoticeCode }> {
     await assertMember(id, u.id);
     const members = await memberIds(id);
     const conv = (await db.query(`SELECT kind, disappearing_seconds FROM conversations WHERE id = $1`, [id])).rows[0];
@@ -759,8 +817,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       const ids = input.attachments.map((a) => a.mediaId);
       const { rows: media } = await db.query(
         `SELECT id, kind, url, variants, poster_url, duration_ms, moderation, private FROM media
-         WHERE id = ANY($1::uuid[]) AND owner_id = $2 AND status <> 'failed' AND deleted_at IS NULL`,
-        [ids, u.id],
+         WHERE id = ANY($1::uuid[]) AND (owner_id = $2 OR id = ANY($3::uuid[])) AND status <> 'failed' AND deleted_at IS NULL`,
+        [ids, u.id, forwarding?.media ?? []],
       );
       if (media.length !== new Set(ids).size) throw notFound('That photo, video or voice message');
       if (media.some((m) => m.moderation === 'blocked')) throw new AppError(422, 'media_blocked', MEDIA_BLOCKED_MESSAGE);
@@ -825,7 +883,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
             // Disappearing messages: deleted this long after sending (NULL when off).
             conv.disappearing_seconds ?? null,
             langOf(input.body),
-            storyReply ? { storyReply } : null,
+            storyReply ? { storyReply } : forwarding ? { forwarded: true } : null,
           ],
         )
         .catch((e: { code?: string; constraint?: string }) => {
@@ -849,7 +907,9 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       return rows[0];
     });
     // A voice note or a Yap is transcribed in a job; a voice note's push waits for its first words (lib/voice-transcripts.ts).
-    const transcribing = row.inserted && (await queueTranscript(db, ctx.transcription, u.id, row, { push: !yap && row.moderation_status === 'normal' }));
+    // A forwarded one isn't: it may be someone else's voice, and they didn't ask for it.
+    const transcribing =
+      row.inserted && !forwarding && (await queueTranscript(db, ctx.transcription, u.id, row, { push: !yap && row.moderation_status === 'normal' }));
     const sender = (await usersByIds(db, [u.id])).get(u.id)!;
     const storyId = (row.story_id as string | null) ?? null;
     /** The message as one reader sees it: with the story card opening only if they can see the story. */
@@ -869,6 +929,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       ...(row.kind === 'yap' ? { kind: 'yap' as const } : {}),
       ...(row.expires_at ? { expiresAt: row.expires_at.toISOString() } : {}),
       ...storyReplyOf(row),
+      ...forwardedOf(row),
     };
     if (row.reply_to_id) message.replyTo = (await messagePreviews(db, [row.reply_to_id], u.id)).get(row.reply_to_id) ?? null;
     if (row.view_once) {
@@ -1097,7 +1158,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       return (await c.query(`DELETE FROM conversation_pins WHERE message_id = $1`, [messageId])).rowCount ?? 0;
     });
     if (pinsRemoved === null) return; // already unsent or deleted
-    await revokeChatMedia(ctx, userId, mediaIdsOf(m.attachments));
+    await revokeChatMedia(ctx, mediaIdsOf(m.attachments));
     // A view-once file is deleted by the view-once worker.
     if (m.view_once) await enqueue(db, 'viewonce.check', { messageId });
     const members = await memberIds(m.conversation_id);
@@ -1577,6 +1638,10 @@ function storyReplyOf(r: { kind?: string; meta?: { storyReply?: { quote?: string
   return reply ? { storyReply: { quote: reply.quote ?? null } } : {};
 }
 
+function forwardedOf(r: { kind?: string; meta?: { forwarded?: boolean } | null }): Pick<Message, 'forwarded'> {
+  return r.kind !== 'system' && r.meta?.forwarded ? { forwarded: true } : {};
+}
+
 function toMessage(r: Record<string, any>): Message {
   return {
     id: r.id,
@@ -1592,6 +1657,7 @@ function toMessage(r: Record<string, any>): Message {
     ...(r.kind === 'yap' || r.kind === 'system' ? { kind: r.kind as 'yap' | 'system' } : {}),
     ...(r.kind === 'system' && r.meta ? { system: r.meta } : {}),
     ...storyReplyOf(r),
+    ...forwardedOf(r),
     ...(r.story ? { story: r.story } : {}),
     ...(r.edited_at ? { editedAt: r.edited_at.toISOString() } : {}),
     ...(r.unsent_at ? { unsent: true } : {}),

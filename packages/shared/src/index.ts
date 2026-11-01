@@ -76,3 +76,4 @@ export * from './today.ts';
 export * from './emoticons.ts';
 export * from './reactions.ts';
 export * from './receipts.ts';
+export * from './forwarding.ts';

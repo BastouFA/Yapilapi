@@ -644,6 +644,7 @@ export const bn: Record<string, string> = {
   'Only group admins can remove people.': 'শুধু গ্রুপের অ্যাডমিনরাই মানুষ সরাতে পারেন।',
   'Only group admins can choose admins.': 'শুধু গ্রুপের অ্যাডমিনরাই অ্যাডমিন বেছে নিতে পারেন।',
   'React with an emoji.': 'একটি ইমোজি দিয়ে রিঅ্যাক্ট করুন।',
+  'This message can’t be forwarded.': 'এই মেসেজ ফরোয়ার্ড করা যাবে না।',
   'To keep younger people safe, you can only message them once you are friends.':
     'অল্পবয়সীদের নিরাপদ রাখতে, আপনারা বন্ধু হলে তবেই তাঁকে বার্তা পাঠাতে পারবেন।',
   'This person only gets messages from people they know.': 'এই ব্যক্তি শুধু পরিচিতদের কাছ থেকেই বার্তা পান।',

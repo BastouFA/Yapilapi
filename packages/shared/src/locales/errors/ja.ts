@@ -641,6 +641,7 @@ export const ja: Record<string, string> = {
   'Only group admins can remove people.': 'メンバーを削除できるのはグループの管理者だけです。',
   'Only group admins can choose admins.': '管理者を指名できるのはグループの管理者だけです。',
   'React with an emoji.': '絵文字でリアクションしてください。',
+  'This message can’t be forwarded.': 'このメッセージは転送できません。',
   'To keep younger people safe, you can only message them once you are friends.': '若い人の安全を守るため、メッセージを送れるのは友達になってからです。',
   'This person only gets messages from people they know.': 'この人は知り合いからのメッセージだけを受け付けています。',
   'To keep younger people safe, adults and people under 18 can be in a group together only when they are friends.':

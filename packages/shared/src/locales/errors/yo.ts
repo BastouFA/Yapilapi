@@ -695,6 +695,7 @@ export const yo: Record<string, string> = {
   'Only group admins can remove people.': 'Àwọn alábòójútó ẹgbẹ́ nìkan ló lè yọ ènìyàn kúrò.',
   'Only group admins can choose admins.': 'Àwọn alábòójútó ẹgbẹ́ nìkan ló lè yan alábòójútó.',
   'React with an emoji.': 'Fèsì pẹ̀lú emoji.',
+  'This message can’t be forwarded.': 'A kò lè fi ìránṣẹ́ yìí ránṣẹ́ síwájú.',
   'To keep younger people safe, you can only message them once you are friends.':
     'Láti dáàbò bo àwọn ọ̀dọ́, o lè fi ìfiránṣẹ́ ránṣẹ́ sí wọn nígbà tí ẹ bá ti di ọ̀rẹ́ nìkan.',
   'This person only gets messages from people they know.': 'Ẹni yìí máa ń gba ìfiránṣẹ́ láti ọ̀dọ̀ àwọn tí ó mọ̀ nìkan.',

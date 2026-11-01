@@ -1043,6 +1043,8 @@ export interface Message {
    * when it's ready). Never on view-once or disappearing messages. Translatable as kind 'transcript'.
    */
   transcript?: VoiceTranscript;
+  /** Forwarded from another chat: it says so, without saying whose it was. */
+  forwarded?: boolean;
   /** Present on view-once messages. Their attachment has no url: open it with POST /v1/messages/:id/view-once/open. */
   viewOnce?: ViewOnceInfo;
   /** The message this one replies to. */

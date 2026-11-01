@@ -708,6 +708,7 @@ export const sw: Record<string, string> = {
   'Only group admins can remove people.': 'Wasimamizi wa kikundi pekee wanaweza kuondoa watu.',
   'Only group admins can choose admins.': 'Wasimamizi wa kikundi pekee wanaweza kuchagua wasimamizi.',
   'React with an emoji.': 'Jibu kwa emoji.',
+  'This message can’t be forwarded.': 'Ujumbe huu hauwezi kusambazwa.',
   'To keep younger people safe, you can only message them once you are friends.': 'Ili kuwalinda vijana, unaweza kumtumia ujumbe tu mkishakuwa marafiki.',
   'This person only gets messages from people they know.': 'Mtu huyu hupokea ujumbe kutoka kwa watu anaowajua tu.',
   'To keep younger people safe, adults and people under 18 can be in a group together only when they are friends.':

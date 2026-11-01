@@ -1325,6 +1325,9 @@ export function createClient(opts: ClientOptions) {
       cancel: (id: string) => del<{ ok: true }>(`/v1/scheduled-messages/${id}`),
     },
     messages: {
+      /** Sends a copy to other chats; `failed` says which couldn't take it (and why). */
+      forward: (id: string, conversationIds: string[], clientId?: string) =>
+        post<{ messages: Message[]; failed: { conversationId: string; message: string }[] }>(`/v1/messages/${id}/forward`, { conversationIds, clientId }),
       /** Edit your own message's text, within 15 minutes of sending it. */
       edit: (id: string, body: string) => patch<{ message: Message }>(`/v1/messages/${id}`, { body }),
       /** Unsend for everyone: a "Message unsent" line stays in its place. */
