@@ -832,6 +832,7 @@ function WatchChat({ conversationId, group, onUnread }: { conversationId: string
   const list = useRef<HTMLDivElement>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
   const stick = useRef(true);
+  const listHeight = useRef(0);
   const patch = (id: string, change: (m: Message) => Message) => setMessages((cur) => cur?.map((x) => (x.id === id ? change(x) : x)) ?? cur);
 
   useEffect(() => {
@@ -1102,7 +1103,13 @@ function WatchChat({ conversationId, group, onUnread }: { conversationId: string
         tabIndex={0}
         onScroll={() => {
           const el = list.current;
-          if (el) stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+          if (!el) return;
+          // The list changing size (the keyboard, the video) isn't you scrolling up to read.
+          if (el.clientHeight !== listHeight.current) {
+            listHeight.current = el.clientHeight;
+            return;
+          }
+          stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
         }}
       >
         {messages === null ? (
@@ -1236,6 +1243,7 @@ function WatchChat({ conversationId, group, onUnread }: { conversationId: string
           aria-label={t('chat.paste')}
           title={t('chat.paste')}
           disabled={!!uploading}
+          onMouseDown={(e) => e.preventDefault()}
           onClick={() => void paste.pasteFromClipboard()}
         >
           <Icon name="copy" size={18} />
@@ -1263,7 +1271,8 @@ function WatchChat({ conversationId, group, onUnread }: { conversationId: string
             }
           }}
         />
-        <Button type="submit" size="sm" icon="send" disabled={!body.trim()} aria-label={t('watch.send')}>
+        {/* Pressing it leaves focus in the box, so the keyboard stays up for the next message. */}
+        <Button type="submit" size="sm" icon="send" disabled={!body.trim()} aria-label={t('watch.send')} onMouseDown={(e) => e.preventDefault()}>
           <span className="watch-chat__send">{t('watch.send')}</span>
         </Button>
       </form>
@@ -1403,9 +1412,8 @@ export function WatchScreen({ id }: { id: string }) {
       root.style.setProperty('--watch-view-top', `${whole ? Math.round(view.offsetTop) : 0}px`);
       root.style.setProperty('--watch-keyboard', `${covered}px`);
       root.style.setProperty('--watch-room', open ? `${Math.round(view.height)}px` : '100dvh');
-      root.style.setProperty('--watch-stage-small', `${Math.min(180, Math.round(view.height * 0.36))}px`);
-      // An iPhone's bar over the keyboard (arrows and a check mark) floats over the page and isn't counted.
-      root.style.setProperty('--watch-keyboard-bar', open && /iP(hone|ad|od)/.test(navigator.userAgent) ? '60px' : '0px');
+      // While typing the video takes under a third of what's left, so the messages stay readable too.
+      root.style.setProperty('--watch-stage-small', `${Math.min(140, Math.round(view.height * 0.28))}px`);
       root.dataset.watchKeyboard = open ? 'open' : 'closed';
     };
     const measure = new ResizeObserver(() => root.style.setProperty('--watch-pin-h', `${pin.offsetHeight}px`));
@@ -1417,7 +1425,7 @@ export function WatchScreen({ id }: { id: string }) {
       measure.disconnect();
       view.removeEventListener('resize', fit);
       view.removeEventListener('scroll', fit);
-      for (const name of ['view-top', 'keyboard', 'room', 'stage-small', 'keyboard-bar', 'pin-h']) root.style.removeProperty(`--watch-${name}`);
+      for (const name of ['view-top', 'keyboard', 'room', 'stage-small', 'pin-h']) root.style.removeProperty(`--watch-${name}`);
       delete root.dataset.watchKeyboard;
     };
   }, [narrow, pin]);
