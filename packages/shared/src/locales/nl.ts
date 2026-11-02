@@ -4191,6 +4191,7 @@ export const nl: Catalog = {
   'watch.youtubeBlocked': 'Deze video kan hier niet afspelen. Open hem op YouTube.',
   'watch.openYoutube': 'Openen op YouTube',
   'watch.chatNew': 'Nieuwe berichten',
+  'watch.showControls': 'Bediening tonen',
   'watch.dropHint': 'Of sleep hier een foto of video naartoe',
   'watch.uploadingProgress': 'Uploaden {progress}',
   'watch.elsewhere': 'Je kijkt op een ander apparaat',

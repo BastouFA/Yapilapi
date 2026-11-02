@@ -4180,6 +4180,7 @@ export const en = {
   'watch.youtubeBlocked': 'This video can’t play here. Open it on YouTube instead.',
   'watch.openYoutube': 'Open on YouTube',
   'watch.chatNew': 'New messages',
+  'watch.showControls': 'Show controls',
   'watch.dropHint': 'Or drop a photo or video here',
   'watch.uploadingProgress': 'Uploading {progress}',
   'watch.elsewhere': 'Watching on another device',

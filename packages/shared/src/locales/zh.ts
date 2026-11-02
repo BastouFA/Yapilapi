@@ -4150,6 +4150,7 @@ export const zh: Catalog = {
   'watch.youtubeBlocked': '这个视频无法在这里播放。请在 YouTube 上打开。',
   'watch.openYoutube': '在 YouTube 上打开',
   'watch.chatNew': '新消息',
+  'watch.showControls': '显示控件',
   'watch.dropHint': '或把照片或视频拖到这里',
   'watch.uploadingProgress': '正在上传 {progress}',
   'watch.elsewhere': '正在其他设备上观看',

@@ -4358,6 +4358,7 @@ export const ru: Catalog = {
   'watch.youtubeBlocked': 'Это видео нельзя воспроизвести здесь. Откройте его на YouTube.',
   'watch.openYoutube': 'Открыть на YouTube',
   'watch.chatNew': 'Новые сообщения',
+  'watch.showControls': 'Показать управление',
   'watch.dropHint': 'Или перетащите сюда фото или видео',
   'watch.uploadingProgress': 'Загрузка {progress}',
   'watch.elsewhere': 'Вы смотрите на другом устройстве',

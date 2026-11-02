@@ -4150,6 +4150,7 @@ export const am: Catalog = {
   'watch.youtubeBlocked': 'ይህ ቪዲዮ እዚህ መጫወት አይችልም። በምትኩ በYouTube ላይ ይክፈቱት።',
   'watch.openYoutube': 'በYouTube ላይ ክፈት',
   'watch.chatNew': 'አዲስ መልዕክቶች',
+  'watch.showControls': 'መቆጣጠሪያዎችን አሳይ',
   'watch.dropHint': 'ወይም ፎቶ ወይም ቪዲዮ እዚህ ይጣሉ',
   'watch.uploadingProgress': 'በመስቀል ላይ {progress}',
   'watch.elsewhere': 'በሌላ መሣሪያ እየተመለከቱ ነው',

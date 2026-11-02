@@ -4186,6 +4186,7 @@ export const tr: Catalog = {
   'watch.youtubeBlocked': 'Bu video burada oynatılamıyor. Bunun yerine YouTube’da aç.',
   'watch.openYoutube': 'YouTube’da aç',
   'watch.chatNew': 'Yeni mesajlar',
+  'watch.showControls': 'Kontrolleri göster',
   'watch.dropHint': 'Ya da bir fotoğraf veya videoyu buraya bırak',
   'watch.uploadingProgress': 'Yükleniyor {progress}',
   'watch.elsewhere': 'Başka bir cihazda izliyorsun',

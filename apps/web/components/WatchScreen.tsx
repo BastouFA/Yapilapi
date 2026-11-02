@@ -808,6 +808,9 @@ function Scrubber({ video, onSeek, disabled }: { video: WatchMedia | null; onSee
   );
 }
 
+/** How long the play bar stays after the last touch while a video plays. */
+const CONTROLS_STAY_MS = 3000;
+
 /** The chat beside the video: the conversation itself, newest at the bottom. `onUnread` hears of messages from others. */
 function WatchChat({ conversationId, group, onUnread }: { conversationId: string; group: boolean; onUnread?: () => void }) {
   const { me, t, toast, locale } = useSession();
@@ -1381,34 +1384,80 @@ export function WatchScreen({ id }: { id: string }) {
   const [chatOpen, setChatOpen] = useState(false);
   const [unread, setUnread] = useState(0);
   const narrow = useNarrow();
-  const sheet = useRef<HTMLElement>(null);
-  // A phone's keyboard goes over the page without moving it, and would hide the message box and
-  // the "Replying to" strip: keep the sheet above it, in the room that's left.
+  const [pin, setPin] = useState<HTMLDivElement | null>(null);
+  // On a phone the video stays at the top of the screen, and the chat fills what's left under it.
+  // A keyboard goes over the page without moving it, and Safari may slide the whole page up to show
+  // the box you're typing in: so the video follows what's really on screen, and the chat sits
+  // between the two.
   useEffect(() => {
     const view = window.visualViewport;
-    if (!narrow || !view) return;
+    if (!narrow || !view || !pin) return;
+    const root = document.documentElement;
     const fit = () => {
-      const el = sheet.current;
-      if (!el) return;
       // Pinching the page in isn't a keyboard.
       const whole = view.scale <= 1.01;
       const open = whole && window.innerHeight - view.height > 80;
-      // Safari may move the page up by itself: only what's still hidden is left to make up.
+      // Only what's still hidden after Safari slid the page is left to make up.
       const covered = whole ? Math.max(0, Math.round(window.innerHeight - view.height - view.offsetTop)) : 0;
-      el.style.setProperty('--watch-keyboard', `${covered}px`);
-      el.style.setProperty('--watch-room', open ? `${Math.round(view.height)}px` : '100dvh');
+      root.style.setProperty('--watch-view-top', `${whole ? Math.round(view.offsetTop) : 0}px`);
+      root.style.setProperty('--watch-keyboard', `${covered}px`);
+      root.style.setProperty('--watch-room', open ? `${Math.round(view.height)}px` : '100dvh');
+      root.style.setProperty('--watch-stage-small', `${Math.min(180, Math.round(view.height * 0.36))}px`);
       // An iPhone's bar over the keyboard (arrows and a check mark) floats over the page and isn't counted.
-      el.style.setProperty('--watch-keyboard-bar', open && /iP(hone|ad|od)/.test(navigator.userAgent) ? '60px' : '0px');
-      el.dataset.keyboard = open ? 'open' : 'closed';
+      root.style.setProperty('--watch-keyboard-bar', open && /iP(hone|ad|od)/.test(navigator.userAgent) ? '60px' : '0px');
+      root.dataset.watchKeyboard = open ? 'open' : 'closed';
     };
+    const measure = new ResizeObserver(() => root.style.setProperty('--watch-pin-h', `${pin.offsetHeight}px`));
+    measure.observe(pin);
     fit();
     view.addEventListener('resize', fit);
     view.addEventListener('scroll', fit);
     return () => {
+      measure.disconnect();
       view.removeEventListener('resize', fit);
       view.removeEventListener('scroll', fit);
+      for (const name of ['view-top', 'keyboard', 'room', 'stage-small', 'keyboard-bar', 'pin-h']) root.style.removeProperty(`--watch-${name}`);
+      delete root.dataset.watchKeyboard;
     };
-  }, [narrow]);
+  }, [narrow, pin]);
+
+  // The play bar goes away a moment after the video starts, like YouTube's. It stays while paused,
+  // and while a keyboard user is on it.
+  const [controlsAway, setControlsAway] = useState(false);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const canHide = !!w.playback?.playing && !w.needsTap && !w.elsewhere && !!w.current && !(w.current.kind === 'upload' && w.current.media.kind === 'image');
+  const wakeControls = useCallback(() => {
+    setControlsAway(false);
+    clearTimeout(hideTimer.current);
+    hideTimer.current = setTimeout(function later() {
+      if (document.activeElement?.closest('.watch-controls')?.matches(':has(:focus-visible)')) {
+        hideTimer.current = setTimeout(later, CONTROLS_STAY_MS);
+        return;
+      }
+      setControlsAway(true);
+      // A tap on YouTube's player leaves focus in it, and the next tap couldn't be noticed.
+      if (document.activeElement?.tagName === 'IFRAME') (document.activeElement as HTMLElement).blur();
+    }, CONTROLS_STAY_MS);
+  }, []);
+  const currentId = w.current?.id;
+  useEffect(() => {
+    if (canHide) wakeControls();
+    else {
+      clearTimeout(hideTimer.current);
+      setControlsAway(false);
+    }
+    return () => clearTimeout(hideTimer.current);
+  }, [canHide, currentId, wakeControls]);
+  // Nothing on YouTube's player reaches this page, but the page does notice losing focus to it.
+  useEffect(() => {
+    if (!canHide) return;
+    const blurred = () => {
+      if (document.activeElement?.tagName === 'IFRAME') wakeControls();
+    };
+    window.addEventListener('blur', blurred);
+    return () => window.removeEventListener('blur', blurred);
+  }, [canHide, wakeControls]);
+
   const { session, current, playback, isHost, video } = w;
   // Left on your other device: back to the chat here too.
   const conversationId = session?.conversationId;
@@ -1538,12 +1587,7 @@ export function WatchScreen({ id }: { id: string }) {
 
   // On phones the chat is a sheet in <body> (fixed to the screen, out of the page's layout).
   const chat = (
-    <aside
-      ref={sheet}
-      className={`watch-chat${narrow ? ' watch-chat--sheet' : ''}${chatOpen ? ' watch-chat--open' : ''}`}
-      id="watch-chat"
-      aria-label={t('watch.chat')}
-    >
+    <aside className={`watch-chat${narrow ? ' watch-chat--sheet' : ''}${chatOpen ? ' watch-chat--open' : ''}`} id="watch-chat" aria-label={t('watch.chat')}>
       {narrow ? (
         <button type="button" className="watch-chat__close yp-action" aria-label={t('m.common.close')} onClick={() => setChatOpen(false)}>
           <Icon name="chevron-down" />
@@ -1639,89 +1683,111 @@ export function WatchScreen({ id }: { id: string }) {
       <div className="watch-layout">
         <section className="watch-player" aria-label={t('watch.nowPlaying')}>
           <Presence watching={session.watching} hostId={session.hostId} note={w.note} />
-          <div className={`watch-stage${youtube ? ' watch-stage--embed' : ''}${drop.over ? ' watch-stage--drop' : ''}`} {...drop.props}>
-            {stage}
-            {/* Nothing is drawn over YouTube's player: its reactions are said in the note above. */}
-            {!youtube ? (
-              <div className="watch-floats" aria-hidden>
-                {w.reactions.map((r) => (
-                  <span key={r.id} className="watch-floats__item" style={{ insetInlineStart: `${8 + Math.round(r.at * 72)}%` }}>
-                    <Icon name={r.kind} size={30} filled={r.kind === 'heart' || r.kind === 'star'} />
-                  </span>
-                ))}
-              </div>
-            ) : null}
-            {w.needsTap && !youtube ? (
-              <div className="watch-stage__overlay">
-                <Button icon="play" onClick={w.tapToJoin}>
-                  {t('watch.playToJoin')}
-                </Button>
-              </div>
-            ) : null}
-            {w.soundHeld && !w.needsTap && !youtube && !photo && !!video && !w.elsewhere ? (
-              <button type="button" className="watch-sound-pill" onClick={w.toggleSound}>
-                <Icon name="volume-off" size={18} />
-                {t('watch.tapForSound')}
-              </button>
-            ) : null}
-          </div>
-          {/* Outside YouTube's player, so nothing covers it. */}
-          {youtube && !!video && (w.needsTap || w.soundHeld) && !w.elsewhere ? (
-            <div className="row watch-embed-taps">
-              {w.needsTap ? (
-                <Button icon="play" onClick={w.tapToJoin}>
-                  {t('watch.playToJoin')}
-                </Button>
-              ) : (
-                <Button variant="secondary" icon="volume-off" onClick={w.toggleSound}>
+          <div
+            ref={setPin}
+            className={`watch-pin${controlsAway ? ' watch-pin--away' : ''}`}
+            onPointerDown={canHide ? wakeControls : undefined}
+            onPointerMove={canHide ? (e) => e.pointerType === 'mouse' && wakeControls() : undefined}
+            onFocus={canHide ? wakeControls : undefined}
+          >
+            <div className={`watch-stage${youtube ? ' watch-stage--embed' : ''}${drop.over ? ' watch-stage--drop' : ''}`} {...drop.props}>
+              {stage}
+              {/* Nothing is drawn over YouTube's player: its reactions are said in the note above. */}
+              {!youtube ? (
+                <div className="watch-floats" aria-hidden>
+                  {w.reactions.map((r) => (
+                    <span key={r.id} className="watch-floats__item" style={{ insetInlineStart: `${8 + Math.round(r.at * 72)}%` }}>
+                      <Icon name={r.kind} size={30} filled={r.kind === 'heart' || r.kind === 'star'} />
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+              {w.needsTap && !youtube ? (
+                <div className="watch-stage__overlay">
+                  <Button icon="play" onClick={w.tapToJoin}>
+                    {t('watch.playToJoin')}
+                  </Button>
+                </div>
+              ) : null}
+              {w.soundHeld && !w.needsTap && !youtube && !photo && !!video && !w.elsewhere ? (
+                <button type="button" className="watch-sound-pill" onClick={w.toggleSound}>
+                  <Icon name="volume-off" size={18} />
                   {t('watch.tapForSound')}
-                </Button>
-              )}
+                </button>
+              ) : null}
             </div>
-          ) : null}
-          {upload.state ? <UploadProgress state={upload.state} /> : null}
-          {w.saverWaiting ? <p className="muted watch-note">{t('watch.dataSaverNote')}</p> : null}
-
-          <div className="watch-controls" role="group" aria-label={t('watch.title')}>
-            <button
-              type="button"
-              className="watch-ctl watch-ctl--main"
-              aria-label={playing ? t('watch.pause') : t('watch.play')}
-              title={playing ? t('watch.pause') : t('watch.play')}
-              disabled={!current || w.elsewhere}
-              onClick={w.needsTap ? w.tapToJoin : w.togglePlay}
-            >
-              <Icon name={playing ? 'pause' : 'play'} size={22} />
-            </button>
-            {!photo ? (
-              <Scrubber video={current ? video : null} onSeek={w.seek} disabled={!current || w.needsTap || w.elsewhere || !ready} />
-            ) : (
-              <span className="watch-scrub" />
-            )}
-            <button
-              type="button"
-              className="watch-ctl"
-              // One name with a pressed state (pressed: sound on), like the reels' sound button.
-              aria-label={t('m.reels.sound')}
-              title={w.muted ? t('m.reels.soundOn') : t('m.reels.soundOff')}
-              aria-pressed={!w.muted}
-              disabled={w.elsewhere}
-              onClick={w.toggleSound}
-            >
-              <Icon name={w.muted ? 'volume-off' : 'volume'} size={20} />
-            </button>
-            {captions.length ? (
+            {/* Outside YouTube's player, so nothing covers it. */}
+            {youtube && !!video && (w.needsTap || w.soundHeld) && !w.elsewhere ? (
+              <div className="row watch-embed-taps">
+                {w.needsTap ? (
+                  <Button icon="play" onClick={w.tapToJoin}>
+                    {t('watch.playToJoin')}
+                  </Button>
+                ) : (
+                  <Button variant="secondary" icon="volume-off" onClick={w.toggleSound}>
+                    {t('watch.tapForSound')}
+                  </Button>
+                )}
+              </div>
+            ) : null}
+            <div className="watch-controls" role="group" aria-label={t('watch.title')}>
               <button
                 type="button"
-                className="watch-ctl watch-ctl--text"
-                aria-pressed={captionsOn}
-                title={t('reel.captions.show')}
-                onClick={() => setCaptionsOn((c) => !c)}
+                className="watch-ctl watch-ctl--main"
+                aria-label={playing ? t('watch.pause') : t('watch.play')}
+                title={playing ? t('watch.pause') : t('watch.play')}
+                disabled={!current || w.elsewhere}
+                onClick={w.needsTap ? w.tapToJoin : w.togglePlay}
               >
-                CC<span className="yp-visually-hidden"> {t('reel.captions.show')}</span>
+                <Icon name={playing ? 'pause' : 'play'} size={22} />
+              </button>
+              {!photo ? (
+                <Scrubber video={current ? video : null} onSeek={w.seek} disabled={!current || w.needsTap || w.elsewhere || !ready} />
+              ) : (
+                <span className="watch-scrub" />
+              )}
+              <button
+                type="button"
+                className="watch-ctl"
+                // One name with a pressed state (pressed: sound on), like the reels' sound button.
+                aria-label={t('m.reels.sound')}
+                title={w.muted ? t('m.reels.soundOn') : t('m.reels.soundOff')}
+                aria-pressed={!w.muted}
+                disabled={w.elsewhere}
+                onClick={w.toggleSound}
+              >
+                <Icon name={w.muted ? 'volume-off' : 'volume'} size={20} />
+              </button>
+              {captions.length ? (
+                <button
+                  type="button"
+                  className="watch-ctl watch-ctl--text"
+                  aria-pressed={captionsOn}
+                  title={t('reel.captions.show')}
+                  onClick={() => setCaptionsOn((c) => !c)}
+                >
+                  CC<span className="yp-visually-hidden"> {t('reel.captions.show')}</span>
+                </button>
+              ) : null}
+            </div>
+            {controlsAway ? (
+              <button
+                type="button"
+                className="watch-show-controls"
+                aria-label={t('watch.showControls')}
+                title={t('watch.showControls')}
+                onClick={() => {
+                  wakeControls();
+                  // This button goes away: the keyboard carries on at the play button.
+                  requestAnimationFrame(() => pin?.querySelector<HTMLElement>('.watch-ctl--main')?.focus());
+                }}
+              >
+                <Icon name="chevron-down" size={18} />
               </button>
             ) : null}
           </div>
+          {upload.state ? <UploadProgress state={upload.state} /> : null}
+          {w.saverWaiting ? <p className="muted watch-note">{t('watch.dataSaverNote')}</p> : null}
           <div className="watch-actions">
             <Button size="sm" variant="secondary" iconRight="chevron-right" disabled={!upNext.length || w.elsewhere} onClick={w.next}>
               {t('watch.next')}

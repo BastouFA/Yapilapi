@@ -4170,6 +4170,7 @@ export const ja: Catalog = {
   'watch.youtubeBlocked': 'この動画はここでは再生できません。YouTubeで開いてください。',
   'watch.openYoutube': 'YouTubeで開く',
   'watch.chatNew': '新しいメッセージ',
+  'watch.showControls': 'コントロールを表示',
   'watch.dropHint': 'または写真か動画をここにドロップ',
   'watch.uploadingProgress': 'アップロード中 {progress}',
   'watch.elsewhere': '別のデバイスで視聴中',

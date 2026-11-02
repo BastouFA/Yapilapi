@@ -1146,11 +1146,11 @@
 .watch-chat.watch-chat--sheet {
   position: fixed;
   inset-inline: 0;
-  /* Above the keyboard, which goes over the page without moving it (set in WatchScreen). */
+  /* Above the keyboard, and right under the video: the chat fills what's left between them. */
   bottom: var(--watch-keyboard, 0px);
   z-index: 1100;
   display: none;
-  height: min(56dvh, 520px, var(--watch-room, 100dvh));
+  height: calc(var(--watch-room, 100dvh) - var(--watch-pin-h, 45dvh));
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
   box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.25);
@@ -1158,10 +1158,23 @@
 .watch-chat.watch-chat--sheet.watch-chat--open {
   display: flex;
 }
-.watch-chat.watch-chat--sheet[data-keyboard='open'] {
+:root[data-watch-keyboard='open'] .watch-chat.watch-chat--sheet {
+  padding-top: var(--space-2);
   padding-bottom: calc(var(--space-2) + var(--watch-keyboard-bar, 0px));
+  border-radius: 0;
 }
-.watch-chat--sheet[data-keyboard='open'] .watch-chat__note {
+/* Between the chat and the keyboard, the bars Safari floats there: nothing of the page shows through. */
+:root[data-watch-keyboard='open'] .watch-chat.watch-chat--sheet::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  top: 100%;
+  height: 240px;
+  background: var(--surface);
+}
+:root[data-watch-keyboard='open'] .watch-chat--sheet .watch-chat__note,
+:root[data-watch-keyboard='open'] .watch-chat--sheet .watch-chat__head,
+:root[data-watch-keyboard='open'] .watch-chat--sheet .watch-chat__close {
   display: none;
 }
 .watch-chat--sheet .watch-chat__close {
@@ -1172,6 +1185,89 @@
 }
 .watch-chat--sheet .watch-chat__head {
   padding-inline-end: 48px;
+}
+
+/* The video and its play bar. */
+.watch-pin {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.watch-controls {
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+.watch-show-controls {
+  display: none;
+}
+/* On a computer the bar fades where it is, so nothing below it moves; pointing at it brings it back. */
+.watch-pin--away .watch-controls:not(:hover, :has(:focus-visible)) {
+  opacity: 0;
+}
+/* On a phone the video stays at the top of the screen, whatever you scroll or type. */
+@media (max-width: 819px) {
+  .watch-page {
+    /* A container query's box would hold the video in the page instead of on the screen. */
+    container-type: normal;
+    padding-top: var(--watch-pin-h, calc(56.25vw + 64px));
+  }
+  .watch-top {
+    position: static;
+  }
+  .watch-pin {
+    position: fixed;
+    top: var(--watch-view-top, 0px);
+    inset-inline: 0;
+    z-index: 30;
+    gap: 0;
+    padding-top: env(safe-area-inset-top, 0px);
+    background: var(--ground);
+    box-shadow: 0 1px 0 var(--line);
+  }
+  .watch-stage {
+    /* svh: it keeps its size when Safari's bars slide away during a scroll. */
+    height: min(40svh, 380px);
+    min-height: 0;
+    border-radius: 0;
+  }
+  .watch-page--chat .watch-stage:not(.watch-stage--embed) {
+    height: min(56.25vw, 30svh);
+  }
+  :root[data-watch-keyboard='open'] .watch-stage {
+    height: var(--watch-stage-small, 160px);
+    aspect-ratio: auto;
+  }
+  :root[data-watch-keyboard='open'] .watch-stage__empty {
+    gap: 4px;
+    padding: var(--space-2);
+    font-size: 13px;
+  }
+  .watch-pin .watch-embed-taps,
+  .watch-controls {
+    padding: var(--space-2) var(--space-3);
+  }
+  .watch-pin--away .watch-controls,
+  :root[data-watch-keyboard='open'] .watch-controls,
+  :root[data-watch-keyboard='open'] .watch-show-controls {
+    display: none;
+  }
+  .watch-pin--away .watch-show-controls {
+    position: relative;
+    display: grid;
+    place-items: center;
+    height: 28px;
+    border: 0;
+    background: none;
+    color: var(--ink-muted);
+    cursor: pointer;
+  }
+  .watch-show-controls::before {
+    content: '';
+    position: absolute;
+    inset: -8px 0;
+  }
+  :root[data-watch-keyboard='open'] .watch-show-controls {
+    display: none;
+  }
 }
 /* Room to scroll the page past the open sheet. */
 .watch-page--chat .watch-layout {

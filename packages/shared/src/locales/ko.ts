@@ -4161,6 +4161,7 @@ export const ko: Catalog = {
   'watch.youtubeBlocked': '이 동영상은 여기서 재생할 수 없어요. YouTube에서 열어 주세요.',
   'watch.openYoutube': 'YouTube에서 열기',
   'watch.chatNew': '새 메시지',
+  'watch.showControls': '컨트롤 표시',
   'watch.dropHint': '또는 사진이나 동영상을 여기에 놓으세요',
   'watch.uploadingProgress': '업로드 중 {progress}',
   'watch.elsewhere': '다른 기기에서 보고 있어요',

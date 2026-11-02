@@ -4181,6 +4181,7 @@ export const ur: Catalog = {
   'watch.youtubeBlocked': 'یہ ویڈیو یہاں نہیں چل سکتی۔ اسے YouTube پر کھولیں۔',
   'watch.openYoutube': 'YouTube پر کھولیں',
   'watch.chatNew': 'نئے پیغامات',
+  'watch.showControls': 'کنٹرول دکھائیں',
   'watch.dropHint': 'یا کوئی تصویر یا ویڈیو یہاں چھوڑیں',
   'watch.uploadingProgress': 'اپ لوڈ ہو رہا ہے {progress}',
   'watch.elsewhere': 'آپ دوسرے آلے پر دیکھ رہے ہیں',

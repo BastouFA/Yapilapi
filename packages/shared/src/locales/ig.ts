@@ -4178,6 +4178,7 @@ export const ig: Catalog = {
   'watch.youtubeBlocked': 'Vidiyo a enweghị ike ịkpọ ebe a. Mepee ya na YouTube kama.',
   'watch.openYoutube': 'Mepee na YouTube',
   'watch.chatNew': 'Ozi ọhụrụ',
+  'watch.showControls': 'Gosi njikwa',
   'watch.dropHint': 'Ma ọ bụ tụba foto ma ọ bụ vidiyo ebe a',
   'watch.uploadingProgress': 'A na-ebulite {progress}',
   'watch.elsewhere': 'Ị na-ele na ngwaọrụ ọzọ',

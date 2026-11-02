@@ -4174,6 +4174,7 @@ export const bn: Catalog = {
   'watch.youtubeBlocked': 'এই ভিডিওটি এখানে চলবে না। এর বদলে YouTube-এ খুলুন।',
   'watch.openYoutube': 'YouTube-এ খুলুন',
   'watch.chatNew': 'নতুন বার্তা',
+  'watch.showControls': 'নিয়ন্ত্রণ দেখান',
   'watch.dropHint': 'অথবা একটি ছবি বা ভিডিও এখানে ছাড়ুন',
   'watch.uploadingProgress': 'আপলোড হচ্ছে {progress}',
   'watch.elsewhere': 'আপনি অন্য ডিভাইসে দেখছেন',

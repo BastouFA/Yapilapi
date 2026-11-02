@@ -4191,6 +4191,7 @@ export const es: Catalog = {
   'watch.youtubeBlocked': 'Este video no se puede reproducir aquí. Ábrelo en YouTube.',
   'watch.openYoutube': 'Abrir en YouTube',
   'watch.chatNew': 'Mensajes nuevos',
+  'watch.showControls': 'Mostrar controles',
   'watch.dropHint': 'O suelta aquí una foto o un video',
   'watch.uploadingProgress': 'Subiendo {progress}',
   'watch.elsewhere': 'Viendo en otro dispositivo',

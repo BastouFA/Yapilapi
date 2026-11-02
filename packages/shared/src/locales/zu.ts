@@ -4206,6 +4206,7 @@ export const zu: Catalog = {
   'watch.youtubeBlocked': 'Le vidiyo ayikwazi ukudlala lapha. Yivule ku-YouTube esikhundleni salokho.',
   'watch.openYoutube': 'Vula ku-YouTube',
   'watch.chatNew': 'Imilayezo emisha',
+  'watch.showControls': 'Bonisa izilawuli',
   'watch.dropHint': 'Noma lahla isithombe noma ividiyo lapha',
   'watch.uploadingProgress': 'Kuyalayishwa {progress}',
   'watch.elsewhere': 'Ubuka kwenye enye idivayisi',

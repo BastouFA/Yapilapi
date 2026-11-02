@@ -102,6 +102,13 @@ test('two people watch together from a chat, and a second device of the same per
   await expect(cleoPage.locator('#watch-chat')).toContainText('This one is good');
   await expect(cleoPage.locator('.watch-stage')).toBeInViewport();
 
+  // On a phone the video stays at the top of the screen when the page scrolls, and the chat sits under it.
+  const stageTop = (await cleoPage.locator('.watch-stage').boundingBox())!.y;
+  await cleoPage.evaluate(() => window.scrollTo(0, 400));
+  expect((await cleoPage.locator('.watch-stage').boundingBox())!.y).toBe(stageTop);
+  const stageBox = (await cleoPage.locator('.watch-stage').boundingBox())!;
+  expect((await cleoPage.locator('#watch-chat').boundingBox())!.y).toBeGreaterThanOrEqual(stageBox.y + stageBox.height);
+
   // Reply and React sit beside each message, as in the chat, and reach the other person.
   const said = cleoPage.locator('#watch-chat .chat-msg', { hasText: 'This one is good' }).first();
   await expect(said.getByRole('button', { name: 'Reply' })).toBeVisible();

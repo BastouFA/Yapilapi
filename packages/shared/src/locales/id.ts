@@ -4202,6 +4202,7 @@ export const id: Catalog = {
   'watch.youtubeBlocked': 'Video ini tidak bisa diputar di sini. Buka di YouTube saja.',
   'watch.openYoutube': 'Buka di YouTube',
   'watch.chatNew': 'Pesan baru',
+  'watch.showControls': 'Tampilkan kontrol',
   'watch.dropHint': 'Atau letakkan foto atau video di sini',
   'watch.uploadingProgress': 'Mengunggah {progress}',
   'watch.elsewhere': 'Menonton di perangkat lain',

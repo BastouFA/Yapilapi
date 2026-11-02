@@ -4188,6 +4188,7 @@ export const sw: Catalog = {
   'watch.youtubeBlocked': 'Video hii haiwezi kuchezwa hapa. Ifungue kwenye YouTube badala yake.',
   'watch.openYoutube': 'Fungua kwenye YouTube',
   'watch.chatNew': 'Ujumbe mpya',
+  'watch.showControls': 'Onyesha vidhibiti',
   'watch.dropHint': 'Au dondosha picha au video hapa',
   'watch.uploadingProgress': 'Inapakia {progress}',
   'watch.elsewhere': 'Unatazama kwenye kifaa kingine',

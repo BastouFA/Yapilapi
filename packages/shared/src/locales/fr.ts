@@ -4207,6 +4207,7 @@ export const fr: Catalog = {
   'watch.youtubeBlocked': 'Cette vidéo ne peut pas être lue ici. Ouvre-la plutôt sur YouTube.',
   'watch.openYoutube': 'Ouvrir sur YouTube',
   'watch.chatNew': 'Nouveaux messages',
+  'watch.showControls': 'Afficher les commandes',
   'watch.dropHint': 'Ou dépose une photo ou une vidéo ici',
   'watch.uploadingProgress': 'Envoi {progress}',
   'watch.elsewhere': 'Tu regardes sur un autre appareil',

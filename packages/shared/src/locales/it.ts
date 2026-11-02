@@ -4191,6 +4191,7 @@ export const it: Catalog = {
   'watch.youtubeBlocked': 'Questo video non può essere riprodotto qui. Aprilo su YouTube.',
   'watch.openYoutube': 'Apri su YouTube',
   'watch.chatNew': 'Nuovi messaggi',
+  'watch.showControls': 'Mostra i controlli',
   'watch.dropHint': 'Oppure trascina qui una foto o un video',
   'watch.uploadingProgress': 'Caricamento {progress}',
   'watch.elsewhere': 'Stai guardando su un altro dispositivo',

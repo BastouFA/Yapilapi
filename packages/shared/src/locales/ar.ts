@@ -4318,6 +4318,7 @@ export const ar: Catalog = {
   'watch.youtubeBlocked': 'لا يمكن تشغيل هذا الفيديو هنا. افتحه على YouTube بدلًا من ذلك.',
   'watch.openYoutube': 'فتح على YouTube',
   'watch.chatNew': 'رسائل جديدة',
+  'watch.showControls': 'إظهار عناصر التحكم',
   'watch.dropHint': 'أو أفلت صورة أو فيديو هنا',
   'watch.uploadingProgress': 'جارٍ الرفع {progress}',
   'watch.elsewhere': 'تشاهد على جهاز آخر',

@@ -4184,6 +4184,7 @@ export const pt: Catalog = {
   'watch.youtubeBlocked': 'Este vídeo não pode ser reproduzido aqui. Abra no YouTube.',
   'watch.openYoutube': 'Abrir no YouTube',
   'watch.chatNew': 'Mensagens novas',
+  'watch.showControls': 'Mostrar controles',
   'watch.dropHint': 'Ou solte uma foto ou um vídeo aqui',
   'watch.uploadingProgress': 'Enviando {progress}',
   'watch.elsewhere': 'Assistindo em outro dispositivo',

@@ -4177,6 +4177,7 @@ export const yo: Catalog = {
   'watch.youtubeBlocked': 'Fídíò yìí kò lè ṣiṣẹ́ níbí. Ṣí i lórí YouTube dípò.',
   'watch.openYoutube': 'Ṣí i lórí YouTube',
   'watch.chatNew': 'Àwọn ìfiránṣẹ́ tuntun',
+  'watch.showControls': 'Fi àwọn ìdarí hàn',
   'watch.dropHint': 'Tàbí ju fọ́tò tàbí fídíò sí ibí',
   'watch.uploadingProgress': 'À ń gbé e sókè {progress}',
   'watch.elsewhere': 'O ń wò ó lórí ẹ̀rọ mìíràn',

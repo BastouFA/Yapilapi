@@ -4201,6 +4201,7 @@ export const de: Catalog = {
   'watch.youtubeBlocked': 'Dieses Video kann hier nicht abgespielt werden. Öffne es stattdessen auf YouTube.',
   'watch.openYoutube': 'Auf YouTube öffnen',
   'watch.chatNew': 'Neue Nachrichten',
+  'watch.showControls': 'Steuerung anzeigen',
   'watch.dropHint': 'Oder zieh ein Foto oder Video hierher',
   'watch.uploadingProgress': 'Wird hochgeladen {progress}',
   'watch.elsewhere': 'Du schaust auf einem anderen Gerät',

@@ -4184,6 +4184,7 @@ export const vi: Catalog = {
   'watch.youtubeBlocked': 'Không phát được video này ở đây. Hãy mở trên YouTube.',
   'watch.openYoutube': 'Mở trên YouTube',
   'watch.chatNew': 'Tin nhắn mới',
+  'watch.showControls': 'Hiện điều khiển',
   'watch.dropHint': 'Hoặc thả ảnh hay video vào đây',
   'watch.uploadingProgress': 'Đang tải lên {progress}',
   'watch.elsewhere': 'Đang xem trên thiết bị khác',

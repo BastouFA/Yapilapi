@@ -4178,6 +4178,7 @@ export const hi: Catalog = {
   'watch.youtubeBlocked': 'यह वीडियो यहाँ नहीं चल सकता। इसे YouTube पर खोलें।',
   'watch.openYoutube': 'YouTube पर खोलें',
   'watch.chatNew': 'नए संदेश',
+  'watch.showControls': 'कंट्रोल दिखाएं',
   'watch.dropHint': 'या कोई फ़ोटो या वीडियो यहाँ छोड़ें',
   'watch.uploadingProgress': 'अपलोड हो रहा है {progress}',
   'watch.elsewhere': 'आप दूसरे डिवाइस पर देख रहे हैं',

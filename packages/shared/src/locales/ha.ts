@@ -4189,6 +4189,7 @@ export const ha: Catalog = {
   'watch.youtubeBlocked': 'Ba za a iya kunna wannan bidiyon a nan ba. Buɗe shi a YouTube maimakon haka.',
   'watch.openYoutube': 'Buɗe a YouTube',
   'watch.chatNew': 'Sabbin saƙonni',
+  'watch.showControls': 'Nuna maɓallan sarrafawa',
   'watch.dropHint': 'Ko ka jefa hoto ko bidiyo a nan',
   'watch.uploadingProgress': 'Ana ɗorawa {progress}',
   'watch.elsewhere': "Kana kallo a wata na'ura",
