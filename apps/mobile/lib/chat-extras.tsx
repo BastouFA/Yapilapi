@@ -459,28 +459,6 @@ function useSkinTone(): SkinTone {
   return current;
 }
 
-// ── A voice message copied in a chat, to paste into another: clipboards don't take sound ──
-export type CopiedVoice = { messageId: string; durationMs: number | null; at: number };
-/** How long a copied voice message waits to be pasted. */
-const COPIED_KEEP_MS = 30 * 60_000;
-let copied: CopiedVoice | null = null;
-const copiedListeners = new Set<(v: CopiedVoice | null) => void>();
-function setCopied(v: CopiedVoice | null) {
-  copied = v;
-  copiedListeners.forEach((l) => l(v));
-}
-export const copyVoice = (messageId: string, durationMs: number | null) => setCopied({ messageId, durationMs, at: Date.now() });
-export const clearCopiedVoice = () => setCopied(null);
-export function useCopiedVoice(): CopiedVoice | null {
-  const [v, setV] = useState(copied);
-  useEffect(() => {
-    copiedListeners.add(setV);
-    setV(copied);
-    return () => void copiedListeners.delete(setV);
-  }, []);
-  return v && Date.now() - v.at < COPIED_KEEP_MS ? v : null;
-}
-
 /** Forward a message: choose up to FORWARD_MAX_CHATS of your chats, and a copy goes to each. */
 export function ForwardSheet({ message, onClose, onForwarded }: { message: Message | null; onClose: () => void; onForwarded: (messages: Message[]) => void }) {
   const c = useColors();

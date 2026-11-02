@@ -410,28 +410,59 @@
 }
 /* Reply and React stay beside the bubble in this narrow column. */
 .watch-chat__list .chat-msg__line .yp-bubble {
-  max-width: calc(100% - 92px);
+  max-width: calc(100% - 134px);
+}
+/* A photo or video needs the width: its buttons go under it. */
+.watch-chat__list .chat-msg--wide .chat-msg__line {
+  flex-wrap: wrap;
+}
+.watch-chat__list .chat-msg--wide .chat-msg__line .yp-bubble {
+  max-width: 100%;
+}
+.watch-chat__list .chat-att__media img,
+.watch-chat__list video.chat-att__media {
+  max-height: 200px;
+}
+.watch-chat__list .chat-msg__more {
+  opacity: 0.75;
+}
+.watch-more {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.watch-more .yp-menu__item {
+  width: 100%;
 }
 .watch-chat__list .chat-picker {
   flex-wrap: wrap;
   border-radius: var(--radius-lg);
 }
 /* The chat's "Replying to" strip, over the box: here it's in a column, so only as tall as it needs. */
-.watch-chat > .chat-compose-context {
+.watch-chat > .chat-compose-context,
+.watch-chat > .chat-paste {
   flex: none;
+  order: 0;
 }
 .watch-chat__composer {
   display: flex;
   align-items: flex-end;
   gap: var(--space-2);
   padding-block: 4px;
-  padding-inline: var(--space-3) 4px;
+  padding-inline: 4px;
   border: 1px solid var(--line-strong);
   border-radius: 22px;
   background: var(--surface);
 }
 .watch-chat__composer:has(textarea:focus-visible) {
   box-shadow: var(--focus-ring);
+}
+.watch-chat__paste {
+  flex: none;
+  justify-content: center;
+  width: 38px;
+  padding: 0;
+  align-self: center;
 }
 .watch-chat__composer textarea {
   flex: 1;

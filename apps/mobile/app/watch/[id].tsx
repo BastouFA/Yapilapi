@@ -19,8 +19,10 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Message, Post, PublicUser } from '../../../../packages/shared/src/types';
 import { WATCH_REACTIONS, youtubeWatchUrl, type WatchQueueItem, type WatchSkipReason } from '../../../../packages/shared/src/watch';
-import { client, errorMessage } from '../../lib/api';
-import { applyReaction, previewOf, previewText, Quote, ReactionRow, ReactionSheet, SystemLine } from '../../lib/chat-extras';
+import { client, errorMessage, mediaUrl } from '../../lib/api';
+import { canForward } from '../../../../packages/shared/src/forwarding';
+import { applyReaction, ForwardSheet, previewOf, previewText, Quote, ReactionRow, ReactionSheet, type SheetAction, SystemLine } from '../../lib/chat-extras';
+import { copyActions, PasteStrips, useChatPaste } from '../../lib/chat-paste';
 import { useDataSaver } from '../../lib/data-saver';
 import { useT } from '../../lib/i18n';
 import { useReducedMotion } from '../../lib/motion';
@@ -377,6 +379,9 @@ function SideChat({ conversationId, meId }: { conversationId: string; meId: stri
   const [reactFor, setReactFor] = useState<string | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [highlight, setHighlight] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const [forwarding, setForwarding] = useState<Message | null>(null);
+  const more = useActionSheet();
   const sending = useRef(false);
   const list = useRef<FlatList<Message>>(null);
   const input = useRef<TextInput>(null);
@@ -475,6 +480,28 @@ function SideChat({ conversationId, meId }: { conversationId: string; meId: stri
     input.current?.focus();
   }
 
+  const addHere = (sent: Message[]) => {
+    const here = sent.filter((m) => m.conversationId === conversationId);
+    stick.current = true;
+    setMessages((cur) => [...cur, ...here.filter((m) => !cur.some((x) => x.id === m.id))]);
+  };
+  const paste = useChatPaste({
+    conversationId,
+    insertText: (text) => setBody((cur) => (cur + text).slice(0, 4000)),
+    onSent: addHere,
+    onError: setError,
+  });
+
+  /** What the ••• beside a message offers: copying it, and sending it to other chats. */
+  const moreActions = (m: Message): SheetAction[] => [
+    ...copyActions(m, t, (text, failed) => {
+      if (failed) return setError(text);
+      setNote(text);
+      setTimeout(() => setNote((cur) => (cur === text ? null : cur)), 3000);
+    }),
+    ...(canForward(m) ? [{ label: t('chat.forward'), icon: 'arrow-redo-outline' as const, onPress: () => setForwarding(m) }] : []),
+  ];
+
   async function react(m: Message, emoji: string, on: boolean) {
     patch(m.id, (x) => applyReaction(x, emoji, true, !on));
     try {
@@ -516,6 +543,11 @@ function SideChat({ conversationId, meId }: { conversationId: string; meId: stri
           <Notice tone="danger">{error}</Notice>
         </View>
       ) : null}
+      {note ? (
+        <View style={{ paddingHorizontal: space[3], paddingTop: space[2] }}>
+          <Notice>{note}</Notice>
+        </View>
+      ) : null}
       <FlatList
         ref={list}
         data={messages}
@@ -537,7 +569,10 @@ function SideChat({ conversationId, meId }: { conversationId: string; meId: stri
         renderItem={({ item: m }) => {
           if (m.kind === 'system') return <SystemLine message={m} meId={meId} />;
           const mine = m.sender.id === meId;
-          const text = m.unsent ? t('m.chat.unsent') : previewText(t, previewOf(m), { meId });
+          // A photo shows itself, as in the chat; a view-once or sensitive one stays a label.
+          const photo = m.unsent || m.viewOnce ? undefined : m.attachments?.find((a) => a.kind === 'image' && !a.removed && !a.sensitive);
+          const text = m.unsent ? t('m.chat.unsent') : photo ? m.body : previewText(t, previewOf(m), { meId });
+          const actions = moreActions(m);
           const tint = mine ? c.onYapi : c.ink;
           const quote = m.replyTo && !m.unsent ? <Quote preview={m.replyTo} tint={tint} meId={meId} onJump={(mid) => void jumpTo(mid)} /> : null;
           // Reply and React, one tap away beside every message, as in the chat.
@@ -561,6 +596,16 @@ function SideChat({ conversationId, meId }: { conversationId: string; meId: stri
               >
                 <Icon name="heart-outline" size={20} color={c.yapi} />
               </Pressable>
+              {actions.length ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t('m.chat.messageOptions')}
+                  onPress={() => more.show({ title: t('m.chat.messageOptions'), actions })}
+                  style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', opacity: 0.8 }}
+                >
+                  <Icon name="ellipsis-horizontal" size={20} color={c.inkMuted} />
+                </Pressable>
+              ) : null}
             </View>
           );
           return (
@@ -580,6 +625,13 @@ function SideChat({ conversationId, meId }: { conversationId: string; meId: stri
                   {!mine ? <Text style={[{ color: c.inkMuted, fontSize: 12, fontWeight: '600' }, userText]}>{m.sender.displayName}</Text> : null}
                   <View style={{ backgroundColor: mine ? c.yapi : c.surface, borderRadius: radius.lg, paddingHorizontal: space[3], paddingVertical: space[2] }}>
                     {quote}
+                    {photo ? (
+                      <Image
+                        source={{ uri: mediaUrl(photo.url) }}
+                        accessibilityLabel={t('m.post.photo')}
+                        style={{ width: 180, height: 135, borderRadius: radius.md, marginBottom: text ? space[1] : 0 }}
+                      />
+                    ) : null}
                     <Text style={[{ color: tint, fontSize: 15, lineHeight: 20, fontStyle: m.unsent ? 'italic' : 'normal' }, userText]}>{text}</Text>
                   </View>
                 </View>
@@ -590,6 +642,7 @@ function SideChat({ conversationId, meId }: { conversationId: string; meId: stri
           );
         }}
       />
+      <PasteStrips paste={paste} />
       {replyTo ? (
         <View
           accessibilityLiveRegion="polite"
@@ -637,6 +690,15 @@ function SideChat({ conversationId, meId }: { conversationId: string; meId: stri
           paddingBottom: Math.max(insets.bottom, space[3]),
         }}
       >
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('chat.paste')}
+          disabled={paste.pasting}
+          onPress={() => void paste.pasteFromClipboard()}
+          style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+        >
+          <Icon name="clipboard-outline" size={22} color={c.inkMuted} />
+        </Pressable>
         <TextInput
           ref={input}
           accessibilityLabel={t('watch.chatPlaceholder')}
@@ -684,6 +746,8 @@ function SideChat({ conversationId, meId }: { conversationId: string; meId: stri
           if (m) void react(m, emoji, on);
         }}
       />
+      <ForwardSheet message={forwarding} onClose={() => setForwarding(null)} onForwarded={addHere} />
+      {more.sheet}
     </View>
   );
 }

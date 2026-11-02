@@ -10,7 +10,12 @@ export function canForward(m: Message & { pending?: boolean }): boolean {
   return !!m.body || !!m.attachments?.some((a) => a.mediaId && !a.removed);
 }
 
-/** The voice message in a message, when it can be copied to paste into another chat. */
-export function copyableVoice(m: Message & { pending?: boolean }) {
-  return canForward(m) ? m.attachments?.find((a) => a.kind === 'audio' && a.mediaId && !a.removed) : undefined;
+/**
+ * The voice message or video in a message, when it can be copied to paste into another chat.
+ * Clipboards don't take either, so the app keeps which message it was and pasting sends it on.
+ */
+export function copyableMedia(m: Message & { pending?: boolean }): { kind: 'voice' | 'video'; durationMs: number | null } | undefined {
+  if (!canForward(m)) return undefined;
+  const a = m.attachments?.find((x) => (x.kind === 'audio' || x.kind === 'video') && x.mediaId && !x.removed);
+  return a ? { kind: a.kind === 'video' ? 'video' : 'voice', durationMs: a.durationMs ?? null } : undefined;
 }

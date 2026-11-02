@@ -122,6 +122,13 @@ test('two people watch together from a chat, and a second device of the same per
   await expect(said.locator('.chat-reaction')).toHaveCount(1);
   await expect(said.locator('.chat-reaction')).toBeInViewport();
   await expect(page.locator('#watch-chat .chat-msg', { hasText: 'This one is good' }).first().locator('.chat-reaction')).toHaveCount(1);
+
+  // ••• beside a message copies it or forwards it, and a Paste button sits by the message box.
+  await said.getByRole('button', { name: 'Message options' }).click();
+  await expect(cleoPage.getByRole('button', { name: 'Copy text' })).toBeVisible();
+  await expect(cleoPage.getByRole('button', { name: 'Forward' })).toBeVisible();
+  await cleoPage.keyboard.press('Escape');
+  await expect(cleoPage.locator('#watch-chat').getByRole('button', { name: 'Paste', exact: true })).toBeVisible();
   await audit(cleoPage, 'the chat sheet');
   await cleoPage.getByRole('button', { name: 'Close' }).click();
 

@@ -4,7 +4,20 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { Avatar, Badge, Button, CaptionTracks, captionTrackMode, ChatBubble, EmptyState, Icon, Skeleton, videoCrossOrigin } from '@yapilapi/design-system';
+import {
+  Avatar,
+  Badge,
+  BottomSheet,
+  Button,
+  CaptionTracks,
+  captionTrackMode,
+  ChatBubble,
+  EmptyState,
+  Icon,
+  type MenuAction,
+  Skeleton,
+  videoCrossOrigin,
+} from '@yapilapi/design-system';
 import {
   noticeText,
   betterClock,
@@ -13,6 +26,7 @@ import {
   expectedPositionMs,
   formatReelTime,
   isNewerPlayback,
+  canForward,
   messagePreviewOf,
   videoPoster,
   videoSrc,
@@ -29,10 +43,13 @@ import {
   type WatchSession,
   type WatchSkipReason,
 } from '@yapilapi/shared';
+import { patiently } from '@yapilapi/api-client';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { useRealtime, useSession } from '@/app/providers';
 import { REACTION_LABEL } from '@/components/Rooms';
-import { applyReaction, EmojiPanel, MessageQuote, previewText, ReactionPicker, ReactionRow, SystemLine } from '@/components/ChatExtras';
+import { MessageAttachments } from '@/components/ChatAttachments';
+import { applyReaction, EmojiPanel, ForwardSheet, MessageQuote, previewText, ReactionPicker, ReactionRow, SystemLine } from '@/components/ChatExtras';
+import { copyActions, PasteStrips, useChatPaste } from '@/components/ChatPaste';
 import { useCalls } from '@/components/Calls';
 import { addNotes, chatName, playbackNotes, postThumb, watchDeviceId } from '@/components/WatchTogether';
 import { AddSheet, UploadProgress, useDropFile, useWatchUpload, WatchSuggestions, type Addition } from '@/components/WatchAdd';
@@ -806,6 +823,9 @@ function WatchChat({ conversationId, group, onUnread }: { conversationId: string
   const [jump, setJump] = useState<string | null>(null);
   const [highlight, setHighlight] = useState<string | null>(null);
   const [reveal, setReveal] = useState<string | null>(null);
+  const [moreFor, setMoreFor] = useState<string | null>(null);
+  const [forwarding, setForwarding] = useState<Message | null>(null);
+  const [uploading, setUploading] = useState<string | null>(null);
   const list = useRef<HTMLDivElement>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
   const stick = useRef(true);
@@ -846,6 +866,7 @@ function WatchChat({ conversationId, group, onUnread }: { conversationId: string
       setReplyTo((cur) => (cur?.id === e.data.id ? null : cur));
       setPickerFor((cur) => (cur === e.data.id ? null : cur));
       setPanelFor((cur) => (cur === e.data.id ? null : cur));
+      setMoreFor((cur) => (cur === e.data.id ? null : cur));
     }
     if (e.type === 'message.deleted' || e.type === 'message.hidden') setMessages((cur) => cur?.filter((x) => x.id !== e.data.id) ?? cur);
     if (e.type === 'message.unsent')
@@ -893,7 +914,17 @@ function WatchChat({ conversationId, group, onUnread }: { conversationId: string
       if (stick.current) el.scrollTop = el.scrollHeight;
     });
     follow.observe(el);
-    return () => follow.disconnect();
+    // A photo or video takes its height when it has loaded.
+    const loaded = () => {
+      if (stick.current) el.scrollTop = el.scrollHeight;
+    };
+    el.addEventListener('load', loaded, true);
+    el.addEventListener('loadedmetadata', loaded, true);
+    return () => {
+      follow.disconnect();
+      el.removeEventListener('load', loaded, true);
+      el.removeEventListener('loadedmetadata', loaded, true);
+    };
   }, []);
 
   // The emoji row and a new reaction go under the message: in this small list that can be out of
@@ -943,6 +974,53 @@ function WatchChat({ conversationId, group, onUnread }: { conversationId: string
     if (earlier.some((m) => m.id === target)) setJump(target);
     else toast(t('m.chat.notFound'));
   }
+
+  const addHere = (sent: Message[]) => {
+    const here = sent.filter((m) => m.conversationId === conversationId);
+    stick.current = true;
+    setMessages((cur) => [...(cur ?? []), ...here.filter((m) => !cur?.some((x) => x.id === m.id))]);
+  };
+
+  /** A pasted photo or video, as its own message. */
+  async function sendFile(file: File, label: string): Promise<boolean> {
+    if (file.size > 50 * 1024 * 1024) {
+      toast(t('chat.fileTooBig'));
+      return false;
+    }
+    setUploading(label);
+    try {
+      const { media } = await patiently(() => api.media.upload(file));
+      const clientId = crypto.randomUUID();
+      const { message, notice, noticeCode } = await patiently(() => api.conversations.send(conversationId, '', clientId, [{ mediaId: media.id }]));
+      addHere([message]);
+      const n = noticeText({ code: noticeCode, message: notice }, t);
+      if (n) toast(n);
+      return true;
+    } catch (err) {
+      toast(errorMessage(err));
+      return false;
+    } finally {
+      setUploading(null);
+    }
+  }
+
+  const paste = useChatPaste({
+    conversationId,
+    sendFile,
+    insertText: (text) => {
+      const box = composer.current;
+      const start = box?.selectionStart ?? body.length;
+      setBody((body.slice(0, start) + text + body.slice(box?.selectionEnd ?? body.length)).slice(0, 4000));
+    },
+    onForwarded: addHere,
+  });
+
+  /** What the ••• beside a message offers: copying it, and sending it to other chats. */
+  const moreActions = (m: Message & { pending?: boolean }): MenuAction[] => [
+    ...copyActions(m, { t, toast }),
+    ...(canForward(m) ? [{ label: t('chat.forward'), icon: 'forward' as const, onSelect: () => setForwarding(m) }] : []),
+  ];
+  const moreMessage = moreFor ? messages?.find((x) => x.id === moreFor) : undefined;
 
   // Replying: the message gives a little bounce toward the message box, as in the chat.
   function startReply(m: Message) {
@@ -1031,12 +1109,21 @@ function WatchChat({ conversationId, group, onUnread }: { conversationId: string
             const mine = m.sender.id === me?.id;
             // Cards the server wrote (a game, a location, an offer) and story replies are said in your language.
             const card = m.game || m.location || m.offer || m.storyReply;
-            const text = m.unsent ? t('m.chat.unsent') : m.body && !card ? m.body : previewText(t, messagePreviewOf(m), { meId: me?.id, locale });
+            // A photo, video or voice message shows itself, as in the chat; a view-once one stays a label.
+            const media = !m.unsent && !m.viewOnce && !card && m.attachments?.length ? m.attachments : null;
+            const text = m.unsent
+              ? t('m.chat.unsent')
+              : media
+                ? m.body
+                : m.body && !card
+                  ? m.body
+                  : previewText(t, messagePreviewOf(m), { meId: me?.id, locale });
+            const more = m.pending ? [] : moreActions(m);
             return (
               <div
                 key={m.id}
                 data-message={m.id}
-                className={`chat-msg${mine ? ' chat-msg--mine' : ''}${echo === m.id ? ' chat-msg--echo' : ''}${highlight === m.id ? ' chat-msg--highlight' : ''}`}
+                className={`chat-msg${mine ? ' chat-msg--mine' : ''}${media ? ' chat-msg--wide' : ''}${echo === m.id ? ' chat-msg--echo' : ''}${highlight === m.id ? ' chat-msg--highlight' : ''}`}
               >
                 <div className="chat-msg__line">
                   <ChatBubble
@@ -1046,6 +1133,7 @@ function WatchChat({ conversationId, group, onUnread }: { conversationId: string
                     body={
                       <>
                         {m.replyTo && !m.unsent ? <MessageQuote preview={m.replyTo} mine={mine} meId={me?.id} onJump={(mid) => void jumpTo(mid)} /> : null}
+                        {media ? <MessageAttachments items={media} /> : null}
                         {text}
                       </>
                     }
@@ -1075,6 +1163,17 @@ function WatchChat({ conversationId, group, onUnread }: { conversationId: string
                       >
                         <Icon name="heart" size={18} />
                       </button>
+                      {more.length ? (
+                        <button
+                          type="button"
+                          className="yp-action chat-msg__quick chat-msg__more"
+                          aria-label={t('m.chat.messageOptions')}
+                          title={t('m.chat.messageOptions')}
+                          onClick={() => setMoreFor(m.id)}
+                        >
+                          <Icon name="more" size={18} />
+                        </button>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>
@@ -1095,6 +1194,12 @@ function WatchChat({ conversationId, group, onUnread }: { conversationId: string
           })
         )}
       </div>
+      <PasteStrips paste={paste} busy={!!uploading} />
+      {uploading ? (
+        <span className="muted watch-chat__note" role="status">
+          {uploading}
+        </span>
+      ) : null}
       {replyTo ? (
         <div className="chat-compose-context" key={replyTo.id}>
           {/* The message box is described by this, so "Replying to …" is read when it gets focus. */}
@@ -1121,6 +1226,16 @@ function WatchChat({ conversationId, group, onUnread }: { conversationId: string
         </div>
       ) : null}
       <form className="watch-chat__composer" onSubmit={(e) => void send(e)}>
+        <button
+          type="button"
+          className="yp-action watch-chat__paste"
+          aria-label={t('chat.paste')}
+          title={t('chat.paste')}
+          disabled={!!uploading}
+          onClick={() => void paste.pasteFromClipboard()}
+        >
+          <Icon name="copy" size={18} />
+        </button>
         <label htmlFor="watch-msg" className="yp-visually-hidden">
           {t('watch.chatPlaceholder')}
         </label>
@@ -1133,11 +1248,14 @@ function WatchChat({ conversationId, group, onUnread }: { conversationId: string
           maxLength={4000}
           aria-describedby={replyTo ? 'watch-reply-context watch-chat-note' : 'watch-chat-note'}
           onChange={(e) => setBody(e.currentTarget.value)}
+          onPaste={paste.onPaste}
           onKeyDown={(e) => {
+            if (e.key === 'Escape' && paste.pasted.length) paste.clearPasted();
             if (e.key === 'Escape' && replyTo) setReplyTo(null);
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
-              void send();
+              if (paste.pasted.length && !body.trim()) void paste.sendPasted();
+              else void send();
             }
           }}
         />
@@ -1154,6 +1272,26 @@ function WatchChat({ conversationId, group, onUnread }: { conversationId: string
         onPick={(emoji) => panelMessage && void react(panelMessage, emoji, !panelMessage.reactions?.some((r) => r.emoji === emoji && r.mine))}
         onClose={() => setPanelFor(null)}
       />
+      <BottomSheet open={!!moreMessage} onClose={() => setMoreFor(null)} title={t('m.chat.messageOptions')}>
+        <ul className="watch-more">
+          {(moreMessage ? moreActions(moreMessage) : []).map((a) => (
+            <li key={a.label}>
+              <button
+                type="button"
+                className="yp-menu__item"
+                onClick={() => {
+                  setMoreFor(null);
+                  a.onSelect();
+                }}
+              >
+                {a.icon ? <Icon name={a.icon} /> : null}
+                {a.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </BottomSheet>
+      <ForwardSheet message={forwarding} onClose={() => setForwarding(null)} onForwarded={addHere} />
     </>
   );
 }
