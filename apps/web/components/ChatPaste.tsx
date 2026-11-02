@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState, type ClipboardEvent } from 'react';
+import { useEffect, useRef, useState, type ClipboardEvent, type RefObject } from 'react';
 import { Icon, type MenuAction } from '@yapilapi/design-system';
 import { copyableMedia, isVideoFile, type Message } from '@yapilapi/shared';
 import { patiently } from '@yapilapi/api-client';
 import { api, errorMessage } from '@/lib/api';
 import { useSession, type Session } from '@/app/providers';
-import { clearCopiedMedia, copyMedia, useCopiedMedia } from '@/lib/chat-clipboard';
+import { clearCopiedMedia, copyMedia, isStandIn, useCopiedMedia } from '@/lib/chat-clipboard';
 import { copyImage, copyText, mediaToSend, readClipboard } from '@/lib/clipboard';
 
 /**
@@ -50,6 +50,51 @@ export function copyActions(m: Message & { pending?: boolean }, { t, toast }: Pi
         }),
     });
   return actions;
+}
+
+/**
+ * Cmd+C and Cmd+V on a Mac, Ctrl+C and Ctrl+V on Windows (and Ctrl+Insert, Shift+Insert), in a chat.
+ * Words you've selected and a box you're typing in are the browser's own. This adds the rest: with
+ * nothing selected, copying takes the whole message under the mouse or the keyboard's focus, and
+ * pasting goes to the message box from anywhere on the page.
+ */
+export function useCopyPasteKeys({ messages, composer }: { messages: Message[] | null; composer: RefObject<HTMLTextAreaElement | null> }) {
+  const { t, toast } = useSession();
+  const latest = useRef({ messages, t, toast });
+  latest.current = { messages, t, toast };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.altKey || e.defaultPrevented) return;
+      const key = e.key.toLowerCase();
+      const command = e.metaKey || e.ctrlKey;
+      const copying = (command && !e.shiftKey && key === 'c') || (e.ctrlKey && key === 'insert');
+      const pasting = (command && key === 'v') || (e.shiftKey && key === 'insert');
+      if (!copying && !pasting) return;
+      if (document.activeElement?.matches('input, textarea, select, [contenteditable="true"]')) return;
+      // A sheet or dialog is in front: the chat behind it stays out of this.
+      if (document.querySelector('[aria-modal="true"], dialog[open]')) return;
+      if (pasting) {
+        // The browser's own paste follows the key, into the box that now has focus.
+        composer.current?.focus();
+        return;
+      }
+      if (window.getSelection()?.toString()) return;
+      const row = document.querySelector('.chat-msg:hover') ?? document.querySelector('.chat-msg:focus-within');
+      const { messages, t, toast } = latest.current;
+      const message = row && messages?.find((m) => m.id === row.getAttribute('data-message'));
+      if (!message) return;
+      const actions = copyActions(message, { t, toast });
+      // What the message mainly is: its photo, video or voice, otherwise its words.
+      const first = (['chat.copyPhoto', 'chat.copyVideo', 'chat.copyVoice', 'chat.copyText', 'chat.copyWords'] as const)
+        .map((label) => actions.find((a) => a.label === t(label)))
+        .find(Boolean);
+      if (!first) return;
+      e.preventDefault();
+      first.onSelect();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [composer]);
 }
 
 /** What's waiting to be pasted into this chat, and the ways to paste it. */
@@ -108,7 +153,10 @@ export function useChatPaste({
     }
     const media = mediaToSend(got.files, got.text);
     if (media.length) setPasted(media);
-    else if (got.text) insertText(got.text);
+    else if (isStandIn(got.text)) {
+      if (copied) void pasteCopied();
+      else toast(t('chat.nothingToPaste'));
+    } else if (got.text) insertText(got.text);
     else if (copied) void pasteCopied();
     else toast(t('chat.nothingToPaste'));
   }
@@ -117,7 +165,11 @@ export function useChatPaste({
     if (off) return;
     const text = e.clipboardData.getData('text/plain');
     const media = mediaToSend([...e.clipboardData.files], text);
-    if (media.length) {
+    if (isStandIn(text)) {
+      // The voice message or video you copied: the message itself, never these words. Sent already, nothing's left.
+      e.preventDefault();
+      if (copied) void pasteCopied();
+    } else if (media.length) {
       e.preventDefault();
       setPasted(media);
     } else if (copied && !text && !e.clipboardData.files.length) {

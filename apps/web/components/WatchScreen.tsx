@@ -49,7 +49,7 @@ import { useRealtime, useSession } from '@/app/providers';
 import { REACTION_LABEL } from '@/components/Rooms';
 import { MessageAttachments } from '@/components/ChatAttachments';
 import { applyReaction, EmojiPanel, ForwardSheet, MessageQuote, previewText, ReactionPicker, ReactionRow, SystemLine } from '@/components/ChatExtras';
-import { copyActions, PasteStrips, useChatPaste } from '@/components/ChatPaste';
+import { copyActions, PasteStrips, useChatPaste, useCopyPasteKeys } from '@/components/ChatPaste';
 import { useCalls } from '@/components/Calls';
 import { addNotes, chatName, playbackNotes, postThumb, watchDeviceId } from '@/components/WatchTogether';
 import { AddSheet, UploadProgress, useDropFile, useWatchUpload, WatchSuggestions, type Addition } from '@/components/WatchAdd';
@@ -1007,6 +1007,7 @@ function WatchChat({ conversationId, group, onUnread }: { conversationId: string
     }
   }
 
+  useCopyPasteKeys({ messages, composer });
   const paste = useChatPaste({
     conversationId,
     sendFile,

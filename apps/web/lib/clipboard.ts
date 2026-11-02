@@ -5,12 +5,32 @@
  */
 export async function copyText(text: string): Promise<boolean> {
   try {
-    if (!navigator.clipboard) return false;
+    if (!navigator.clipboard) return copyTheOldWay(text);
     await navigator.clipboard.writeText(text);
     return true;
   } catch {
-    return false;
+    return copyTheOldWay(text);
   }
+}
+
+/** For a browser that refuses the clipboard above: a hidden box, selected and copied. */
+function copyTheOldWay(text: string): boolean {
+  const back = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const box = document.createElement('textarea');
+  box.value = text;
+  box.setAttribute('readonly', '');
+  box.style.cssText = 'position:fixed;opacity:0;pointer-events:none';
+  document.body.appendChild(box);
+  box.select();
+  let ok = false;
+  try {
+    ok = document.execCommand('copy');
+  } catch {
+    /* no way left: the caller says so */
+  }
+  box.remove();
+  back?.focus({ preventScroll: true });
+  return ok;
 }
 
 /**

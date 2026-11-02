@@ -30,7 +30,7 @@ import { GroupInfoSheet } from '@/components/GroupInfo';
 import { ReportSheet } from '@/components/PostList';
 import { useRealtime, useSession } from '../../../providers';
 import { useCalls } from '@/components/Calls';
-import { copyActions, PasteStrips, useChatPaste } from '@/components/ChatPaste';
+import { copyActions, PasteStrips, useChatPaste, useCopyPasteKeys } from '@/components/ChatPaste';
 import { EmojiPicker, noteEmoji } from '@/components/EmojiPicker';
 import { MiniAppsSheet } from '@/components/MiniApps';
 import { MessageAttachments, ViewOnceMessage, VoiceRecorder, VoiceTranscript } from '@/components/ChatAttachments';
@@ -498,6 +498,7 @@ export default function ChatPage() {
     }
   }
 
+  useCopyPasteKeys({ messages, composer });
   const paste = useChatPaste({
     conversationId: id,
     sendFile: (file, label) => sendFile(file, label),
@@ -1074,6 +1075,7 @@ export default function ChatPage() {
                 {showDay ? <div className="yp-chat__day">{day}</div> : null}
                 <div
                   id={`msg-${m.id}`}
+                  data-message={m.id}
                   className={`chat-msg${mine ? ' chat-msg--mine' : ''}${wide ? ' chat-msg--wide' : ''}${highlight === m.id ? ' chat-msg--highlight' : ''}${echo === m.id ? ' chat-msg--echo' : ''}`}
                   onContextMenu={(e) => {
                     if (mine || m.unsent) return;

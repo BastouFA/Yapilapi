@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { copyText } from '@/lib/clipboard';
 
 /**
  * A voice message or video copied in a chat, to paste into another. Clipboards don't take them, so
@@ -36,7 +37,17 @@ function save(value: CopiedMedia | null) {
   listeners.forEach((l) => l());
 }
 
-export const copyMedia = (messageId: string, kind: 'voice' | 'video', durationMs: number | null) => save({ messageId, kind, durationMs, at: Date.now() });
+/**
+ * Put on the real clipboard in its place, so Paste knows it's still the latest thing copied: anything
+ * copied after it (words from another app) replaces this, and Paste then means that instead.
+ */
+const STAND_IN = { voice: '[YAPILAPI voice message]', video: '[YAPILAPI video]' };
+export const isStandIn = (text: string) => text === STAND_IN.voice || text === STAND_IN.video;
+
+export const copyMedia = (messageId: string, kind: 'voice' | 'video', durationMs: number | null) => {
+  save({ messageId, kind, durationMs, at: Date.now() });
+  void copyText(STAND_IN[kind]);
+};
 export const clearCopiedMedia = () => save(null);
 
 /** What's waiting to be pasted, in every tab of this browser. */

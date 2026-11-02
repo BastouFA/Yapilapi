@@ -136,6 +136,12 @@ test('two people watch together from a chat, and a second device of the same per
   await expect(cleoPage.getByRole('button', { name: 'Forward' })).toBeVisible();
   await cleoPage.keyboard.press('Escape');
   await expect(cleoPage.locator('#watch-chat').getByRole('button', { name: 'Paste', exact: true })).toBeVisible();
+
+  // Cmd+C or Ctrl+C with nothing selected copies the message you're on.
+  await cleoPage.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  await said.getByRole('button', { name: 'Reply' }).focus();
+  await cleoPage.keyboard.press('ControlOrMeta+c');
+  await expect.poll(() => cleoPage.evaluate(() => navigator.clipboard.readText())).toBe('This one is good');
   await audit(cleoPage, 'the chat sheet');
   await cleoPage.getByRole('button', { name: 'Close' }).click();
 
