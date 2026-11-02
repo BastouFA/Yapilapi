@@ -17,6 +17,7 @@ import {
 } from '@yapilapi/shared';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
+import { flushSync } from 'react-dom';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AIPanel, BottomSheet, Button, ChatBubble, EmptyState, Icon, Menu, Skeleton, Switch, TranslatableText, type MenuAction } from '@yapilapi/design-system';
@@ -1420,11 +1421,17 @@ export default function ChatPage() {
           title={emojiOpen ? t('emoji.keyboard') : t('emoji.button')}
           aria-expanded={emojiOpen}
           onClick={() => {
-            // Back to the keyboard goes back to writing. The other way the keyboard has to go, or it
-            // stays over the emojis.
-            if (emojiOpen) composer.current?.focus();
-            else composer.current?.blur();
-            setEmojiOpen(!emojiOpen);
+            // Back to the keyboard goes back to writing. The panel closes first: an iPhone moves the
+            // page to show the box when it gets focus, and the box mustn't move after that, or the
+            // keyboard covers it.
+            if (emojiOpen) {
+              flushSync(() => setEmojiOpen(false));
+              composer.current?.focus();
+              return;
+            }
+            // The other way the keyboard has to go, or it stays over the emojis.
+            composer.current?.blur();
+            setEmojiOpen(true);
           }}
         >
           <Icon name={emojiOpen ? 'keyboard' : 'smile'} />
@@ -1438,8 +1445,9 @@ export default function ChatPage() {
           value={body}
           maxLength={4000}
           onFocus={() => {
-            // A touch screen's keyboard is coming up: it takes the panel's place.
-            if (matchMedia('(hover: none)').matches) setEmojiOpen(false);
+            // A touch screen's keyboard is coming up: it takes the panel's place, before the phone
+            // moves the page to show this box.
+            if (emojiOpen && matchMedia('(hover: none)').matches) flushSync(() => setEmojiOpen(false));
           }}
           onPaste={(e) => {
             const media = editing ? [] : mediaToSend([...e.clipboardData.files], e.clipboardData.getData('text/plain'));
