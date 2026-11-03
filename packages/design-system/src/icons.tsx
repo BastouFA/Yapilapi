@@ -123,6 +123,11 @@ const PATHS = {
   ticket: ['M4 6h16v4a2 2 0 0 0 0 4v4H4v-4a2 2 0 0 0 0-4V6z', 'M14 6v2.5', 'M14 11v2', 'M14 15.5V18'],
   /** A handset: voice calls. */
   phone: ['M5 4h3.5l1.8 4.3-2.3 1.4a11 11 0 0 0 6.3 6.3l1.4-2.3L20 15.5V19a1 1 0 0 1-1.1 1A16 16 0 0 1 4 5.1 1 1 0 0 1 5 4z'],
+  /** A camera seen from the back, with its lens: taking a photo. */
+  camera: [
+    'M4 8.5A1.5 1.5 0 0 1 5.5 7H8l1.5-2.5h5L16 7h2.5A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5v-9z',
+    'M12 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
+  ],
   /** A camera with a lens on its side: video calls. */
   video: ['M3 7.5A1.5 1.5 0 0 1 4.5 6h9A1.5 1.5 0 0 1 15 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 3 16.5v-9z', 'M15 10.5l6-3.5v10l-6-3.5'],
   /** A frame to scan a code in: check-in at the door. */

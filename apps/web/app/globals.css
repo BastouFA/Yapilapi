@@ -4918,6 +4918,10 @@ video.chat-att__media {
   height: 100%;
   object-fit: cover;
 }
+/* What's on screen is the whole photo, nothing cut off at the edges. */
+.cam__view--whole {
+  object-fit: contain;
+}
 .cam__view--mirror {
   transform: scaleX(-1);
 }
@@ -4991,6 +4995,24 @@ span.cam__icon {
   background: rgb(0 0 0 / 0.35);
   color: #fff;
   font-size: 14px;
+}
+.cam__review {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+}
+.cam__review .cam__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-size: 16px;
+}
+.cam__review .cam__pill:disabled {
+  opacity: 0.7;
+  cursor: default;
 }
 .cam__timer {
   display: inline-flex;
@@ -7365,6 +7387,17 @@ button.yp-chip[aria-pressed='true'] {
   .yp-composer textarea + .yp-action,
   .yp-composer textarea + .yp-btn {
     margin-inline-start: auto;
+  }
+  /* One row of buttons, even on a small phone. Send later can't be used until there are words, and
+     once there are, Send has taken over from recording. */
+  .yp-composer:has(textarea:placeholder-shown) > .chat-later {
+    display: none;
+  }
+  .yp-composer:has(textarea:placeholder-shown) > .chat-later + .yp-btn {
+    margin-inline-start: auto;
+  }
+  .yp-composer:has(textarea:not(:placeholder-shown)) > [data-voice-start] {
+    display: none;
   }
   /* With every button in the row the box is narrow: the hint stays on one line (cut short where
      the browser supports it) instead of wrapping into a second line the one-line box hides. */

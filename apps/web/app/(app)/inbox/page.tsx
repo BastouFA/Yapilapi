@@ -43,7 +43,7 @@ export default function Inbox() {
   return (
     <div className="yp-shell__inner">
       <div className="yp-topbar">
-        <h1>{base === '/yap' ? t('yapMode.title') : t('inbox.title')}</h1>
+        <h1 style={{ flexShrink: 0 }}>{base === '/yap' ? t('yapMode.title') : t('inbox.title')}</h1>
         <div className="row">
           {base === '/inbox' ? (
             <>

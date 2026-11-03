@@ -447,7 +447,7 @@ export function VoiceRecorder({
       </Button>
     );
   return (
-    <button type="button" className="yp-action" aria-label={t('m.chat.record')} disabled={disabled} onClick={() => void start()}>
+    <button type="button" className="yp-action" data-voice-start aria-label={t('m.chat.record')} disabled={disabled} onClick={() => void start()}>
       <Icon name="mic" />
     </button>
   );

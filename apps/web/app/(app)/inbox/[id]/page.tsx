@@ -35,6 +35,7 @@ import { EmojiPicker, noteEmoji } from '@/components/EmojiPicker';
 import { MiniAppsSheet } from '@/components/MiniApps';
 import { MessageAttachments, ViewOnceMessage, VoiceRecorder, VoiceTranscript } from '@/components/ChatAttachments';
 import { ViewOnceCapture } from '@/components/ViewOnceCapture';
+import { ChatCamera } from '@/components/ChatCamera';
 import { SharedPostCard, sharedPostIn } from '@/components/SharedPostCard';
 import { linkify } from '@/lib/linkify';
 import { TurnOnYapsPrompt, YapButton } from '@/components/Yap';
@@ -462,6 +463,7 @@ export default function ChatPage() {
   // View once straight from the camera or the microphone.
   const [captureOpen, setCaptureOpen] = useState(false);
   const [captureStart, setCaptureStart] = useState<'photo' | 'voice'>('photo');
+  const [cameraOpen, setCameraOpen] = useState(false);
   const setCaptureMode = (m: 'voice') => {
     setCaptureStart(m);
     setCaptureOpen(true);
@@ -1290,6 +1292,9 @@ export default function ChatPage() {
               : []),
           ]}
         />
+        <button type="button" className="yp-action" aria-label={t('m.camera.takePhoto')} disabled={!!uploading} onClick={() => setCameraOpen(true)}>
+          <Icon name="camera" />
+        </button>
         <button type="button" className="yp-action" aria-label={t('m.chat.sendPhoto')} disabled={!!uploading} onClick={() => fileInput.current?.click()}>
           <Icon name="image" />
         </button>
@@ -1366,7 +1371,7 @@ export default function ChatPage() {
         {!editing ? (
           <button
             type="button"
-            className="yp-action"
+            className="yp-action chat-later"
             aria-label={t('m.chat.later.title')}
             title={t('m.chat.later.title')}
             disabled={!body.trim()}
@@ -1399,6 +1404,9 @@ export default function ChatPage() {
       {/* The end of the page, under the Yap button and suggested replies: following the newest
           message scrolls here, so they stay on screen above the message box in a long chat. */}
       <div ref={endRef} aria-hidden />
+      {cameraOpen ? (
+        <ChatCamera onClose={() => setCameraOpen(false)} onSend={(f) => sendFile(f, isVideoFile(f) ? t('chat.sendingVideo') : t('chat.sendingPhoto'))} />
+      ) : null}
       <ViewOnceCapture
         key={captureStart}
         open={captureOpen}

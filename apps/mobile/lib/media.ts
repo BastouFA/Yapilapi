@@ -57,6 +57,14 @@ export async function pickOne(
   return r.assets[0];
 }
 
+/** A photo taken now with the camera. Returns null when the person closed it, or 'denied' when camera access is off. */
+export async function takePhoto(): Promise<Picked | 'denied' | null> {
+  const perm = await ImagePicker.requestCameraPermissionsAsync();
+  if (!perm.granted) return 'denied';
+  const r = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.9 });
+  return r.canceled ? null : (r.assets[0] ?? null);
+}
+
 /**
  * Upload a picked file. Small files go in one request to the same multipart endpoint the web
  * app uses (XMLHttpRequest, so progress shows); large ones (long videos) go in resumable

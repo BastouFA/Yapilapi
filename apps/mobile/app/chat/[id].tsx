@@ -22,7 +22,7 @@ import { useCalls } from '../../lib/calls';
 import { client, errorMessage, mediaUrl } from '../../lib/api';
 import { swapEmoticon } from '../../lib/emoticons';
 import { copyActions, PasteStrips, useChatPaste } from '../../lib/chat-paste';
-import { clock, MAX_UPLOAD_BYTES, pickOne, uploadFile, uploadPicked, VOICE_MIME } from '../../lib/media';
+import { clock, MAX_UPLOAD_BYTES, pickOne, takePhoto, uploadFile, uploadPicked, VOICE_MIME, type Picked } from '../../lib/media';
 import { useT } from '../../lib/i18n';
 import { VOICE_RECORDING } from '../../lib/voice';
 import { StoryCardView } from '../../lib/story-stickers';
@@ -684,6 +684,19 @@ export default function Chat() {
       if (asset === 'denied') setError(t('m.create.photosPermission'));
       return;
     }
+    await sendPicked(asset);
+  }
+
+  async function sendCameraPhoto() {
+    const asset = await takePhoto().catch(() => null);
+    if (!asset || asset === 'denied') {
+      if (asset === 'denied') setError(t('m.camera.denied'));
+      return;
+    }
+    await sendPicked(asset);
+  }
+
+  async function sendPicked(asset: Picked) {
     setSending(true);
     setError(null);
     try {
@@ -1366,10 +1379,23 @@ export default function Chat() {
             </Pressable>
             <Pressable
               accessibilityRole="button"
+              accessibilityLabel={t('m.camera.takePhoto')}
+              disabled={sending}
+              // 36 wide, like its neighbour; the touch area reaches 44 into both.
+              hitSlop={slop({ start: 4, end: 4 })}
+              onPress={() => void sendCameraPhoto()}
+              style={{ width: 36, height: 44, alignItems: 'center', justifyContent: 'center', opacity: sending ? 0.45 : 1 }}
+            >
+              <Icon name="camera-outline" size={24} color={c.inkMuted} />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
               accessibilityLabel={t('m.chat.sendPhoto')}
               disabled={sending}
+              // 36 wide; the touch area reaches 44 into its neighbours.
+              hitSlop={slop({ start: 4, end: 4 })}
               onPress={() => void sendMedia()}
-              style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', opacity: sending ? 0.45 : 1 }}
+              style={{ width: 36, height: 44, alignItems: 'center', justifyContent: 'center', opacity: sending ? 0.45 : 1 }}
             >
               <Icon name="image-outline" size={24} color={c.inkMuted} />
             </Pressable>
