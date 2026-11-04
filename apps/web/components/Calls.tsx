@@ -50,8 +50,10 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
   const ice = useRef<RTCIceServer[]>([]);
   const localVideo = useRef<HTMLVideoElement>(null);
   const callRef = useRef<CallInfo | null>(null);
-  // Answering on this device: the server's "answered" for you may arrive before the answer returns.
-  const answering = useRef(false);
+  // This device is in the call: it placed it, or you answered here. Every device you're signed in on
+  // rings and gets the signals, and only this one may reply: a tab in the background that replied
+  // too could beat you to it, and the caller would end up connected to a screen nobody's looking at.
+  const joined = useRef(false);
   const overlay = useRef<HTMLDivElement>(null);
   callRef.current = call;
   // Keep keyboard focus in the call UI while it's up. No Escape: that shouldn't hang up.
@@ -61,6 +63,8 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
   useModalFocus(overlay, phase !== 'idle' && !!call && !compact);
 
   const cleanup = useCallback(() => {
+    joined.current = false;
+    callRef.current = null;
     peers.current.forEach((p) => p.close());
     peers.current.clear();
     offered.current.clear();
@@ -159,6 +163,8 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
         const r = await api.calls.start(conversationId, kind);
         started = r.call.id;
         ice.current = r.iceServers;
+        joined.current = true;
+        callRef.current = r.call;
         setCall(r.call);
         setPhase('outgoing');
       } catch (e) {
@@ -172,7 +178,7 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
 
   async function answer() {
     if (!call) return;
-    answering.current = true;
+    joined.current = true;
     try {
       // Camera and microphone first, so the caller's offer (sent as soon as we answer) finds them ready.
       await getMedia(call.kind);
@@ -184,8 +190,6 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
       toast(e instanceof DOMException ? t(call.kind === 'video' ? 'calls.allowToAnswer' : 'calls.allowMicToAnswer') : errorMessage(e));
       await api.calls.decline(call.id).catch(() => {});
       cleanup();
-    } finally {
-      answering.current = false;
     }
   }
 
@@ -242,13 +246,15 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
     if (e.type === 'call.incoming') {
       // Already on a call: the caller hears that you're busy.
       if (cur) return void api.calls.decline(e.data.id, true).catch(() => {});
+      // Now, not at the next render: a tab in the background renders late, and the events after this one mustn't miss it.
+      callRef.current = e.data;
       setCall(e.data);
       setPhase('incoming');
       return;
     }
     if (!cur || e.data?.callId !== cur.id) return;
     // Answered on your other device: this one stops ringing.
-    if (e.type === 'call.answered' && e.data.userId === me?.id && phase === 'incoming' && !answering.current) {
+    if (e.type === 'call.answered' && e.data.userId === me?.id && !joined.current) {
       toast(t('calls.answeredElsewhere'));
       cleanup();
       return;
@@ -273,6 +279,7 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     if (e.type === 'call.signal') {
+      if (!joined.current) return;
       const pc = peerFor(cur.id, e.data.from);
       const flush = async () => {
         for (const c of pending.current.get(e.data.from) ?? []) await pc.addIceCandidate(c).catch(() => {});
@@ -286,6 +293,8 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
         void tuneSenders(pc);
         await api.calls.signal(cur.id, e.data.from, 'answer', ans);
       } else if (e.data.type === 'answer') {
+        // Only one answer fits an offer: an old app on another device may still send a second.
+        if (pc.signalingState !== 'have-local-offer') return;
         await pc.setRemoteDescription(clearVoice(e.data.data));
         await flush();
         void tuneSenders(pc);

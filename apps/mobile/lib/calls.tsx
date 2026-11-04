@@ -87,8 +87,10 @@ export function CallsProvider({ children }: { children: ReactNode }) {
   callRef.current = call;
   const starting = useRef(false);
   const phaseRef = useRef<Phase>('idle');
-  // Answering on this phone: the server's "answered" for you may arrive before the answer returns.
-  const answering = useRef(false);
+  // This device is in the call: it placed it, or you answered here. Every device you're signed in on
+  // rings and gets the signals, and only this one may reply: another that replied too could beat you
+  // to it, and the caller would end up connected to a screen nobody's looking at.
+  const joined = useRef(false);
   phaseRef.current = phase;
 
   const flash = useCallback((text: string) => {
@@ -97,6 +99,8 @@ export function CallsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const cleanup = useCallback(() => {
+    joined.current = false;
+    callRef.current = null;
     peers.current.forEach((p) => p.close());
     peers.current.clear();
     offered.current.clear();
@@ -231,6 +235,8 @@ export function CallsProvider({ children }: { children: ReactNode }) {
         await getMedia(kind);
         const r = await (await client()).calls.start(conversationId, kind);
         ice.current = r.iceServers;
+        joined.current = true;
+        callRef.current = r.call;
         setCall(r.call);
         setPhase('outgoing');
         beginAudio(kind);
@@ -250,7 +256,7 @@ export function CallsProvider({ children }: { children: ReactNode }) {
     const cur = incoming ?? callRef.current;
     if (!cur) return;
     stopRinging();
-    answering.current = true;
+    joined.current = true;
     try {
       // Media and ICE servers first, so the caller's offer finds everything ready.
       const api = await client();
@@ -265,8 +271,6 @@ export function CallsProvider({ children }: { children: ReactNode }) {
       explain(e, 'answer');
       await (await client()).calls.decline(cur.id).catch(() => {});
       cleanup();
-    } finally {
-      answering.current = false;
     }
   }
 
@@ -285,6 +289,8 @@ export function CallsProvider({ children }: { children: ReactNode }) {
   // The ringtone (when the native audio module is there) and a buzz until the call is answered or over.
   const ringIncoming = useCallback(
     (c: CallInfo) => {
+      // Now, not at the next render: the events after this one mustn't miss it.
+      callRef.current = c;
       setCall(c);
       setPhase('incoming');
       void loadNames(c);
@@ -325,12 +331,13 @@ export function CallsProvider({ children }: { children: ReactNode }) {
         setPhase('active');
         await offerTo(cur.id, peerFor(cur.id, e.data.userId), e.data.userId);
       }
-      if (e.type === 'call.answered' && e.data.userId === me.id && phaseRef.current === 'incoming' && !answering.current) {
+      if (e.type === 'call.answered' && e.data.userId === me.id && !joined.current) {
         // Answered on another device.
         cleanup();
         return;
       }
       if (e.type === 'call.signal') {
+        if (!joined.current) return;
         const from = e.data.from as string;
         const pc = peerFor(cur.id, from);
         const data = e.data.data as SignalData;
@@ -341,6 +348,8 @@ export function CallsProvider({ children }: { children: ReactNode }) {
           await pc.setLocalDescription(ans);
           await (await client()).calls.signal(cur.id, from, 'answer', { type: ans.type, sdp: ans.sdp });
         } else if (e.data.type === 'answer') {
+          // Only one answer fits an offer: an old app on another device may still send a second.
+          if (pc.signalingState !== 'have-local-offer') return;
           await pc.setRemoteDescription(new rtc.RTCSessionDescription(data as never));
           await flushCandidates(from, pc);
         } else if (e.data.type === 'candidate') {
