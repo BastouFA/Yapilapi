@@ -5115,7 +5115,8 @@ span.cam__icon {
   text-transform: uppercase;
   cursor: pointer;
 }
-.cam__mode[aria-selected='true'] {
+.cam__mode[aria-selected='true'],
+.cam__mode[aria-pressed='true'] {
   background: #fff;
   color: #0b0c14;
 }

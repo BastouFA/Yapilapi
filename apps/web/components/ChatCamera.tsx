@@ -6,13 +6,23 @@ import { Icon, useModalFocus } from '@yapilapi/design-system';
 import { isVideoFile, MEDIA_ACCEPT } from '@yapilapi/shared';
 import { useSession } from '@/app/providers';
 
+// A chat takes files up to 50 MB: a minute at this rate stays well under it.
+const VIDEO_MAX_SECONDS = 60;
+const VIDEO_BITS_PER_SECOND = 4_000_000;
+
+const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
 /**
- * The camera in a chat: take a photo, look at it, send it or take another. It stays open until the
- * photo has gone, so a failed send doesn't lose it. Where the browser can't reach the camera, the
- * gallery button still gets a photo or video in (an iPhone offers its own camera there too).
+ * The camera in a chat: take a photo or a video, look at it, send it or take another. It stays open
+ * until it has gone, so a failed send doesn't lose it. The microphone is asked for only on Video, so
+ * a photo never stops your music. Where the browser can't reach the camera, the gallery button still
+ * gets a photo or video in (an iPhone offers its own camera there too).
  */
 export function ChatCamera({ onClose, onSend }: { onClose: () => void; onSend: (file: File) => Promise<boolean> }) {
-  const { t } = useSession();
+  const { t, toast } = useSession();
+  const [mode, setMode] = useState<'photo' | 'video'>('photo');
+  const [recording, setRecording] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
   const [facing, setFacing] = useState<'user' | 'environment'>('environment');
   const [status, setStatus] = useState<'starting' | 'ready' | 'denied' | 'none'>('starting');
   const [canFlip, setCanFlip] = useState(false);
@@ -24,13 +34,16 @@ export function ChatCamera({ onClose, onSend }: { onClose: () => void; onSend: (
   const root = useRef<HTMLDivElement>(null);
   const video = useRef<HTMLVideoElement>(null);
   const stream = useRef<MediaStream | null>(null);
+  const recorder = useRef<MediaRecorder | null>(null);
+  const chunks = useRef<Blob[]>([]);
   const gallery = useRef<HTMLInputElement>(null);
   const send = useRef<HTMLButtonElement>(null);
   const open = useRef(true);
   const reviewing = !!shot;
   const sendingLabel = t(shot && isVideoFile(shot.file) ? 'chat.sendingVideo' : 'chat.sendingPhoto');
 
-  useModalFocus(root, true, onClose);
+  // Escape while recording stops it, and what was recorded is there to look at.
+  useModalFocus(root, true, () => (recording ? stopRecording() : onClose()));
 
   useEffect(() => {
     open.current = true;
@@ -46,8 +59,12 @@ export function ChatCamera({ onClose, onSend }: { onClose: () => void; onSend: (
     const start = async () => {
       if (!navigator.mediaDevices?.getUserMedia) return setStatus('none');
       setStatus('starting');
+      const picture = { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1080 } };
       try {
-        const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
+        // No microphone still makes a video, a silent one.
+        const s =
+          (mode === 'video' ? await navigator.mediaDevices.getUserMedia({ video: picture, audio: true }).catch(() => null) : null) ??
+          (await navigator.mediaDevices.getUserMedia({ video: picture, audio: false }));
         if (cancelled) return s.getTracks().forEach((tr) => tr.stop());
         stream.current = s;
         if (video.current) {
@@ -70,11 +87,34 @@ export function ChatCamera({ onClose, onSend }: { onClose: () => void; onSend: (
       stream.current?.getTracks().forEach((tr) => tr.stop());
       stream.current = null;
     };
-  }, [facing, reviewing, restart]);
+  }, [facing, mode, reviewing, restart]);
+
+  // Closed in the middle of a recording: it goes nowhere.
+  useEffect(
+    () => () => {
+      const r = recorder.current;
+      if (r?.state !== 'recording') return;
+      r.onstop = null;
+      r.stop();
+    },
+    [],
+  );
+
+  // Recording timer, stopping at the limit.
+  useEffect(() => {
+    if (!recording) return;
+    const started = Date.now();
+    const timer = setInterval(() => {
+      const s = (Date.now() - started) / 1000;
+      setElapsed(s);
+      if (s >= VIDEO_MAX_SECONDS) stopRecording();
+    }, 200);
+    return () => clearInterval(timer);
+  }, [recording]);
 
   // Back from another app: an iPhone may have stopped the camera, which would leave a frozen picture.
   useEffect(() => {
-    if (reviewing) return;
+    if (reviewing || recording) return;
     const onVisible = () => {
       if (document.visibilityState !== 'visible') return;
       const track = stream.current?.getVideoTracks()[0];
@@ -83,7 +123,7 @@ export function ChatCamera({ onClose, onSend }: { onClose: () => void; onSend: (
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [reviewing]);
+  }, [reviewing, recording]);
 
   useEffect(() => {
     if (!shot) return;
@@ -106,6 +146,31 @@ export function ChatCamera({ onClose, onSend }: { onClose: () => void; onSend: (
     c.toBlob((b) => b && look(new File([b], `photo-${Date.now()}.jpg`, { type: 'image/jpeg' })), 'image/jpeg', 0.92);
   };
 
+  const startRecording = () => {
+    const s = stream.current;
+    if (!s || recording) return;
+    if (typeof MediaRecorder === 'undefined') return toast(t('camera.noRecorder'));
+    const type = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'].find((x) => MediaRecorder.isTypeSupported(x));
+    const r = new MediaRecorder(s, { videoBitsPerSecond: VIDEO_BITS_PER_SECOND, ...(type ? { mimeType: type } : {}) });
+    chunks.current = [];
+    r.ondataavailable = (e) => e.data.size && chunks.current.push(e.data);
+    r.onstop = () => {
+      const mime = (r.mimeType || 'video/webm').split(';')[0]!;
+      const blob = new Blob(chunks.current, { type: mime });
+      setRecording(false);
+      if (blob.size >= 1000) look(new File([blob], `video-${Date.now()}.${mime === 'video/mp4' ? 'mp4' : 'webm'}`, { type: mime }));
+    };
+    recorder.current = r;
+    r.start(250);
+    setElapsed(0);
+    setRecording(true);
+  };
+
+  function stopRecording() {
+    if (recorder.current?.state === 'recording') recorder.current.stop();
+    recorder.current = null;
+  }
+
   const sendShot = async () => {
     if (!shot || sending) return;
     setSending(true);
@@ -119,13 +184,22 @@ export function ChatCamera({ onClose, onSend }: { onClose: () => void; onSend: (
     <div ref={root} tabIndex={-1} className="cam" role="dialog" aria-modal="true" aria-label={t('m.camera.title')}>
       {shot ? (
         isVideoFile(shot.file) ? (
-          <video src={shot.url} className="cam__view cam__view--whole" controls playsInline />
+          // Its own element: the live one still holds the camera's stream, which would win over this file.
+          <video key="recorded" src={shot.url} className="cam__view cam__view--whole" controls playsInline />
         ) : (
           // eslint-disable-next-line @next/next/no-img-element -- a photo on this device, not yet uploaded
           <img src={shot.url} alt="" className="cam__view cam__view--whole" />
         )
       ) : (
-        <video ref={video} className={`cam__view cam__view--whole${facing === 'user' ? ' cam__view--mirror' : ''}`} muted playsInline autoPlay aria-hidden />
+        <video
+          key="live"
+          ref={video}
+          className={`cam__view cam__view--whole${facing === 'user' ? ' cam__view--mirror' : ''}`}
+          muted
+          playsInline
+          autoPlay
+          aria-hidden
+        />
       )}
       {flash ? <span className="cam__flash" aria-hidden /> : null}
 
@@ -144,7 +218,12 @@ export function ChatCamera({ onClose, onSend }: { onClose: () => void; onSend: (
         <button type="button" className="cam__icon" aria-label={t('m.camera.close')} onClick={onClose}>
           <Icon name="x" />
         </button>
-        {!shot && canFlip ? (
+        {recording ? (
+          <span className="cam__timer" role="timer" aria-live="off">
+            <span className="cam__dot" aria-hidden /> {clock(elapsed)} / {clock(VIDEO_MAX_SECONDS)}
+          </span>
+        ) : null}
+        {!shot && canFlip && !recording ? (
           <button type="button" className="cam__icon" aria-label={t('m.camera.flip')} onClick={() => setFacing((f) => (f === 'user' ? 'environment' : 'user'))}>
             <Icon name="repost" />
           </button>
@@ -165,14 +244,32 @@ export function ChatCamera({ onClose, onSend }: { onClose: () => void; onSend: (
             </button>
           </div>
         ) : (
-          <div className="cam__controls">
-            <button type="button" className="cam__gallery" aria-label={t('camera.gallery')} onClick={() => gallery.current?.click()}>
-              <Icon name="image" />
-            </button>
-            <button type="button" className="cam__shutter" aria-label={t('m.camera.takePhoto')} disabled={status !== 'ready'} onClick={takePhoto}>
-              <span aria-hidden />
-            </button>
-          </div>
+          <>
+            <div className="cam__controls">
+              <button type="button" className="cam__gallery" aria-label={t('camera.gallery')} disabled={recording} onClick={() => gallery.current?.click()}>
+                <Icon name="image" />
+              </button>
+              <button
+                type="button"
+                className={`cam__shutter${mode === 'video' ? ' cam__shutter--reel' : ''}${recording ? ' cam__shutter--rec' : ''}`}
+                aria-label={t(mode === 'photo' ? 'm.camera.takePhoto' : recording ? 'm.camera.stopRecording' : 'm.camera.startRecording')}
+                disabled={status !== 'ready'}
+                onClick={() => (mode === 'photo' ? takePhoto() : recording ? stopRecording() : startRecording())}
+                style={recording ? ({ '--cam-progress': `${Math.min(1, elapsed / VIDEO_MAX_SECONDS) * 360}deg` } as React.CSSProperties) : undefined}
+              >
+                <span aria-hidden />
+              </button>
+            </div>
+            {recording ? null : (
+              <div className="cam__modes" role="group" aria-label={t('viewOnce.capture.kind')}>
+                {(['photo', 'video'] as const).map((m) => (
+                  <button key={m} type="button" className="cam__mode" aria-pressed={mode === m} onClick={() => setMode(m)}>
+                    {t(m === 'photo' ? 'viewOnce.capture.photo' : 'viewOnce.capture.video')}
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
       <span role="status" className="yp-visually-hidden">

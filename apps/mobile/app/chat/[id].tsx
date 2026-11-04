@@ -22,7 +22,7 @@ import { useCalls } from '../../lib/calls';
 import { client, errorMessage, mediaUrl } from '../../lib/api';
 import { swapEmoticon } from '../../lib/emoticons';
 import { copyActions, PasteStrips, useChatPaste } from '../../lib/chat-paste';
-import { clock, MAX_UPLOAD_BYTES, pickOne, takePhoto, uploadFile, uploadPicked, VOICE_MIME, type Picked } from '../../lib/media';
+import { clock, MAX_UPLOAD_BYTES, pickOne, takeWithCamera, uploadFile, uploadPicked, VOICE_MIME, type Picked } from '../../lib/media';
 import { useT } from '../../lib/i18n';
 import { VOICE_RECORDING } from '../../lib/voice';
 import { StoryCardView } from '../../lib/story-stickers';
@@ -688,7 +688,7 @@ export default function Chat() {
   }
 
   async function sendCameraPhoto() {
-    const asset = await takePhoto().catch(() => null);
+    const asset = await takeWithCamera().catch(() => null);
     if (!asset || asset === 'denied') {
       if (asset === 'denied') setError(t('m.camera.denied'));
       return;

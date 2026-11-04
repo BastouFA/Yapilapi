@@ -42,6 +42,7 @@ import {
   type WatchReaction,
   type WatchSession,
   type WatchSkipReason,
+  isVideoFile,
 } from '@yapilapi/shared';
 import { patiently } from '@yapilapi/api-client';
 import { api, ApiError, errorMessage } from '@/lib/api';
@@ -50,6 +51,7 @@ import { REACTION_LABEL } from '@/components/Rooms';
 import { MessageAttachments } from '@/components/ChatAttachments';
 import { applyReaction, EmojiPanel, ForwardSheet, MessageQuote, previewText, ReactionPicker, ReactionRow, SystemLine } from '@/components/ChatExtras';
 import { copyActions, PasteStrips, useChatPaste, useCopyPasteKeys } from '@/components/ChatPaste';
+import { ChatCamera } from '@/components/ChatCamera';
 import { useCalls } from '@/components/Calls';
 import { addNotes, chatName, playbackNotes, postThumb, watchDeviceId } from '@/components/WatchTogether';
 import { AddSheet, UploadProgress, useDropFile, useWatchUpload, WatchSuggestions, type Addition } from '@/components/WatchAdd';
@@ -985,7 +987,9 @@ function WatchChat({ conversationId, group, onUnread }: { conversationId: string
     setMessages((cur) => [...(cur ?? []), ...here.filter((m) => !cur?.some((x) => x.id === m.id))]);
   };
 
-  /** A pasted photo or video, as its own message. */
+  const [cameraOpen, setCameraOpen] = useState(false);
+
+  /** A pasted or camera photo or video, as its own message. */
   async function sendFile(file: File, label: string): Promise<boolean> {
     if (file.size > 50 * 1024 * 1024) {
       toast(t('chat.fileTooBig'));
@@ -1248,6 +1252,16 @@ function WatchChat({ conversationId, group, onUnread }: { conversationId: string
         >
           <Icon name="copy" size={18} />
         </button>
+        <button
+          type="button"
+          className="yp-action watch-chat__paste"
+          aria-label={t('m.camera.takePhoto')}
+          title={t('m.camera.takePhoto')}
+          disabled={!!uploading}
+          onClick={() => setCameraOpen(true)}
+        >
+          <Icon name="camera" size={18} />
+        </button>
         <label htmlFor="watch-msg" className="yp-visually-hidden">
           {t('watch.chatPlaceholder')}
         </label>
@@ -1276,6 +1290,9 @@ function WatchChat({ conversationId, group, onUnread }: { conversationId: string
           <span className="watch-chat__send">{t('watch.send')}</span>
         </Button>
       </form>
+      {cameraOpen ? (
+        <ChatCamera onClose={() => setCameraOpen(false)} onSend={(f) => sendFile(f, isVideoFile(f) ? t('chat.sendingVideo') : t('chat.sendingPhoto'))} />
+      ) : null}
       <p className="muted watch-chat__note" id="watch-chat-note">
         {t('watch.chatNote')}
       </p>

@@ -142,6 +142,14 @@ test('two people watch together from a chat, and a second device of the same per
   await said.getByRole('button', { name: 'Reply' }).focus();
   await cleoPage.keyboard.press('ControlOrMeta+c');
   await expect.poll(() => cleoPage.evaluate(() => navigator.clipboard.readText())).toBe('This one is good');
+
+  // The camera by the message box: its gallery button is what works without a camera here.
+  await cleoPage.locator('#watch-chat').getByRole('button', { name: 'Take photo' }).click();
+  const camera = cleoPage.getByRole('dialog', { name: 'Camera' });
+  await camera.locator('input[type=file]').setInputFiles(path.join(import.meta.dirname, 'fixtures', 'bread.jpg'));
+  await camera.getByRole('button', { name: 'Send' }).click();
+  await expect(camera).toHaveCount(0);
+  await expect(cleoPage.locator('#watch-chat .chat-msg img').first()).toBeVisible();
   await audit(cleoPage, 'the chat sheet');
   await cleoPage.getByRole('button', { name: 'Close' }).click();
 

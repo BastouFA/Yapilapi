@@ -57,11 +57,11 @@ export async function pickOne(
   return r.assets[0];
 }
 
-/** A photo taken now with the camera. Returns null when the person closed it, or 'denied' when camera access is off. */
-export async function takePhoto(): Promise<Picked | 'denied' | null> {
+/** A photo or a video of up to a minute, taken now with the camera. Returns null when the person closed it, or 'denied' when camera access is off. */
+export async function takeWithCamera(): Promise<Picked | 'denied' | null> {
   const perm = await ImagePicker.requestCameraPermissionsAsync();
   if (!perm.granted) return 'denied';
-  const r = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.9 });
+  const r = await ImagePicker.launchCameraAsync({ mediaTypes: ['images', 'videos'], quality: 0.9, videoMaxDuration: 60 });
   return r.canceled ? null : (r.assets[0] ?? null);
 }
 

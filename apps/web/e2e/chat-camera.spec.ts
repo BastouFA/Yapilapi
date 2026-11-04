@@ -7,7 +7,7 @@ import { expect, request, test, type APIRequestContext } from '@playwright/test'
  * in the chat. Runs on Chromium's made-up camera; a phone's real one needs a phone.
  */
 test.use({
-  permissions: ['camera'],
+  permissions: ['camera', 'microphone'],
   launchOptions: { args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] },
 });
 test.beforeEach(({}, info) => test.skip(info.project.name.endsWith('dark'), 'covered by the light projects'));
@@ -64,11 +64,27 @@ test('take a photo in a chat, take another, send it', async ({ page, baseURL }, 
   await expect(page.locator('.chat-msg img').first()).toBeVisible();
   await expect(page.getByRole('button', { name: 'Take photo' })).toBeFocused();
 
+  // Video: record, stop, look, send.
+  await page.getByRole('button', { name: 'Take photo' }).click();
+  await camera.getByRole('button', { name: 'Video' }).click();
+  const record = camera.getByRole('button', { name: 'Start recording' });
+  await expect(record).toBeEnabled();
+  await record.click();
+  await expect(camera.getByRole('timer')).toBeVisible();
+  await page.waitForTimeout(1_500);
+  await camera.getByRole('button', { name: 'Stop recording' }).click();
+  await expect(camera.locator('video[controls]')).toBeVisible();
+  // It's the recording that plays, not what's left of the camera.
+  await expect.poll(() => camera.locator('video[controls]').evaluate((v: HTMLVideoElement) => (v.srcObject ? 0 : v.videoWidth))).toBeGreaterThan(100);
+  await send.click();
+  await expect(camera).toHaveCount(0);
+  await expect(page.locator('.chat-msg video').first()).toBeVisible();
+
   // The gallery button on the camera takes a video too, with the same look first.
   await page.getByRole('button', { name: 'Take photo' }).click();
   await camera.locator('input[type=file]').setInputFiles(path.join(import.meta.dirname, 'fixtures', 'clip.mp4'));
   await expect(camera.locator('video[controls]')).toBeVisible();
   await send.click();
   await expect(camera).toHaveCount(0);
-  await expect(page.locator('.chat-msg video').first()).toBeVisible();
+  await expect(page.locator('.chat-msg video')).toHaveCount(2);
 });
