@@ -98,7 +98,10 @@ test('two people watch together from a chat, and a second device of the same per
   // The chat is a sheet over the lower part of the screen; the video stays above it.
   await cleoPage.getByRole('button', { name: 'Chat', exact: true }).click();
   await cleoPage.locator('#watch-msg').fill('This one is good');
+  // On a phone the keyboard's Return key starts a new line; the Send button sends.
   await cleoPage.locator('#watch-msg').press('Enter');
+  await expect(cleoPage.locator('#watch-msg')).toHaveValue('This one is good\n');
+  await cleoPage.getByRole('button', { name: 'Send' }).click();
   await expect(cleoPage.locator('#watch-chat')).toContainText('This one is good');
   await expect(cleoPage.locator('.watch-stage')).toBeInViewport();
 
@@ -116,7 +119,7 @@ test('two people watch together from a chat, and a second device of the same per
   await expect(cleoPage.locator('#watch-chat .chat-compose-context')).toContainText('This one is good');
   await expect(cleoPage.locator('#watch-msg')).toBeFocused();
   await cleoPage.locator('#watch-msg').fill('The ending especially');
-  await cleoPage.locator('#watch-msg').press('Enter');
+  await cleoPage.getByRole('button', { name: 'Send' }).click();
   await expect(cleoPage.locator('#watch-chat .chat-compose-context')).toHaveCount(0);
   const answer = cleoPage.locator('#watch-chat .chat-msg', { hasText: 'The ending especially' });
   await expect(answer.locator('.chat-quote')).toContainText('This one is good');

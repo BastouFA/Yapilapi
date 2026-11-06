@@ -69,36 +69,46 @@ async function media(owner: TestUser, kind: 'image' | 'audio', viewOnce = false)
 }
 
 describe('new message pushes', () => {
-  it('pushes once per chat while unread, says how many later, opens the chat and stays out of Activity', async () => {
+  it('updates one notification per chat with each message, buzzing again only after a pause, and stays out of Activity', async () => {
     const ada = await person('Ada');
     const bo = await person('Bo');
     const id = await chat(ada, bo);
     const unreadBefore = (await as(t.app, bo).get('/v1/notifications')).body.unread;
     await send(ada, id, { body: 'See you at six' });
+    await settle();
     await send(ada, id, { body: 'Bring the speaker' });
+    await settle();
     await send(ada, id, { body: 'And snacks' });
     await settle();
-    // One push for the three: the first one's words, and it opens the chat (YAPILAPI, Yap and the web).
-    expect(messagePushes(bo)).toHaveLength(1);
+    // Each message updates the chat's notification (the same tag, so the phone replaces it): the
+    // count, with the newest under it. Only the first one rang; the next two came a moment later.
+    expect(messagePushes(bo).map((p) => [p.msg.body, p.msg.renotify])).toEqual([
+      ['Ada: See you at six', true],
+      ['Ada: 2 new messages\nSee you at six\nBring the speaker', false],
+      ['Ada: 3 new messages\nSee you at six\nBring the speaker\nAnd snacks', false],
+    ]);
     expect(messagePushes(bo)[0]!.msg).toMatchObject({
       title: 'YAPILAPI',
-      body: 'Ada: See you at six',
       url: `/inbox/${id}`,
       tag: `message:${id}`,
       data: { type: 'message', entityType: 'conversation', entityId: id },
     });
+    expect(new Set(messagePushes(bo).map((p) => p.msg.tag))).toEqual(new Set([`message:${id}`]));
     // The sender is never told about their own messages.
     expect(messagePushes(ada)).toHaveLength(0);
     // Not in the Activity list, nor its count: the chat list's unread count says it.
     const activity = (await as(t.app, bo).get('/v1/notifications')).body;
     expect(activity.items.some((n: any) => n.type === 'message')).toBe(false);
     expect(activity.unread).toBe(unreadBefore);
-    // A while later, the next one goes out again, saying how many (the browser replaces the first).
+    // A while later the next one rings again, with the newest three under the count.
     await db().query(`UPDATE notifications SET data = data || '{"pushedAt": 0}' WHERE user_id = $1 AND type = 'message'`, [bo.id]);
     await send(ada, id, { body: 'On my way' });
     await settle();
-    expect(messagePushes(bo).map((p) => p.msg.body)).toEqual(['Ada: See you at six', 'Ada: 4 new messages']);
-    expect(messagePushes(bo)[1]!.msg.tag).toBe(`message:${id}`);
+    expect(messagePushes(bo)[3]!.msg).toMatchObject({
+      body: 'Ada: 4 new messages\nBring the speaker\nAnd snacks\nOn my way',
+      renotify: true,
+      tag: `message:${id}`,
+    });
   });
 
   it('clears when the chat is read, so the next message pushes again with its words', async () => {
@@ -106,16 +116,17 @@ describe('new message pushes', () => {
     const bo = await person('Bo');
     const id = await chat(ada, bo);
     await send(ada, id, { body: 'First' });
+    await settle();
     await send(ada, id, { body: 'Second' });
     await settle();
-    expect(messagePushes(bo)).toHaveLength(1);
+    expect(messagePushes(bo)).toHaveLength(2);
     const rows = async () => (await db().query(`SELECT 1 FROM notifications WHERE user_id = $1 AND type = 'message' AND entity_id = $2`, [bo.id, id])).rowCount;
     expect(await rows()).toBe(1);
     expect((await as(t.app, bo).post(`/v1/conversations/${id}/read`)).status).toBe(200);
     expect(await rows()).toBe(0);
     await send(ada, id, { body: 'Third' });
     await settle();
-    expect(messagePushes(bo).map((p) => p.msg.body)).toEqual(['Ada: First', 'Ada: Third']);
+    expect(messagePushes(bo).map((p) => p.msg.body)).toEqual(['Ada: First', 'Ada: 2 new messages\nFirst\nSecond', 'Ada: Third']);
     // Marking all of Activity read doesn't touch a chat's push.
     expect((await as(t.app, bo).post('/v1/notifications/read')).status).toBe(200);
     expect(await rows()).toBe(1);
@@ -174,7 +185,7 @@ describe('new message pushes', () => {
     await as(t.app, quiet).put('/v1/me/interactions', { quietHours: null });
     await send(ada, crew, { body: 'Still here' });
     await settle();
-    expect(messagePushes(quiet).map((p) => p.msg.body)).toEqual(['Ada in All: 2 new messages']);
+    expect(messagePushes(quiet).map((p) => [p.msg.body, p.msg.renotify])).toEqual([['Ada in All: 2 new messages\nAda: Anyone\nAda: Still here', true]]);
   });
 
   it('pushes a message request once, until they write back', async () => {
@@ -227,6 +238,11 @@ describe('new message pushes', () => {
     const bodies = messagePushes(bo).map((p) => p.msg.body);
     expect(bodies).toEqual(['Ada: Voice message', 'Ada: Photo', 'Ada: Photo · View once', 'Ada: New message', 'Ada: Photo']);
     expect(JSON.stringify(messagePushes(bo))).not.toMatch(/4417|With a photo/);
+    // Several unread: the lines under the count say what each is, never its words.
+    await send(ada, id, { body: 'Door code 9981' });
+    await settle();
+    expect(messagePushes(bo).at(-1)!.msg.body).toBe('Ada: 2 new messages\nPhoto\nNew message');
+    expect(JSON.stringify(messagePushes(bo))).not.toMatch(/9981/);
   });
 
   it('pushes polls, and writes in the recipient’s language', async () => {
@@ -242,7 +258,7 @@ describe('new message pushes', () => {
     await db().query(`UPDATE notifications SET data = data || '{"pushedAt": 0}' WHERE user_id = $1 AND type = 'message'`, [bo.id]);
     await send(ada, id, { body: 'Vote' });
     await settle();
-    expect(messagePushes(bo)[1]!.msg.body).toBe('Ada : 2 nouveaux messages');
+    expect(messagePushes(bo)[1]!.msg.body).toBe('Ada : 2 nouveaux messages\nSondage : Pizza or rice\nVote');
   });
 
   it('reaches the Yap phone app, titled Yap', async () => {

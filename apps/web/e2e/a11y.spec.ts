@@ -298,7 +298,7 @@ const STATES: [string, (page: Page, d: SeedData) => Promise<void>][] = [
       await open(page, `/inbox/${d.conversationId}`);
       // Messages can be edited for a few minutes after sending, so send a fresh one.
       await page.getByRole('textbox', { name: /message/i }).fill('Running late, save me a seat');
-      await page.keyboard.press('Enter');
+      await page.getByRole('button', { name: 'Send', exact: true }).click();
       await expect(page.locator('.chat-msg--mine').last().getByRole('button', { name: 'Message options' })).toBeVisible();
       await page.locator('.chat-msg--mine').last().getByRole('button', { name: 'Message options' }).click();
       await page.getByRole('menuitem', { name: 'Edit' }).click();

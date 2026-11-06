@@ -1,6 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 import type { RealtimeHub } from './realtime.ts';
 import { messagePreviews } from './chat.ts';
+import type { RecentMessage } from './push.ts';
 import { activeControls } from './family.ts';
 import { isEnabled, notify } from './services.ts';
 import { ageOf } from './users.ts';
@@ -8,10 +9,14 @@ import { ageOf } from './users.ts';
 type Q = Pool | PoolClient;
 
 /**
- * More messages in a chat join the push that's already there (it's still unread); it goes out
- * again, saying how many, once the last one is this old.
+ * More messages in a chat join the push that's already there (it's still unread), and each one
+ * updates it ("Ada: 3 new messages", with the newest under it). It rings or buzzes again once the
+ * last time it did is this old; sooner, it changes quietly, so a quick run of messages buzzes once.
  */
-export const MESSAGE_REPUSH_SECONDS = 120;
+export const MESSAGE_ALERT_AGAIN_SECONDS = 20;
+
+/** A push for several messages shows at most this many of the newest under the count. */
+export const PUSH_RECENT_MESSAGES = 3;
 
 /** A voice message's push says at most this much of what was said (its transcript). */
 export const PUSH_TRANSCRIPT_CHARS = 80;
@@ -70,8 +75,8 @@ export async function pushNewMessage(deps: { db: Q; realtime: RealtimeHub }, mes
     )
   ).rows[0];
   if (!m || m.chat_kind === 'community') return;
-  const { rows } = await db.query<{ id: string; birth_date: Date | null; friends: boolean; family: boolean; wrote: boolean }>(
-    `SELECT u.id, u.birth_date,
+  const { rows } = await db.query<{ id: string; birth_date: Date | null; friends: boolean; family: boolean; wrote: boolean; last_read_at: Date }>(
+    `SELECT u.id, u.birth_date, cm.last_read_at,
             EXISTS (SELECT 1 FROM friendships f WHERE f.user_a = LEAST(u.id, $2::uuid) AND f.user_b = GREATEST(u.id, $2::uuid)) AS friends,
             EXISTS (SELECT 1 FROM family_links fl WHERE fl.status = 'active'
                     AND ((fl.guardian_id = $2 AND fl.teen_id = u.id) OR (fl.guardian_id = u.id AND fl.teen_id = $2))) AS family,
@@ -94,6 +99,7 @@ export async function pushNewMessage(deps: { db: Q; realtime: RealtimeHub }, mes
     // The message as they see it (nothing when they can't, for example from someone they blocked).
     const preview = (await messagePreviews(db, [m.id], r.id)).get(m.id);
     if (!preview?.available) continue;
+    const recent = await recentUnread(db, m.conversation_id, r.id, r.last_read_at);
     await notify(db, realtime, {
       userId: r.id,
       category: 'messages',
@@ -102,15 +108,40 @@ export async function pushNewMessage(deps: { db: Q; realtime: RealtimeHub }, mes
       entityType: 'conversation',
       entityId: m.conversation_id,
       group: m.conversation_id,
-      messages: { repushAfterSeconds: MESSAGE_REPUSH_SECONDS },
+      messages: { alertAgainSeconds: MESSAGE_ALERT_AGAIN_SECONDS },
       pushData: {
         preview: { ...preview, sender: null },
+        recent,
         private: !!m.expires_at,
         chat: m.chat_kind === 'group' ? m.title : null,
         ...(transcript && preview.attachmentKind === 'audio' ? { transcript } : {}),
       },
     });
   }
+}
+
+/**
+ * The newest messages someone hasn't read in a chat (oldest first), as they'd see them, for a push
+ * about several: only ones that push (lib/push.ts says a disappearing one's kind, never its words).
+ */
+async function recentUnread(db: Q, conversationId: string, readerId: string, since: Date): Promise<RecentMessage[]> {
+  const { rows } = await db.query<{ id: string; private: boolean; name: string | null }>(
+    `SELECT m.id, m.expires_at IS NOT NULL AS private, p.display_name AS name
+     FROM messages m LEFT JOIN profiles p ON p.user_id = m.sender_id
+     WHERE m.conversation_id = $1 AND m.sender_id <> $2 AND m.kind = 'message' AND m.created_at > $3
+       AND m.deleted_at IS NULL AND m.moderation_status = 'normal' AND (m.expires_at IS NULL OR m.expires_at > now())
+     ORDER BY m.created_at DESC, m.id DESC LIMIT $4`,
+    [conversationId, readerId, since, PUSH_RECENT_MESSAGES],
+  );
+  const previews = await messagePreviews(
+    db,
+    rows.map((r) => r.id),
+    readerId,
+  );
+  return rows.reverse().flatMap((r) => {
+    const p = previews.get(r.id);
+    return p?.available ? [{ preview: { ...p, sender: null }, private: r.private, name: r.name }] : [];
+  });
 }
 
 /** Reading a chat: its message push is done with, and a Yap's notification is read. */

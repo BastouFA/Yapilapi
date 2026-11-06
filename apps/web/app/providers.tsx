@@ -18,6 +18,7 @@ import { ApiError } from '@yapilapi/api-client';
 import { api, errorMessage, sharedRequest, WS_URL } from '@/lib/api';
 import { ServerWake } from '@/components/ServerWake';
 import { revealLocale, startLocale, visitorLocale, writeLocaleChoice, writeLocaleHint } from '@/lib/locale-script';
+import { closeChatNotifications } from '@/lib/push';
 import {
   connectionHints,
   dataSaverActive,
@@ -275,6 +276,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
       sharedRequest('conversations', () => api.conversations.list())
         .then((r) => {
           if (asked === unreadAnswers.current) setUnreadState((u) => ({ ...u, messages: r.items.reduce((s, c) => s + c.unreadCount, 0) }));
+          // Chats read since (on another device, say) lose their notification here too.
+          closeChatNotifications(r.items.filter((c) => !c.unreadCount).map((c) => c.id));
         })
         .catch(() => {});
     };

@@ -102,15 +102,20 @@ export async function disableBrowserPush(turnOff = false) {
 }
 
 /**
- * Opening a chat: the browser's notification about its new messages goes (the API sends them with
- * the tag `message:<chat id>`, and clears its own when the chat is read).
+ * Takes read chats' notifications off this device (the API sends them with the tag
+ * `message:<chat id>`): they'd stay on the lock screen and in the phone's list after the chat was
+ * read, here or on another device. The page closes them, and asks the service worker to as well,
+ * since a phone's home-screen app doesn't always let the page see the worker's notifications.
  */
-export async function closeChatNotifications(conversationId: string) {
-  if (!pushSupported()) return;
-  try {
-    const reg = await navigator.serviceWorker.getRegistration('/sw.js');
-    for (const n of (await reg?.getNotifications({ tag: `message:${conversationId}` })) ?? []) n.close();
-  } catch {
-    // Nothing to close.
-  }
+export function closeChatNotifications(conversationIds: string[]): void {
+  if (!conversationIds.length || typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+  const tags = new Set(conversationIds.map((id) => `message:${id}`));
+  void navigator.serviceWorker
+    .getRegistration('/sw.js')
+    .then(async (reg) => {
+      if (!reg) return;
+      for (const n of await reg.getNotifications()) if (tags.has(n.tag)) n.close();
+      reg.active?.postMessage({ type: 'chats-read', ids: conversationIds });
+    })
+    .catch(() => {});
 }

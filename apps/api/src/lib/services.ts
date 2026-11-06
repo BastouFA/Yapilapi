@@ -133,11 +133,12 @@ type Notice = {
   data?: object;
   group?: string;
   /**
-   * New messages in a chat (with `group`): every one counts, whoever sent it ("3 new messages"),
-   * and a grouped one pushes again once the last push for it is `repushAfterSeconds` old, or
-   * never went out (during quiet hours, say).
+   * New messages in a chat (with `group`): every one counts, whoever sent it ("3 new messages"), and
+   * every one pushes, replacing the chat's notification on the device with the new count and words.
+   * It rings or buzzes again once the last push for it is `alertAgainSeconds` old (or never went
+   * out, during quiet hours say); sooner, it changes quietly, so a burst of messages buzzes once.
    */
-  messages?: { repushAfterSeconds: number };
+  messages?: { alertAgainSeconds: number };
   /** For the push's text only; never stored. */
   pushData?: object;
 };
@@ -188,8 +189,8 @@ export async function notify(db: Q, realtime: RealtimeHub, n: Notice): Promise<v
       if (pausedNow) return;
       // `grouped`: it joined a row that was already unread, so the unread count stays the same.
       if (inbox) await realtime.publish([n.userId], { type: 'notification.created', data: { id: row.id, category: n.category, type: n.type, grouped: true } });
-      if (n.messages && (row.pushed_at == null || Date.now() - Number(row.pushed_at) >= n.messages.repushAfterSeconds * 1000))
-        await push(db, row.id, n, p, { count });
+      if (n.messages)
+        await push(db, row.id, n, p, { count }, row.pushed_at == null || Date.now() - Number(row.pushed_at) >= n.messages.alertAgainSeconds * 1000);
       return;
     }
   }
@@ -203,7 +204,7 @@ export async function notify(db: Q, realtime: RealtimeHub, n: Notice): Promise<v
   const paused = p?.notifications_paused_until && p.notifications_paused_until > new Date() && n.category !== 'security';
   if (paused) return;
   if (inbox) await realtime.publish([n.userId], { type: 'notification.created', data: { id: rows[0]!.id, category: n.category, type: n.type } });
-  await push(db, rows[0]!.id, n, p, n.messages ? { count: 1 } : {});
+  await push(db, rows[0]!.id, n, p, n.messages ? { count: 1 } : {}, true);
 }
 
 /**
@@ -212,7 +213,7 @@ export async function notify(db: Q, realtime: RealtimeHub, n: Notice): Promise<v
  * lands in the inbox. `extra` goes with its data into the text. One that can push again when
  * grouped (`messages`) notes when it went out, and its own tag lets a browser replace the last one.
  */
-async function push(db: Q, id: string, n: Notice, p: { focus_mode: boolean } | undefined, extra: object): Promise<void> {
+async function push(db: Q, id: string, n: Notice, p: { focus_mode: boolean } | undefined, extra: object, alert: boolean): Promise<void> {
   if (!pushSender || p?.focus_mode) return;
   if (n.category !== 'security' && ((await activeControls(db, n.userId))?.quietNow || (await inQuietHours(db, n.userId)))) return;
   // The recipient's language and the actor's name, in one query.
@@ -225,11 +226,12 @@ async function push(db: Q, id: string, n: Notice, p: { focus_mode: boolean } | u
   const data: Record<string, string> = { type: n.type };
   if (n.entityType) data.entityType = n.entityType;
   if (n.entityId) data.entityId = n.entityId;
-  if (n.messages) await db.query(`UPDATE notifications SET data = data || jsonb_build_object('pushedAt', $2::bigint) WHERE id = $1`, [id, Date.now()]);
+  // When it last rang or buzzed: a quiet update doesn't move it.
+  if (n.messages && alert) await db.query(`UPDATE notifications SET data = data || jsonb_build_object('pushedAt', $2::bigint) WHERE id = $1`, [id, Date.now()]);
   // A push about a chat opens the chat.
   const url = n.entityType === 'conversation' && n.entityId ? `/inbox/${n.entityId}` : '/notifications';
   const tag = n.messages && n.group ? `${n.type}:${n.group}` : n.type;
-  void pushSender(n.userId, { title: 'YAPILAPI', body: text, tag, url, data }).catch(() => {});
+  void pushSender(n.userId, { title: 'YAPILAPI', body: text, tag, url, data, ...(n.messages ? { renotify: alert } : {}) }).catch(() => {});
 }
 
 let pushSender: PushSender | null = null;

@@ -46,6 +46,8 @@ import {
 } from '@yapilapi/shared';
 import { patiently } from '@yapilapi/api-client';
 import { api, ApiError, errorMessage } from '@/lib/api';
+import { enterSends } from '@/lib/enter-sends';
+import { closeChatNotifications } from '@/lib/push';
 import { useRealtime, useSession } from '@/app/providers';
 import { REACTION_LABEL } from '@/components/Rooms';
 import { MessageAttachments } from '@/components/ChatAttachments';
@@ -845,6 +847,7 @@ function WatchChat({ conversationId, group, onUnread }: { conversationId: string
         setMessages(r.items);
         setCursor(r.nextCursor);
         void api.conversations.read(conversationId).catch(() => {});
+        closeChatNotifications([conversationId]);
       },
       () => live && setMessages([]),
     );
@@ -864,6 +867,7 @@ function WatchChat({ conversationId, group, onUnread }: { conversationId: string
       });
       if (m.sender.id !== me?.id) {
         void api.conversations.read(conversationId).catch(() => {});
+        closeChatNotifications([conversationId]);
         if (m.kind !== 'system') onUnread?.();
       }
     }
@@ -1278,7 +1282,7 @@ function WatchChat({ conversationId, group, onUnread }: { conversationId: string
           onKeyDown={(e) => {
             if (e.key === 'Escape' && paste.pasted.length) paste.clearPasted();
             if (e.key === 'Escape' && replyTo) setReplyTo(null);
-            if (e.key === 'Enter' && !e.shiftKey) {
+            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && enterSends()) {
               e.preventDefault();
               if (paste.pasted.length && !body.trim()) void paste.sendPasted();
               else void send();

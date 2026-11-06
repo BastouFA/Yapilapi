@@ -38,6 +38,7 @@ import { ViewOnceCapture } from '@/components/ViewOnceCapture';
 import { ChatCamera } from '@/components/ChatCamera';
 import { SharedPostCard, sharedPostIn } from '@/components/SharedPostCard';
 import { linkify } from '@/lib/linkify';
+import { enterSends } from '@/lib/enter-sends';
 import { TurnOnYapsPrompt, YapButton } from '@/components/Yap';
 import { StoryCardView } from '@/components/StoryStickers';
 import { NowStatusLine } from '@/components/ProfilePlus';
@@ -212,7 +213,7 @@ export default function ChatPage() {
       (r) => setUnread({ messages: r.unread, notifications: r.notifications }),
       () => {},
     );
-    void closeChatNotifications(id);
+    closeChatNotifications([id]);
   }
   function load() {
     setLoadError(null);
@@ -1359,7 +1360,7 @@ export default function ChatPage() {
             if (next.trim() && !editing) saidTyping();
           }}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
+            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && enterSends()) {
               e.preventDefault();
               if (paste.pasted.length && !body.trim() && !editing) void paste.sendPasted();
               else void send();

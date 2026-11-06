@@ -12,6 +12,11 @@ export interface PushMessage {
   tag?: string;
   /** Small string map for the app to act on (for example the call id on call_incoming). */
   data?: Record<string, string>;
+  /**
+   * For a notification that replaces the last one with its tag (a chat's): whether it rings or
+   * buzzes again (true), or changes quietly (false, more messages a moment after the last).
+   */
+  renotify?: boolean;
 }
 
 export type PushSender = (userId: string, msg: PushMessage) => Promise<void>;
@@ -48,7 +53,14 @@ export function createPushSender(db: Pool, config: Config, fetchImpl: typeof fet
     for (const s of rows) {
       try {
         if (s.kind === 'webpush' && vapid) {
-          await webpush.sendNotification({ endpoint: s.endpoint, keys: s.keys }, JSON.stringify(msg), { TTL: 3600 });
+          // Messages and calls go out at high urgency, or an Android phone saving battery holds them
+          // back for minutes; a call is no use later, a message still is the next day.
+          const type = msg.data?.type ?? msg.tag ?? '';
+          const urgent = type === 'message' || type === 'call_incoming';
+          await webpush.sendNotification({ endpoint: s.endpoint, keys: s.keys }, JSON.stringify(msg), {
+            TTL: type === 'call_incoming' ? 45 : type === 'message' ? 86400 : 3600,
+            ...(urgent ? { urgency: 'high' as const } : {}),
+          });
         } else if (s.kind === 'expo') {
           const yap = s.keys?.app === 'yap';
           // The notification's type (a new message's tag also names its chat).
@@ -108,7 +120,7 @@ function listing(d: Data, fallback: MessageKey, locale: string): string {
 }
 /**
  * A new message (lib/message-push.ts): "Ada: See you at six", "Ada in Family: Photo", or "Ada: 3 new
- * messages" once several came in. `d.preview` is the message as the recipient sees it, `d.chat` a
+ * messages" once several came in, with the newest of them under it (`d.recent`). `d.preview` is the message as the recipient sees it, `d.chat` a
  * group's name, `d.private` a disappearing message, `d.transcript` a voice note's first words
  * ("Ada: Voice message: See you at six").
  */
@@ -122,7 +134,21 @@ function messageText(name: string, d: Data, locale: string): string {
         ? t('push.message.voice', locale, { text: d.transcript })
         : messageLine(preview, !!d.private, locale);
   const chat = typeof d.chat === 'string' && d.chat ? d.chat : null;
-  return chat ? t('push.message.group', locale, { name, group: chat, text }) : t('push.message', locale, { name, text });
+  const head = chat ? t('push.message.group', locale, { name, group: chat, text }) : t('push.message', locale, { name, text });
+  // Several unread: the newest ones under the count, one a line (in a group, each with who wrote it).
+  const recent = count > 1 && Array.isArray(d.recent) ? (d.recent as RecentMessage[]) : [];
+  const lines = recent.map((r) =>
+    chat && r.name ? t('push.message', locale, { name: r.name, text: messageLine(r.preview, r.private, locale) }) : messageLine(r.preview, r.private, locale),
+  );
+  return [head, ...lines].join('\n');
+}
+
+/** One of the newest unread messages in a chat, for its push (lib/message-push.ts). */
+export interface RecentMessage {
+  preview: MessagePreview;
+  private: boolean;
+  /** Who wrote it (shown in a group). */
+  name: string | null;
 }
 
 /**
