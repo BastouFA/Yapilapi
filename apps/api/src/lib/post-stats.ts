@@ -1,4 +1,5 @@
 import type { Pool, PoolClient } from 'pg';
+import { fadeSql } from './fade.ts';
 
 type Q = Pool | PoolClient;
 
@@ -35,7 +36,7 @@ export interface StatDelta {
 }
 
 /** A post's momentum as of `at` (SQL), from post_stats aliased `ps`; 0 without a row. */
-export const trendSql = (at: string) => `coalesce(ps.trend * exp(-greatest(0, extract(epoch FROM (${at} - ps.trend_at))) / 3600.0 / ${TREND.fadeHours}), 0)`;
+export const trendSql = (at: string) => `coalesce(ps.trend * ${fadeSql('ps.trend_at', at, 3600 * TREND.fadeHours)}, 0)`;
 
 const COLS = [
   'impressions',
@@ -84,7 +85,7 @@ export async function bumpStats(db: Q, deltas: StatDelta[]): Promise<void> {
   const ids = rows.map((r) => r.postId);
   // A row for each post first (posts that are gone get none), then add: the counts can go down too.
   await db.query(`INSERT INTO post_stats (post_id) SELECT p.id FROM posts p WHERE p.id = ANY($1::uuid[]) ON CONFLICT (post_id) DO NOTHING`, [ids]);
-  const fade = `exp(-greatest(0, extract(epoch FROM (now() - ps.trend_at))) / 3600.0 / ${TREND.fadeHours})`;
+  const fade = fadeSql('ps.trend_at', 'now()', 3600 * TREND.fadeHours);
   await db.query(
     `UPDATE post_stats ps SET
        ${COLS.map((c) => `${c} = greatest(0, ps.${c} + x.${c})`).join(',\n       ')},

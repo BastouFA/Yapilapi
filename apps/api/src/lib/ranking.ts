@@ -523,9 +523,9 @@ function rankingSql(o: RankOptions, chains = false): { sql: string; params: unkn
            (SELECT count(*) FROM unnest(p.topics) t WHERE t = ANY(me.more))::int AS more_n,
            (SELECT count(*) FROM unnest(p.topics) t WHERE t = ANY(me.less))::int AS less_n,
            (SELECT t FROM unnest(p.topics) t WHERE t = ANY(me.interests) LIMIT 1) AS matched_topic,
-           coalesce((SELECT sum((me.taff ->> t)::real) FROM unnest(p.topics) t), 0)::real AS topic_aff,
-           (SELECT t FROM unnest(p.topics) t WHERE (me.taff ->> t)::real >= ${RANKING.likedTopicReason} ORDER BY (me.taff ->> t)::real DESC LIMIT 1) AS learned_topic,
-           coalesce(ca.s, 0)::real AS creator_aff,
+           coalesce((SELECT sum((me.taff ->> t)::float8) FROM unnest(p.topics) t), 0) AS topic_aff,
+           (SELECT t FROM unnest(p.topics) t WHERE (me.taff ->> t)::float8 >= ${RANKING.likedTopicReason} ORDER BY (me.taff ->> t)::float8 DESC LIMIT 1) AS learned_topic,
+           coalesce(ca.s, 0)::float8 AS creator_aff,
            coalesce(sm.n, 0)::real AS similar_n,
            p.like_count, p.comment_count,
            coalesce(ps.impressions, 0) AS impressions, coalesce(ps.completes, 0) AS completes, coalesce(ps.skips, 0) AS skips,
@@ -533,7 +533,7 @@ function rankingSql(o: RankOptions, chains = false): { sql: string; params: unkn
            coalesce(ps.listens, 0) AS listens, coalesce(ps.listen_completes, 0) AS listen_completes,
            CASE WHEN p.format = 'yap' THEN (SELECT count(*) FROM comments vr WHERE vr.post_id = p.id AND vr.voice_media_id IS NOT NULL AND vr.deleted_at IS NULL
                                               AND vr.moderation_status IN ('normal', 'review'))::int ELSE 0 END AS voice_replies,
-           ${trendSql(at)}::real AS trend,
+           ${trendSql(at)}::float8 AS trend,
            (extract(epoch FROM (${at} - p.created_at)) / 3600.0)::real AS age_hours,
            (au.created_at > ${at} - interval '${X.newCreatorDays} days'
             OR (SELECT count(*) FROM (SELECT 1 FROM posts p3 WHERE p3.author_id = p.author_id AND p3.deleted_at IS NULL AND p3.status = 'published' LIMIT ${X.newCreatorPosts}) z) < ${X.newCreatorPosts}) AS new_creator,

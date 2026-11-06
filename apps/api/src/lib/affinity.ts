@@ -1,5 +1,6 @@
 import type { Pool, PoolClient } from 'pg';
 import { personalizationAllowed } from './services.ts';
+import { fadeSql } from './fade.ts';
 
 type Q = Pool | PoolClient;
 
@@ -60,8 +61,7 @@ export interface Learning {
 }
 
 /** A score as of `at` (SQL): faded since it last changed. `t` is the affinity table's alias. */
-export const fadedScoreSql = (t: string, at: string) =>
-  `(${t}.score * exp(-greatest(0, extract(epoch FROM (${at} - ${t}.updated_at))) / 86400.0 / ${AFFINITY.fadeDays}))`;
+export const fadedScoreSql = (t: string, at: string) => `(${t}.score * ${fadeSql(`${t}.updated_at`, at, 86400 * AFFINITY.fadeDays)})`;
 
 /**
  * Learn from what someone did. `allowed` is whether Personalization is on, when the caller already
@@ -82,7 +82,7 @@ export async function learn(db: Q, userId: string, items: Learning[], allowed?: 
         topics.set(k, (topics.get(k) ?? 0) + d.topic);
       }
   }
-  const fade = `exp(-greatest(0, extract(epoch FROM (now() - a.updated_at))) / 86400.0 / ${AFFINITY.fadeDays})`;
+  const fade = fadeSql('a.updated_at', 'now()', 86400 * AFFINITY.fadeDays);
   const clamp = (x: string) => `greatest(${AFFINITY.min}, least(${AFFINITY.max}, ${x}))`;
   if (topics.size)
     await db.query(

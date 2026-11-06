@@ -9,6 +9,7 @@ import { plusCol, publicUserFrom } from './users.ts';
 import { notBlockedSql } from './visibility.ts';
 import { accountCommentsAllowedSql } from './interactions.ts';
 import { voiceClipSql } from './voice.ts';
+import { fadeSql } from './fade.ts';
 
 type Q = Pool | PoolClient;
 
@@ -75,7 +76,7 @@ export function topScoreSql(asOf: string): string {
   return `(ln(1 + cm.like_count) * 2.0
     + CASE WHEN cm.author_id <> p.author_id AND EXISTS (SELECT 1 FROM comment_likes cl WHERE cl.comment_id = cm.id AND cl.user_id = p.author_id) THEN 1.5 ELSE 0 END
     + ln(1 + cm.reply_count) * 1.5
-    + 2.0 * exp(-greatest(extract(epoch FROM (${asOf}::timestamptz - cm.created_at)), 0) / 43200.0))`;
+    + 2.0 * ${fadeSql('cm.created_at', `${asOf}::timestamptz`, 43200)})`;
 }
 
 export function toComment(r: Record<string, any>, opts: { hidden?: boolean } = {}): Comment {
