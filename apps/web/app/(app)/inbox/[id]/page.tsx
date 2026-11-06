@@ -1217,6 +1217,8 @@ export default function ChatPage() {
         className={`yp-composer${replyTo || editing ? ' yp-composer--context' : ''}`}
         onSubmit={(e) => {
           e.preventDefault();
+          // Sent from the Send button with the keyboard: back to the box for the next message.
+          composer.current?.focus();
           void send();
         }}
       >
@@ -1384,7 +1386,14 @@ export default function ChatPage() {
             <Icon name="clock" />
           </button>
         ) : null}
-        <Button type="submit" icon={editing ? 'check' : 'send'} disabled={!body.trim()} aria-label={editing ? t('m.chat.saveEdit') : t('inbox.send')}>
+        {/* Tapping it leaves focus in the box, so a phone's keyboard stays up for the next message. */}
+        <Button
+          type="submit"
+          icon={editing ? 'check' : 'send'}
+          disabled={!body.trim()}
+          aria-label={editing ? t('m.chat.saveEdit') : t('inbox.send')}
+          onMouseDown={(e) => e.preventDefault()}
+        >
           <span className="chat-send__label">{editing ? t('common.save') : t('inbox.send')}</span>
         </Button>
       </form>

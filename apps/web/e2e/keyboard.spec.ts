@@ -213,7 +213,7 @@ async function tabUntil(page: Page, done: () => Promise<boolean>, max = 80, key 
   expect(await done(), `never reached the target with ${key}; focus is on ${await focused(page)}`).toBe(true);
 }
 
-test('chat: reply to a message with the keyboard only', async ({ page }) => {
+test('chat: reply to a message with the keyboard only', async ({ page }, info) => {
   const { conversationId, replyTargetId } = seed();
   await page.goto(`/inbox/${conversationId}`);
   await page.waitForLoadState('networkidle');
@@ -239,6 +239,8 @@ test('chat: reply to a message with the keyboard only', async ({ page }) => {
   await expect(box).toBeFocused();
   const text = `See you at 7 (${Date.now().toString(36)})`;
   await page.keyboard.type(text);
+  // On a phone Return starts a new line: Tab on to the Send button. On a computer Enter sends.
+  if (info.project.name.startsWith('mobile')) await tabUntil(page, isFocused(page.getByRole('button', { name: 'Send', exact: true })), 5);
   await page.keyboard.press('Enter');
   const sent = page.locator('.chat-msg--mine', { hasText: text });
   await expect(sent.getByRole('button', { name: /Go to the message from Ben Keyboard: Great\. It starts at 7/ })).toBeVisible();
