@@ -8150,6 +8150,12 @@ button.yp-chip[aria-pressed='true'] {
 .reel__video--contain {
   object-fit: contain;
 }
+/* One video fills its stage exactly. As a grid item, Safari placed it lower than the stage, leaving
+   a dark strip across the top of every reel that showed as a gap between reels while swiping. */
+.reel__stage:not(.reel__stage--duet) > .reel__video {
+  position: absolute;
+  inset: 0;
+}
 .reel__backdrop {
   position: absolute;
   inset: -10%;
@@ -8212,7 +8218,8 @@ button.yp-chip[aria-pressed='true'] {
   background: transparent;
 }
 .reel button:focus-visible,
-.reel a:focus-visible {
+.reel a:focus-visible,
+.reels__top button:focus-visible {
   outline: none;
   box-shadow:
     0 0 0 2px var(--reel-scrim),
@@ -8228,7 +8235,8 @@ button.yp-chip[aria-pressed='true'] {
 }
 
 /* Top: back, the title, sound and clear view. The action rail starts well below it. */
-.reel__top {
+.reel__top,
+.reels__top {
   position: absolute;
   z-index: 4;
   top: 10px;
@@ -8237,6 +8245,34 @@ button.yp-chip[aria-pressed='true'] {
   align-items: center;
   gap: 6px;
   transition: opacity 400ms ease;
+}
+/* Phones: the reel's own bar gives way to one that stays put over the reels while they slide under
+   it, as in Instagram, so a swipe never shows a second bar halfway down the screen. It fades and
+   steps aside with the reel on screen. */
+.reels__top {
+  --reel-scrim: #05060b;
+  --reel-accent: #ff5c7a;
+  position: fixed;
+  z-index: 11;
+  top: calc(env(safe-area-inset-top, 0px) + 10px);
+  color: #f2f3fa;
+}
+.reels-page:has(.reel--active.reel--faint) .reels__top {
+  opacity: 0.55;
+}
+.reels-page:has(.reels--clear) .reels__top:not(:has(:focus-visible)) {
+  opacity: 0;
+  pointer-events: none;
+}
+@media (max-width: 899px) {
+  .reel__top {
+    display: none;
+  }
+}
+@media (min-width: 900px) {
+  .reels__top {
+    display: none;
+  }
 }
 /* "New" on a recent reel, "Watch again" past the new ones. */
 /* Plain words beside the name: it says something, it is nothing to tap. */

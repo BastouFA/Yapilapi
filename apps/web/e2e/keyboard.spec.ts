@@ -389,14 +389,16 @@ test('reels: keys, toggles, the scrubber and the options sheet', async ({ page }
   // The reel's length is known once its video has loaded.
   await expect.poll(async () => Number(await slider.getAttribute('aria-valuemax')), { timeout: 15_000 }).toBeGreaterThan(0);
 
-  // M and C switch sound and clear view; both are toggles with aria-pressed.
-  const sound = reel.getByRole('button', { name: 'Sound', exact: true });
+  // M and C switch sound and clear view; both are toggles with aria-pressed. They're on the reel's
+  // card on a computer, and on the one bar over the reels on a phone.
+  const bar = page.locator('.reel--active .reel__top, .reels__top').filter({ visible: true });
+  const sound = bar.getByRole('button', { name: 'Sound', exact: true });
   await expect(sound).toHaveAttribute('aria-pressed', 'false');
   await page.keyboard.press('m');
   await expect(sound).toHaveAttribute('aria-pressed', 'true');
   await page.keyboard.press('m');
   await expect(sound).toHaveAttribute('aria-pressed', 'false');
-  const clear = reel.getByRole('button', { name: 'Clear view', exact: true });
+  const clear = bar.getByRole('button', { name: 'Clear view', exact: true });
   await page.keyboard.press('c');
   await expect(clear).toHaveAttribute('aria-pressed', 'true');
   await page.keyboard.press('c');

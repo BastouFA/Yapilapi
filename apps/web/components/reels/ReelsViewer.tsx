@@ -13,7 +13,7 @@ import { WatchChatPicker } from '@/components/WatchTogether';
 import { SendToChatSheet } from '@/components/SendToChat';
 import { AddToStorySheet } from '@/components/AddToStory';
 import { useSession } from '@/app/providers';
-import { ReelItem, type ReelViewerApi } from './ReelItem';
+import { ReelItem, ReelTopBar, type ReelViewerApi } from './ReelItem';
 import { HighlightsSheet, OptionsSheet, ShareSheet, type ChainOptions } from './sheets';
 import { PassMicSheet, StartChainSheet, takeMicHref } from '@/components/PassTheMic';
 import { VideoCoverEditor } from '@/components/editor/VideoCoverEditor';
@@ -657,6 +657,8 @@ export function ReelsViewer() {
       <p className="yp-visually-hidden" aria-live="polite">
         {announce}
       </p>
+      {/* Phones: one bar that stays put while the reels slide under it. */}
+      <ReelTopBar className="reels__top" muted={muted} clear={clear} viewer={viewer} />
       <div className={`reels${clear ? ' reels--clear' : ''}`} ref={list} aria-describedby="reels-keys">
         {items.map((p, i) => (
           <ReelItem

@@ -689,20 +689,7 @@ export function ReelItem({
           </span>
         ))}
 
-        <div className="reel__top">
-          <button type="button" className="reel__icon-btn" onClick={viewer.back} aria-label={t('m.common.back')}>
-            <Icon name="arrow-left" size={22} />
-          </button>
-          <span className="reel__top-title" aria-hidden>
-            {t('m.title.reels')}
-          </span>
-          <button type="button" className="reel__icon-btn" onClick={viewer.toggleMute} aria-pressed={!muted} aria-label={t('m.reels.sound')}>
-            <Icon name={muted ? 'volume-off' : 'volume'} size={20} />
-          </button>
-          <button type="button" className="reel__icon-btn reel__clear-btn" onClick={viewer.toggleClear} aria-pressed={clear} aria-label={t('reel.clearView')}>
-            <ClearViewIcon />
-          </button>
-        </div>
+        <ReelTopBar className="reel__top" muted={muted} clear={clear} viewer={viewer} />
         {clear && active ? (
           <p className="reel__clear-hint" aria-hidden>
             {t('reel.clearView.hint')}
@@ -1126,6 +1113,40 @@ function ReelStats({ post, mine }: { post: Post; mine: boolean }) {
           {t('post.stats.onlyYou')}
         </span>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * Back, the title, sound and clear view. On a phone one bar stays put over the reels while they slide
+ * under it, as in Instagram; on a computer each reel's card has its own.
+ */
+export function ReelTopBar({
+  className,
+  muted,
+  clear,
+  viewer,
+}: {
+  className: string;
+  muted: boolean;
+  clear: boolean;
+  viewer: Pick<ReelViewerApi, 'back' | 'toggleMute' | 'toggleClear'>;
+}) {
+  const { t } = useSession();
+  return (
+    <div className={className}>
+      <button type="button" className="reel__icon-btn" onClick={viewer.back} aria-label={t('m.common.back')}>
+        <Icon name="arrow-left" size={22} />
+      </button>
+      <span className="reel__top-title" aria-hidden>
+        {t('m.title.reels')}
+      </span>
+      <button type="button" className="reel__icon-btn" onClick={viewer.toggleMute} aria-pressed={!muted} aria-label={t('m.reels.sound')}>
+        <Icon name={muted ? 'volume-off' : 'volume'} size={20} />
+      </button>
+      <button type="button" className="reel__icon-btn reel__clear-btn" onClick={viewer.toggleClear} aria-pressed={clear} aria-label={t('reel.clearView')}>
+        <ClearViewIcon />
+      </button>
     </div>
   );
 }

@@ -525,7 +525,7 @@ const STATES: [string, (page: Page, d: SeedData) => Promise<void>][] = [
     'reels: clear view',
     async (page, d) => {
       await open(page, `/reels?start=${d.reel2Id}`);
-      const clear = page.locator('.reel--active').getByRole('button', { name: 'Clear view', exact: true });
+      const clear = page.locator('.reel--active .reel__top, .reels__top').filter({ visible: true }).getByRole('button', { name: 'Clear view', exact: true });
       await clear.click();
       await expect(clear).toHaveAttribute('aria-pressed', 'true');
     },
