@@ -7456,4 +7456,11 @@ export const yo: Catalog = {
   'plans.costs.undo': 'Dá padà',
   'plans.remove': 'Yọ kúrò',
   'plans.costs.empty': 'Kò sí ìnáwó kankan síbẹ̀.',
+  'gif.tab': 'GIF',
+  'gif.search': 'Wá lórí KLIPY',
+  'gif.none': 'A kò rí GIF kankan',
+  'gif.error': 'Àwọn GIF kò le ṣí.',
+  'gif.sending': 'Ó ń fi GIF ránṣẹ́…',
+  'gif.send': 'Fi GIF ránṣẹ́: {title}',
+  'gif.poweredBy': 'Láti ọwọ́ KLIPY',
 };

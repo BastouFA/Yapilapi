@@ -7404,4 +7404,11 @@ export const am: Catalog = {
   'plans.costs.undo': 'ይቀልብሱ',
   'plans.remove': 'ያስወግዱ',
   'plans.costs.empty': 'እስካሁን ወጪ የለም።',
+  'gif.tab': 'GIF',
+  'gif.search': 'KLIPY ላይ ይፈልጉ',
+  'gif.none': 'ምንም GIF አልተገኘም',
+  'gif.error': 'GIFዎች መጫን አልቻሉም።',
+  'gif.sending': 'GIF በመላክ ላይ…',
+  'gif.send': 'GIF ላክ፦ {title}',
+  'gif.poweredBy': 'በKLIPY የቀረበ',
 };

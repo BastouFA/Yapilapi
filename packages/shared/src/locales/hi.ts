@@ -7461,4 +7461,11 @@ export const hi: Catalog = {
   'plans.costs.undo': 'पहले जैसा करें',
   'plans.remove': 'हटाएँ',
   'plans.costs.empty': 'अभी कोई ख़र्च नहीं।',
+  'gif.tab': 'GIF',
+  'gif.search': 'KLIPY में खोजें',
+  'gif.none': 'कोई GIF नहीं मिला',
+  'gif.error': 'GIF लोड नहीं हो सके।',
+  'gif.sending': 'GIF भेजा जा रहा है…',
+  'gif.send': 'GIF भेजें: {title}',
+  'gif.poweredBy': 'KLIPY द्वारा संचालित',
 };

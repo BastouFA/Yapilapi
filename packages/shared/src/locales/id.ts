@@ -7503,4 +7503,11 @@ export const id: Catalog = {
   'plans.costs.undo': 'Urungkan',
   'plans.remove': 'Hapus',
   'plans.costs.empty': 'Belum ada pengeluaran.',
+  'gif.tab': 'GIF',
+  'gif.search': 'Cari di KLIPY',
+  'gif.none': 'GIF tidak ditemukan',
+  'gif.error': 'GIF tidak dapat dimuat.',
+  'gif.sending': 'Mengirim GIF…',
+  'gif.send': 'Kirim GIF: {title}',
+  'gif.poweredBy': 'Didukung oleh KLIPY',
 };

@@ -7453,4 +7453,11 @@ export const bn: Catalog = {
   'plans.costs.undo': 'আগের অবস্থায় ফিরুন',
   'plans.remove': 'সরান',
   'plans.costs.empty': 'এখনো কোনো খরচ নেই।',
+  'gif.tab': 'GIF',
+  'gif.search': 'KLIPY-তে খুঁজুন',
+  'gif.none': 'কোনো GIF পাওয়া যায়নি',
+  'gif.error': 'GIF লোড করা যায়নি।',
+  'gif.sending': 'GIF পাঠানো হচ্ছে…',
+  'gif.send': 'GIF পাঠান: {title}',
+  'gif.poweredBy': 'KLIPY দ্বারা চালিত',
 };

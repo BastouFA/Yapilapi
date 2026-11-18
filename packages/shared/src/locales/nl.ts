@@ -7491,4 +7491,11 @@ export const nl: Catalog = {
   'plans.costs.undo': 'Ongedaan maken',
   'plans.remove': 'Verwijderen',
   'plans.costs.empty': 'Nog geen uitgaven.',
+  'gif.tab': 'GIF',
+  'gif.search': 'Zoeken op KLIPY',
+  'gif.none': 'Geen GIF’s gevonden',
+  'gif.error': 'GIF’s konden niet laden.',
+  'gif.sending': 'GIF versturen…',
+  'gif.send': 'GIF versturen: {title}',
+  'gif.poweredBy': 'Mogelijk gemaakt door KLIPY',
 };

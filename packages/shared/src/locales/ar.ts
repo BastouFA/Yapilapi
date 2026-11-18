@@ -7795,4 +7795,11 @@ export const ar: Catalog = {
   'plans.costs.undo': 'تراجع',
   'plans.remove': 'إزالة',
   'plans.costs.empty': 'لا مصاريف بعد.',
+  'gif.tab': 'GIF',
+  'gif.search': 'البحث في KLIPY',
+  'gif.none': 'لم يتم العثور على صور GIF',
+  'gif.error': 'تعذّر تحميل صور GIF.',
+  'gif.sending': 'جارٍ إرسال GIF…',
+  'gif.send': 'إرسال GIF: {title}',
+  'gif.poweredBy': 'مدعوم من KLIPY',
 };

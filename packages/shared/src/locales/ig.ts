@@ -7464,4 +7464,11 @@ export const ig: Catalog = {
   'plans.costs.undo': 'Meghachi',
   'plans.remove': 'Wepụ',
   'plans.costs.empty': 'Enweghị mmefu ọ bụla ugbu a.',
+  'gif.tab': 'GIF',
+  'gif.search': 'Chọọ na KLIPY',
+  'gif.none': 'Ahụghị GIF ọ bụla',
+  'gif.error': 'GIF enweghị ike ibunye.',
+  'gif.sending': 'Na-eziga GIF…',
+  'gif.send': 'Ziga GIF: {title}',
+  'gif.poweredBy': 'Site na KLIPY',
 };

@@ -52,6 +52,7 @@ import momentsModule from './modules/moments.ts';
 import chaptersModule, { openDueChapters } from './modules/chapters.ts';
 import boardsModule from './modules/boards.ts';
 import mediaModule from './modules/media.ts';
+import gifsModule from './modules/gifs.ts';
 import creatorModule from './modules/creator.ts';
 import payoutsModule from './modules/payouts.ts';
 import developerModule from './modules/developer.ts';
@@ -502,6 +503,7 @@ export async function buildApp(
     chaptersModule,
     boardsModule,
     mediaModule,
+    gifsModule,
     creatorModule,
     payoutsModule,
     developerModule,

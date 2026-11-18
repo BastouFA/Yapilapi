@@ -7423,4 +7423,11 @@ export const ko: Catalog = {
   'plans.costs.undo': '실행 취소',
   'plans.remove': '삭제',
   'plans.costs.empty': '아직 지출이 없어요.',
+  'gif.tab': 'GIF',
+  'gif.search': 'KLIPY에서 검색',
+  'gif.none': 'GIF를 찾을 수 없어요',
+  'gif.error': 'GIF를 불러오지 못했어요.',
+  'gif.sending': 'GIF 보내는 중…',
+  'gif.send': 'GIF 보내기: {title}',
+  'gif.poweredBy': 'KLIPY 제공',
 };

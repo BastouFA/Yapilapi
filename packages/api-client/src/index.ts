@@ -852,6 +852,17 @@ export function createClient(opts: ClientOptions) {
           })}`,
         ),
     },
+    /** GIFs from KLIPY for chats: trending without `q`. `enabled` false: there's no GIF tab. `send` keeps the chosen one as your own photo. */
+    gifs: {
+      list: (q?: string, page?: number) =>
+        get<{
+          enabled: boolean;
+          items: { id: string; title: string; preview: { url: string; width: number; height: number }; url: string }[];
+          next: number | null;
+        }>(`/v1/gifs${qs({ q, page })}`),
+      send: (url: string, title?: string) =>
+        post<{ media: { id: string; kind: 'image'; url: string; altText: string | null } }>('/v1/gifs/send', { url, title }),
+    },
     media: {
       /**
        * `viewOnce`: stored privately for a view-once chat message (no public address; url is empty).

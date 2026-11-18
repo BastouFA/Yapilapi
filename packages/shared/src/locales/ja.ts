@@ -7446,4 +7446,11 @@ export const ja: Catalog = {
   'plans.costs.undo': '元に戻す',
   'plans.remove': '削除',
   'plans.costs.empty': 'まだ支出はありません。',
+  'gif.tab': 'GIF',
+  'gif.search': 'KLIPYで検索',
+  'gif.none': 'GIFが見つかりません',
+  'gif.error': 'GIFを読み込めませんでした。',
+  'gif.sending': 'GIFを送信中…',
+  'gif.send': 'GIFを送信: {title}',
+  'gif.poweredBy': 'Powered by KLIPY',
 };

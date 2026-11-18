@@ -7473,4 +7473,11 @@ export const vi: Catalog = {
   'plans.costs.undo': 'Hoàn tác',
   'plans.remove': 'Gỡ',
   'plans.costs.empty': 'Chưa có khoản chi nào.',
+  'gif.tab': 'GIF',
+  'gif.search': 'Tìm trên KLIPY',
+  'gif.none': 'Không tìm thấy GIF',
+  'gif.error': 'Không tải được GIF.',
+  'gif.sending': 'Đang gửi GIF…',
+  'gif.send': 'Gửi GIF: {title}',
+  'gif.poweredBy': 'Được cung cấp bởi KLIPY',
 };

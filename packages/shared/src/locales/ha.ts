@@ -7481,4 +7481,11 @@ export const ha: Catalog = {
   'plans.costs.undo': 'Soke',
   'plans.remove': 'Cire',
   'plans.costs.empty': 'Babu kashe kuɗi tukuna.',
+  'gif.tab': 'GIF',
+  'gif.search': 'Bincika KLIPY',
+  'gif.none': 'Ba a sami GIF ba',
+  'gif.error': 'GIF ba su iya lodawa ba.',
+  'gif.sending': 'Ana aika GIF…',
+  'gif.send': 'Aika GIF: {title}',
+  'gif.poweredBy': 'KLIPY ne ke samarwa',
 };

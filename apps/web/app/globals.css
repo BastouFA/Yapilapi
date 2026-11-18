@@ -3767,6 +3767,76 @@ video.chat-att__media {
   padding: var(--space-4);
   text-align: center;
 }
+/* The GIF tab beside the emojis in a chat (components/GifPicker.tsx). */
+.emoji-dock__tabs {
+  display: flex;
+  gap: var(--space-1);
+  margin-bottom: var(--space-2);
+}
+.emoji-dock__tab {
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--ink);
+  font: 600 14px/20px var(--font-sans);
+  cursor: pointer;
+}
+.emoji-dock__tab[aria-selected='true'] {
+  border-color: var(--yapi);
+  background: var(--surface-sunken);
+}
+.gif-panel {
+  display: grid;
+  gap: var(--space-2);
+}
+.gif-panel__body {
+  height: min(34dvh, 320px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.gif-panel__grid {
+  columns: 3 110px;
+  column-gap: 4px;
+}
+.gif-panel__gif {
+  display: block;
+  width: 100%;
+  margin: 0 0 4px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  cursor: pointer;
+  break-inside: avoid;
+}
+.gif-panel__gif img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.gif-panel__gif:focus-visible {
+  outline: 2px solid var(--yapi);
+  outline-offset: 2px;
+}
+.gif-panel__note {
+  padding: var(--space-4);
+  color: var(--ink-muted);
+  text-align: center;
+}
+.gif-panel__more {
+  display: block;
+  margin: var(--space-2) auto;
+}
+.gif-panel__credit {
+  margin: 0;
+  color: var(--ink-muted);
+  font: 500 11px/14px var(--font-sans);
+  text-align: end;
+}
 /* Where a phone's keyboard would be, under the message box. */
 .emoji-dock {
   scroll-margin-bottom: calc(72px + env(safe-area-inset-bottom, 0px));

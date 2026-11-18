@@ -7467,4 +7467,11 @@ export const tr: Catalog = {
   'plans.costs.undo': 'Geri al',
   'plans.remove': 'Kaldır',
   'plans.costs.empty': 'Henüz masraf yok.',
+  'gif.tab': 'GIF',
+  'gif.search': 'KLIPY’de ara',
+  'gif.none': 'GIF bulunamadı',
+  'gif.error': 'GIF’ler yüklenemedi.',
+  'gif.sending': 'GIF gönderiliyor…',
+  'gif.send': 'GIF gönder: {title}',
+  'gif.poweredBy': 'KLIPY tarafından desteklenmektedir',
 };

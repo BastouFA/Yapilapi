@@ -7481,4 +7481,11 @@ export const sw: Catalog = {
   'plans.costs.undo': 'Tendua',
   'plans.remove': 'Ondoa',
   'plans.costs.empty': 'Bado hakuna gharama.',
+  'gif.tab': 'GIF',
+  'gif.search': 'Tafuta KLIPY',
+  'gif.none': 'Hakuna GIF zilizopatikana',
+  'gif.error': 'GIF hazikuweza kupakia.',
+  'gif.sending': 'Inatuma GIF…',
+  'gif.send': 'Tuma GIF: {title}',
+  'gif.poweredBy': 'Inaendeshwa na KLIPY',
 };

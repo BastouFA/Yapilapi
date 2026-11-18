@@ -7509,4 +7509,11 @@ export const de: Catalog = {
   'plans.costs.undo': 'Rückgängig',
   'plans.remove': 'Entfernen',
   'plans.costs.empty': 'Noch keine Ausgaben.',
+  'gif.tab': 'GIF',
+  'gif.search': 'KLIPY durchsuchen',
+  'gif.none': 'Keine GIFs gefunden',
+  'gif.error': 'GIFs konnten nicht geladen werden.',
+  'gif.sending': 'GIF wird gesendet…',
+  'gif.send': 'GIF senden: {title}',
+  'gif.poweredBy': 'Bereitgestellt von KLIPY',
 };

@@ -108,7 +108,8 @@ jobs:
       - name: Start API and web
         run: |
           # JOB_WORKER: process uploads and render the seeded recap video (off by default with APP_ENV=test).
-          APP_ENV=test JOB_WORKER=true API_HOST=127.0.0.1 RATE_LIMIT_MAX=100000 WEB_ORIGIN=http://localhost:3000 \
+          # KLIPY_API_KEY=dev: the GIF tab shows sample GIFs made by the API.
+          APP_ENV=test JOB_WORKER=true API_HOST=127.0.0.1 RATE_LIMIT_MAX=100000 WEB_ORIGIN=http://localhost:3000 KLIPY_API_KEY=dev \
             pnpm --filter @yapilapi/api start > api.log 2>&1 &
           pnpm --filter @yapilapi/web start > web.log 2>&1 &
           for url in http://127.0.0.1:4000/health/ready http://localhost:3000/login; do

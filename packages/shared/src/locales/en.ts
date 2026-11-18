@@ -7457,6 +7457,13 @@ export const en = {
   'plans.costs.undo': 'Undo',
   'plans.remove': 'Remove',
   'plans.costs.empty': 'No expenses yet.',
+  'gif.tab': 'GIF',
+  'gif.search': 'Search KLIPY',
+  'gif.none': 'No GIFs found',
+  'gif.error': 'GIFs couldn’t load.',
+  'gif.sending': 'Sending GIF…',
+  'gif.send': 'Send GIF: {title}',
+  'gif.poweredBy': 'Powered by KLIPY',
 } as const;
 
 export type MessageKey = keyof typeof en;

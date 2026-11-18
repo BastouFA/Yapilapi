@@ -7486,4 +7486,11 @@ export const es: Catalog = {
   'plans.costs.undo': 'Deshacer',
   'plans.remove': 'Quitar',
   'plans.costs.empty': 'Aún no hay gastos.',
+  'gif.tab': 'GIF',
+  'gif.search': 'Buscar en KLIPY',
+  'gif.none': 'No se encontraron GIF',
+  'gif.error': 'No se pudieron cargar los GIF.',
+  'gif.sending': 'Enviando GIF…',
+  'gif.send': 'Enviar GIF: {title}',
+  'gif.poweredBy': 'Con la tecnología de KLIPY',
 };

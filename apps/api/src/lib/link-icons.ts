@@ -46,7 +46,7 @@ export function sniffIcon(b: Uint8Array): string | null {
 }
 
 /** Read at most `max` bytes of a response; null if it is longer. */
-async function readCapped(res: Response, max: number): Promise<Uint8Array | null> {
+export async function readCapped(res: Response, max: number): Promise<Uint8Array | null> {
   const declared = Number(res.headers.get('content-length') ?? '');
   if (Number.isFinite(declared) && declared > max) {
     await res.body?.cancel().catch(() => {});

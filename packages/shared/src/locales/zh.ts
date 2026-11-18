@@ -7403,4 +7403,11 @@ export const zh: Catalog = {
   'plans.costs.undo': '撤销',
   'plans.remove': '移除',
   'plans.costs.empty': '还没有支出。',
+  'gif.tab': 'GIF',
+  'gif.search': '搜索 KLIPY',
+  'gif.none': '未找到 GIF',
+  'gif.error': 'GIF 无法加载。',
+  'gif.sending': '正在发送 GIF…',
+  'gif.send': '发送 GIF：{title}',
+  'gif.poweredBy': '由 KLIPY 提供',
 };

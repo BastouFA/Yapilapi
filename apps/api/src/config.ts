@@ -44,6 +44,8 @@ const schema = z.object({
   /** The model that writes Yapilapi Today (one short script per person and day, one per city): a cheaper one than AI_MODEL. */
   AI_TODAY_MODEL: z.string().default('claude-sonnet-5-5'),
   ANTHROPIC_API_KEY: z.string().optional().default(''),
+  /** KLIPY (klipy.com), the GIF library behind the GIF tab in chats; without a key there is no GIF tab. */
+  KLIPY_API_KEY: z.string().optional().default(''),
   PAYMENTS_PROVIDER: z.enum(['dev', 'stripe']).default('dev'),
   /** Stripe (PAYMENTS_PROVIDER=stripe): secret key, webhook signing secret, and the publishable key the browser uses. */
   STRIPE_SECRET_KEY: z.string().default(''),

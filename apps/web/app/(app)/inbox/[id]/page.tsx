@@ -26,6 +26,7 @@ import { patiently } from '@yapilapi/api-client';
 import { api, errorMessage, isGone } from '@/lib/api';
 import { useChatBase } from '@/lib/chat-base';
 import { closeChatNotifications } from '@/lib/push';
+import { GifPicker, useGifsEnabled, type GifResult } from '@/components/GifPicker';
 import { withEmoticons } from '@/lib/emoticons';
 import { GroupInfoSheet } from '@/components/GroupInfo';
 import { ReportSheet } from '@/components/PostList';
@@ -125,6 +126,9 @@ export default function ChatPage() {
   const composer = useRef<HTMLTextAreaElement>(null);
   // The emoji panel, where a phone's keyboard would be. Where the caret goes after an emoji goes in.
   const [emojiOpen, setEmojiOpen] = useState(false);
+  // The panel under the message box: emojis, or GIFs when the server has them.
+  const [dockTab, setDockTab] = useState<'emoji' | 'gif'>('emoji');
+  const gifsOn = useGifsEnabled();
   const emojiDock = useRef<HTMLDivElement>(null);
   // It opens under the message box, which can be the bottom of the screen.
   useEffect(() => {
@@ -480,14 +484,24 @@ export default function ChatPage() {
   /** Upload a photo, video or voice recording, then send it as a message (a yap, or view once). */
   /** Sends a file, and says whether it went. A moment without the server doesn't lose it: it keeps trying for over a minute. */
   async function sendFile(file: File, label: string, o: { kind?: 'yap'; viewOnce?: boolean } = {}): Promise<boolean> {
-    if (!me) return false;
     if (file.size > 50 * 1024 * 1024) {
       toast(t('chat.fileTooBig'));
       return false;
     }
+    return sendMedia(label, () => api.media.upload(file, undefined, { viewOnce: o.viewOnce }), o);
+  }
+
+  /** A GIF from the GIF tab: the server keeps it as your own photo, then it's sent like one. */
+  function sendGif(g: GifResult) {
+    setEmojiOpen(false);
+    return sendMedia(t('gif.sending'), () => api.gifs.send(g.url, g.title || undefined));
+  }
+
+  async function sendMedia(label: string, store: () => Promise<{ media: { id: string } }>, o: { kind?: 'yap'; viewOnce?: boolean } = {}): Promise<boolean> {
+    if (!me) return false;
     setUploading(label);
     try {
-      const { media } = await patiently(() => api.media.upload(file, undefined, { viewOnce: o.viewOnce }));
+      const { media } = await patiently(store);
       const clientId = crypto.randomUUID();
       const { message, notice, noticeCode } = await patiently(() => api.conversations.send(id, '', clientId, [{ mediaId: media.id }], o));
       setMessages((cur) => (cur?.some((x) => x.id === message.id) ? cur : [...(cur ?? []), message]));
@@ -1409,7 +1423,31 @@ export default function ChatPage() {
             composer.current?.focus();
           }}
         >
-          <EmojiPicker onPick={(emoji, _from, byPointer) => insertEmoji(emoji, byPointer)} onBackspace={backspaceEmoji} />
+          {gifsOn ? (
+            <div className="emoji-dock__tabs" role="tablist">
+              {(['emoji', 'gif'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  role="tab"
+                  id={`dock-tab-${tab}`}
+                  aria-controls="dock-panel"
+                  aria-selected={dockTab === tab}
+                  className="emoji-dock__tab"
+                  onClick={() => setDockTab(tab)}
+                >
+                  {tab === 'gif' ? t('gif.tab') : t('emoji.button')}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          <div id="dock-panel" role={gifsOn ? 'tabpanel' : undefined} aria-labelledby={gifsOn ? `dock-tab-${dockTab}` : undefined}>
+            {gifsOn && dockTab === 'gif' ? (
+              <GifPicker onPick={(g) => void sendGif(g)} />
+            ) : (
+              <EmojiPicker onPick={(emoji, _from, byPointer) => insertEmoji(emoji, byPointer)} onBackspace={backspaceEmoji} />
+            )}
+          </div>
         </div>
       ) : null}
       {/* The end of the page, under the Yap button and suggested replies: following the newest

@@ -7515,4 +7515,11 @@ export const fr: Catalog = {
   'plans.costs.undo': 'Annuler',
   'plans.remove': 'Retirer',
   'plans.costs.empty': 'Aucune dépense pour l’instant.',
+  'gif.tab': 'GIF',
+  'gif.search': 'Rechercher sur KLIPY',
+  'gif.none': 'Aucun GIF trouvé',
+  'gif.error': 'Les GIF n’ont pas pu se charger.',
+  'gif.sending': 'Envoi du GIF…',
+  'gif.send': 'Envoyer le GIF : {title}',
+  'gif.poweredBy': 'Fourni par KLIPY',
 };

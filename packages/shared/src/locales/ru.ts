@@ -7880,4 +7880,11 @@ export const ru: Catalog = {
   'plans.costs.undo': 'Отменить',
   'plans.remove': 'Удалить',
   'plans.costs.empty': 'Расходов пока нет.',
+  'gif.tab': 'GIF',
+  'gif.search': 'Поиск в KLIPY',
+  'gif.none': 'GIF не найдены',
+  'gif.error': 'Не удалось загрузить GIF.',
+  'gif.sending': 'Отправка GIF…',
+  'gif.send': 'Отправить GIF: {title}',
+  'gif.poweredBy': 'При поддержке KLIPY',
 };

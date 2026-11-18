@@ -7512,4 +7512,11 @@ export const zu: Catalog = {
   'plans.costs.undo': 'Hlehlisa',
   'plans.remove': 'Susa',
   'plans.costs.empty': 'Azikho izindleko okwamanje.',
+  'gif.tab': 'GIF',
+  'gif.search': 'Sesha ku-KLIPY',
+  'gif.none': 'Awekho ama-GIF atholakele',
+  'gif.error': 'Ama-GIF awakwazanga ukulayisha.',
+  'gif.sending': 'Ithumela i-GIF…',
+  'gif.send': 'Thumela i-GIF: {title}',
+  'gif.poweredBy': 'Inikwa amandla yi-KLIPY',
 };
