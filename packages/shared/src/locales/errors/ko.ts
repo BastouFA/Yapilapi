@@ -1281,4 +1281,9 @@ export const ko: Record<string, string> = {
   // packages/shared/src/plan-schemas.ts
   'Choose a place or write where.': '장소를 선택하거나 어디인지 쓰세요.',
   'Choose who to invite.': '초대할 사람을 선택하세요.',
+  // apps/api/src/modules/gifs.ts
+  "GIFs couldn't load. Try again in a moment.": 'GIF를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
+  'GIFs are not available.': 'GIF를 사용할 수 없어요.',
+  'That GIF can’t be sent.': '이 GIF는 보낼 수 없어요.',
+  "That GIF couldn't be sent. Try another one.": '이 GIF를 보내지 못했어요. 다른 GIF를 시도해 주세요.',
 };

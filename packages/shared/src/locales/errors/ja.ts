@@ -1303,4 +1303,9 @@ export const ja: Record<string, string> = {
   // packages/shared/src/plan-schemas.ts
   'Choose a place or write where.': '場所を選ぶか、場所を書いてください。',
   'Choose who to invite.': '招待する人を選んでください。',
+  // apps/api/src/modules/gifs.ts
+  "GIFs couldn't load. Try again in a moment.": 'GIFを読み込めませんでした。しばらくしてからもう一度お試しください。',
+  'GIFs are not available.': 'GIFは利用できません。',
+  'That GIF can’t be sent.': 'このGIFは送信できません。',
+  "That GIF couldn't be sent. Try another one.": 'このGIFを送信できませんでした。別のGIFをお試しください。',
 };

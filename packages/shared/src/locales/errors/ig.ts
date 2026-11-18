@@ -1299,4 +1299,9 @@ export const ig: Record<string, string> = {
   // packages/shared/src/plan-schemas.ts
   'Choose a place or write where.': 'Họrọ ebe ma ọ bụ dee ebe ọ bụ.',
   'Choose who to invite.': 'Họrọ ndị ị ga-akpọ òkù.',
+  // apps/api/src/modules/gifs.ts
+  "GIFs couldn't load. Try again in a moment.": 'GIF enweghị ike ibunye. Nwaa ọzọ n’oge na-adịghị anya.',
+  'GIFs are not available.': 'GIF adịghị.',
+  'That GIF can’t be sent.': 'Enweghị ike iziga GIF a.',
+  "That GIF couldn't be sent. Try another one.": 'Enweghị ike iziga GIF a. Nwaa nke ọzọ.',
 };

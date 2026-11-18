@@ -1401,4 +1401,9 @@ export const yo: Record<string, string> = {
   // packages/shared/src/plan-schemas.ts
   'Choose a place or write where.': 'Yan ibì kan tàbí kọ ibi tí ó jẹ́.',
   'Choose who to invite.': 'Yan àwọn tí o fẹ́ pè.',
+  // apps/api/src/modules/gifs.ts
+  "GIFs couldn't load. Try again in a moment.": 'Àwọn GIF kò le ṣí. Gbìyànjú lẹ́ẹ̀kan sí i láìpẹ́.',
+  'GIFs are not available.': 'Àwọn GIF kò sí lárọ̀ọ́wọ́tó.',
+  'That GIF can’t be sent.': 'A kò le fi GIF yìí ránṣẹ́.',
+  "That GIF couldn't be sent. Try another one.": 'A kò le fi GIF yìí ránṣẹ́. Gbìyànjú òmíràn.',
 };

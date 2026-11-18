@@ -1416,4 +1416,9 @@ export const es: Record<string, string> = {
   // packages/shared/src/plan-schemas.ts
   'Choose a place or write where.': 'Elige un lugar o escribe dónde.',
   'Choose who to invite.': 'Elige a quién invitar.',
+  // apps/api/src/modules/gifs.ts
+  "GIFs couldn't load. Try again in a moment.": 'No se pudieron cargar los GIF. Inténtalo de nuevo en un momento.',
+  'GIFs are not available.': 'Los GIF no están disponibles.',
+  'That GIF can’t be sent.': 'Ese GIF no se puede enviar.',
+  "That GIF couldn't be sent. Try another one.": 'No se pudo enviar ese GIF. Prueba con otro.',
 };

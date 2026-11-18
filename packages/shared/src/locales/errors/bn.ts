@@ -1302,4 +1302,9 @@ export const bn: Record<string, string> = {
   // packages/shared/src/plan-schemas.ts
   'Choose a place or write where.': 'একটি জায়গা বেছে নিন বা কোথায় তা লিখুন।',
   'Choose who to invite.': 'কাকে আমন্ত্রণ জানাবেন, বেছে নিন।',
+  // apps/api/src/modules/gifs.ts
+  "GIFs couldn't load. Try again in a moment.": 'GIF লোড করা যায়নি। একটু পরে আবার চেষ্টা করুন।',
+  'GIFs are not available.': 'GIF উপলব্ধ নেই।',
+  'That GIF can’t be sent.': 'এই GIF পাঠানো যাবে না।',
+  "That GIF couldn't be sent. Try another one.": 'এই GIF পাঠানো যায়নি। অন্য একটি চেষ্টা করুন।',
 };

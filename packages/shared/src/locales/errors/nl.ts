@@ -1322,4 +1322,9 @@ export const nl: Record<string, string> = {
   // packages/shared/src/plan-schemas.ts
   'Choose a place or write where.': 'Kies een plek of schrijf waar.',
   'Choose who to invite.': 'Kies wie je wilt uitnodigen.',
+  // apps/api/src/modules/gifs.ts
+  "GIFs couldn't load. Try again in a moment.": 'GIF’s konden niet laden. Probeer het zo opnieuw.',
+  'GIFs are not available.': 'GIF’s zijn niet beschikbaar.',
+  'That GIF can’t be sent.': 'Die GIF kan niet worden verstuurd.',
+  "That GIF couldn't be sent. Try another one.": 'Die GIF kon niet worden verstuurd. Probeer een andere.',
 };

@@ -1330,4 +1330,9 @@ export const zu: Record<string, string> = {
   // packages/shared/src/plan-schemas.ts
   'Choose a place or write where.': 'Khetha indawo noma ubhale ukuthi kuphi.',
   'Choose who to invite.': 'Khetha ozobamema.',
+  // apps/api/src/modules/gifs.ts
+  "GIFs couldn't load. Try again in a moment.": 'Ama-GIF awakwazanga ukulayisha. Zama futhi maduze.',
+  'GIFs are not available.': 'Ama-GIF awatholakali.',
+  'That GIF can’t be sent.': 'Leyo GIF ayikwazi ukuthunyelwa.',
+  "That GIF couldn't be sent. Try another one.": 'Leyo GIF ayikwazanga ukuthunyelwa. Zama enye.',
 };

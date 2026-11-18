@@ -1314,4 +1314,9 @@ export const id: Record<string, string> = {
   // packages/shared/src/plan-schemas.ts
   'Choose a place or write where.': 'Pilih tempat atau tulis lokasinya.',
   'Choose who to invite.': 'Pilih siapa yang akan diundang.',
+  // apps/api/src/modules/gifs.ts
+  "GIFs couldn't load. Try again in a moment.": 'GIF tidak dapat dimuat. Coba lagi sebentar lagi.',
+  'GIFs are not available.': 'GIF tidak tersedia.',
+  'That GIF can’t be sent.': 'GIF itu tidak dapat dikirim.',
+  "That GIF couldn't be sent. Try another one.": 'GIF itu tidak dapat dikirim. Coba yang lain.',
 };

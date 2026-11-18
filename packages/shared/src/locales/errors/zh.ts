@@ -1254,4 +1254,9 @@ export const zh: Record<string, string> = {
   // packages/shared/src/plan-schemas.ts
   'Choose a place or write where.': '请选择一个地点，或者写下在哪里。',
   'Choose who to invite.': '请选择要邀请谁。',
+  // apps/api/src/modules/gifs.ts
+  "GIFs couldn't load. Try again in a moment.": 'GIF 无法加载。请稍后再试。',
+  'GIFs are not available.': 'GIF 不可用。',
+  'That GIF can’t be sent.': '无法发送此 GIF。',
+  "That GIF couldn't be sent. Try another one.": '此 GIF 发送失败。请换一个试试。',
 };

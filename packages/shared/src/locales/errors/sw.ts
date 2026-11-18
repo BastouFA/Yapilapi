@@ -1416,4 +1416,9 @@ export const sw: Record<string, string> = {
   // packages/shared/src/plan-schemas.ts
   'Choose a place or write where.': 'Chagua mahali au andika ni wapi.',
   'Choose who to invite.': 'Chagua wa kuwaalika.',
+  // apps/api/src/modules/gifs.ts
+  "GIFs couldn't load. Try again in a moment.": 'GIF hazikuweza kupakia. Jaribu tena baada ya muda mfupi.',
+  'GIFs are not available.': 'GIF hazipatikani.',
+  'That GIF can’t be sent.': 'GIF hiyo haiwezi kutumwa.',
+  "That GIF couldn't be sent. Try another one.": 'GIF hiyo haikuweza kutumwa. Jaribu nyingine.',
 };

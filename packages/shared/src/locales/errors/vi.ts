@@ -1306,4 +1306,9 @@ export const vi: Record<string, string> = {
   // packages/shared/src/plan-schemas.ts
   'Choose a place or write where.': 'Hãy chọn một địa điểm hoặc ghi nơi đến.',
   'Choose who to invite.': 'Hãy chọn người để mời.',
+  // apps/api/src/modules/gifs.ts
+  "GIFs couldn't load. Try again in a moment.": 'Không tải được GIF. Hãy thử lại sau giây lát.',
+  'GIFs are not available.': 'GIF không khả dụng.',
+  'That GIF can’t be sent.': 'Không thể gửi GIF này.',
+  "That GIF couldn't be sent. Try another one.": 'Không gửi được GIF này. Hãy thử GIF khác.',
 };

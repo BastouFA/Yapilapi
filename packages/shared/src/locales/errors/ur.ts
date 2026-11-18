@@ -1317,4 +1317,9 @@ export const ur: Record<string, string> = {
   // packages/shared/src/plan-schemas.ts
   'Choose a place or write where.': 'کوئی جگہ منتخب کریں یا لکھیں کہ کہاں۔',
   'Choose who to invite.': 'منتخب کریں کہ کسے دعوت دینی ہے۔',
+  // apps/api/src/modules/gifs.ts
+  "GIFs couldn't load. Try again in a moment.": 'GIF لوڈ نہیں ہو سکے۔ تھوڑی دیر بعد دوبارہ کوشش کریں۔',
+  'GIFs are not available.': 'GIF دستیاب نہیں ہیں۔',
+  'That GIF can’t be sent.': 'یہ GIF نہیں بھیجا جا سکتا۔',
+  "That GIF couldn't be sent. Try another one.": 'یہ GIF نہیں بھیجا جا سکا۔ کوئی اور آزمائیں۔',
 };

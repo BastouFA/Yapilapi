@@ -1315,4 +1315,9 @@ export const tr: Record<string, string> = {
   // packages/shared/src/plan-schemas.ts
   'Choose a place or write where.': 'Bir yer seç ya da nerede olduğunu yaz.',
   'Choose who to invite.': 'Kimi davet edeceğini seç.',
+  // apps/api/src/modules/gifs.ts
+  "GIFs couldn't load. Try again in a moment.": 'GIF’ler yüklenemedi. Birazdan tekrar dene.',
+  'GIFs are not available.': 'GIF’ler kullanılamıyor.',
+  'That GIF can’t be sent.': 'Bu GIF gönderilemez.',
+  "That GIF couldn't be sent. Try another one.": 'Bu GIF gönderilemedi. Başka bir tane dene.',
 };

@@ -1259,4 +1259,9 @@ export const am: Record<string, string> = {
   // packages/shared/src/plan-schemas.ts
   'Choose a place or write where.': 'ቦታ ይምረጡ ወይም የት እንደሆነ ይጻፉ።',
   'Choose who to invite.': 'ማንን እንደሚጋብዙ ይምረጡ።',
+  // apps/api/src/modules/gifs.ts
+  "GIFs couldn't load. Try again in a moment.": 'GIFዎች መጫን አልቻሉም። ትንሽ ቆይተው እንደገና ይሞክሩ።',
+  'GIFs are not available.': 'GIFዎች አይገኙም።',
+  'That GIF can’t be sent.': 'ይህ GIF መላክ አይችልም።',
+  "That GIF couldn't be sent. Try another one.": 'ይህ GIF መላክ አልተቻለም። ሌላ ይሞክሩ።',
 };

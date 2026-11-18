@@ -1385,4 +1385,9 @@ export const ar: Record<string, string> = {
   // packages/shared/src/plan-schemas.ts
   'Choose a place or write where.': 'اختر مكانًا أو اكتب أين.',
   'Choose who to invite.': 'اختر من تدعو.',
+  // apps/api/src/modules/gifs.ts
+  "GIFs couldn't load. Try again in a moment.": 'تعذّر تحميل صور GIF. حاول مرة أخرى بعد قليل.',
+  'GIFs are not available.': 'صور GIF غير متاحة.',
+  'That GIF can’t be sent.': 'لا يمكن إرسال صورة GIF هذه.',
+  "That GIF couldn't be sent. Try another one.": 'تعذّر إرسال صورة GIF هذه. جرّب صورة أخرى.',
 };

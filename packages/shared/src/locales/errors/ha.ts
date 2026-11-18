@@ -1419,4 +1419,9 @@ export const ha: Record<string, string> = {
   // packages/shared/src/plan-schemas.ts
   'Choose a place or write where.': 'Zaɓi wuri ko ka rubuta inda yake.',
   'Choose who to invite.': 'Zaɓi wanda za ka gayyata.',
+  // apps/api/src/modules/gifs.ts
+  "GIFs couldn't load. Try again in a moment.": 'GIF ba su iya lodawa ba. Sake gwadawa nan da ɗan lokaci.',
+  'GIFs are not available.': 'Babu GIF a halin yanzu.',
+  'That GIF can’t be sent.': 'Ba za a iya aika wannan GIF ba.',
+  "That GIF couldn't be sent. Try another one.": 'Ba a iya aika wannan GIF ba. Gwada wani.',
 };
