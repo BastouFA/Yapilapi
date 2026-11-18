@@ -212,8 +212,13 @@ export type UserRole = (typeof USER_ROLES)[number];
  * contents and converts what browsers can't show (HEIC photos to JPEG, any
  * video to a web MP4), so pickers accept everything phones and cameras make.
  * Extensions are listed too because some browsers don't know HEIC or MKV types.
+ *
+ * The common photo types are named first: Safari on an iPhone turns a photo from
+ * the library whose type isn't named into the first named one, so with HEIC first
+ * an animated GIF arrived as a still HEIC photo. Named, a GIF stays a GIF (and a
+ * PNG a PNG); anything else becomes a JPEG.
  */
-export const IMAGE_ACCEPT = 'image/*,.heic,.heif,.avif,.tif,.tiff,.bmp';
+export const IMAGE_ACCEPT = 'image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif,image/avif,image/*,.heic,.heif,.avif,.tif,.tiff,.bmp';
 export const VIDEO_ACCEPT = 'video/*,.mov,.mkv,.avi,.3gp,.3g2,.m4v,.mpg,.mpeg,.ts,.webm';
 export const MEDIA_ACCEPT = `${IMAGE_ACCEPT},${VIDEO_ACCEPT}`;
 export const AUDIO_ACCEPT = 'audio/*,.m4a,.mp3,.aac,.wav,.ogg,.oga,.opus,.flac,.amr,.weba';

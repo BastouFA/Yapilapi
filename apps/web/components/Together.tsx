@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Avatar, BottomSheet, Button, cx, Icon, TextField, useDataSaver } from '@yapilapi/design-system';
 import {
+  IMAGE_ACCEPT,
   momentDayLabel,
   momentGroups,
   peopleGroups,
@@ -487,8 +488,8 @@ export function AddButtons({ onFiles, disabled }: { onFiles: (files: File[]) => 
       <Button icon="image" variant="secondary" onClick={() => camera.current?.click()} disabled={disabled} className="tg-camera-btn">
         {t('together.add.camera')}
       </Button>
-      <input ref={library} type="file" accept="image/*,video/*" multiple hidden onChange={pick} />
-      <input ref={camera} type="file" accept="image/*,video/*" capture="environment" hidden onChange={pick} />
+      <input ref={library} type="file" accept={`${IMAGE_ACCEPT},video/*`} multiple hidden onChange={pick} />
+      <input ref={camera} type="file" accept={`${IMAGE_ACCEPT},video/*`} capture="environment" hidden onChange={pick} />
     </>
   );
 }

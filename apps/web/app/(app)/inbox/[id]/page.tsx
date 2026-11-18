@@ -6,6 +6,7 @@ import {
   isVideoFile,
   replaceFinalEmoticon,
   canForward,
+  IMAGE_ACCEPT,
   MEDIA_ACCEPT,
   MESSAGE_EDIT_MINUTES,
   messagePreviewOf,
@@ -1268,7 +1269,7 @@ export default function ChatPage() {
         <input
           ref={viewOnceInput}
           type="file"
-          accept="image/*,video/*,audio/*,.heic,.heif"
+          accept={`${IMAGE_ACCEPT},video/*,audio/*`}
           hidden
           onChange={(e) => {
             const f = e.currentTarget.files?.[0];

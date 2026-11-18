@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type DragEvent, type FormEvent } from 'react';
 import { BottomSheet, Button, Icon, Segments, Skeleton } from '@yapilapi/design-system';
-import { youtubeIdFrom, type Post } from '@yapilapi/shared';
+import { IMAGE_ACCEPT, youtubeIdFrom, type Post } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { prepareUpload } from '@/lib/data-saver';
 import { useSession } from '@/app/providers';
@@ -20,7 +20,7 @@ export interface Addition {
 }
 
 /** Photos and videos only, as POST /v1/media?for=watch takes them. */
-const ACCEPT = 'image/*,video/*,.heic,.heif,.mov';
+const ACCEPT = `${IMAGE_ACCEPT},video/*,.mov`;
 const isMediaFile = (f: File) => /^(image|video)\//.test(f.type) || /\.(heic|heif|mov|mp4|m4v|webm|jpe?g|png|gif|webp)$/i.test(f.name);
 
 /**

@@ -78,13 +78,10 @@ export async function readClipboard(): Promise<{ files: File[]; text: string } |
     const files: File[] = [];
     let text = '';
     for (const item of await navigator.clipboard.read()) {
-      for (const type of item.types) {
-        if (type === 'text/plain') text = await (await item.getType(type)).text();
-        else if (type.startsWith('image/') || type.startsWith('video/')) {
-          files.push(new File([await item.getType(type)], `pasted.${type.split('/')[1]}`, { type }));
-          break;
-        }
-      }
+      if (item.types.includes('text/plain')) text = await (await item.getType('text/plain')).text();
+      // A copied GIF can come as a still PNG too: the GIF keeps its animation.
+      const type = item.types.find((t) => t === 'image/gif') ?? item.types.find((t) => t.startsWith('image/') || t.startsWith('video/'));
+      if (type) files.push(new File([await item.getType(type)], `pasted.${type.split('/')[1]}`, { type }));
     }
     return { files, text };
   } catch {
