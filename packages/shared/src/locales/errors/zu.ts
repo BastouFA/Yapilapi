@@ -1335,4 +1335,12 @@ export const zu: Record<string, string> = {
   'GIFs are not available.': 'Ama-GIF awatholakali.',
   'That GIF can’t be sent.': 'Leyo GIF ayikwazi ukuthunyelwa.',
   "That GIF couldn't be sent. Try another one.": 'Leyo GIF ayikwazanga ukuthunyelwa. Zama enye.',
+  // apps/api/src/modules/stickers.ts and messaging.ts
+  'You can keep up to 200 stickers. Remove one to add another.': 'Ungagcina izitikha ezifika ku-200. Susa esisodwa ukuze wengeze esinye.',
+  'A sticker is made from a photo.': 'Isitikha senziwa ngesithombe.',
+  'This photo can’t be a sticker.': 'Lesi sithombe asikwazi ukuba isitikha.',
+  'A sticker can be up to 5 MB.': 'Isitikha singaba ngu-5 MB kuphela.',
+  'That message isn’t a sticker.': 'Lowo myalezo akusona isitikha.',
+  'A sticker is one photo, with no words.': 'Isitikha yisithombe esisodwa, esingenamagama.',
+  "Sticker doesn't exist or isn't visible to you.": 'Lesi sitikha asikho noma awukwazi ukusibona.',
 };

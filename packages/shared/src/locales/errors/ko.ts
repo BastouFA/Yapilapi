@@ -1286,4 +1286,12 @@ export const ko: Record<string, string> = {
   'GIFs are not available.': 'GIF를 사용할 수 없어요.',
   'That GIF can’t be sent.': '이 GIF는 보낼 수 없어요.',
   "That GIF couldn't be sent. Try another one.": '이 GIF를 보내지 못했어요. 다른 GIF를 시도해 주세요.',
+  // apps/api/src/modules/stickers.ts and messaging.ts
+  'You can keep up to 200 stickers. Remove one to add another.': '스티커는 200개까지 보관할 수 있어요. 새로 추가하려면 하나를 삭제하세요.',
+  'A sticker is made from a photo.': '스티커는 사진으로 만들어요.',
+  'This photo can’t be a sticker.': '이 사진은 스티커로 만들 수 없어요.',
+  'A sticker can be up to 5 MB.': '스티커는 최대 5MB까지 가능해요.',
+  'That message isn’t a sticker.': '이 메시지는 스티커가 아니에요.',
+  'A sticker is one photo, with no words.': '스티커는 글자 없이 사진 한 장이에요.',
+  "Sticker doesn't exist or isn't visible to you.": '이 스티커가 없거나 볼 수 없어요.',
 };

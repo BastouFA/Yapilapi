@@ -676,7 +676,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
                 EXISTS (SELECT 1 FROM chat_polls p WHERE p.message_id = messages.id) OR EXISTS (SELECT 1 FROM chat_lists l WHERE l.message_id = messages.id)
                   OR EXISTS (SELECT 1 FROM chat_games g WHERE g.message_id = messages.id) OR (messages.meta ? 'mixId')
                   OR EXISTS (SELECT 1 FROM location_shares s WHERE s.message_id = messages.id)
-                  OR (messages.meta ? 'listingId') OR (messages.meta ? 'offerId') AS rich
+                  OR (messages.meta ? 'listingId') OR (messages.meta ? 'offerId') OR (messages.meta ? 'sticker') AS rich
          FROM messages WHERE id = $1`,
         [messageId, MESSAGE_EDIT_MINUTES],
       )
@@ -735,7 +735,12 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     for (const [i, conversationId] of chats.entries()) {
       try {
         const clientId = input.clientId ? `${input.clientId}:${i}` : undefined;
-        const sent = await sendMessage(u, conversationId, parse(sendMessageSchema, { body: source.body, attachments, clientId }), { media });
+        const sent = await sendMessage(
+          u,
+          conversationId,
+          parse(sendMessageSchema, { body: source.body, attachments, clientId, sticker: !!source.meta?.sticker }),
+          { media },
+        );
         messages.push(sent.message);
       } catch (e) {
         // None of them went: the reason is the answer. Some did: it says which didn't.
@@ -780,6 +785,9 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       if (input.attachments.length !== 1) throw badRequest('A Yap is one voice clip.');
     }
     if (input.viewOnce && input.attachments.length !== 1) throw badRequest('Send one photo or video at a time to view once.');
+    // A sticker is one photo on its own: no words, not a Yap, not view once, not a shared story.
+    const stickerError = () => new AppError(400, 'sticker_invalid', 'A sticker is one photo, with no words.');
+    if (input.sticker && (yap || input.viewOnce || input.body || input.attachments.length !== 1 || input.storyId || input.storyReplyTo)) throw stickerError();
     let toStranger = false;
     if (conv.kind === 'direct') {
       const other = members.find((m) => m !== u.id);
@@ -830,6 +838,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
         if (clip.duration_ms == null) throw new AppError(422, 'yap_length_unknown', 'We couldn’t tell how long this clip is. Try recording it again.');
         if (clip.duration_ms > YAP_MAX_MS + YAP_LENGTH_SLACK_MS) throw new AppError(422, 'yap_too_long', 'Yaps can be up to 60 seconds.');
       }
+      if (input.sticker && media[0]!.kind !== 'image') throw stickerError();
       if (input.viewOnce) {
         const m = media[0]!;
         if (!m.private || !['image', 'video', 'audio'].includes(m.kind))
@@ -845,7 +854,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
         return {
           mediaId: m.id,
           kind: m.kind,
-          url: m.variants?.mp4 ?? m.variants?.large ?? m.url,
+          // A sticker is the file itself: its smaller sizes are still pictures, without its transparency kept as made.
+          url: input.sticker ? m.url : (m.variants?.mp4 ?? m.variants?.large ?? m.url),
           name: a.name,
           durationMs: m.duration_ms ?? null,
           posterUrl: m.poster_url ?? null,
@@ -883,7 +893,11 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
             // Disappearing messages: deleted this long after sending (NULL when off).
             conv.disappearing_seconds ?? null,
             langOf(input.body),
-            storyReply ? { storyReply } : forwarding ? { forwarded: true } : null,
+            storyReply
+              ? { storyReply }
+              : forwarding || input.sticker
+                ? { ...(forwarding ? { forwarded: true } : {}), ...(input.sticker ? { sticker: true } : {}) }
+                : null,
           ],
         )
         .catch((e: { code?: string; constraint?: string }) => {
@@ -930,6 +944,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       ...(row.expires_at ? { expiresAt: row.expires_at.toISOString() } : {}),
       ...storyReplyOf(row),
       ...forwardedOf(row),
+      ...stickerOf(row),
     };
     if (row.reply_to_id) message.replyTo = (await messagePreviews(db, [row.reply_to_id], u.id)).get(row.reply_to_id) ?? null;
     if (row.view_once) {
@@ -1642,6 +1657,10 @@ function forwardedOf(r: { kind?: string; meta?: { forwarded?: boolean } | null }
   return r.kind !== 'system' && r.meta?.forwarded ? { forwarded: true } : {};
 }
 
+function stickerOf(r: { kind?: string; meta?: { sticker?: boolean } | null }): Pick<Message, 'sticker'> {
+  return r.kind !== 'system' && r.meta?.sticker ? { sticker: true } : {};
+}
+
 function toMessage(r: Record<string, any>): Message {
   return {
     id: r.id,
@@ -1658,6 +1677,7 @@ function toMessage(r: Record<string, any>): Message {
     ...(r.kind === 'system' && r.meta ? { system: r.meta } : {}),
     ...storyReplyOf(r),
     ...forwardedOf(r),
+    ...stickerOf(r),
     ...(r.story ? { story: r.story } : {}),
     ...(r.edited_at ? { editedAt: r.edited_at.toISOString() } : {}),
     ...(r.unsent_at ? { unsent: true } : {}),

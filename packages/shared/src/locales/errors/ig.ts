@@ -1304,4 +1304,12 @@ export const ig: Record<string, string> = {
   'GIFs are not available.': 'GIF adịghị.',
   'That GIF can’t be sent.': 'Enweghị ike iziga GIF a.',
   "That GIF couldn't be sent. Try another one.": 'Enweghị ike iziga GIF a. Nwaa nke ọzọ.',
+  // apps/api/src/modules/stickers.ts and messaging.ts
+  'You can keep up to 200 stickers. Remove one to add another.': 'Ị nwere ike idowe ruo stịka 200. Wepụ otu ka ịtinye ọzọ.',
+  'A sticker is made from a photo.': 'A na-eji foto eme stịka.',
+  'This photo can’t be a sticker.': 'Foto a enweghị ike ịbụ stịka.',
+  'A sticker can be up to 5 MB.': 'Stịka nwere ike ruo MB 5.',
+  'That message isn’t a sticker.': 'Ozi ahụ abụghị stịka.',
+  'A sticker is one photo, with no words.': 'Stịka bụ naanị otu foto, na-enweghị okwu.',
+  "Sticker doesn't exist or isn't visible to you.": 'Stịka a adịghị ma ọ bụ ị nweghị ike ịhụ ya.',
 };

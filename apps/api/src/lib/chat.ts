@@ -57,7 +57,7 @@ export async function messagePreviews(db: Q, ids: string[], readerId: string): P
             (SELECT s.mode FROM location_shares s WHERE s.message_id = m.id LIMIT 1) AS location_mode,
             (SELECT json_build_object('amountCents', o.amount_cents, 'currency', trim(o.currency), 'counter', o.counter_of IS NOT NULL)
                FROM market_offers o WHERE o.message_id = m.id) AS offer,
-            m.meta->'storyReply' AS story_reply
+            m.meta->'storyReply' AS story_reply, coalesce((m.meta->>'sticker')::boolean, false) AS sticker
      FROM messages m LEFT JOIN media vm ON vm.id = m.view_once_media_id WHERE m.id = ANY($1::uuid[])`,
     [unique, readerId],
   );
@@ -88,6 +88,7 @@ export async function messagePreviews(db: Q, ids: string[], readerId: string): P
             ...(r.story_reply ? { storyReply: { quote: r.story_reply.quote ?? null } } : {}),
             ...(r.view_once ? { viewOnce: true } : {}),
             ...(r.kind === 'yap' ? { yap: true } : {}),
+            ...(r.sticker && r.kind !== 'system' ? { sticker: true } : {}),
           },
     );
   }

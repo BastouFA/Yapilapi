@@ -1322,4 +1322,12 @@ export const hi: Record<string, string> = {
   'GIFs are not available.': 'GIF उपलब्ध नहीं हैं।',
   'That GIF can’t be sent.': 'यह GIF नहीं भेजा जा सकता।',
   "That GIF couldn't be sent. Try another one.": 'यह GIF नहीं भेजा जा सका। कोई दूसरा आज़माएँ।',
+  // apps/api/src/modules/stickers.ts and messaging.ts
+  'You can keep up to 200 stickers. Remove one to add another.': 'आप ज़्यादा से ज़्यादा 200 स्टिकर रख सकते हैं। नया जोड़ने के लिए एक हटाएँ।',
+  'A sticker is made from a photo.': 'स्टिकर फ़ोटो से बनता है।',
+  'This photo can’t be a sticker.': 'यह फ़ोटो स्टिकर नहीं बन सकती।',
+  'A sticker can be up to 5 MB.': 'स्टिकर ज़्यादा से ज़्यादा 5 MB का हो सकता है।',
+  'That message isn’t a sticker.': 'वह संदेश स्टिकर नहीं है।',
+  'A sticker is one photo, with no words.': 'स्टिकर सिर्फ़ एक फ़ोटो होता है, बिना शब्दों के।',
+  "Sticker doesn't exist or isn't visible to you.": 'यह स्टिकर मौजूद नहीं है या आप इसे नहीं देख सकते।',
 };

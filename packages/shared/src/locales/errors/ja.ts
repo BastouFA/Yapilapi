@@ -1308,4 +1308,12 @@ export const ja: Record<string, string> = {
   'GIFs are not available.': 'GIFは利用できません。',
   'That GIF can’t be sent.': 'このGIFは送信できません。',
   "That GIF couldn't be sent. Try another one.": 'このGIFを送信できませんでした。別のGIFをお試しください。',
+  // apps/api/src/modules/stickers.ts and messaging.ts
+  'You can keep up to 200 stickers. Remove one to add another.': 'ステッカーは200個まで保存できます。追加するには1つ削除してください。',
+  'A sticker is made from a photo.': 'ステッカーは写真から作ります。',
+  'This photo can’t be a sticker.': 'この写真はステッカーにできません。',
+  'A sticker can be up to 5 MB.': 'ステッカーは5 MBまでです。',
+  'That message isn’t a sticker.': 'このメッセージはステッカーではありません。',
+  'A sticker is one photo, with no words.': 'ステッカーは写真1枚だけで、文字は付けられません。',
+  "Sticker doesn't exist or isn't visible to you.": 'このステッカーは存在しないか、表示できません。',
 };

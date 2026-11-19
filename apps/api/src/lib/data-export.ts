@@ -257,6 +257,11 @@ export async function exportSections(db: Q, userId: string) {
       `SELECT t.message_id, t.body, t.lang, t.created_at FROM message_transcripts t JOIN messages m ON m.id = t.message_id
        WHERE m.sender_id = $1 AND t.status = 'ready' ORDER BY t.created_at`,
     ),
+    // Your stickers: each one's photo (also under content.media) and, for one saved from a chat, that it was saved.
+    stickers: await q(
+      `SELECT s.id, s.media_id, ${openUrl('m')} AS url, s.from_media_id IS NOT NULL AS saved_from_chat, s.created_at
+       FROM stickers s JOIN media m ON m.id = s.media_id WHERE s.owner_id = $1 ORDER BY s.created_at DESC`,
+    ),
     messageReactions: await q(`SELECT message_id, emoji FROM message_reactions WHERE user_id = $1`),
     messagesHidden: await q(`SELECT message_id, hidden_at FROM message_hides WHERE user_id = $1`),
     messagesPinned: await q(`SELECT conversation_id, message_id, pinned_at FROM conversation_pins WHERE pinned_by = $1`),
@@ -663,7 +668,7 @@ export const EXPORT_README = {
     content:
       'Stories, chapters, boards, saves, memories, recaps, lives, rooms, products, drops, places, businesses, photos and videos, your Yaps, voice replies and voice intro (recordings and transcripts), your Ask the city questions and helpful answers, and more you made; your event tickets, tickets given or received, events you co-host and how many people you checked in.',
     chats:
-      'Chats you are in, the transcripts of your own voice messages, and the polls, lists, plans, games, calls and watch together sessions you took part in (your side only), and when you shared where you were, with whom (never the place).',
+      'Chats you are in, your stickers, the transcripts of your own voice messages, and the polls, lists, plans, games, calls and watch together sessions you took part in (your side only), and when you shared where you were, with whom (never the place).',
     activity:
       'Reposts, votes, notifications, feed feedback, what the recommender learned you like, daily minutes, and views and feed activity counted per day.',
     relationships: 'Friends, friend requests, blocks, mutes, restrictions and family links.',

@@ -307,6 +307,8 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
         `DELETE FROM together_comments WHERE author_id = $1`,
         `DELETE FROM together_requests WHERE user_id = $1`,
         `DELETE FROM together_members WHERE user_id = $1`,
+        // Their stickers (copies they saved are their own photos, which go just below).
+        `DELETE FROM stickers WHERE owner_id = $1`,
         `DELETE FROM media WHERE owner_id = $1`,
         `DELETE FROM share_videos sv USING posts p WHERE p.id = sv.post_id AND p.author_id = $1`,
         `UPDATE recaps SET deleted_at = coalesce(deleted_at, now()) WHERE owner_id = $1`,

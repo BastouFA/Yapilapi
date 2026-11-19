@@ -1322,4 +1322,12 @@ export const ur: Record<string, string> = {
   'GIFs are not available.': 'GIF دستیاب نہیں ہیں۔',
   'That GIF can’t be sent.': 'یہ GIF نہیں بھیجا جا سکتا۔',
   "That GIF couldn't be sent. Try another one.": 'یہ GIF نہیں بھیجا جا سکا۔ کوئی اور آزمائیں۔',
+  // apps/api/src/modules/stickers.ts and messaging.ts
+  'You can keep up to 200 stickers. Remove one to add another.': 'آپ زیادہ سے زیادہ 200 اسٹیکرز رکھ سکتے ہیں۔ نیا شامل کرنے کے لیے ایک ہٹائیں۔',
+  'A sticker is made from a photo.': 'اسٹیکر تصویر سے بنتا ہے۔',
+  'This photo can’t be a sticker.': 'یہ تصویر اسٹیکر نہیں بن سکتی۔',
+  'A sticker can be up to 5 MB.': 'اسٹیکر زیادہ سے زیادہ 5 MB کا ہو سکتا ہے۔',
+  'That message isn’t a sticker.': 'یہ پیغام اسٹیکر نہیں ہے۔',
+  'A sticker is one photo, with no words.': 'اسٹیکر صرف ایک تصویر ہوتا ہے، الفاظ کے بغیر۔',
+  "Sticker doesn't exist or isn't visible to you.": 'یہ اسٹیکر موجود نہیں یا آپ اسے نہیں دیکھ سکتے۔',
 };

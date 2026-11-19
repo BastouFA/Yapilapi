@@ -1264,4 +1264,12 @@ export const am: Record<string, string> = {
   'GIFs are not available.': 'GIFዎች አይገኙም።',
   'That GIF can’t be sent.': 'ይህ GIF መላክ አይችልም።',
   "That GIF couldn't be sent. Try another one.": 'ይህ GIF መላክ አልተቻለም። ሌላ ይሞክሩ።',
+  // apps/api/src/modules/stickers.ts and messaging.ts
+  'You can keep up to 200 stickers. Remove one to add another.': 'እስከ 200 ስቲከሮች ማቆየት ይችላሉ። ሌላ ለማከል አንዱን ያስወግዱ።',
+  'A sticker is made from a photo.': 'ስቲከር ከፎቶ ይሠራል።',
+  'This photo can’t be a sticker.': 'ይህ ፎቶ ስቲከር ሊሆን አይችልም።',
+  'A sticker can be up to 5 MB.': 'ስቲከር እስከ 5 MB ሊሆን ይችላል።',
+  'That message isn’t a sticker.': 'ያ መልእክት ስቲከር አይደለም።',
+  'A sticker is one photo, with no words.': 'ስቲከር ያለ ጽሑፍ አንድ ፎቶ ብቻ ነው።',
+  "Sticker doesn't exist or isn't visible to you.": 'ይህ ስቲከር የለም ወይም ለእርስዎ አይታይም።',
 };

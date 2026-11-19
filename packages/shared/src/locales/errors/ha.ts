@@ -1424,4 +1424,12 @@ export const ha: Record<string, string> = {
   'GIFs are not available.': 'Babu GIF a halin yanzu.',
   'That GIF can’t be sent.': 'Ba za a iya aika wannan GIF ba.',
   "That GIF couldn't be sent. Try another one.": 'Ba a iya aika wannan GIF ba. Gwada wani.',
+  // apps/api/src/modules/stickers.ts and messaging.ts
+  'You can keep up to 200 stickers. Remove one to add another.': 'Za ka iya ajiye har sitika 200. Cire ɗaya don ƙara wani.',
+  'A sticker is made from a photo.': 'Ana yin sitika daga hoto.',
+  'This photo can’t be a sticker.': 'Wannan hoton ba zai iya zama sitika ba.',
+  'A sticker can be up to 5 MB.': 'Sitika zai iya kai MB 5.',
+  'That message isn’t a sticker.': 'Wannan saƙon ba sitika ba ne.',
+  'A sticker is one photo, with no words.': 'Sitika hoto ɗaya ne kawai, ba tare da rubutu ba.',
+  "Sticker doesn't exist or isn't visible to you.": 'Wannan sitikan babu shi ko ba za ka iya ganinsa ba.',
 };

@@ -33,6 +33,7 @@ export function messagePreviewOf(m: Message): MessagePreview {
     ...(m.storyReply ? { storyReply: m.storyReply } : {}),
     ...(m.viewOnce ? { viewOnce: true } : {}),
     ...(m.kind === 'yap' ? { yap: true } : {}),
+    ...(m.sticker ? { sticker: true } : {}),
     ...(m.poll
       ? { kind: 'poll' as const }
       : m.list
@@ -92,6 +93,7 @@ export function messagePreviewText(p: MessagePreview, tr: PreviewTranslator): st
   if (p.viewOnce)
     return t(p.attachmentKind === 'video' ? 'm.viewOnce.videoSent' : p.attachmentKind === 'audio' ? 'm.viewOnce.voiceSent' : 'm.viewOnce.photoSent');
   if (p.yap) return t('m.yap.label');
+  if (p.sticker) return t('sticker.preview');
   if (p.body) return p.body;
   switch (p.attachmentKind) {
     case 'image':

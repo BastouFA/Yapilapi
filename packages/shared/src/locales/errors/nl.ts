@@ -1327,4 +1327,12 @@ export const nl: Record<string, string> = {
   'GIFs are not available.': 'GIF’s zijn niet beschikbaar.',
   'That GIF can’t be sent.': 'Die GIF kan niet worden verstuurd.',
   "That GIF couldn't be sent. Try another one.": 'Die GIF kon niet worden verstuurd. Probeer een andere.',
+  // apps/api/src/modules/stickers.ts and messaging.ts
+  'You can keep up to 200 stickers. Remove one to add another.': 'Je kunt tot 200 stickers bewaren. Verwijder er een om een nieuwe toe te voegen.',
+  'A sticker is made from a photo.': 'Een sticker maak je van een foto.',
+  'This photo can’t be a sticker.': 'Van deze foto kan geen sticker worden gemaakt.',
+  'A sticker can be up to 5 MB.': 'Een sticker mag tot 5 MB zijn.',
+  'That message isn’t a sticker.': 'Dat bericht is geen sticker.',
+  'A sticker is one photo, with no words.': 'Een sticker is één foto, zonder tekst.',
+  "Sticker doesn't exist or isn't visible to you.": 'Deze sticker bestaat niet of is niet zichtbaar voor jou.',
 };

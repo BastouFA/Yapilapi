@@ -1320,4 +1320,12 @@ export const tr: Record<string, string> = {
   'GIFs are not available.': 'GIF’ler kullanılamıyor.',
   'That GIF can’t be sent.': 'Bu GIF gönderilemez.',
   "That GIF couldn't be sent. Try another one.": 'Bu GIF gönderilemedi. Başka bir tane dene.',
+  // apps/api/src/modules/stickers.ts and messaging.ts
+  'You can keep up to 200 stickers. Remove one to add another.': 'En fazla 200 çıkartma tutabilirsin. Yenisini eklemek için birini kaldır.',
+  'A sticker is made from a photo.': 'Çıkartma bir fotoğraftan yapılır.',
+  'This photo can’t be a sticker.': 'Bu fotoğraf çıkartma olamaz.',
+  'A sticker can be up to 5 MB.': 'Bir çıkartma en fazla 5 MB olabilir.',
+  'That message isn’t a sticker.': 'Bu mesaj bir çıkartma değil.',
+  'A sticker is one photo, with no words.': 'Çıkartma tek bir fotoğraftır, yazı içermez.',
+  "Sticker doesn't exist or isn't visible to you.": 'Bu çıkartma yok ya da sen göremiyorsun.',
 };

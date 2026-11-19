@@ -3837,6 +3837,228 @@ video.chat-att__media {
   font: 500 11px/14px var(--font-sans);
   text-align: end;
 }
+/* The Stickers tab beside the emojis (components/Stickers.tsx). */
+.sticker-panel {
+  display: grid;
+  gap: var(--space-2);
+}
+.sticker-panel__body {
+  height: min(34dvh, 320px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.sticker-panel__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 6px;
+}
+.sticker-panel__make,
+.sticker-panel__sticker {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  min-height: 44px;
+  padding: 6px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+.sticker-panel__make {
+  align-content: center;
+  gap: 4px;
+  border: 1px dashed var(--line);
+  background: var(--surface-sunken);
+  font: 600 12px/16px var(--font-sans);
+  text-align: center;
+}
+.sticker-panel__sticker:hover {
+  background: var(--surface-sunken);
+}
+.sticker-panel__sticker img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+.sticker-panel__sticker--remove img {
+  opacity: 0.7;
+}
+.sticker-panel__x {
+  position: absolute;
+  top: 4px;
+  inset-inline-end: 4px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  background: var(--ink);
+  color: var(--surface);
+}
+.sticker-panel__make:focus-visible,
+.sticker-panel__sticker:focus-visible {
+  outline: 2px solid var(--yapi);
+  outline-offset: 2px;
+}
+.sticker-panel__foot {
+  display: flex;
+  justify-content: flex-end;
+}
+/* A sticker in a chat: the picture on its own, no bubble. */
+.chat-msg--sticker .chat-msg__line .yp-bubble,
+.chat-accent .chat-msg--sticker .yp-bubble--me {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+}
+.chat-msg--sticker .yp-bubble__time {
+  display: table;
+  margin-inline-start: auto;
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--ink-muted);
+}
+.chat-sticker {
+  display: block;
+  width: 150px;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.chat-sticker--button {
+  cursor: pointer;
+  border-radius: var(--radius-md);
+}
+.chat-sticker--button:focus-visible {
+  outline: 2px solid var(--yapi);
+  outline-offset: 2px;
+}
+.chat-sticker__img {
+  display: block;
+  width: 150px;
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  object-fit: contain;
+}
+.sticker-view {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+  padding-bottom: var(--space-2);
+}
+.sticker-view__img {
+  width: min(220px, 60vw);
+  aspect-ratio: 1;
+  object-fit: contain;
+}
+.sticker-view__have {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--ink-muted);
+}
+/* The sticker maker. The checks show where the sticker will be see-through. */
+.sticker-maker {
+  display: grid;
+  gap: var(--space-3);
+  padding-bottom: var(--space-2);
+}
+.sticker-maker__file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.sticker-maker__stage {
+  display: grid;
+  place-items: center;
+}
+.sticker-maker__canvas {
+  width: min(280px, 100%);
+  aspect-ratio: 1;
+  border-radius: var(--radius-md);
+  background: repeating-conic-gradient(var(--surface-sunken) 0 25%, var(--surface) 0 50%) 0 0 / 24px 24px;
+  touch-action: none;
+  cursor: grab;
+}
+.sticker-maker__canvas:active {
+  cursor: grabbing;
+}
+.sticker-maker__canvas:focus-visible {
+  outline: 2px solid var(--yapi);
+  outline-offset: 3px;
+}
+.sticker-maker__hint {
+  margin: 0;
+  color: var(--ink-muted);
+  font: 500 13px/18px var(--font-sans);
+  text-align: center;
+}
+.sticker-maker__animated {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+.sticker-maker__animated p,
+.sticker-maker__problem {
+  margin: 0;
+}
+.sticker-maker__problem {
+  color: var(--danger, var(--ink));
+}
+.sticker-maker__shapes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.sticker-maker__shapes legend {
+  margin-bottom: var(--space-1);
+  font: 600 14px/20px var(--font-sans);
+}
+.sticker-maker__shape {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+}
+.sticker-maker__shape:has(input:checked) {
+  border-color: var(--yapi);
+  background: var(--surface-sunken);
+}
+.sticker-maker__shape:has(input:focus-visible) {
+  outline: 2px solid var(--yapi);
+  outline-offset: 2px;
+}
+.sticker-maker__zoom {
+  width: 100%;
+  min-height: 44px;
+  accent-color: var(--yapi);
+}
+.sticker-maker__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
 /* Where a phone's keyboard would be, under the message box. */
 .emoji-dock {
   scroll-margin-bottom: calc(72px + env(safe-area-inset-bottom, 0px));

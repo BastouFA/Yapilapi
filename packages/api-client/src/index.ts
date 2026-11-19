@@ -1,4 +1,5 @@
 import type {
+  Sticker,
   BrowserAccount,
   CaptionErrorCode,
   MediaEditErrorCode,
@@ -864,6 +865,17 @@ export function createClient(opts: ClientOptions) {
       send: (url: string, title?: string) =>
         post<{ media: { id: string; kind: 'image'; url: string; altText: string | null } }>('/v1/gifs/send', { url, title }),
     },
+    /**
+     * Your stickers for chats, newest first (up to `max`). `add` makes one of your photos (an upload)
+     * a sticker; `save` keeps a sticker someone sent in a chat (a copy of your own); `remove` takes
+     * one off your list. Send one with conversations.send(…, [{ mediaId }], { sticker: true }).
+     */
+    stickers: {
+      list: () => get<{ items: Sticker[]; max: number }>('/v1/stickers'),
+      add: (mediaId: string) => post<{ sticker: Sticker }>('/v1/stickers', { mediaId }),
+      save: (messageId: string) => post<{ sticker: Sticker }>('/v1/stickers/save', { messageId }),
+      remove: (id: string) => del<{ ok: true }>(`/v1/stickers/${id}`),
+    },
     media: {
       /**
        * `viewOnce`: stored privately for a view-once chat message (no public address; url is empty).
@@ -1197,7 +1209,7 @@ export function createClient(opts: ClientOptions) {
         body: string,
         clientId?: string,
         attachments: { mediaId: string; name?: string }[] = [],
-        o: { kind?: 'message' | 'yap'; viewOnce?: boolean; replyToId?: string } = {},
+        o: { kind?: 'message' | 'yap'; viewOnce?: boolean; replyToId?: string; sticker?: boolean } = {},
       ) => post<{ message: Message; notice?: string; noticeCode?: NoticeCode }>(`/v1/conversations/${id}/messages`, { body, clientId, attachments, ...o }),
       /** Text search in this chat (messages you can see, since you joined), newest first. */
       search: (id: string, q: string, cursor?: string) => get<Page<Message>>(`/v1/conversations/${id}/search${qs({ q, cursor })}`),

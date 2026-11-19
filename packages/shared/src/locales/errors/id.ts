@@ -1319,4 +1319,12 @@ export const id: Record<string, string> = {
   'GIFs are not available.': 'GIF tidak tersedia.',
   'That GIF can’t be sent.': 'GIF itu tidak dapat dikirim.',
   "That GIF couldn't be sent. Try another one.": 'GIF itu tidak dapat dikirim. Coba yang lain.',
+  // apps/api/src/modules/stickers.ts and messaging.ts
+  'You can keep up to 200 stickers. Remove one to add another.': 'Kamu bisa menyimpan hingga 200 stiker. Hapus satu untuk menambahkan yang lain.',
+  'A sticker is made from a photo.': 'Stiker dibuat dari foto.',
+  'This photo can’t be a sticker.': 'Foto ini tidak bisa dijadikan stiker.',
+  'A sticker can be up to 5 MB.': 'Stiker maksimal 5 MB.',
+  'That message isn’t a sticker.': 'Pesan itu bukan stiker.',
+  'A sticker is one photo, with no words.': 'Stiker adalah satu foto, tanpa tulisan.',
+  "Sticker doesn't exist or isn't visible to you.": 'Stiker ini tidak ada atau tidak terlihat olehmu.',
 };

@@ -1311,4 +1311,12 @@ export const vi: Record<string, string> = {
   'GIFs are not available.': 'GIF không khả dụng.',
   'That GIF can’t be sent.': 'Không thể gửi GIF này.',
   "That GIF couldn't be sent. Try another one.": 'Không gửi được GIF này. Hãy thử GIF khác.',
+  // apps/api/src/modules/stickers.ts and messaging.ts
+  'You can keep up to 200 stickers. Remove one to add another.': 'Bạn có thể giữ tối đa 200 nhãn dán. Hãy xóa một nhãn dán để thêm nhãn dán khác.',
+  'A sticker is made from a photo.': 'Nhãn dán được tạo từ một bức ảnh.',
+  'This photo can’t be a sticker.': 'Ảnh này không thể làm nhãn dán.',
+  'A sticker can be up to 5 MB.': 'Nhãn dán tối đa 5 MB.',
+  'That message isn’t a sticker.': 'Tin nhắn đó không phải nhãn dán.',
+  'A sticker is one photo, with no words.': 'Nhãn dán là một ảnh duy nhất, không kèm chữ.',
+  "Sticker doesn't exist or isn't visible to you.": 'Nhãn dán này không tồn tại hoặc bạn không xem được.',
 };

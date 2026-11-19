@@ -1259,4 +1259,12 @@ export const zh: Record<string, string> = {
   'GIFs are not available.': 'GIF 不可用。',
   'That GIF can’t be sent.': '无法发送此 GIF。',
   "That GIF couldn't be sent. Try another one.": '此 GIF 发送失败。请换一个试试。',
+  // apps/api/src/modules/stickers.ts and messaging.ts
+  'You can keep up to 200 stickers. Remove one to add another.': '你最多可以保留 200 个贴纸。移除一个后再添加新的。',
+  'A sticker is made from a photo.': '贴纸需要用照片制作。',
+  'This photo can’t be a sticker.': '这张照片不能做成贴纸。',
+  'A sticker can be up to 5 MB.': '贴纸最大为 5 MB。',
+  'That message isn’t a sticker.': '这条消息不是贴纸。',
+  'A sticker is one photo, with no words.': '贴纸只能是一张照片，不能带文字。',
+  "Sticker doesn't exist or isn't visible to you.": '这个贴纸不存在，或你无法查看。',
 };

@@ -21,12 +21,13 @@ import { flushSync } from 'react-dom';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AIPanel, BottomSheet, Button, ChatBubble, EmptyState, Icon, Menu, Skeleton, Switch, TranslatableText, type MenuAction } from '@yapilapi/design-system';
-import type { ChatGame, Conversation, Message, ScheduledMessage } from '@yapilapi/shared';
+import type { ChatGame, Conversation, Message, ScheduledMessage, Sticker } from '@yapilapi/shared';
 import { patiently } from '@yapilapi/api-client';
 import { api, errorMessage, isGone } from '@/lib/api';
 import { useChatBase } from '@/lib/chat-base';
 import { closeChatNotifications } from '@/lib/push';
 import { GifPicker, useGifsEnabled, type GifResult } from '@/components/GifPicker';
+import { StickerMaker, StickerMessage, StickerPicker, useSaveSticker } from '@/components/Stickers';
 import { withEmoticons } from '@/lib/emoticons';
 import { GroupInfoSheet } from '@/components/GroupInfo';
 import { ReportSheet } from '@/components/PostList';
@@ -126,9 +127,11 @@ export default function ChatPage() {
   const composer = useRef<HTMLTextAreaElement>(null);
   // The emoji panel, where a phone's keyboard would be. Where the caret goes after an emoji goes in.
   const [emojiOpen, setEmojiOpen] = useState(false);
-  // The panel under the message box: emojis, or GIFs when the server has them.
-  const [dockTab, setDockTab] = useState<'emoji' | 'gif'>('emoji');
+  // The panel under the message box: emojis, your stickers, or GIFs when the server has them.
+  const [dockTab, setDockTab] = useState<'emoji' | 'sticker' | 'gif'>('emoji');
   const gifsOn = useGifsEnabled();
+  const [stickerMaker, setStickerMaker] = useState(false);
+  const saveSticker = useSaveSticker();
   const emojiDock = useRef<HTMLDivElement>(null);
   // It opens under the message box, which can be the bottom of the screen.
   useEffect(() => {
@@ -497,7 +500,17 @@ export default function ChatPage() {
     return sendMedia(t('gif.sending'), () => api.gifs.send(g.url, g.title || undefined));
   }
 
-  async function sendMedia(label: string, store: () => Promise<{ media: { id: string } }>, o: { kind?: 'yap'; viewOnce?: boolean } = {}): Promise<boolean> {
+  /** One of your stickers from the Stickers tab: its photo, sent as a sticker. */
+  function sendSticker(s: Sticker) {
+    setEmojiOpen(false);
+    return sendMedia(t('sticker.sending'), async () => ({ media: { id: s.media.id } }), { sticker: true });
+  }
+
+  async function sendMedia(
+    label: string,
+    store: () => Promise<{ media: { id: string } }>,
+    o: { kind?: 'yap'; viewOnce?: boolean; sticker?: boolean } = {},
+  ): Promise<boolean> {
     if (!me) return false;
     setUploading(label);
     try {
@@ -721,6 +734,8 @@ export default function ChatPage() {
       actions.push({ label: t('chat.react'), icon: 'heart', onSelect: () => setPickerFor(m.id) });
     }
     if (canForward(m)) actions.push({ label: t('chat.forward'), icon: 'forward', onSelect: () => setForwarding(m) });
+    const keepSticker = saveSticker(m, mine);
+    if (keepSticker) actions.push({ label: t('sticker.add'), icon: 'plus', onSelect: () => void keepSticker() });
     if (editable) actions.push({ label: t('m.chat.edit'), icon: 'create', onSelect: () => startEdit(m) });
     actions.push(...copyActions(m, { t, toast }));
     if (canManage && !m.unsent && !m.moderation)
@@ -1042,12 +1057,17 @@ export default function ChatPage() {
             ) : (
               said
             );
+            // A sticker shows on its own, without a bubble (one taken down or kept from under-18s shows as any photo would).
+            const sticker = !!m.sticker && !m.unsent && m.attachments.length === 1 && !m.attachments[0]!.removed && !m.attachments[0]!.sensitive;
             // A card, a photo or a player needs the width: on phones Reply and React go under it.
             const wide =
               !m.unsent &&
+              !sticker &&
               !!(m.poll || m.list || m.game || m.mix || m.location || m.market || m.offer || m.viewOnce || m.story || m.attachments.length || shared);
             const content = m.unsent ? (
               <span className="chat-unsent">{mine ? t('m.chat.unsentMine') : t('m.chat.unsent')}</span>
+            ) : sticker ? (
+              <StickerMessage message={m} mine={mine} />
             ) : m.poll ? (
               <PollView message={m} meId={me?.id} mine={mine} onPoll={(poll) => patchMessage(m.id, (x) => ({ ...x, poll }))} />
             ) : m.list ? (
@@ -1094,7 +1114,7 @@ export default function ChatPage() {
                 <div
                   id={`msg-${m.id}`}
                   data-message={m.id}
-                  className={`chat-msg${mine ? ' chat-msg--mine' : ''}${wide ? ' chat-msg--wide' : ''}${highlight === m.id ? ' chat-msg--highlight' : ''}${echo === m.id ? ' chat-msg--echo' : ''}`}
+                  className={`chat-msg${mine ? ' chat-msg--mine' : ''}${wide ? ' chat-msg--wide' : ''}${sticker ? ' chat-msg--sticker' : ''}${highlight === m.id ? ' chat-msg--highlight' : ''}${echo === m.id ? ' chat-msg--echo' : ''}`}
                   onContextMenu={(e) => {
                     if (mine || m.unsent) return;
                     e.preventDefault();
@@ -1423,27 +1443,27 @@ export default function ChatPage() {
             composer.current?.focus();
           }}
         >
-          {gifsOn ? (
-            <div className="emoji-dock__tabs" role="tablist">
-              {(['emoji', 'gif'] as const).map((tab) => (
-                <button
-                  key={tab}
-                  type="button"
-                  role="tab"
-                  id={`dock-tab-${tab}`}
-                  aria-controls="dock-panel"
-                  aria-selected={dockTab === tab}
-                  className="emoji-dock__tab"
-                  onClick={() => setDockTab(tab)}
-                >
-                  {tab === 'gif' ? t('gif.tab') : t('emoji.button')}
-                </button>
-              ))}
-            </div>
-          ) : null}
-          <div id="dock-panel" role={gifsOn ? 'tabpanel' : undefined} aria-labelledby={gifsOn ? `dock-tab-${dockTab}` : undefined}>
+          <div className="emoji-dock__tabs" role="tablist">
+            {(gifsOn ? (['emoji', 'sticker', 'gif'] as const) : (['emoji', 'sticker'] as const)).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                role="tab"
+                id={`dock-tab-${tab}`}
+                aria-controls="dock-panel"
+                aria-selected={dockTab === tab}
+                className="emoji-dock__tab"
+                onClick={() => setDockTab(tab)}
+              >
+                {tab === 'gif' ? t('gif.tab') : tab === 'sticker' ? t('sticker.tab') : t('emoji.button')}
+              </button>
+            ))}
+          </div>
+          <div id="dock-panel" role="tabpanel" aria-labelledby={`dock-tab-${dockTab === 'gif' && !gifsOn ? 'emoji' : dockTab}`}>
             {gifsOn && dockTab === 'gif' ? (
               <GifPicker onPick={(g) => void sendGif(g)} />
+            ) : dockTab === 'sticker' ? (
+              <StickerPicker onPick={(s) => void sendSticker(s)} onMake={() => setStickerMaker(true)} />
             ) : (
               <EmojiPicker onPick={(emoji, _from, byPointer) => insertEmoji(emoji, byPointer)} onBackspace={backspaceEmoji} />
             )}
@@ -1453,6 +1473,7 @@ export default function ChatPage() {
       {/* The end of the page, under the Yap button and suggested replies: following the newest
           message scrolls here, so they stay on screen above the message box in a long chat. */}
       <div ref={endRef} aria-hidden />
+      <StickerMaker open={stickerMaker} onClose={() => setStickerMaker(false)} onSaved={() => setStickerMaker(false)} />
       {cameraOpen ? (
         <ChatCamera onClose={() => setCameraOpen(false)} onSend={(f) => sendFile(f, isVideoFile(f) ? t('chat.sendingVideo') : t('chat.sendingPhoto'))} />
       ) : null}

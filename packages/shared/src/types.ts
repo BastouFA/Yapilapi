@@ -741,6 +741,8 @@ export interface MessagePreview {
   viewOnce?: boolean;
   /** A hold-to-talk voice clip. */
   yap?: boolean;
+  /** A sticker (attachmentKind is 'image'). */
+  sticker?: boolean;
 }
 
 /** An offer or a counter-offer on a Market listing, as a one-line preview says it. */
@@ -1045,6 +1047,8 @@ export interface Message {
   transcript?: VoiceTranscript;
   /** Forwarded from another chat: it says so, without saying whose it was. */
   forwarded?: boolean;
+  /** A sticker: its one photo shows without a bubble, and people in the chat can add it to their stickers. */
+  sticker?: boolean;
   /** Present on view-once messages. Their attachment has no url: open it with POST /v1/messages/:id/view-once/open. */
   viewOnce?: ViewOnceInfo;
   /** The message this one replies to. */
@@ -1080,6 +1084,15 @@ export interface Message {
   storyReply?: StoryReply;
   /** On a chat's last message in the inbox: what it is, for its one-line preview in the reader's language. */
   preview?: MessagePreview;
+}
+
+/** One of your stickers (GET /v1/stickers), to send from the Stickers tab. */
+export interface Sticker {
+  id: string;
+  media: { id: string; url: string; thumbUrl: string | null; mime: string | null; width: number | null; height: number | null; sizeBytes: number | null };
+  /** Saved from a chat: the photo it was copied from (a message's attachment mediaId), so the app can say it's already yours. */
+  fromMediaId: string | null;
+  createdAt: string;
 }
 
 export interface Community {

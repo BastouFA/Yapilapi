@@ -619,6 +619,8 @@ export const sendMessageSchema = z
      * the reply, and the message says what it answers (`Message.storyReply`).
      */
     storyReplyTo: uuid.optional(),
+    /** A sticker: one photo (one of your stickers), no words. It shows without a bubble, and others can save it. */
+    sticker: z.boolean().default(false),
   })
   .refine((v) => v.body.length > 0 || v.attachments.length > 0 || !!v.storyId, { message: 'Write a message or attach a file.', path: ['body'] });
 

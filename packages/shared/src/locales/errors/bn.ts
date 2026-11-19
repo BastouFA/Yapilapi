@@ -1307,4 +1307,12 @@ export const bn: Record<string, string> = {
   'GIFs are not available.': 'GIF উপলব্ধ নেই।',
   'That GIF can’t be sent.': 'এই GIF পাঠানো যাবে না।',
   "That GIF couldn't be sent. Try another one.": 'এই GIF পাঠানো যায়নি। অন্য একটি চেষ্টা করুন।',
+  // apps/api/src/modules/stickers.ts and messaging.ts
+  'You can keep up to 200 stickers. Remove one to add another.': 'আপনি সর্বোচ্চ 200টি স্টিকার রাখতে পারেন। নতুন যোগ করতে একটি সরান।',
+  'A sticker is made from a photo.': 'স্টিকার ছবি থেকে বানানো হয়।',
+  'This photo can’t be a sticker.': 'এই ছবিটি স্টিকার হতে পারে না।',
+  'A sticker can be up to 5 MB.': 'একটি স্টিকার সর্বোচ্চ 5 MB হতে পারে।',
+  'That message isn’t a sticker.': 'এই বার্তাটি স্টিকার নয়।',
+  'A sticker is one photo, with no words.': 'স্টিকার মানে একটি মাত্র ছবি, কোনো লেখা ছাড়া।',
+  "Sticker doesn't exist or isn't visible to you.": 'এই স্টিকারটি নেই বা আপনি এটি দেখতে পারবেন না।',
 };

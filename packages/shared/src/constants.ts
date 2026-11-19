@@ -222,6 +222,12 @@ export const IMAGE_ACCEPT = 'image/jpeg,image/png,image/gif,image/webp,image/hei
 export const VIDEO_ACCEPT = 'video/*,.mov,.mkv,.avi,.3gp,.3g2,.m4v,.mpg,.mpeg,.ts,.webm';
 export const MEDIA_ACCEPT = `${IMAGE_ACCEPT},${VIDEO_ACCEPT}`;
 export const AUDIO_ACCEPT = 'audio/*,.m4a,.mp3,.aac,.wav,.ogg,.oga,.opus,.flac,.amr,.weba';
+/** Stickers in chats: how many each person can keep, the largest file one can be, and the size the app makes them. */
+export const STICKER_MAX = 200;
+export const STICKER_MAX_BYTES = 5 * 1024 * 1024;
+export const STICKER_SIZE = 512;
+/** A sticker's caption, written on it in the maker. */
+export const STICKER_CAPTION_MAX = 40;
 
 /**
  * Audio posts: one recording on its own (a voice note, a song you made, a clip of a talk), up to 5

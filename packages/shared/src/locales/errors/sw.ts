@@ -1421,4 +1421,12 @@ export const sw: Record<string, string> = {
   'GIFs are not available.': 'GIF hazipatikani.',
   'That GIF can’t be sent.': 'GIF hiyo haiwezi kutumwa.',
   "That GIF couldn't be sent. Try another one.": 'GIF hiyo haikuweza kutumwa. Jaribu nyingine.',
+  // apps/api/src/modules/stickers.ts and messaging.ts
+  'You can keep up to 200 stickers. Remove one to add another.': 'Unaweza kuweka hadi vibandiko 200. Ondoa kimoja ili kuongeza kingine.',
+  'A sticker is made from a photo.': 'Kibandiko hutengenezwa kutoka kwa picha.',
+  'This photo can’t be a sticker.': 'Picha hii haiwezi kuwa kibandiko.',
+  'A sticker can be up to 5 MB.': 'Kibandiko kinaweza kuwa hadi MB 5.',
+  'That message isn’t a sticker.': 'Ujumbe huo si kibandiko.',
+  'A sticker is one photo, with no words.': 'Kibandiko ni picha moja, bila maneno.',
+  "Sticker doesn't exist or isn't visible to you.": 'Kibandiko hiki hakipo au huwezi kukiona.',
 };

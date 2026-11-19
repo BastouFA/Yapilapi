@@ -1406,4 +1406,12 @@ export const yo: Record<string, string> = {
   'GIFs are not available.': 'Àwọn GIF kò sí lárọ̀ọ́wọ́tó.',
   'That GIF can’t be sent.': 'A kò le fi GIF yìí ránṣẹ́.',
   "That GIF couldn't be sent. Try another one.": 'A kò le fi GIF yìí ránṣẹ́. Gbìyànjú òmíràn.',
+  // apps/api/src/modules/stickers.ts and messaging.ts
+  'You can keep up to 200 stickers. Remove one to add another.': 'O lè tọ́jú tó sítíkà 200. Yọ ọ̀kan kúrò kí o tó fi òmíràn kún un.',
+  'A sticker is made from a photo.': 'Láti inú fọ́tò ni a ti ń ṣe sítíkà.',
+  'This photo can’t be a sticker.': 'Fọ́tò yìí kò le di sítíkà.',
+  'A sticker can be up to 5 MB.': 'Sítíkà kan lè tó MB 5.',
+  'That message isn’t a sticker.': 'Ìfiránṣẹ́ yẹn kì í ṣe sítíkà.',
+  'A sticker is one photo, with no words.': 'Sítíkà jẹ́ fọ́tò kan ṣoṣo, láìsí ọ̀rọ̀.',
+  "Sticker doesn't exist or isn't visible to you.": 'Sítíkà yìí kò sí tàbí o kò lè rí i.',
 };

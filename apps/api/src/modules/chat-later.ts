@@ -41,6 +41,7 @@ export interface ChatLaterHelpers {
       clientId?: string;
       kind: 'message' | 'yap';
       viewOnce: boolean;
+      sticker: boolean;
       storyId?: string;
     },
   ) => Promise<{ message: Message; notice?: string }>;
@@ -123,7 +124,7 @@ export function registerChatLater(app: FastifyInstance, ctx: AppContext, h: Chat
       s.sender_id,
     ]);
     if (!member.rowCount) throw new AppError(403, 'not_member', 'You’re no longer in this chat.');
-    const input = { body: s.body as string, attachments: [], clientId: `later:${s.id}`, kind: 'message' as const, viewOnce: false };
+    const input = { body: s.body as string, attachments: [], clientId: `later:${s.id}`, kind: 'message' as const, viewOnce: false, sticker: false };
     const send = (replyToId?: string) =>
       h.sendMessage({ id: s.sender_id, birthDate: u.birth_date }, s.conversation_id, { ...input, ...(replyToId ? { replyToId } : {}) });
     let out: { message: Message };

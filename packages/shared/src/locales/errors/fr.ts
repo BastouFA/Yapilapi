@@ -1442,4 +1442,12 @@ export const fr: Record<string, string> = {
   'GIFs are not available.': 'Les GIF ne sont pas disponibles.',
   'That GIF can’t be sent.': 'Ce GIF ne peut pas être envoyé.',
   "That GIF couldn't be sent. Try another one.": 'Ce GIF n’a pas pu être envoyé. Essaie-en un autre.',
+  // apps/api/src/modules/stickers.ts and messaging.ts
+  'You can keep up to 200 stickers. Remove one to add another.': 'Tu peux garder jusqu’à 200 stickers. Retires-en un pour en ajouter un autre.',
+  'A sticker is made from a photo.': 'Un sticker se fait à partir d’une photo.',
+  'This photo can’t be a sticker.': 'Cette photo ne peut pas devenir un sticker.',
+  'A sticker can be up to 5 MB.': 'Un sticker peut faire jusqu’à 5 Mo.',
+  'That message isn’t a sticker.': 'Ce message n’est pas un sticker.',
+  'A sticker is one photo, with no words.': 'Un sticker, c’est une seule photo, sans texte.',
+  "Sticker doesn't exist or isn't visible to you.": 'Ce sticker n’existe pas ou tu ne peux pas le voir.',
 };
