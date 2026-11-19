@@ -51,6 +51,13 @@ describe('Stripe provider', () => {
     expect(provider.publicConfig()).toEqual({ provider: 'stripe', publishableKey: 'pk_test_x' });
   });
 
+  it('refuses every event while the signing secret is still a placeholder', () => {
+    const placeholder = stripePaymentProvider({ secretKey: 'sk_test_offline', webhookSecret: () => 'pending', publishableKey: 'pk_test_x' });
+    const body = event('payment_intent.succeeded', { id: 'pi_1', object: 'payment_intent', amount: 2500, amount_received: 2500, currency: 'usd' });
+    const forged = new Stripe('sk_test_offline').webhooks.generateTestHeaderString({ payload: body, secret: 'pending' });
+    expect(() => placeholder.verifyWebhook(body, { 'stripe-signature': forged })).toThrow(/not set up yet/);
+  });
+
   it('converts zero-decimal currencies back to hundredths and ignores other events', () => {
     const xof = event('payment_intent.succeeded', { id: 'pi_2', object: 'payment_intent', amount: 5000, amount_received: 5000, currency: 'xof' });
     expect(provider.verifyWebhook(xof, { 'stripe-signature': sign(xof) })?.amountCents).toBe(500_000);

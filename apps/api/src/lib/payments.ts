@@ -202,6 +202,10 @@ export function stripePaymentProvider(opts: { secretKey: string; webhookSecret: 
     verifyWebhook(rawBody, headers) {
       const sig = headers['stripe-signature'];
       const secret = typeof opts.webhookSecret === 'function' ? opts.webhookSecret() : opts.webhookSecret;
+      // Until the real signing secret (whsec_…) is known, the configured value can be a
+      // placeholder such as "pending". Anyone could sign with that, so refuse every event:
+      // Stripe retries, and the retry lands once the real secret is in place.
+      if (!secret || !secret.startsWith('whsec_')) throw new Error('Stripe webhook signing secret is not set up yet');
       const event = stripe.webhooks.constructEvent(rawBody, typeof sig === 'string' ? sig : '', secret);
       if (event.type === 'payment_intent.succeeded' || event.type === 'payment_intent.payment_failed') {
         const pi = event.data.object;
