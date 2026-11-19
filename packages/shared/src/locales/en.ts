@@ -7464,6 +7464,8 @@ export const en = {
   'gif.sending': 'Sending GIF…',
   'gif.send': 'Send GIF: {title}',
   'gif.poweredBy': 'Powered by KLIPY',
+  'gif.searchGiphy': 'Search GIPHY',
+  'gif.poweredByGiphy': 'Powered by GIPHY',
 } as const;
 
 export type MessageKey = keyof typeof en;

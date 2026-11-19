@@ -7522,4 +7522,6 @@ export const fr: Catalog = {
   'gif.sending': 'Envoi du GIF…',
   'gif.send': 'Envoyer le GIF : {title}',
   'gif.poweredBy': 'Fourni par KLIPY',
+  'gif.searchGiphy': 'Rechercher sur GIPHY',
+  'gif.poweredByGiphy': 'Fourni par GIPHY',
 };

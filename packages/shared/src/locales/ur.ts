@@ -7471,4 +7471,6 @@ export const ur: Catalog = {
   'gif.sending': 'GIF بھیجا جا رہا ہے…',
   'gif.send': 'GIF بھیجیں: {title}',
   'gif.poweredBy': 'KLIPY کے تعاون سے',
+  'gif.searchGiphy': 'GIPHY میں تلاش کریں',
+  'gif.poweredByGiphy': 'GIPHY کے تعاون سے',
 };

@@ -7498,4 +7498,6 @@ export const nl: Catalog = {
   'gif.sending': 'GIF versturen…',
   'gif.send': 'GIF versturen: {title}',
   'gif.poweredBy': 'Mogelijk gemaakt door KLIPY',
+  'gif.searchGiphy': 'Zoeken op GIPHY',
+  'gif.poweredByGiphy': 'Mogelijk gemaakt door GIPHY',
 };

@@ -7480,4 +7480,6 @@ export const vi: Catalog = {
   'gif.sending': 'Đang gửi GIF…',
   'gif.send': 'Gửi GIF: {title}',
   'gif.poweredBy': 'Được cung cấp bởi KLIPY',
+  'gif.searchGiphy': 'Tìm trên GIPHY',
+  'gif.poweredByGiphy': 'Được cung cấp bởi GIPHY',
 };

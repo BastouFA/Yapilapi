@@ -7510,4 +7510,6 @@ export const id: Catalog = {
   'gif.sending': 'Mengirim GIF…',
   'gif.send': 'Kirim GIF: {title}',
   'gif.poweredBy': 'Didukung oleh KLIPY',
+  'gif.searchGiphy': 'Cari di GIPHY',
+  'gif.poweredByGiphy': 'Didukung oleh GIPHY',
 };

@@ -7468,4 +7468,6 @@ export const hi: Catalog = {
   'gif.sending': 'GIF भेजा जा रहा है…',
   'gif.send': 'GIF भेजें: {title}',
   'gif.poweredBy': 'KLIPY द्वारा संचालित',
+  'gif.searchGiphy': 'GIPHY में खोजें',
+  'gif.poweredByGiphy': 'GIPHY द्वारा संचालित',
 };

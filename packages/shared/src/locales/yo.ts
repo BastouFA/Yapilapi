@@ -7463,4 +7463,6 @@ export const yo: Catalog = {
   'gif.sending': 'Ó ń fi GIF ránṣẹ́…',
   'gif.send': 'Fi GIF ránṣẹ́: {title}',
   'gif.poweredBy': 'Láti ọwọ́ KLIPY',
+  'gif.searchGiphy': 'Wá lórí GIPHY',
+  'gif.poweredByGiphy': 'Láti ọwọ́ GIPHY',
 };

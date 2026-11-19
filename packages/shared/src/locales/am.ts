@@ -7411,4 +7411,6 @@ export const am: Catalog = {
   'gif.sending': 'GIF በመላክ ላይ…',
   'gif.send': 'GIF ላክ፦ {title}',
   'gif.poweredBy': 'በKLIPY የቀረበ',
+  'gif.searchGiphy': 'GIPHY ላይ ይፈልጉ',
+  'gif.poweredByGiphy': 'በGIPHY የቀረበ',
 };

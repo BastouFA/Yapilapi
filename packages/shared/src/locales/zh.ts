@@ -7410,4 +7410,6 @@ export const zh: Catalog = {
   'gif.sending': '正在发送 GIF…',
   'gif.send': '发送 GIF：{title}',
   'gif.poweredBy': '由 KLIPY 提供',
+  'gif.searchGiphy': '搜索 GIPHY',
+  'gif.poweredByGiphy': '由 GIPHY 提供',
 };

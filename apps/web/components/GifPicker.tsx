@@ -8,7 +8,7 @@ import { api } from '@/lib/api';
 export type GifResult = Awaited<ReturnType<typeof api.gifs.list>>['items'][number];
 type Page = Awaited<ReturnType<typeof api.gifs.list>>;
 
-// Whether there are GIFs at all (the server has a KLIPY key), asked once per page load with the
+// Whether there are GIFs at all (the server has a GIPHY or KLIPY key), asked once per page load with the
 // trending ones, which the panel then shows without asking again.
 let first: Promise<Page | null> | null = null;
 let enabled: boolean | null = null;
@@ -42,13 +42,14 @@ export function useGifsEnabled(): boolean {
 }
 
 /**
- * The GIF tab beside the emojis: trending GIFs from KLIPY, or a search. Tapping one sends it
- * (onPick). KLIPY asks that its search box say "Search KLIPY".
+ * The GIF tab beside the emojis: trending GIFs from GIPHY or KLIPY, or a search. Tapping one sends
+ * it (onPick). The search box and the credit name the one the results come from, as each asks.
  */
 export function GifPicker({ onPick }: { onPick: (gif: GifResult) => void }) {
   const { t } = useSession();
   const [query, setQuery] = useState('');
   const [items, setItems] = useState<GifResult[] | null>(null);
+  const [provider, setProvider] = useState<Page['provider']>();
   const [next, setNext] = useState<number | null>(null);
   const [failed, setFailed] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -66,6 +67,7 @@ export function GifPicker({ onPick }: { onPick: (gif: GifResult) => void }) {
             if (n !== asked.current) return;
             setItems(r.items);
             setNext(r.next);
+            setProvider(r.provider);
           },
           () => n === asked.current && setFailed(true),
         );
@@ -92,14 +94,16 @@ export function GifPicker({ onPick }: { onPick: (gif: GifResult) => void }) {
       .finally(() => setLoadingMore(false));
   }
 
+  const giphy = provider === 'giphy';
+  const searchLabel = t(giphy ? 'gif.searchGiphy' : 'gif.search');
   return (
     <div className="gif-panel">
       <input
         className="yp-input gif-panel__search"
         type="search"
         value={query}
-        placeholder={t('gif.search')}
-        aria-label={t('gif.search')}
+        placeholder={searchLabel}
+        aria-label={searchLabel}
         enterKeyHint="search"
         onChange={(e) => setQuery(e.currentTarget.value)}
       />
@@ -143,7 +147,7 @@ export function GifPicker({ onPick }: { onPick: (gif: GifResult) => void }) {
           </Button>
         ) : null}
       </div>
-      <p className="gif-panel__credit">{t('gif.poweredBy')}</p>
+      <p className="gif-panel__credit">{t(giphy ? 'gif.poweredByGiphy' : 'gif.poweredBy')}</p>
     </div>
   );
 }

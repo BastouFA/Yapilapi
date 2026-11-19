@@ -7802,4 +7802,6 @@ export const ar: Catalog = {
   'gif.sending': 'جارٍ إرسال GIF…',
   'gif.send': 'إرسال GIF: {title}',
   'gif.poweredBy': 'مدعوم من KLIPY',
+  'gif.searchGiphy': 'البحث في GIPHY',
+  'gif.poweredByGiphy': 'مدعوم من GIPHY',
 };

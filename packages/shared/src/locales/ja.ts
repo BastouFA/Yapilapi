@@ -7453,4 +7453,6 @@ export const ja: Catalog = {
   'gif.sending': 'GIFを送信中…',
   'gif.send': 'GIFを送信: {title}',
   'gif.poweredBy': 'Powered by KLIPY',
+  'gif.searchGiphy': 'GIPHYで検索',
+  'gif.poweredByGiphy': 'Powered by GIPHY',
 };

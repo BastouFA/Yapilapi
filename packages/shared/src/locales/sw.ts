@@ -7488,4 +7488,6 @@ export const sw: Catalog = {
   'gif.sending': 'Inatuma GIF…',
   'gif.send': 'Tuma GIF: {title}',
   'gif.poweredBy': 'Inaendeshwa na KLIPY',
+  'gif.searchGiphy': 'Tafuta GIPHY',
+  'gif.poweredByGiphy': 'Inaendeshwa na GIPHY',
 };

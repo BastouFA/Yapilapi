@@ -7887,4 +7887,6 @@ export const ru: Catalog = {
   'gif.sending': 'Отправка GIF…',
   'gif.send': 'Отправить GIF: {title}',
   'gif.poweredBy': 'При поддержке KLIPY',
+  'gif.searchGiphy': 'Поиск в GIPHY',
+  'gif.poweredByGiphy': 'При поддержке GIPHY',
 };

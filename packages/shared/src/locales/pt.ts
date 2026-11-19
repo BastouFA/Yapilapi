@@ -7484,4 +7484,6 @@ export const pt: Catalog = {
   'gif.sending': 'A enviar GIF…',
   'gif.send': 'Enviar GIF: {title}',
   'gif.poweredBy': 'Com tecnologia KLIPY',
+  'gif.searchGiphy': 'Pesquisar no GIPHY',
+  'gif.poweredByGiphy': 'Com tecnologia GIPHY',
 };

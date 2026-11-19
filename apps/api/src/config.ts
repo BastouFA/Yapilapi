@@ -46,6 +46,8 @@ const schema = z.object({
   ANTHROPIC_API_KEY: z.string().optional().default(''),
   /** KLIPY (klipy.com), the GIF library behind the GIF tab in chats; without a key there is no GIF tab. */
   KLIPY_API_KEY: z.string().optional().default(''),
+  /** GIPHY (developers.giphy.com): when set, the GIF tab searches GIPHY first, with KLIPY behind it. */
+  GIPHY_API_KEY: z.string().optional().default(''),
   PAYMENTS_PROVIDER: z.enum(['dev', 'stripe']).default('dev'),
   /** Stripe (PAYMENTS_PROVIDER=stripe): secret key, webhook signing secret, and the publishable key the browser uses. */
   STRIPE_SECRET_KEY: z.string().default(''),

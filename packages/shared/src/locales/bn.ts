@@ -7460,4 +7460,6 @@ export const bn: Catalog = {
   'gif.sending': 'GIF পাঠানো হচ্ছে…',
   'gif.send': 'GIF পাঠান: {title}',
   'gif.poweredBy': 'KLIPY দ্বারা চালিত',
+  'gif.searchGiphy': 'GIPHY-তে খুঁজুন',
+  'gif.poweredByGiphy': 'GIPHY দ্বারা চালিত',
 };

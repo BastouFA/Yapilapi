@@ -7519,4 +7519,6 @@ export const zu: Catalog = {
   'gif.sending': 'Ithumela i-GIF…',
   'gif.send': 'Thumela i-GIF: {title}',
   'gif.poweredBy': 'Inikwa amandla yi-KLIPY',
+  'gif.searchGiphy': 'Sesha ku-GIPHY',
+  'gif.poweredByGiphy': 'Inikwa amandla yi-GIPHY',
 };

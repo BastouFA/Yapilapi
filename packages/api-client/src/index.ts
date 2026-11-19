@@ -852,11 +852,12 @@ export function createClient(opts: ClientOptions) {
           })}`,
         ),
     },
-    /** GIFs from KLIPY for chats: trending without `q`. `enabled` false: there's no GIF tab. `send` keeps the chosen one as your own photo. */
+    /** GIFs from GIPHY or KLIPY (`provider`) for chats: trending without `q`. `enabled` false: there's no GIF tab. `send` keeps the chosen one as your own photo. */
     gifs: {
       list: (q?: string, page?: number) =>
         get<{
           enabled: boolean;
+          provider?: 'giphy' | 'klipy';
           items: { id: string; title: string; preview: { url: string; width: number; height: number }; url: string }[];
           next: number | null;
         }>(`/v1/gifs${qs({ q, page })}`),

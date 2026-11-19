@@ -7488,4 +7488,6 @@ export const ha: Catalog = {
   'gif.sending': 'Ana aika GIF…',
   'gif.send': 'Aika GIF: {title}',
   'gif.poweredBy': 'KLIPY ne ke samarwa',
+  'gif.searchGiphy': 'Bincika GIPHY',
+  'gif.poweredByGiphy': 'GIPHY ne ke samarwa',
 };

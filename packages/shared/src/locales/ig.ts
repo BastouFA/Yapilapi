@@ -7471,4 +7471,6 @@ export const ig: Catalog = {
   'gif.sending': 'Na-eziga GIF…',
   'gif.send': 'Ziga GIF: {title}',
   'gif.poweredBy': 'Site na KLIPY',
+  'gif.searchGiphy': 'Chọọ na GIPHY',
+  'gif.poweredByGiphy': 'Site na GIPHY',
 };

@@ -7516,4 +7516,6 @@ export const de: Catalog = {
   'gif.sending': 'GIF wird gesendet…',
   'gif.send': 'GIF senden: {title}',
   'gif.poweredBy': 'Bereitgestellt von KLIPY',
+  'gif.searchGiphy': 'GIPHY durchsuchen',
+  'gif.poweredByGiphy': 'Bereitgestellt von GIPHY',
 };

@@ -7430,4 +7430,6 @@ export const ko: Catalog = {
   'gif.sending': 'GIF 보내는 중…',
   'gif.send': 'GIF 보내기: {title}',
   'gif.poweredBy': 'KLIPY 제공',
+  'gif.searchGiphy': 'GIPHY에서 검색',
+  'gif.poweredByGiphy': 'GIPHY 제공',
 };

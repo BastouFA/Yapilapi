@@ -7493,4 +7493,6 @@ export const es: Catalog = {
   'gif.sending': 'Enviando GIF…',
   'gif.send': 'Enviar GIF: {title}',
   'gif.poweredBy': 'Con la tecnología de KLIPY',
+  'gif.searchGiphy': 'Buscar en GIPHY',
+  'gif.poweredByGiphy': 'Con la tecnología de GIPHY',
 };

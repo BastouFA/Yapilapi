@@ -7474,4 +7474,6 @@ export const tr: Catalog = {
   'gif.sending': 'GIF gönderiliyor…',
   'gif.send': 'GIF gönder: {title}',
   'gif.poweredBy': 'KLIPY tarafından desteklenmektedir',
+  'gif.searchGiphy': 'GIPHY’de ara',
+  'gif.poweredByGiphy': 'GIPHY tarafından desteklenmektedir',
 };
