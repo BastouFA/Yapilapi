@@ -19,6 +19,7 @@ import { api, errorMessage, sharedRequest, WS_URL } from '@/lib/api';
 import { ServerWake } from '@/components/ServerWake';
 import { revealLocale, startLocale, visitorLocale, writeLocaleChoice, writeLocaleHint } from '@/lib/locale-script';
 import { closeChatNotifications } from '@/lib/push';
+import { watchStaleKeyboard } from '@/lib/stale-keyboard';
 import {
   connectionHints,
   dataSaverActive,
@@ -233,6 +234,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [refreshFlags]);
+  // A phone's keyboard that went away and left the page laid out around it (lib/stale-keyboard.ts).
+  useEffect(() => watchStaleKeyboard(), []);
 
   // <html lang> and dir follow the language on screen, before the browser paints it (so Arabic never
   // shows left to right first), and this browser remembers a signed-in reader's for the next page
